@@ -3,16 +3,13 @@
 const games = [
   { name: "8 Ball Pool", tag: "1v1", gradient: "from-teal/30 to-purple/30" },
   { name: "Chess", tag: "1v1", gradient: "from-amber-500/20 to-rose-500/20" },
+  { name: "Connect 4", tag: "1v1", gradient: "from-red-500/30 to-amber-400/30" },
   {
     name: "Mini Golf",
     tag: "Coming Soon",
     gradient: "from-emerald-500/20 to-teal/30",
   },
-  {
-    name: "Penalty Shootout",
-    tag: "Coming Soon",
-    gradient: "from-green-500/20 to-emerald-500/20",
-  },
+  { name: "Reaction Duel", tag: "1v1", gradient: "from-orange-500/30 to-red-500/30" },
   { name: "Darts", tag: "Coming Soon", gradient: "from-purple/20 to-pink-500/20" },
   {
     name: "Card Clash",

@@ -36,9 +36,11 @@ function AnimatedCounter({
   }, [value, duration]);
 
   const formatted =
-    value >= 1000
-      ? (count / 1000).toFixed(count >= 10000 ? 0 : 1) + "K"
-      : count.toString();
+    value >= 10000
+      ? count.toLocaleString()
+      : value >= 1000
+        ? (count / 1000).toFixed(count >= 10000 ? 0 : 1) + "K"
+        : count.toString();
 
   return (
     <>

@@ -14,9 +14,18 @@ const config: Config = {
         teal: "#00E5C7",
         purple: "#7C5CFC",
         "body-gray": "#A1A1AA",
+        // Admin dashboard (distinct from player site)
+        "admin-bg": "#0A0B0F",
+        "admin-card": "#12131A",
+        "admin-accent": "#6366F1",
+        "admin-pink": "#EC4899",
+        "admin-success": "#22C55E",
+        "admin-warning": "#F59E0B",
+        "admin-danger": "#EF4444",
+        "admin-body": "#9CA3AF",
       },
       fontFamily: {
-        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "system-ui", "sans-serif"],
       },
       borderRadius: {
         card: "12px",

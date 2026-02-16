@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ToastProvider } from "@/components/Toast";
+import ConnectionMonitor from "@/components/ConnectionMonitor";
 import "./globals.css";
 
 const inter = Inter({
@@ -21,7 +23,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <ConnectionMonitor />
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

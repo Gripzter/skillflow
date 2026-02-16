@@ -40,3 +40,12 @@ body {
 .delay-2 { transition-delay: 0.2s; }
 .delay-3 { transition-delay: 0.3s; }
 .delay-4 { transition-delay: 0.4s; }
+
+/* Victory celebration glow */
+@keyframes victory-glow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+.victory-glow {
+  animation: victory-glow 1.5s ease-in-out infinite;
+}

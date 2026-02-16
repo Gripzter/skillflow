@@ -1,0 +1,233 @@
+"use client";
+
+import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import AuthLayout from "@/components/AuthLayout";
+import PasswordInput from "@/components/PasswordInput";
+import { useToast } from "@/components/Toast";
+import { createClient } from "@/lib/supabase";
+
+const DEV_ACCESS_CODE = "6174";
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+}
+
+export default function LoginPage() {
+  const router = useRouter();
+  const { showToast } = useToast();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [loading, setLoading] = useState(false);
+
+  const [devSectionOpen, setDevSectionOpen] = useState(false);
+  const [devCode, setDevCode] = useState("");
+  const [devError, setDevError] = useState("");
+  const [devLoading, setDevLoading] = useState(false);
+
+  function validate(): boolean {
+    const newErrors: FormErrors = {};
+
+    if (!email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    if (!password) {
+      newErrors.password = "Password is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      if (!supabase) {
+        showToast(
+          "Authentication is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
+          "error"
+        );
+        setLoading(false);
+        return;
+      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        showToast(error.message, "error");
+      } else {
+        showToast("Welcome back!", "success");
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      showToast("Something went wrong. Please try again.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleDeveloperLogin() {
+    setDevError("");
+    if (!devCode.trim()) {
+      setDevError("Enter developer code");
+      return;
+    }
+    setDevLoading(true);
+    if (devCode.trim() === DEV_ACCESS_CODE) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("skillflow_dev_mode", "true");
+        localStorage.setItem(
+          "skillflow_dev_user",
+          JSON.stringify({
+            username: "Developer",
+            email: "dev@skillflow.com",
+            role: "developer",
+          })
+        );
+      }
+      router.push("/dashboard");
+      router.refresh();
+    } else {
+      setDevError("Invalid developer code");
+      setDevLoading(false);
+    }
+  }
+
+  return (
+    <AuthLayout heading="Welcome back" subtitle="Log in to your account">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        {/* Email */}
+        <div>
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+            }}
+            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray transition-colors focus:outline-none ${
+              errors.email
+                ? "border-red-500/50 focus:border-red-500"
+                : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
+            }`}
+          />
+          {errors.email && <p className="mt-1.5 text-sm text-red-400">{errors.email}</p>}
+        </div>
+
+        {/* Password */}
+        <div>
+          <PasswordInput
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
+            }}
+            error={errors.password}
+          />
+          {errors.password && <p className="mt-1.5 text-sm text-red-400">{errors.password}</p>}
+        </div>
+
+        {/* Forgot password */}
+        <div className="text-right">
+          <Link href="#" className="text-sm text-body-gray hover:text-teal transition-colors">
+            Forgot password?
+          </Link>
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-lg bg-teal py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Logging In...
+            </span>
+          ) : (
+            "Log In"
+          )}
+        </button>
+      </form>
+
+      {/* Developer Access — outside form to avoid nested form hydration error */}
+      <div className="mt-6 border-t border-white/5 pt-4">
+        <button
+          type="button"
+          onClick={() => {
+            setDevSectionOpen((o) => !o);
+            setDevError("");
+            if (!devSectionOpen) setDevCode("");
+          }}
+          className="text-xs text-body-gray hover:text-white/80 transition-colors"
+        >
+          Developer Access
+        </button>
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            devSectionOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="mt-3 rounded-lg border border-purple/20 bg-purple/5 px-3 py-3">
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  placeholder="Enter developer code"
+                  value={devCode}
+                  onChange={(e) => {
+                    setDevCode(e.target.value);
+                    if (devError) setDevError("");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleDeveloperLogin();
+                    }
+                  }}
+                  className="w-full rounded border border-white/10 bg-[#1A1D27] px-3 py-2 text-sm text-white placeholder:text-body-gray focus:border-purple focus:outline-none focus:ring-1 focus:ring-purple font-mono"
+                />
+                {devError && <p className="text-xs text-red-400">{devError}</p>}
+                <button
+                  type="button"
+                  onClick={handleDeveloperLogin}
+                  disabled={devLoading}
+                  className="w-full rounded-lg bg-purple py-2 text-sm font-medium text-white transition-all hover:shadow-purple-glow disabled:opacity-60"
+                >
+                  Developer Login
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-6 text-center text-sm text-body-gray">
+        Don&apos;t have an account?{" "}
+        <Link href="/signup" className="text-teal font-medium hover:underline">
+          Sign up
+        </Link>
+      </p>
+    </AuthLayout>
+  );
+}
