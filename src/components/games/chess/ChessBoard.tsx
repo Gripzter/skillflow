@@ -32,6 +32,8 @@ export interface ChessBoardProps {
   dragging: { square: string; piece: PieceCode; x: number; y: number } | null;
   /** Current turn: "w" | "b" - only that side's pieces are movable */
   turn: "w" | "b";
+  /** When true, render board flipped (black at bottom) for player2 */
+  flipped?: boolean;
 }
 
 export default function ChessBoard({
@@ -47,8 +49,11 @@ export default function ChessBoard({
   onPieceDragEnd,
   dragging,
   turn,
+  flipped = false,
 }: ChessBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  const displayRows = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
+  const displayCols = flipped ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7];
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, square: string, piece: PieceCode | null) => {
@@ -109,8 +114,11 @@ export default function ChessBoard({
     >
       {/* Board grid */}
       <div className="flex flex-col" style={{ width: 20 + squareSize * 8, height: squareSize * 8 + 24 }}>
-        {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
-          <div key={row} className="flex">
+        {displayRows.map((displayRowIdx, rowIdx) => {
+          const boardRow = displayRows[rowIdx];
+          const boardColBase = displayCols[0];
+          return (
+          <div key={boardRow} className="flex">
             {/* Rank label (left side) */}
             <div
               className="flex items-center justify-end pr-1 font-bold"
@@ -119,14 +127,15 @@ export default function ChessBoard({
                 minWidth: 20,
                 height: squareSize,
                 fontSize: 11,
-                color: isLightSquare(0, row) ? DARK_SQUARE : LIGHT_SQUARE,
+                color: isLightSquare(0, boardRow) ? DARK_SQUARE : LIGHT_SQUARE,
               }}
             >
-              {RANKS[row]}
+              {RANKS[boardRow]}
             </div>
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((col) => {
-              const square = indicesToSquare(col, row);
-              const piece = board[row]?.[col] ?? null;
+            {displayCols.map((displayColIdx, colIdx) => {
+              const boardCol = displayCols[colIdx];
+              const square = indicesToSquare(boardCol, boardRow);
+              const piece = board[boardRow]?.[boardCol] ?? null;
               const isLight = isLightSquare(col, row);
               const isSelected = selectedSquare === square;
               const isLegal = legalMoveTargets.includes(square);
@@ -197,22 +206,22 @@ export default function ChessBoard({
               );
             })}
           </div>
-        ))}
+        );})}
         {/* File labels */}
         <div className="flex" style={{ height: 24 }}>
           <div style={{ width: 20, minWidth: 20 }} />
-          {FILES.map((file, col) => (
+          {displayCols.map((boardCol) => (
             <div
-              key={file}
+              key={boardCol}
               className="flex items-center justify-center font-bold"
               style={{
                 width: squareSize,
                 height: 24,
                 fontSize: 11,
-                color: isLightSquare(col, 7) ? DARK_SQUARE : LIGHT_SQUARE,
+                color: isLightSquare(boardCol, flipped ? 0 : 7) ? DARK_SQUARE : LIGHT_SQUARE,
               }}
             >
-              {file}
+              {FILES[boardCol]}
             </div>
           ))}
         </div>

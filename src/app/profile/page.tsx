@@ -4,7 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
-import { getCurrentUser, getMatches, getTransactions, logout as apiLogout } from "@/lib/api";
+import Footer from "@/components/Footer";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 
@@ -128,6 +130,7 @@ export default function ProfilePage() {
   const [isDevMode, setIsDevMode] = useState(false);
   const [matches, setMatches] = useState<StoredMatch[]>([]);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
+  const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
   const [gameTab, setGameTab] = useState<string>("all");
   const [showAllMatches, setShowAllMatches] = useState(false);
 
@@ -147,6 +150,7 @@ export default function ProfilePage() {
         const [matchList, txs] = await Promise.all([getMatches(), getTransactions()]);
         setMatches(matchList);
         setTransactions(txs);
+        setPracticeStats(getPracticeStats(user.username));
       } catch {
         router.push("/login");
       } finally {
@@ -253,7 +257,7 @@ export default function ProfilePage() {
   const innerH = chartH - pad.top - pad.bottom;
 
   return (
-    <div className="min-h-screen bg-charcoal">
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username={username}
@@ -262,8 +266,9 @@ export default function ProfilePage() {
         loggingOut={loggingOut}
         currentPage="profile"
       />
+      <ModeToggleBarContent />
 
-      <main className="mx-auto max-w-[1200px] px-4 pb-16 pt-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Section 1: Profile header */}
         <section
           className="animate-fade-in overflow-hidden rounded-card border border-white/10 bg-gradient-to-br from-[#0D0F14] via-[#151821] to-[#0D0F14]"
@@ -319,9 +324,29 @@ export default function ProfilePage() {
           ))}
         </section>
 
+        {/* Practice Stats */}
+        <section className="mt-8 animate-fade-in rounded-card border border-purple-500/20 bg-purple-500/5 p-6">
+          <h2 className="text-lg font-bold text-purple-300">Practice Stats</h2>
+          <p className="mt-1 text-xs text-body-gray">Free play — no money involved</p>
+          <div className="mt-4 grid grid-cols-3 gap-4">
+            <div className="rounded-lg bg-white/5 p-4">
+              <p className="text-xs text-body-gray">Practice Matches</p>
+              <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceMatchesPlayed}</p>
+            </div>
+            <div className="rounded-lg bg-white/5 p-4">
+              <p className="text-xs text-body-gray">Practice Wins</p>
+              <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceWins}</p>
+            </div>
+            <div className="rounded-lg bg-white/5 p-4">
+              <p className="text-xs text-body-gray">Practice Win Rate</p>
+              <p className="mt-1 text-xl font-bold text-purple-400">{practiceStats.practiceWinRate}%</p>
+            </div>
+          </div>
+        </section>
+
         {/* Section 3: Game stats */}
         <section className="mt-10 animate-fade-in">
-          <h2 className="text-xl font-bold text-white">Game Stats</h2>
+          <h2 className="text-xl font-bold text-white">Competitive Game Stats</h2>
           <div className="mt-3 flex gap-1 rounded-lg bg-white/5 p-1">
             {GAME_TABS.map((tab) => (
               <button
@@ -570,6 +595,7 @@ export default function ProfilePage() {
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }

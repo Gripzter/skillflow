@@ -4,10 +4,31 @@
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 
 body {
   @apply bg-charcoal text-white antialiased;
+  overscroll-behavior: none;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input,
+button,
+select,
+textarea {
+  font-size: 16px;
+}
+
+button,
+a,
+input[type="button"],
+input[type="submit"] {
+  touch-action: manipulation;
 }
 
 /* Subtle grid background pattern */
@@ -48,4 +69,9 @@ body {
 }
 .victory-glow {
   animation: victory-glow 1.5s ease-in-out infinite;
+}
+
+/* Generic active press state helper */
+.pressable:active {
+  transform: scale(0.97);
 }

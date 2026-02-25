@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
 import {
   getCurrentUser,
   getMatch,
   completeMatchAndSettle,
+  updateMatch as apiUpdateMatch,
   type StoredMatch,
 } from "@/lib/api";
 import { updateMatch } from "@/lib/matchmaking";
@@ -15,10 +17,15 @@ import { getConnectionMetrics } from "@/lib/connection-tester";
 import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
 import type { ConnectionSnapshot } from "@/lib/connection-logger";
 import { ConnectionCheckWarning, ConnectionCheckUnrecommended } from "@/components/ConnectionCheckModal";
+import { useMultiplayer } from "@/hooks/useMultiplayer";
 import EightBallPool from "@/components/games/EightBallPool";
 import Chess from "@/components/games/Chess";
 import ConnectFour from "@/components/games/ConnectFour";
 import ReactionDuel from "@/components/games/ReactionDuel";
+import MemoryMatch from "@/components/games/MemoryMatch";
+import SpellingBee from "@/components/games/SpellingBee";
+
+const OPPONENT_RECONNECT_SEC = 30;
 
 type Outcome = null | "victory" | "defeat" | "draw";
 
@@ -28,6 +35,7 @@ export default function MatchPage() {
   const matchId = (params?.id as string) || "";
 
   const [username, setUsername] = useState<string>("Player");
+  const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -37,6 +45,31 @@ export default function MatchPage() {
   const [forfeitConfirm, setForfeitConfirm] = useState(false);
   const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
   const [connectionCheckState, setConnectionCheckState] = useState<"checking" | "ok" | "warning" | "unrecommended">("checking");
+  const [opponentDisconnectedAt, setOpponentDisconnectedAt] = useState<number | null>(null);
+  const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
+  const [wonByForfeit, setWonByForfeit] = useState(false);
+  const [incomingEvent, setIncomingEvent] = useState<Record<string, unknown> | null>(null);
+  const forfeitHandledRef = useRef(false);
+  const inProgressSetRef = useRef(false);
+  const matchRef = useRef<StoredMatch | null>(null);
+  matchRef.current = match;
+
+  const {
+    connected: realtimeConnected,
+    opponentConnected,
+    sendGameEvent,
+  } = useMultiplayer({
+    matchId: match?.isRealMultiplayer ? matchId : "",
+    userId,
+    onGameEvent: (event) => {
+      const e = event as { type?: string };
+      if (e.type === "opponent_disconnected") {
+        setOpponentDisconnectedAt((t) => (t === null ? Date.now() : t));
+        return;
+      }
+      setIncomingEvent(event as Record<string, unknown>);
+    },
+  });
 
   useEffect(() => {
     async function load() {
@@ -47,6 +80,7 @@ export default function MatchPage() {
           return;
         }
         setUsername(user.username);
+        setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
         const m = await getMatch(matchId);
         if (!m) {
@@ -96,6 +130,50 @@ export default function MatchPage() {
     return () => clearInterval(t);
   }, [match]);
 
+  // Clear disconnect state when opponent reconnects
+  useEffect(() => {
+    if (opponentConnected) {
+      setOpponentDisconnectedAt(null);
+      setReconnectCountdown(null);
+    }
+  }, [opponentConnected]);
+
+  // Real multiplayer: when both connected, set match status to in_progress in DB (once)
+  useEffect(() => {
+    if (!match?.isRealMultiplayer || !realtimeConnected || !opponentConnected) return;
+    if (inProgressSetRef.current) return;
+    inProgressSetRef.current = true;
+    apiUpdateMatch(matchId, { status: "in_progress" });
+  }, [match?.isRealMultiplayer, matchId, realtimeConnected, opponentConnected]);
+
+  // Opponent disconnect: 30s countdown then forfeit win
+  useEffect(() => {
+    if (!match?.isRealMultiplayer || forfeitHandledRef.current) return;
+    if (opponentDisconnectedAt === null) {
+      setReconnectCountdown(null);
+      return;
+    }
+    setReconnectCountdown(OPPONENT_RECONNECT_SEC);
+    const interval = setInterval(() => {
+      setReconnectCountdown((c) => {
+        if (c === null || c <= 1) {
+          clearInterval(interval);
+          const m = matchRef.current;
+          if (!forfeitHandledRef.current && m) {
+            forfeitHandledRef.current = true;
+            setWonByForfeit(true);
+            completeMatchAndSettle(m, "player1").catch(() => {});
+            dispatchWalletUpdated();
+            setOutcome("victory");
+          }
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [match?.isRealMultiplayer, opponentDisconnectedAt]);
+
   const handleWin = useCallback(async () => {
     if (!match) return;
     try {
@@ -129,10 +207,13 @@ export default function MatchPage() {
     setOutcome("draw");
   }, [match]);
 
-  const handleForfeitConfirm = useCallback(() => {
+  const handleForfeitConfirm = useCallback(async () => {
+    if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
+      await sendGameEvent({ type: "resign" }).catch(() => {});
+    }
     handleLoss();
     setForfeitConfirm(false);
-  }, [handleLoss]);
+  }, [handleLoss, match?.isRealMultiplayer, match?.gameType, sendGameEvent]);
 
   const handleConnectionContinue = useCallback(
     (ack: { timestamp: string; rating: "warning" | "unrecommended" } | null) => {
@@ -209,6 +290,14 @@ export default function MatchPage() {
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   const shortId = match.id.slice(0, 8);
+  const isRealMultiplayer = match.isRealMultiplayer ?? false;
+  const myRole: "player1" | "player2" =
+    isRealMultiplayer && match.player1Id && match.player2Id
+      ? match.player1Id === userId
+        ? "player1"
+        : "player2"
+      : "player1";
+  const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
 
   return (
     <div className="flex min-h-screen flex-col bg-charcoal">
@@ -220,20 +309,30 @@ export default function MatchPage() {
         loggingOut={loggingOut}
         currentPage="play"
       />
+      <ModeToggleBarContent />
 
       {/* Top bar */}
       <div className="border-b border-white/5 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-white">
-            {match.gameType === "chess"
-              ? "Chess ♟"
-              : match.gameType === "connect-4"
-                ? "Connect 4 🔴🟡"
-                : match.gameType === "reaction-duel"
-                  ? "Reaction Duel ⚡"
-                  : match.gameDisplayName}
+              {match.gameType === "chess"
+                ? "Chess ♟"
+                : match.gameType === "connect-4"
+                  ? "Connect 4 🔴🟡"
+                  : match.gameType === "reaction-duel"
+                    ? "Reaction Duel ⚡"
+                    : match.gameType === "memory-match"
+                      ? "Memory Match 🧠"
+                      : match.gameType === "spelling-bee"
+                        ? "Spelling Bee 🐝"
+                        : match.gameDisplayName}
             </span>
+            {match.isPractice && (
+              <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+                PRACTICE
+              </span>
+            )}
             <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
               ✓ Connection OK
             </span>
@@ -243,8 +342,27 @@ export default function MatchPage() {
         </div>
       </div>
 
+      {/* Waiting for opponent (real multiplayer) */}
+      {waitingForOpponent && (
+        <main className="mx-auto flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+          <div className="h-12 w-12 animate-pulse rounded-full border-2 border-teal/50" />
+          <p className="mt-4 text-lg font-semibold text-white">Waiting for opponent to connect...</p>
+          <p className="mt-1 text-body-gray">They have joined the match and are loading the game.</p>
+        </main>
+      )}
+
+      {/* Opponent disconnected countdown */}
+      {isRealMultiplayer && opponentDisconnectedAt !== null && reconnectCountdown !== null && !outcome && (
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-charcoal/90 px-4">
+          <p className="text-lg font-semibold text-amber-400">Opponent disconnected...</p>
+          <p className="mt-2 text-body-gray">
+            Waiting {reconnectCountdown}s for reconnection. If they don&apos;t return, you win by forfeit.
+          </p>
+        </div>
+      )}
+
       {/* Main: Chess and Connect 4 use full-width layout; Pool uses 3 columns */}
-      {match.gameType === "chess" ? (
+      {!waitingForOpponent && match.gameType === "chess" ? (
         <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
             <div className="card-border flex min-h-[500px] flex-1 flex-col rounded-card bg-card p-4">
@@ -256,15 +374,23 @@ export default function MatchPage() {
                   else handleLoss();
                 }}
                 onGameDraw={handleDraw}
-                isPlayer2Bot={true}
+                isPlayer2Bot={!isRealMultiplayer}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
               />
             </div>
           ) : null}
         </main>
-      ) : match.gameType === "connect-4" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+      ) : !waitingForOpponent && match.gameType === "connect-4" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-[500px] flex-1 flex-col rounded-card bg-card p-4">
+            <div
+              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ height: "calc(100vh - 160px)" }}
+            >
               <ConnectFour
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
@@ -273,12 +399,17 @@ export default function MatchPage() {
                   else handleLoss();
                 }}
                 onGameDraw={handleDraw}
-                isPlayer2Bot={true}
+                isPlayer2Bot={!isRealMultiplayer}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
               />
             </div>
           ) : null}
         </main>
-      ) : match.gameType === "reaction-duel" ? (
+      ) : !waitingForOpponent && match.gameType === "reaction-duel" ? (
         <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
             <div className="card-border flex min-h-[400px] flex-1 flex-col rounded-card bg-card p-4">
@@ -290,12 +421,62 @@ export default function MatchPage() {
                   else handleLoss();
                 }}
                 onGameDraw={handleDraw}
-                isPlayer2Bot={true}
+                isPlayer2Bot={!isRealMultiplayer}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
               />
             </div>
           ) : null}
         </main>
-      ) : (
+      ) : !waitingForOpponent && match.gameType === "memory-match" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ height: "calc(100vh - 160px)" }}
+            >
+              <MemoryMatch
+                player1={{ username: match.player1.username, rating: match.player1.rating }}
+                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                onGameEnd={(winner) => {
+                  if (winner === "player1") handleWin();
+                  else handleLoss();
+                }}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "spelling-bee" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ minHeight: "calc(100vh - 160px)" }}
+            >
+              <SpellingBee
+                player1={{ username: match.player1.username, rating: match.player1.rating }}
+                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                onGameEnd={(winner) => {
+                  if (winner === "player1") handleWin();
+                  else handleLoss();
+                }}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent ? (
         <main className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-6 md:grid-cols-[1fr_2fr_1fr]">
           <div className="card-border rounded-card bg-card p-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-2xl font-bold text-white">
@@ -315,7 +496,7 @@ export default function MatchPage() {
                   if (winner === "player1") handleWin();
                   else handleLoss();
                 }}
-                isPlayer2Bot={true}
+                isPlayer2Bot={!isRealMultiplayer}
               />
             ) : match.status === "in_progress" && !outcome ? (
               <>
@@ -345,22 +526,26 @@ export default function MatchPage() {
             </div>
             <p className="mt-2 font-medium text-white">
               {match.player2.username}
-              <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                🤖 BOT
-              </span>
+              {!isRealMultiplayer && (
+                <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
+                  🤖 BOT
+                </span>
+              )}
             </p>
             <p className="text-xs text-body-gray">Rating {match.player2.rating}</p>
             <p className="mt-4 text-3xl font-bold text-white">0</p>
             <p className="text-xs text-body-gray">Score</p>
           </div>
         </main>
-      )}
+      ) : null}
 
       {/* Bottom bar */}
       <div className="border-t border-white/5 px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4">
           <p className="text-sm text-body-gray">
-            Stake: ${match.stakeAmount.toFixed(2)} each • Winner gets: ${match.winnerPayout.toFixed(2)} • Platform fee: ${match.platformFee.toFixed(2)}
+            {match.isPractice
+              ? "Practice Match — No stakes"
+              : `Stake: $${match.stakeAmount.toFixed(2)} each • Winner gets: $${match.winnerPayout.toFixed(2)} • Platform fee: $${match.platformFee.toFixed(2)}`}
           </p>
           <div className="flex gap-2">
             <button
@@ -373,9 +558,12 @@ export default function MatchPage() {
               <button
                 type="button"
                 onClick={() => setForfeitConfirm(true)}
-                className="rounded-lg border border-red-500/50 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                className={match.isPractice
+                  ? "rounded-lg border border-white/20 px-4 py-2 text-sm text-body-gray hover:bg-white/10"
+                  : "rounded-lg border border-red-500/50 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                }
               >
-                Forfeit Match
+                {match.isPractice ? "Leave Match" : "Forfeit Match"}
               </button>
             )}
           </div>
@@ -385,10 +573,20 @@ export default function MatchPage() {
       {/* Victory overlay */}
       {outcome === "victory" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
-          <div className="absolute inset-0 bg-gradient-to-t from-teal/10 via-transparent to-teal/10 victory-glow" aria-hidden />
+          <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
           <div className="animate-fade-in relative text-center">
-            <p className="text-5xl font-bold text-white drop-shadow-[0_0_30px_rgba(0,229,199,0.5)] sm:text-6xl">🏆 VICTORY!</p>
-            <p className="mt-4 text-2xl font-bold text-teal">You won ${match.winnerPayout.toFixed(2)}!</p>
+            <p className="text-5xl font-bold text-white sm:text-6xl">
+              {match.isPractice ? "You won! 🎯" : "🏆 VICTORY!"}
+            </p>
+            {wonByForfeit && (
+              <p className="mt-4 text-xl font-semibold text-amber-400">Opponent left the match. You win by forfeit!</p>
+            )}
+            {!match.isPractice && !wonByForfeit && (
+              <p className="mt-4 text-2xl font-bold text-teal">You won ${match.winnerPayout.toFixed(2)}!</p>
+            )}
+            {!match.isPractice && wonByForfeit && (
+              <p className="mt-2 text-lg font-semibold text-teal">You won ${match.winnerPayout.toFixed(2)}!</p>
+            )}
             <p className="mt-2 text-body-gray">Defeated {match.player2.username}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
@@ -401,8 +599,16 @@ export default function MatchPage() {
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                Play Again
+                {match.isPractice ? "Play Again (Practice)" : "Play Again"}
               </Link>
+              {match.isPractice && (
+                <Link
+                  href="/play"
+                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                >
+                  Play for Real Money
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -413,8 +619,14 @@ export default function MatchPage() {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className="animate-fade-in text-center">
             <p className="text-2xl font-semibold text-white">Draw!</p>
-            <p className="mt-2 text-lg text-teal">Stakes refunded.</p>
-            <p className="mt-1 text-body-gray">Your ${match.stakeAmount.toFixed(2)} has been returned to your wallet.</p>
+            {match.isPractice ? (
+              <p className="mt-2 text-lg text-purple-400">Practice match — no stakes.</p>
+            ) : (
+              <>
+                <p className="mt-2 text-lg text-teal">Stakes refunded.</p>
+                <p className="mt-1 text-body-gray">Your ${match.stakeAmount.toFixed(2)} has been returned to your wallet.</p>
+              </>
+            )}
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
                 href="/play"
@@ -437,9 +649,12 @@ export default function MatchPage() {
       {outcome === "defeat" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className="animate-fade-in text-center">
-            <p className="text-2xl font-semibold text-white">Better luck next time</p>
-            <p className="mt-2 text-lg text-red-400">You lost ${match.stakeAmount.toFixed(2)}</p>
+            <p className="text-2xl font-semibold text-white">Better luck next time{match.isPractice ? "!" : ""}</p>
+            {!match.isPractice && (
+              <p className="mt-2 text-lg text-red-400">You lost ${match.stakeAmount.toFixed(2)}</p>
+            )}
             <p className="mt-1 text-body-gray">{match.player2.username} won</p>
+            {match.isPractice && <p className="mt-1 text-body-gray">Try again?</p>}
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
                 href="/play"
@@ -451,19 +666,29 @@ export default function MatchPage() {
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                Try Again
+                {match.isPractice ? "Play Again (Practice)" : "Try Again"}
               </Link>
+              {match.isPractice && (
+                <Link
+                  href="/play"
+                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                >
+                  Play for Real Money
+                </Link>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Forfeit confirmation modal */}
+      {/* Forfeit / Leave confirmation modal */}
       {forfeitConfirm && !outcome && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
           <div className="card-border w-full max-w-sm rounded-card bg-card p-6">
             <p className="text-center font-medium text-white">
-              Are you sure you want to forfeit? You will lose your ${match.stakeAmount.toFixed(2)} stake.
+              {match.isPractice
+                ? "Leave this practice match? Your progress will not be saved."
+                : `Are you sure you want to forfeit? You will lose your $${match.stakeAmount.toFixed(2)} stake.`}
             </p>
             <div className="mt-6 flex gap-3">
               <button
@@ -476,9 +701,9 @@ export default function MatchPage() {
               <button
                 type="button"
                 onClick={handleForfeitConfirm}
-                className="flex-1 rounded-lg bg-red-500/20 py-2.5 font-medium text-red-400 hover:bg-red-500/30"
+                className={`flex-1 rounded-lg py-2.5 font-medium ${match.isPractice ? "bg-white/10 text-white hover:bg-white/20" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}
               >
-                Forfeit
+                {match.isPractice ? "Leave" : "Forfeit"}
               </button>
             </div>
           </div>

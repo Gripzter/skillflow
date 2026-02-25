@@ -18,6 +18,8 @@ const TARGET_BASE_MOBILE = 80;
 const ROUND_RESULT_DURATION = 2000;
 const TAP_TIMEOUT_MS = 5000;
 const MISS_PENALTY_MS = 500;
+const ROUND_START_DELAY_MIN = 2000;
+const ROUND_START_DELAY_MAX = 5000;
 
 function reactionLabel(ms: number): { text: string; color: string } {
   if (ms < 200) return { text: "INSANE! 🔥", color: "#EAB308" };
@@ -27,7 +29,9 @@ function reactionLabel(ms: number): { text: string; color: string } {
   return { text: "Slow", color: "#9ca3af" };
 }
 
-interface ReactionDuelProps {
+import type { GameMultiplayerProps } from "./Chess";
+
+interface ReactionDuelProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
   player2: { username: string; rating: number };
   onGameEnd: (winner: "player1" | "player2") => void;
@@ -44,6 +48,11 @@ export default function ReactionDuel({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  isMultiplayer = false,
+  myRole = "player1",
+  sendGameEvent,
+  incomingEvent,
+  onEventProcessed,
 }: ReactionDuelProps) {
   const [phase, setPhase] = useState<Phase>("countdown");
   const [countdownN, setCountdownN] = useState(3);
@@ -58,6 +67,7 @@ export default function ReactionDuel({
   const [targetColor, setTargetColor] = useState("#00E5C7");
   const [p1Reaction, setP1Reaction] = useState<Reaction | null>(null);
   const [p2Reaction, setP2Reaction] = useState<Reaction | null>(null);
+  const [opponentReactionForRound, setOpponentReactionForRound] = useState<{ round: number; reactionTime: number } | null>(null);
   const [tapPos, setTapPos] = useState<{ x: number; y: number } | null>(null);
   const [showTooEarly, setShowTooEarly] = useState(false);
   const [showMiss, setShowMiss] = useState(false);
@@ -69,16 +79,20 @@ export default function ReactionDuel({
   const tapTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roundResultTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const areaSizeRef = useRef({ w: GAME_AREA_MIN.w, h: GAME_AREA_MIN.h });
+  const roundStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
   const baseTargetSize = isMobile ? TARGET_BASE_MOBILE : TARGET_BASE;
 
   const clearAllTimeouts = useCallback(() => {
     if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+    if (roundStartTimeoutRef.current) clearTimeout(roundStartTimeoutRef.current);
     if (botTimeoutRef.current) clearTimeout(botTimeoutRef.current);
     if (tapTimeoutRef.current) clearTimeout(tapTimeoutRef.current);
     if (roundResultTimeoutRef.current) clearTimeout(roundResultTimeoutRef.current);
     readyTimeoutRef.current = null;
+    roundStartTimeoutRef.current = null;
     botTimeoutRef.current = null;
     tapTimeoutRef.current = null;
     roundResultTimeoutRef.current = null;
@@ -109,13 +123,102 @@ export default function ReactionDuel({
     return () => clearTimeout(t);
   }, [phase, countdownN]);
 
+  // Incoming multiplayer: round_start (show target after delay), reaction_result (opponent's time)
+  useEffect(() => {
+    if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
+    const type = incomingEvent.type as string | undefined;
+    if (type === "round_start") {
+      const r = incomingEvent.round as number | undefined;
+      const delay = incomingEvent.delay as number | undefined;
+      const targetNormX = incomingEvent.targetNormX as number | undefined;
+      const targetNormY = incomingEvent.targetNormY as number | undefined;
+      if (typeof r !== "number" || typeof delay !== "number" || phase !== "get_ready") {
+        onEventProcessed();
+        return;
+      }
+      lastProcessedEventRef.current = incomingEvent;
+      const area = areaSizeRef.current;
+      const x = typeof targetNormX === "number" ? targetNormX * area.w : area.w / 2;
+      const y = typeof targetNormY === "number" ? targetNormY * area.h : area.h / 2;
+      const size = baseTargetSize;
+      if (roundStartTimeoutRef.current) clearTimeout(roundStartTimeoutRef.current);
+      roundStartTimeoutRef.current = setTimeout(() => {
+        roundStartTimeoutRef.current = null;
+        setP1Reaction(null);
+        setP2Reaction(null);
+        setShowTooEarly(false);
+        setShowMiss(false);
+        setTapPos(null);
+        setTargetPos({ x, y });
+        setTargetDiameter(getTargetDiameter(size));
+        setTargetColor(getTargetColor(r - 1));
+        targetAppearTimeRef.current = performance.now();
+        setPhase("target");
+        tapTimeoutRef.current = setTimeout(() => {
+          tapTimeoutRef.current = null;
+          const setReaction = myRole === "player1" ? setP1Reaction : setP2Reaction;
+          setReaction((prev) => (prev === null ? "timeout" : prev));
+          if (sendGameEvent) sendGameEvent({ type: "reaction_result", round: r, reactionTime: -2 }).catch(() => {});
+        }, TAP_TIMEOUT_MS);
+      }, delay);
+      onEventProcessed();
+    } else if (type === "reaction_result") {
+      const r = incomingEvent.round as number | undefined;
+      const reactionTime = incomingEvent.reactionTime as number | undefined;
+      if (typeof r !== "number" || typeof reactionTime !== "number") {
+        onEventProcessed();
+        return;
+      }
+      lastProcessedEventRef.current = incomingEvent;
+      const value = reactionTime === -1 ? -1 : reactionTime;
+      setOpponentReactionForRound({ round: r, reactionTime: value });
+      onEventProcessed();
+    }
+  }, [incomingEvent, onEventProcessed, phase, baseTargetSize, myRole, sendGameEvent]);
+
+  useEffect(() => () => {
+    if (roundStartTimeoutRef.current) clearTimeout(roundStartTimeoutRef.current);
+  }, []);
+
   useEffect(() => {
     if (phase !== "get_ready") return;
     setP1Reaction(null);
     setP2Reaction(null);
+    setOpponentReactionForRound(null);
     setShowTooEarly(false);
     setShowMiss(false);
     setTapPos(null);
+
+    if (isMultiplayer && myRole === "player1" && sendGameEvent) {
+      const area = areaSizeRef.current;
+      const size = baseTargetSize;
+      const pos = getRandomTargetPosition(area.w, area.h, size);
+      const targetNormX = area.w > 0 ? pos.x / area.w : 0.5;
+      const targetNormY = area.h > 0 ? pos.y / area.h : 0.5;
+      const delay = ROUND_START_DELAY_MIN + Math.floor(Math.random() * (ROUND_START_DELAY_MAX - ROUND_START_DELAY_MIN + 1));
+      sendGameEvent({ type: "round_start", round, delay, targetNormX, targetNormY }).catch(() => {});
+      readyTimeoutRef.current = setTimeout(() => {
+        readyTimeoutRef.current = null;
+        setTargetPos(pos);
+        setTargetDiameter(getTargetDiameter(size));
+        setTargetColor(getTargetColor(round - 1));
+        targetAppearTimeRef.current = performance.now();
+        setPhase("target");
+        tapTimeoutRef.current = setTimeout(() => {
+          tapTimeoutRef.current = null;
+          setP1Reaction((prev) => (prev === null ? "timeout" : prev));
+          if (sendGameEvent) sendGameEvent({ type: "reaction_result", round, reactionTime: -2 }).catch(() => {});
+        }, TAP_TIMEOUT_MS);
+      }, delay);
+      return () => {
+        if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
+      };
+    }
+
+    if (isMultiplayer && myRole === "player2") {
+      return;
+    }
+
     const duration = getReadyDurationMs();
     readyTimeoutRef.current = setTimeout(() => {
       readyTimeoutRef.current = null;
@@ -141,27 +244,35 @@ export default function ReactionDuel({
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
     };
-  }, [phase, round, isPlayer2Bot, baseTargetSize]);
+  }, [phase, round, isPlayer2Bot, isMultiplayer, myRole, sendGameEvent, baseTargetSize]);
 
   const handleGameAreaTap = useCallback(
     (clientX: number, clientY: number) => {
       if (phase === "countdown") return;
       if (phase === "get_ready") {
         setShowTooEarly(true);
-        setP1Reaction("false_start");
+        const myReaction: Reaction = "false_start";
+        if (!isMultiplayer || myRole === "player1") setP1Reaction(myReaction);
+        else setP2Reaction(myReaction);
+        if (isMultiplayer && sendGameEvent) {
+          sendGameEvent({ type: "reaction_result", round, reactionTime: -1 }).catch(() => {});
+        }
         if (botTimeoutRef.current) {
           clearTimeout(botTimeoutRef.current);
           botTimeoutRef.current = null;
         }
-        const botMs = getReactionBotResponseMs();
-        setP2Reaction(botMs);
-        setTimeout(() => {
-          setPhase("round_result");
-          roundResultTimeoutRef.current = setTimeout(() => advanceRound("false_start", botMs), ROUND_RESULT_DURATION);
-        }, 800);
+        if (!isMultiplayer && isPlayer2Bot) {
+          const botMs = getReactionBotResponseMs();
+          setP2Reaction(botMs);
+          setTimeout(() => {
+            setPhase("round_result");
+            roundResultTimeoutRef.current = setTimeout(() => advanceRound("false_start", botMs), ROUND_RESULT_DURATION);
+          }, 800);
+        }
         return;
       }
-      if (phase !== "target" || p1Reaction !== null) return;
+      const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
+      if (phase !== "target" || myReactionAlreadySet) return;
       const el = gameAreaRef.current;
       if (!el || !targetPos) return;
       const rect = el.getBoundingClientRect();
@@ -171,31 +282,28 @@ export default function ReactionDuel({
       const radius = targetDiameter / 2 + 15;
       const hit = dist <= radius;
       const reactionMs = Math.round(performance.now() - targetAppearTimeRef.current);
-      if (hit) {
-        if (tapTimeoutRef.current) {
-          clearTimeout(tapTimeoutRef.current);
-          tapTimeoutRef.current = null;
-        }
-        setP1Reaction(reactionMs);
-        setLastP1Time(reactionMs);
-        setP1TotalMs((t) => t + reactionMs);
-        setTapPos({ x: targetPos.x, y: targetPos.y });
-        setPhase("tapped");
+      const value: Reaction = hit ? reactionMs : reactionMs + MISS_PENALTY_MS;
+      const sendValue = typeof value === "number" ? value : -1;
+      if (myRole === "player1") {
+        setP1Reaction(value);
+        setLastP1Time(typeof value === "number" ? value : null);
+        if (typeof value === "number") setP1TotalMs((t) => t + value);
       } else {
-        setShowMiss(true);
-        setTapPos({ x, y });
-        const withPenalty = reactionMs + MISS_PENALTY_MS;
-        setP1Reaction(withPenalty);
-        setLastP1Time(withPenalty);
-        setP1TotalMs((t) => t + withPenalty);
-        if (tapTimeoutRef.current) {
-          clearTimeout(tapTimeoutRef.current);
-          tapTimeoutRef.current = null;
-        }
-        setPhase("tapped");
+        setP2Reaction(value);
+        if (typeof value === "number") setP2TotalMs((t) => t + value);
+      }
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
+      setTapPos({ x: hit ? targetPos.x : x, y: hit ? targetPos.y : y });
+      if (!hit) setShowMiss(true);
+      setPhase("tapped");
+      if (isMultiplayer && sendGameEvent) {
+        sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
       }
     },
-    [phase, p1Reaction, targetPos, targetDiameter]
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, advanceRound]
   );
 
   const advanceRound = useCallback(
@@ -208,7 +316,7 @@ export default function ReactionDuel({
       setRoundHistory((prev) => [...prev, { p1, p2, winner }]);
       setP1Wins((w) => (winner === "player1" ? w + 1 : w));
       setP2Wins((w) => (winner === "player2" ? w + 1 : w));
-      if (typeof p2 === "number") setP2TotalMs((t) => t + p2);
+      if (typeof p1 === "number") setP1TotalMs((t) => t + p1);
       if (typeof p2 === "number") setP2TotalMs((t) => t + p2);
       setRound((r) => {
         if (r >= TOTAL_ROUNDS) {
@@ -216,7 +324,7 @@ export default function ReactionDuel({
           setTimeout(() => {
             const newP1Wins = winner === "player1" ? p1Wins + 1 : p1Wins;
             const newP2Wins = winner === "player2" ? p2Wins + 1 : p2Wins;
-            const totalP1 = p1TotalMs;
+            const totalP1 = p1TotalMs + (typeof p1 === "number" ? p1 : 0);
             const totalP2 = p2TotalMs + (typeof p2 === "number" ? p2 : 0);
             const matchWinner = getMatchWinner(newP1Wins, newP2Wins, totalP1, totalP2);
             if (matchWinner === "draw") onGameDraw();
@@ -231,17 +339,40 @@ export default function ReactionDuel({
     [p1Wins, p2Wins, p1TotalMs, p2TotalMs, onGameEnd, onGameDraw]
   );
 
+  function toReaction(t: number): Reaction {
+    if (t === -1) return "false_start";
+    if (t === -2) return "timeout";
+    return t;
+  }
+
   useEffect(() => {
     if (phase !== "tapped") return;
-    const p2 = p2Reaction;
-    if (p2 !== null && p1Reaction !== null) {
+    if (isMultiplayer && opponentReactionForRound?.round === round) {
+      const myReaction = myRole === "player1" ? p1Reaction : p2Reaction;
+      if (myReaction === null) return;
+      const p1: Reaction = myRole === "player1" ? myReaction : toReaction(opponentReactionForRound.reactionTime);
+      const p2: Reaction = myRole === "player1" ? toReaction(opponentReactionForRound.reactionTime) : myReaction;
       setPhase("round_result");
-      roundResultTimeoutRef.current = setTimeout(() => advanceRound(p1Reaction!, p2), ROUND_RESULT_DURATION);
+      setOpponentReactionForRound(null);
+      roundResultTimeoutRef.current = setTimeout(() => {
+        roundResultTimeoutRef.current = null;
+        advanceRound(p1, p2);
+      }, ROUND_RESULT_DURATION);
+      return () => {
+        if (roundResultTimeoutRef.current) clearTimeout(roundResultTimeoutRef.current);
+      };
     }
-    return () => {
-      if (roundResultTimeoutRef.current) clearTimeout(roundResultTimeoutRef.current);
-    };
-  }, [phase, p1Reaction, p2Reaction, advanceRound]);
+    if (!isMultiplayer) {
+      const p2 = p2Reaction;
+      if (p2 !== null && p1Reaction !== null) {
+        setPhase("round_result");
+        roundResultTimeoutRef.current = setTimeout(() => advanceRound(p1Reaction!, p2), ROUND_RESULT_DURATION);
+      }
+      return () => {
+        if (roundResultTimeoutRef.current) clearTimeout(roundResultTimeoutRef.current);
+      };
+    }
+  }, [phase, p1Reaction, p2Reaction, advanceRound, isMultiplayer, myRole, round, opponentReactionForRound]);
 
   useEffect(() => {
     return () => clearAllTimeouts();

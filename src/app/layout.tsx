@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
+import { PlayModeProvider } from "@/contexts/PlayModeContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import ConnectionMonitor from "@/components/ConnectionMonitor";
+import MobileTabBar from "@/components/MobileTabBar";
 import "./globals.css";
+import "@/styles/themes/sci-fi.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,9 +27,31 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+        />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#0D0F14" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
       <body className="font-sans">
-        <ConnectionMonitor />
-        <ToastProvider>{children}</ToastProvider>
+        <ThemeProvider>
+          <ConnectionMonitor />
+          <ToastProvider>
+            <PlayModeProvider>
+              {children}
+              <MobileTabBar />
+            </PlayModeProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

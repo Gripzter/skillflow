@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import Footer from "@/components/Footer";
 import {
   getCurrentUser,
   getWalletBalance,
@@ -165,8 +166,11 @@ export default function WalletPage() {
 
 
   return (
-    <div className="min-h-screen bg-charcoal">
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
+      <p className="border-b border-white/5 bg-charcoal/80 px-4 py-2 text-center text-xs text-body-gray">
+        Practice matches don&apos;t affect your balance.
+      </p>
       <AppNavbar
         username={username}
         isDevMode={isDevMode}
@@ -175,27 +179,27 @@ export default function WalletPage() {
         currentPage="wallet"
       />
 
-      <main className="relative mx-auto max-w-[1000px] px-4 py-8 sm:px-6 lg:px-8">
+      <main className="relative mx-auto max-w-[1000px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Balance card */}
         <section className="animate-fade-in relative overflow-hidden rounded-card border border-white/10 bg-card p-8 sm:p-10">
           <div className="absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r from-teal/20 via-transparent to-purple/20 opacity-60" />
           <div className="relative text-center">
             <p className="text-body-gray">Your Balance</p>
-            <p className="mt-2 text-5xl font-bold text-white sm:text-6xl">
+            <p className="mt-2 text-4xl font-bold text-white sm:text-5xl">
               ${balance.toFixed(2)}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
               <button
                 type="button"
                 onClick={() => document.getElementById("quick-deposit")?.scrollIntoView({ behavior: "smooth" })}
-                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow"
+                className="pressable w-full rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
               >
                 Deposit
               </button>
               <button
                 type="button"
                 onClick={() => document.getElementById("withdraw-funds")?.scrollIntoView({ behavior: "smooth" })}
-                className="rounded-lg border border-white/30 bg-transparent px-6 py-3 font-semibold text-white transition-colors hover:bg-white/5"
+                className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
               >
                 Withdraw
               </button>
@@ -377,6 +381,7 @@ export default function WalletPage() {
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }

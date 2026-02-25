@@ -220,7 +220,7 @@ export default function SignUpPage() {
 
         {/* Terms checkbox */}
         <div>
-          <label className="flex items-start gap-3 cursor-pointer">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
               checked={termsAccepted}
@@ -231,14 +231,15 @@ export default function SignUpPage() {
               className="mt-1 h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-[#1A1D27] checked:border-teal checked:bg-teal transition-colors focus:ring-1 focus:ring-teal focus:ring-offset-0"
             />
             <span className="text-sm text-body-gray">
-              I agree to the{" "}
-              <Link href="#" className="text-teal hover:underline">
+              I confirm that I am at least 18 years old and agree to the{" "}
+              <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
                 Terms of Service
               </Link>{" "}
               and{" "}
-              <Link href="#" className="text-teal hover:underline">
+              <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
                 Privacy Policy
               </Link>
+              .
             </span>
           </label>
           {errors.terms && <p className="mt-1.5 text-sm text-red-400">{errors.terms}</p>}
@@ -247,7 +248,7 @@ export default function SignUpPage() {
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !termsAccepted}
           className="w-full rounded-lg bg-teal py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? (
@@ -264,7 +265,19 @@ export default function SignUpPage() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-body-gray">
+      <p className="mt-4 text-center text-xs text-body-gray">
+        By creating an account, you confirm you are at least 18 years old and agree to our{" "}
+        <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
+          Privacy Policy
+        </Link>
+        .
+      </p>
+
+      <p className="mt-4 text-center text-sm text-body-gray">
         Already have an account?{" "}
         <Link href="/login" className="text-teal font-medium hover:underline">
           Log in

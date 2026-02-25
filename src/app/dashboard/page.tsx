@@ -5,16 +5,20 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
-import { getCurrentUser, getWalletBalance, getMatches, logout as apiLogout } from "@/lib/api";
+import Footer from "@/components/Footer";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import { getCurrentUser, getWalletBalance, getMatches, getPracticeMatches, getPracticeStats, logout as apiLogout } from "@/lib/api";
 
 const GAMES = [
   { name: "8 Ball Pool", slug: "8-ball-pool", tag: "1v1", gradient: "from-teal/30 to-purple/30", comingSoon: false },
   { name: "Chess", slug: "chess", tag: "1v1", gradient: "from-amber-500/20 to-rose-500/20", comingSoon: false },
   { name: "Connect 4", slug: "connect-4", tag: "1v1", gradient: "from-red-500/30 to-amber-400/30", comingSoon: false },
+  { name: "Memory Match", slug: "memory-match", tag: "Coming Soon", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", comingSoon: true },
   { name: "Mini Golf", slug: "mini-golf", tag: "Coming Soon", gradient: "from-emerald-500/20 to-teal/30", comingSoon: true },
   { name: "Reaction Duel", slug: "reaction-duel", tag: "1v1", gradient: "from-orange-500/30 to-red-500/30", comingSoon: false },
+  { name: "Spelling Bee", slug: "spelling-bee", tag: "1v1", gradient: "from-amber-500/30 to-yellow-600/30", comingSoon: false },
   { name: "Darts", slug: "darts", tag: "Coming Soon", gradient: "from-purple/20 to-pink-500/20", comingSoon: true },
-  { name: "Card Clash", slug: "card-clash", tag: "Coming Soon", gradient: "from-rose-500/20 to-purple/20", comingSoon: true },
 ];
 
 export default function DashboardPage() {
@@ -26,6 +30,8 @@ export default function DashboardPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [balance, setBalance] = useState(0);
   const [matches, setMatches] = useState<{ id: string; status: string; winner?: string }[]>([]);
+  const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
+  const { isPractice } = usePlayMode();
 
   useEffect(() => {
     async function load() {
@@ -40,6 +46,8 @@ export default function DashboardPage() {
         const [bal, matchList] = await Promise.all([getWalletBalance(), getMatches()]);
         setBalance(bal);
         setMatches(matchList);
+        const pStats = getPracticeStats(user.username);
+        setPracticeStats(pStats);
       } catch {
         router.push("/login");
       } finally {
@@ -79,7 +87,7 @@ export default function DashboardPage() {
   const totalEarnings = balance; // simplified; could sum from transactions if needed
 
   return (
-    <div className="min-h-screen bg-charcoal">
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username={username}
@@ -88,93 +96,158 @@ export default function DashboardPage() {
         loggingOut={loggingOut}
         currentPage="dashboard"
       />
-      <main className="mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
+      <ModeToggleBarContent />
+      <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Welcome banner */}
-        <section className="animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
+        <section className="welcome-banner animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white sm:text-3xl">
                 Welcome back, {username}!
               </h1>
-              <p className="mt-1 text-body-gray">Ready to compete?</p>
+              <p className="mt-1 text-body-gray">
+                {isPractice ? "Practice mode — sharpen your skills!" : "Ready to compete?"}
+              </p>
             </div>
             <div className="flex flex-wrap gap-6 border-t border-white/5 pt-4 sm:border-t-0 sm:border-l sm:border-white/5 sm:pt-0 sm:pl-6">
-              <div>
-                <p className="text-xs text-body-gray">Matches Played</p>
-                <p className="text-lg font-semibold text-white">{matches.length}</p>
-              </div>
-              <div>
-                <p className="text-xs text-body-gray">Win Rate</p>
-                <p className="text-lg font-semibold text-white">{winRate}%</p>
-              </div>
-              <div>
-                <p className="text-xs text-body-gray">Total Earnings</p>
-                <p className="text-lg font-semibold text-white">${totalEarnings.toFixed(2)}</p>
-              </div>
+              {isPractice ? (
+                <>
+                  <div>
+                    <p className="stat-label text-xs text-body-gray">Practice Matches</p>
+                    <p className="stat-number text-lg font-semibold text-white">{practiceStats.practiceMatchesPlayed}</p>
+                  </div>
+                  <div>
+                    <p className="stat-label text-xs text-body-gray">Practice Win Rate</p>
+                    <p className="stat-number text-lg font-semibold text-purple-400">{practiceStats.practiceWinRate}%</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="stat-label text-xs text-body-gray">Matches Played</p>
+                    <p className="stat-number text-lg font-semibold text-white">{matches.length}</p>
+                  </div>
+                  <div>
+                    <p className="stat-label text-xs text-body-gray">Win Rate</p>
+                    <p className="stat-number text-lg font-semibold text-white">{winRate}%</p>
+                  </div>
+                  <div>
+                    <p className="stat-label text-xs text-body-gray">Total Earnings</p>
+                    <p className="stat-number text-lg font-semibold text-white">${totalEarnings.toFixed(2)}</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </section>
 
-        {/* Quick actions */}
-        <section className="mt-8">
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <Link
-              href="/wallet"
-              className="card-border group animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-teal-glow/20 "
-            >
-              <div className="h-1 w-12 rounded-full bg-teal" />
-              <p className="mt-4 text-lg font-semibold text-white">💰 Deposit</p>
-              <p className="mt-1 text-sm text-body-gray">Add funds to your wallet</p>
-            </Link>
-            <Link
-              href="/play"
-              className="card-border group animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-glow/20 "
-            >
-              <div className="h-1 w-12 rounded-full bg-purple" />
-              <p className="mt-4 text-lg font-semibold text-white">🎮 Quick Match</p>
-              <p className="mt-1 text-sm text-body-gray">Find an opponent now</p>
-            </Link>
-            <Link
-              href="/external"
-              className="card-border group animate-fade-in rounded-card border-orange-500/30 bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10"
-            >
-              <div className="h-1 w-12 rounded-full bg-orange-500" />
-              <p className="mt-4 text-lg font-semibold text-white">⚔️ Arena</p>
-              <p className="mt-1 text-sm text-body-gray">Wager on CS2, Sim Racing & more</p>
-            </Link>
-            <Link
-              href="/leaderboard"
-              className="card-border group animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/10 "
-            >
-              <div className="h-1 w-12 rounded-full bg-amber-500" />
-              <p className="mt-4 text-lg font-semibold text-white">🏆 Leaderboard</p>
-              <p className="mt-1 text-sm text-body-gray">See top players</p>
-            </Link>
-          </div>
-        </section>
+        {!isPractice && (
+          <>
+            {/* Last Touch — featured event banner */}
+            <section className="mt-8">
+              <Link
+                href="/last-touch"
+                className="last-touch-banner group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="title bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
+                      LAST TOUCH
+                    </h2>
+                    <p className="mt-1 text-body-gray">Hold your ground. Win it all.</p>
+                    <p className="mt-2 text-sm text-teal">Next game in: 14:32 • Prize pool grows in real time</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-xs text-body-gray">Prize Pool</p>
+                      <p className="text-xl font-bold text-white">$1,247</p>
+                    </div>
+                    <span className="join-btn rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(0,229,199,0.4)]">
+                      Join Now
+                    </span>
+                  </div>
+                </div>
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal/20 blur-2xl" />
+              </Link>
+            </section>
+
+            {/* Quick actions */}
+            <section className="mt-8">
+              <div className="-mx-4 flex gap-3 overflow-x-auto pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
+                <Link
+                  href="/wallet"
+                  className="action-card pressable card-border group ml-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-teal-glow/20 sm:ml-0"
+                >
+                  <div className="top-accent h-1 w-12 rounded-full bg-teal" />
+                  <p className="mt-4 text-lg font-semibold text-white">💰 Deposit</p>
+                  <p className="mt-1 text-sm text-body-gray">Add funds to your wallet</p>
+                </Link>
+                <Link
+                  href="/play"
+                  className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-glow/20"
+                >
+                  <div className="top-accent h-1 w-12 rounded-full bg-purple" />
+                  <p className="mt-4 text-lg font-semibold text-white">🎮 Quick Match</p>
+                  <p className="mt-1 text-sm text-body-gray">Find an opponent now</p>
+                </Link>
+                <Link
+                  href="/external"
+                  className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card border-orange-500/30 bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10"
+                >
+                  <div className="top-accent h-1 w-12 rounded-full bg-orange-500" />
+                  <p className="mt-4 text-lg font-semibold text-white">⚔️ Arena</p>
+                  <p className="mt-1 text-sm text-body-gray">Wager on CS2, Sim Racing & more</p>
+                </Link>
+                <Link
+                  href="/leaderboard"
+                  className="action-card pressable card-border group mr-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/10 sm:mr-0"
+                >
+                  <div className="top-accent h-1 w-12 rounded-full bg-amber-500" />
+                  <p className="mt-4 text-lg font-semibold text-white">🏆 Leaderboard</p>
+                  <p className="mt-1 text-sm text-body-gray">See top players</p>
+                </Link>
+              </div>
+            </section>
+          </>
+        )}
 
         {/* Available games */}
-        <section className="mt-10">
-          <h2 className="text-xl font-bold text-white">Choose Your Game</h2>
+        <section className={isPractice ? "mt-8" : "mt-10"}>
+          <h2 className="section-title text-xl font-bold text-white">Choose Your Game</h2>
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-            {GAMES.map((game, i) => {
+            {(isPractice
+              ? GAMES.filter(
+                  (g) => !g.comingSoon && ["8-ball-pool", "chess", "connect-4", "reaction-duel", "spelling-bee"].includes(g.slug)
+                )
+              : GAMES
+            ).map((game, i) => {
+              const tagLabel = game.comingSoon
+                ? game.tag
+                : isPractice
+                  ? "1v1 • Free Play"
+                  : "1v1 • $1–$100 stakes";
+              const accentClass = game.comingSoon
+                ? "bg-white/10 text-body-gray"
+                : isPractice
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-teal/20 text-teal";
+              const hoverBorder = game.comingSoon ? "" : isPractice ? "hover:border-purple-500/30 hover:shadow-purple-500/10" : "hover:border-teal/30 hover:shadow-teal-glow/10";
               const content = (
                 <div
-                  className={`card-border relative flex min-h-[120px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
+                  className={`game-card card-border relative flex min-h-[120px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
                     game.comingSoon
                       ? "cursor-not-allowed opacity-60"
-                      : "hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-teal-glow/10"
+                      : `hover:-translate-y-0.5 ${hoverBorder}`
                   }`}
                 >
                   <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${game.gradient} opacity-40`} />
                   <div className="relative">
                     <p className="font-semibold text-white">{game.name}</p>
                     <span
-                      className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        game.comingSoon ? "bg-white/10 text-body-gray" : "bg-teal/20 text-teal"
-                      }`}
+                      className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${accentClass}`}
                     >
-                      {game.tag}
+                      {tagLabel}
                     </span>
                   </div>
                   {game.comingSoon ? (
@@ -185,7 +258,7 @@ export default function DashboardPage() {
                       <span className="text-xs">Coming soon</span>
                     </div>
                   ) : (
-                    <p className="relative mt-2 text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
+                    <p className={`relative mt-2 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100 ${isPractice ? "text-purple-400" : "text-teal"}`}>
                       Play Now →
                     </p>
                   )}
@@ -203,31 +276,35 @@ export default function DashboardPage() {
             })}
           </div>
 
-          <div className="mt-8 border-t border-white/10 pt-8">
-            <h3 className="text-lg font-bold text-white">External Games</h3>
-            <p className="mt-1 text-sm text-body-gray">Wager on real games. Play externally, win on SkillFlow.</p>
-            <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-              <Link href="/external/cs2" className="group animate-fade-in">
-                <div className="card-border relative flex min-h-[120px] flex-col justify-between rounded-card border-orange-500/20 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-orange-500/10">
-                  <div className="absolute inset-0 rounded-card bg-gradient-to-br from-blue-900/40 to-orange-600/40 opacity-60" />
-                  <div className="relative">
-                    <p className="font-semibold text-white">Counter-Strike 2</p>
-                    <span className="mt-2 inline-block w-fit rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-medium text-orange-400">
-                      Arena
-                    </span>
+          {!isPractice && (
+            <div className="mt-8 border-t border-white/10 pt-8">
+              <h3 className="section-title text-lg font-bold text-white">External Games</h3>
+              <p className="mt-1 text-sm text-body-gray">Wager on real games. Play externally, win on SkillFlow.</p>
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+                <Link href="/external/cs2" className="group animate-fade-in">
+                  <div className="card-border relative flex min-h-[120px] flex-col justify-between rounded-card border-orange-500/20 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-orange-500/10">
+                    <div className="absolute inset-0 rounded-card bg-gradient-to-br from-blue-900/40 to-orange-600/40 opacity-60" />
+                    <div className="relative">
+                      <p className="font-semibold text-white">Counter-Strike 2</p>
+                      <span className="mt-2 inline-block w-fit rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-medium text-orange-400">
+                        Arena
+                      </span>
+                    </div>
+                    <p className="relative mt-2 text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
+                      Wager on real CS2 →
+                    </p>
                   </div>
-                  <p className="relative mt-2 text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
-                    Wager on real CS2 →
-                  </p>
-                </div>
-              </Link>
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
         </section>
 
+        {!isPractice && (
+          <>
         {/* Recent matches */}
         <section className="mt-10">
-          <h2 className="text-xl font-bold text-white">Recent Matches</h2>
+          <h2 className="section-title text-xl font-bold text-white">Recent Matches</h2>
           <div className="card-border mt-4 flex min-h-[160px] flex-col items-center justify-center rounded-card bg-card py-12">
             {matches.length === 0 ? (
               <>
@@ -242,12 +319,15 @@ export default function DashboardPage() {
 
         {/* Live matches */}
         <section className="mt-10">
-          <h2 className="text-xl font-bold text-white">Live Now 🔴</h2>
+          <h2 className="section-title text-xl font-bold text-white">Live Now 🔴</h2>
           <div className="card-border mt-4 flex min-h-[100px] items-center justify-center rounded-card bg-card py-8">
             <p className="text-body-gray">No live matches right now</p>
           </div>
         </section>
+          </>
+        )}
       </main>
+      <Footer />
     </div>
   );
 }

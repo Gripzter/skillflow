@@ -20,7 +20,7 @@ export default function Hero() {
       <div className="pointer-events-none absolute inset-0 bg-mesh-gradient bg-grid-pattern" />
 
       <div className="relative mx-auto max-w-4xl text-center">
-        <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+        <h1 className="text-[28px] font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
           Bet On Yourself.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-body-gray sm:text-xl">
@@ -42,7 +42,7 @@ export default function Hero() {
           />
           <button
             type="submit"
-            className="rounded-card bg-teal px-6 py-3.5 font-semibold text-charcoal transition-all hover:shadow-teal-glow"
+            className="pressable w-full rounded-card bg-teal px-6 py-3.5 font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
           >
             Join the Waitlist
           </button>

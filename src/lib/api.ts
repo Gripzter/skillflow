@@ -22,6 +22,13 @@ import {
   type StoredMatch,
   type PlayerInfo,
 } from "@/lib/matchmaking";
+import {
+  getPracticeMatch,
+  getPracticeMatches,
+  createPracticeMatch as createPracticeMatchLocal,
+  updatePracticeMatch as updatePracticeMatchLocal,
+  getPracticeStats,
+} from "@/lib/practice-matches";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
@@ -50,6 +57,8 @@ function mapDbMatchToStoredMatch(row: {
   status: string;
   result: string | null;
   created_at: string;
+  player2_id?: string | null;
+  player1_id?: string | null;
 }): StoredMatch {
   const status = row.status === "completed" || row.status === "draw" ? "completed" : "in_progress";
   let winner: "player1" | "player2" | undefined;
@@ -78,6 +87,9 @@ function mapDbMatchToStoredMatch(row: {
     status,
     winner,
     createdAt: row.created_at,
+    isRealMultiplayer: !!row.player2_id,
+    player1Id: row.player1_id ?? undefined,
+    player2Id: row.player2_id ?? undefined,
   };
 }
 
@@ -348,7 +360,17 @@ export async function createMatch(params: {
   stakeAmount: number;
   player1: PlayerInfo;
   player2: PlayerInfo;
+  isPractice?: boolean;
 }): Promise<StoredMatch> {
+  if (params.isPractice) {
+    const pm = createPracticeMatchLocal(
+      params.player1,
+      params.player2,
+      params.gameType,
+      params.gameDisplayName
+    );
+    return { ...pm, isPractice: true } as StoredMatch;
+  }
   if (isDevMode()) {
     return createLocalMatch(
       params.player1,
@@ -385,6 +407,8 @@ export async function createMatch(params: {
 }
 
 export async function getMatch(id: string): Promise<StoredMatch | null> {
+  const practice = getPracticeMatch(id);
+  if (practice) return { ...practice, isPractice: true } as StoredMatch;
   if (isDevMode()) return getLocalMatch(id);
   const supabase = createClient();
   if (!supabase) return null;
@@ -412,6 +436,14 @@ export async function updateMatch(
   id: string,
   updates: Partial<{ status: string; winner: "player1" | "player2" | "draw" }>
 ): Promise<void> {
+  const practice = getPracticeMatch(id);
+  if (practice) {
+    updatePracticeMatchLocal(id, {
+      status: updates.status as "in_progress" | "completed",
+      winner: updates.winner === "draw" ? undefined : (updates.winner as "player1" | "player2"),
+    });
+    return;
+  }
   if (isDevMode()) {
     const forLocal =
       updates.winner === "draw"
@@ -436,12 +468,19 @@ export async function completeMatch(matchId: string, winner: "player1" | "player
 
 /**
  * Complete a match and settle wallet (credit winner or refund draw).
- * Call this from the match page on win/loss/draw.
+ * Practice matches: no wallet changes, only update practice storage.
  */
 export async function completeMatchAndSettle(
   match: StoredMatch,
   outcome: "player1" | "player2" | "draw"
 ): Promise<void> {
+  if (match.isPractice) {
+    await updateMatch(match.id, {
+      status: "completed",
+      winner: outcome === "draw" ? undefined : outcome,
+    });
+    return;
+  }
   if (outcome === "player2") {
     await updateMatch(match.id, { status: "completed", winner: "player2" });
     return;
@@ -541,3 +580,6 @@ export async function logout(): Promise<void> {
 // Re-export for pages that still need them
 export { generateId, generateFakeOpponent, computePayout };
 export type { StoredMatch, PlayerInfo };
+
+// Practice stats (from practice-matches)
+export { getPracticeMatches, getPracticeStats } from "@/lib/practice-matches";

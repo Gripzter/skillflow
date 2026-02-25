@@ -5,12 +5,8 @@
 
 import type { Chess } from "chess.js";
 import type { Board } from "./connect4-logic";
-import {
-  COLS,
-  getValidColumns,
-  dropDisc,
-  checkWin,
-} from "./connect4-logic";
+import type { SpellingDifficulty } from "./spelling-words";
+import { COLS, getValidColumns, dropDisc, checkWin } from "./connect4-logic";
 
 const BOT_PLAYER = 2 as const;
 const HUMAN_PLAYER = 1 as const;
@@ -246,3 +242,283 @@ export function getReactionBotResponseMs(): number {
   if (r < 0.2) return 600 + Math.floor(Math.random() * 201); // slow
   return 250 + Math.floor(Math.random() * 301); // 250–550
 }
+
+// --- Memory Match bot ---
+
+export type MemoryAccuracy = "easy" | "medium" | "hard";
+
+export interface MemoryMatchCardSnapshot {
+  index: number;
+  icon: string;
+  state: "hidden" | "revealed" | "matched";
+}
+
+export interface MemoryMatchBotState {
+  /** icon -> indices the bot believes are that icon and still useful (not matched) */
+  memory: Record<string, number[]>;
+}
+
+export interface MemoryMatchBotMove {
+  firstIndex: number;
+  secondIndex: number;
+  knowsPair: boolean;
+  updatedMemory: Record<string, number[]>;
+}
+
+export interface MemoryMatchBotContext {
+  cards: MemoryMatchCardSnapshot[];
+  memory: Record<string, number[]>;
+  accuracy?: MemoryAccuracy;
+}
+
+function getAccuracyRate(acc: MemoryAccuracy): number {
+  if (acc === "easy") return 0.4;
+  if (acc === "hard") return 0.85;
+  return 0.65;
+}
+
+/**
+ * Update the bot's memory based on currently visible (revealed) cards.
+ * Some cards are remembered based on the configured accuracy.
+ */
+function updateMemoryFromVisible(
+  ctx: MemoryMatchBotContext
+): Record<string, number[]> {
+  const accuracy = getAccuracyRate(ctx.accuracy ?? "medium");
+  const next: Record<string, number[]> = {};
+
+  // Start from previous memory but drop indices that are no longer hidden/revealed
+  for (const [icon, indices] of Object.entries(ctx.memory ?? {})) {
+    const filtered = indices.filter((i) => {
+      const card = ctx.cards[i];
+      return card && card.state !== "matched";
+    });
+    if (filtered.length) {
+      next[icon] = filtered;
+    }
+  }
+
+  // Consider currently revealed cards for potential remembering
+  for (const card of ctx.cards) {
+    if (card.state === "hidden" || card.state === "matched") continue;
+    if (Math.random() > accuracy) continue;
+    const arr = next[card.icon] ?? [];
+    if (!arr.includes(card.index)) {
+      arr.push(card.index);
+    }
+    next[card.icon] = arr;
+  }
+
+  return next;
+}
+
+export function getMemoryMatchBotMove(ctx: MemoryMatchBotContext): MemoryMatchBotMove {
+  const memory = updateMemoryFromVisible(ctx);
+
+  const hiddenIndices = ctx.cards
+    .filter((c) => c.state === "hidden")
+    .map((c) => c.index);
+
+  // 1. If we know a full pair, pick that.
+  for (const [icon, indices] of Object.entries(memory)) {
+    const usable = indices.filter((i) => hiddenIndices.includes(i));
+    if (usable.length >= 2) {
+      const [a, b] = usable.slice(0, 2);
+      return {
+        firstIndex: a,
+        secondIndex: b,
+        knowsPair: true,
+        updatedMemory: memory,
+      };
+    }
+  }
+
+  // 2. If we know one card of a pair, flip an unknown first, then that known card.
+  let knownSingle: number | null = null;
+  for (const indices of Object.values(memory)) {
+    const usable = indices.filter((i) => hiddenIndices.includes(i));
+    if (usable.length === 1) {
+      knownSingle = usable[0];
+      break;
+    }
+  }
+
+  if (knownSingle != null && hiddenIndices.length > 1) {
+    const unknownHidden = hiddenIndices.filter((i) => i !== knownSingle);
+    const firstIndex =
+      unknownHidden[Math.floor(Math.random() * unknownHidden.length)];
+    return {
+      firstIndex,
+      secondIndex: knownSingle,
+      knowsPair: false,
+      updatedMemory: memory,
+    };
+  }
+
+  // 3. Otherwise, flip two random hidden cards.
+  if (hiddenIndices.length >= 2) {
+    const shuffled = [...hiddenIndices];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return {
+      firstIndex: shuffled[0],
+      secondIndex: shuffled[1],
+      knowsPair: false,
+      updatedMemory: memory,
+    };
+  }
+
+  // Fallback: just pick any two cards (should be rare / endgame).
+  const allIndices = ctx.cards.map((c) => c.index);
+  const [a = 0, b = 0] = allIndices;
+  return {
+    firstIndex: a,
+    secondIndex: b,
+    knowsPair: false,
+    updatedMemory: memory,
+  };
+}
+
+/**
+ * Timing helper for memory match bot.
+ * Slightly faster when it "knows" a pair.
+ */
+export function getMemoryMatchBotDelayMs(
+  knowsPair: boolean,
+  isSecondCard: boolean
+): number {
+  if (knowsPair) {
+    return isSecondCard
+      ? 500 + Math.floor(Math.random() * 400)
+      : 500 + Math.floor(Math.random() * 400);
+  }
+  return isSecondCard
+    ? 600 + Math.floor(Math.random() * 600)
+    : 800 + Math.floor(Math.random() * 700);
+}
+
+// --- Spelling Bee bot ---
+
+export interface SpellingBeeBotInput {
+  word: string;
+  difficulty: SpellingDifficulty;
+  commonMisspellings?: string[];
+}
+
+/**
+ * Spelling Bee bot: returns answer and simulated response time.
+ * Accuracy: easy 90%, medium 70%, hard 50%, expert 30%.
+ * When wrong: uses commonMisspellings or applies realistic misspelling patterns.
+ * 5% chance expert words result in timeout (timedOut: true).
+ */
+export function getSpellingBeeBotAnswer(input: SpellingBeeBotInput): {
+  answer: string;
+  timeMs: number;
+  timedOut?: boolean;
+} {
+  const { word, difficulty, commonMisspellings } = input;
+  const correct = word.trim().toLowerCase();
+
+  const accuracyByDifficulty: Record<SpellingDifficulty, number> = {
+    easy: 0.9,
+    medium: 0.7,
+    hard: 0.5,
+    expert: 0.3,
+  };
+  const chance = accuracyByDifficulty[difficulty];
+  const spellCorrectly = Math.random() < chance;
+
+  const timeRangeByDifficulty: Record<SpellingDifficulty, [number, number]> = {
+    easy: [2000, 5000],
+    medium: [3000, 7000],
+    hard: [5000, 10000],
+    expert: [7000, 14000],
+  };
+  const [minMs, maxMs] = timeRangeByDifficulty[difficulty];
+
+  const timedOut = difficulty === "expert" && Math.random() < 0.05;
+  if (timedOut) {
+    return {
+      answer: "",
+      timeMs: 15000 + Math.floor(Math.random() * 500),
+      timedOut: true,
+    };
+  }
+
+  if (spellCorrectly) {
+    const timeMs = minMs + Math.floor(Math.random() * (maxMs - minMs + 1));
+    return { answer: correct, timeMs };
+  }
+
+  const wrongTimeMs = Math.min(12000, minMs + 2000 + Math.floor(Math.random() * (maxMs - minMs + 3000)));
+  const wrongAnswer = getRealisticMisspelling(correct, commonMisspellings);
+  return { answer: wrongAnswer, timeMs: wrongTimeMs };
+}
+
+function getRealisticMisspelling(correct: string, commonMisspellings?: string[]): string {
+  if (commonMisspellings?.length) {
+    return commonMisspellings[Math.floor(Math.random() * commonMisspellings.length)];
+  }
+  const arr = correct.split("");
+  const pattern = Math.floor(Math.random() * 5);
+  switch (pattern) {
+    case 0: {
+      const i = arr.findIndex((_, j) => j < arr.length - 1 && arr[j] === arr[j + 1]);
+      if (i >= 0) {
+        const out = [...arr];
+        out.splice(i, 1);
+        return out.join("");
+      }
+      const dup = Math.min(arr.length - 1, Math.floor(Math.random() * arr.length));
+      const out = [...arr];
+      out.splice(dup, 0, arr[dup]);
+      return out.join("");
+    }
+    case 1: {
+      const vowels = "aeiou";
+      const i = arr.findIndex((c) => vowels.includes(c));
+      if (i >= 0) {
+        const out = [...arr];
+        out[i] = vowels[(vowels.indexOf(out[i]) + 1) % 5];
+        return out.join("");
+      }
+      break;
+    }
+    case 2: {
+      const i = arr.findIndex((c) => "kgndbt".includes(c));
+      if (i >= 0) {
+        const out = [...arr];
+        out.splice(i, 1);
+        return out.join("");
+      }
+      break;
+    }
+    case 3: {
+      if (arr.length >= 2) {
+        const i = Math.min(arr.length - 2, Math.floor(Math.random() * (arr.length - 1)));
+        const out = [...arr];
+        [out[i], out[i + 1]] = [out[i + 1], out[i]];
+        return out.join("");
+      }
+      break;
+    }
+    case 4: {
+      const suf = ["ence", "ance", "able", "ible", "tion", "sion"];
+      for (const s of suf) {
+        if (correct.endsWith(s)) {
+          const alt = s === "ence" ? "ance" : s === "ance" ? "ence" : s === "able" ? "ible" : s === "ible" ? "able" : s === "tion" ? "sion" : "tion";
+          return correct.slice(0, -s.length) + alt;
+        }
+      }
+      if (correct.endsWith("er")) return correct.slice(0, -2) + "re";
+      if (correct.endsWith("re")) return correct.slice(0, -2) + "er";
+      break;
+    }
+  }
+  const drop = Math.floor(Math.random() * arr.length);
+  const out = arr.filter((_, i) => i !== drop);
+  return out.length ? out.join("") : correct;
+}
+

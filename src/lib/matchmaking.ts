@@ -52,6 +52,13 @@ export interface StoredMatch {
   createdAt: string;
   connectionLog?: ConnectionSnapshot[];
   connectionWarningAcknowledged?: false | ConnectionWarningAck;
+  /** When true, match is from practice storage; no wallet impact */
+  isPractice?: boolean;
+  /** When true, match is real multiplayer (two humans); use realtime channel */
+  isRealMultiplayer?: boolean;
+  /** Real match: player user IDs for role resolution */
+  player1Id?: string;
+  player2Id?: string;
 }
 
 export function generateMatchId(): string {

@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import AppNavbar from "@/components/AppNavbar";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import { useOnlinePlayers } from "@/hooks/useOnlinePlayers";
+import { getCurrentUser } from "@/lib/api";
 
 interface DisplayUser {
   user_metadata?: { username?: string };
@@ -15,10 +19,11 @@ const GAMES = [
   { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-teal/30 to-purple/30", active: true },
   { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
   { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
-  { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
+  { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: false },
   { name: "Reaction Duel", slug: "reaction-duel", gradient: "from-orange-500/30 to-red-500/30", active: true },
+  { name: "Spelling Bee", slug: "spelling-bee", gradient: "from-amber-500/30 to-yellow-600/30", active: true },
+  { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
   { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
-  { name: "Card Clash", slug: "card-clash", gradient: "from-rose-500/20 to-purple/20", active: false },
 ];
 
 function useRandom(min: number, max: number, seed: string): number {
@@ -36,6 +41,7 @@ function GameCard({
   active,
   playersOnline,
   waitSec,
+  isPractice,
 }: {
   name: string;
   slug: string;
@@ -43,12 +49,15 @@ function GameCard({
   active: boolean;
   playersOnline: number;
   waitSec: number;
+  isPractice: boolean;
 }) {
   const content = (
     <div
       className={`card-border relative flex min-h-[160px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
         active
-          ? "hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-teal-glow/10 cursor-pointer"
+          ? isPractice
+            ? "hover:-translate-y-0.5 hover:border-purple-500/30 hover:shadow-purple-500/10 cursor-pointer"
+            : "hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-teal-glow/10 cursor-pointer"
           : "cursor-not-allowed opacity-60"
       }`}
     >
@@ -56,8 +65,8 @@ function GameCard({
       <div className="relative">
         <p className="font-semibold text-white">{name}</p>
         {active ? (
-          <span className="mt-2 inline-block w-fit rounded-full bg-teal/20 px-2.5 py-0.5 text-xs font-medium text-teal">
-            1v1
+          <span className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>
+            {isPractice ? "1v1 • Free" : "1v1"}
           </span>
         ) : (
           <span className="mt-2 inline-block w-fit rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-body-gray">
@@ -87,11 +96,14 @@ function GameCard({
 
 export default function PlayPage() {
   const router = useRouter();
+  const { isPractice } = usePlayMode();
   const [user, setUser] = useState<DisplayUser | null>(null);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [playersWait, setPlayersWait] = useState<{ players: number; wait: number }[]>([]);
+  const onlineCount = useOnlinePlayers(userId);
 
   useEffect(() => {
     setPlayersWait(
@@ -104,35 +116,18 @@ export default function PlayPage() {
 
   useEffect(() => {
     async function getUser() {
-      if (typeof window !== "undefined" && localStorage.getItem("skillflow_dev_mode") === "true") {
-        try {
-          const raw = localStorage.getItem("skillflow_dev_user");
-          if (raw) {
-            const devUser = JSON.parse(raw) as { username: string; email: string; role: string };
-            setUser({
-              user_metadata: { username: devUser.username },
-              email: devUser.email,
-            });
-            setIsDevMode(true);
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // fall through
-        }
-      }
-      const supabase = createClient();
-      if (!supabase) {
+      const current = await getCurrentUser();
+      if (!current) {
+        router.push("/login");
         setLoading(false);
-        router.push("/login");
         return;
       }
-      const { data: { user: u } } = await supabase.auth.getUser();
-      if (!u) {
-        router.push("/login");
-        return;
-      }
-      setUser(u);
+      setUserId(current.id);
+      setUser({
+        user_metadata: { username: current.username },
+        email: current.email,
+      });
+      setIsDevMode(current.isDevMode ?? false);
       setLoading(false);
     }
     getUser();
@@ -168,7 +163,7 @@ export default function PlayPage() {
   const username = user?.user_metadata?.username || "Player";
 
   return (
-    <div className="min-h-screen bg-charcoal">
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username={username}
@@ -177,19 +172,54 @@ export default function PlayPage() {
         loggingOut={loggingOut}
         currentPage="play"
       />
-      <main className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
+      <ModeToggleBarContent />
+      <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
+        {!isPractice && (
+          <Link
+            href="/last-touch"
+            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
+                  LAST TOUCH
+                </h2>
+                <p className="mt-1 text-body-gray">Hold your ground. Win it all.</p>
+                <p className="mt-2 text-sm text-teal">Massive prize pool • Last finger standing wins</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-body-gray">Prize Pool</p>
+                  <p className="text-xl font-bold text-white">$1,247</p>
+                </div>
+                <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(0,229,199,0.4)]">
+                  Join Now
+                </span>
+              </div>
+            </div>
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal/20 blur-2xl" />
+          </Link>
+        )}
+
         <h1 className="text-2xl font-bold text-white sm:text-3xl">Choose Your Game</h1>
-        <p className="mt-1 text-body-gray">Select a game and stake to find your opponent</p>
+        <p className="mt-1 text-body-gray">
+          {isPractice ? "Select a game to play for free" : "Select a game and stake to find your opponent"}
+        </p>
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3">
-          {GAMES.map((game, i) => (
+          {(isPractice
+            ? GAMES.filter((g) => g.active && ["8-ball-pool", "chess", "connect-4", "reaction-duel", "spelling-bee"].includes(g.slug))
+            : GAMES
+          ).map((game, i) => (
             <GameCard
               key={game.slug}
               name={game.name}
               slug={game.slug}
               gradient={game.gradient}
               active={game.active}
-              playersOnline={playersWait[i]?.players ?? 100}
+              playersOnline={onlineCount}
               waitSec={playersWait[i]?.wait ?? 15}
+              isPractice={isPractice}
             />
           ))}
         </div>

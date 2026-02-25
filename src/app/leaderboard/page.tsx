@@ -3,7 +3,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
-import { getCurrentUser, getLeaderboard, logout as apiLogout } from "@/lib/api";
+import Footer from "@/components/Footer";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
 import {
   generateFakeLeaderboard,
   sortAndRankPlayers,
@@ -31,10 +34,12 @@ export default function LeaderboardPage() {
   const [isDevMode, setIsDevMode] = useState(false);
 
   const [rawPlayers, setRawPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [practicePlayers, setPracticePlayers] = useState<LeaderboardPlayer[]>([]);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("earnings");
   const [gameFilter, setGameFilter] = useState("All Games");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const { isPractice } = usePlayMode();
 
   useEffect(() => {
     async function load() {
@@ -56,6 +61,29 @@ export default function LeaderboardPage() {
           }));
           setRawPlayers(withCurrent);
         }
+        const practice = getPracticeMatches();
+        const byUser: Record<string, { wins: number; matches: number }> = {};
+        practice.filter((m) => m.status === "completed").forEach((m) => {
+          const u = m.player1.username;
+          if (!byUser[u]) byUser[u] = { wins: 0, matches: 0 };
+          byUser[u].matches++;
+          if (m.winner === "player1") byUser[u].wins++;
+        });
+        const list: LeaderboardPlayer[] = Object.entries(byUser)
+          .map(([username, s]) => ({
+            id: username,
+            username,
+            avatarGradient: "from-purple-500/40 to-pink-500/40",
+            skillRating: 1000,
+            totalMatches: s.matches,
+            winRate: s.matches ? (s.wins / s.matches) * 100 : 0,
+            totalEarnings: 0,
+            trend: "up",
+            isCurrentUser: username === user.username,
+          }))
+          .sort((a, b) => b.totalMatches - a.totalMatches)
+          .slice(0, 50);
+        setPracticePlayers(list);
       } catch {
         router.push("/login");
       } finally {
@@ -70,11 +98,17 @@ export default function LeaderboardPage() {
     [rawPlayers, activeTab]
   );
 
+  const sortedPractice = useMemo(
+    () => [...practicePlayers].sort((a, b) => b.totalMatches - a.totalMatches),
+    [practicePlayers]
+  );
+
   const filteredPlayers = useMemo(() => {
-    if (!search.trim()) return sortedPlayers;
+    const source = isPractice ? sortedPractice : sortedPlayers;
+    if (!search.trim()) return source;
     const q = search.trim().toLowerCase();
-    return sortedPlayers.filter((p) => p.username.toLowerCase().includes(q));
-  }, [sortedPlayers, search]);
+    return source.filter((p) => p.username.toLowerCase().includes(q));
+  }, [sortedPlayers, sortedPractice, search, isPractice]);
 
   const podium = filteredPlayers.slice(0, 3);
   const tablePlayers = filteredPlayers.slice(3);
@@ -115,7 +149,7 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal pb-24">
+    <div className="min-h-screen bg-charcoal pb-24 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username={username}
@@ -124,51 +158,58 @@ export default function LeaderboardPage() {
         loggingOut={loggingOut}
         currentPage="leaderboard"
       />
+      <ModeToggleBarContent />
 
-      <main className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="text-3xl font-bold text-white sm:text-4xl">
-          Leaderboard 🏆
+      <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">
+          {isPractice ? "Practice Leaderboard 🎯" : "Leaderboard 🏆"}
         </h1>
-        <p className="mt-1 text-body-gray">See how you stack up against the competition</p>
+        <p className="mt-1 text-body-gray">
+          {isPractice ? "Ranked by practice matches played" : "See how you stack up against the competition"}
+        </p>
 
-        {/* Tabs */}
-        <div className="mt-6 flex flex-wrap gap-2 border-b border-white/5 pb-4">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.id);
-                setPage(1);
-              }}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                activeTab === tab.id
-                  ? "bg-teal text-charcoal"
-                  : "bg-card text-body-gray hover:text-white"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {!isPractice && (
+          <>
+            {/* Tabs */}
+            <div className="mt-6 flex flex-nowrap gap-2 overflow-x-auto border-b border-white/5 pb-4">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setPage(1);
+                  }}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                    activeTab === tab.id
+                      ? "bg-teal text-charcoal"
+                      : "bg-card text-body-gray hover:text-white"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-        {/* Game filter */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {GAME_FILTERS.map((game) => (
-            <button
-              key={game}
-              type="button"
-              onClick={() => setGameFilter(game)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                gameFilter === game
-                  ? "border-teal/50 bg-teal/10 text-teal"
-                  : "border-white/10 text-body-gray hover:text-white"
-              }`}
-            >
-              {game}
-            </button>
-          ))}
-        </div>
+            {/* Game filter */}
+            <div className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto">
+              {GAME_FILTERS.map((game) => (
+                <button
+                  key={game}
+                  type="button"
+                  onClick={() => setGameFilter(game)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    gameFilter === game
+                      ? "border-teal/50 bg-teal/10 text-teal"
+                      : "border-white/10 text-body-gray hover:text-white"
+                  }`}
+                >
+                  {game}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Podium - Top 3 */}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
@@ -185,9 +226,9 @@ export default function LeaderboardPage() {
               </div>
               <p className="mt-2 font-semibold text-white">{podium[1].username}</p>
               {podium[1].isCurrentUser && (
-                <span className="mt-1 rounded bg-teal/20 px-2 py-0.5 text-xs text-teal">You</span>
+                <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-lg font-bold text-white">{getMainStat(podium[1], activeTab)}</p>
+              <p className="mt-2 text-lg font-bold text-white">{isPractice ? `${podium[1].totalMatches} matches` : getMainStat(podium[1], activeTab)}</p>
             </div>
           )}
           {podium[0] && (
@@ -204,9 +245,9 @@ export default function LeaderboardPage() {
               </div>
               <p className="mt-2 font-semibold text-white">{podium[0].username}</p>
               {podium[0].isCurrentUser && (
-                <span className="mt-1 rounded bg-teal/20 px-2 py-0.5 text-xs text-teal">You</span>
+                <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-xl font-bold text-[#FFD700]">{getMainStat(podium[0], activeTab)}</p>
+              <p className="mt-2 text-xl font-bold text-[#FFD700]">{isPractice ? `${podium[0].totalMatches} matches` : getMainStat(podium[0], activeTab)}</p>
             </div>
           )}
           {podium[2] && (
@@ -222,9 +263,9 @@ export default function LeaderboardPage() {
               </div>
               <p className="mt-2 font-semibold text-white">{podium[2].username}</p>
               {podium[2].isCurrentUser && (
-                <span className="mt-1 rounded bg-teal/20 px-2 py-0.5 text-xs text-teal">You</span>
+                <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-lg font-bold text-white">{getMainStat(podium[2], activeTab)}</p>
+              <p className="mt-2 text-lg font-bold text-white">{isPractice ? `${podium[2].totalMatches} matches` : getMainStat(podium[2], activeTab)}</p>
             </div>
           )}
         </div>
@@ -249,13 +290,10 @@ export default function LeaderboardPage() {
                   <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
                   <th className="px-4 py-3 font-medium text-body-gray">Player</th>
                   <th className="px-4 py-3 font-medium text-body-gray">
-                    {activeTab === "earnings" && "Total Earnings"}
-                    {activeTab === "winRate" && "Win Rate"}
-                    {activeTab === "matches" && "Matches"}
-                    {activeTab === "rating" && "Rating"}
+                    {isPractice ? "Practice Matches" : (activeTab === "earnings" && "Total Earnings") || (activeTab === "winRate" && "Win Rate") || (activeTab === "matches" && "Matches") || (activeTab === "rating" && "Rating")}
                   </th>
-                  <th className="px-4 py-3 font-medium text-body-gray">Secondary</th>
-                  <th className="px-4 py-3 font-medium text-body-gray">Trend</th>
+                  <th className="px-4 py-3 font-medium text-body-gray">{isPractice ? "Win %" : "Secondary"}</th>
+                  {!isPractice && <th className="px-4 py-3 font-medium text-body-gray">Trend</th>}
                 </tr>
               </thead>
               <tbody>
@@ -264,9 +302,9 @@ export default function LeaderboardPage() {
                   return (
                     <tr
                       key={player.id}
-                      className={`border-b border-white/5 transition-colors hover:border-l-2 hover:border-l-teal ${
+                      className={`border-b border-white/5 transition-colors hover:border-l-2 ${isPractice ? "hover:border-l-purple-500" : "hover:border-l-teal"} ${
                         rank % 2 === 0 ? "bg-[#151821]" : "bg-[#1A1D27]"
-                      } ${player.isCurrentUser ? "bg-teal/10" : ""}`}
+                      } ${player.isCurrentUser ? (isPractice ? "bg-purple-500/10" : "bg-teal/10") : ""}`}
                     >
                       <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                       <td className="px-4 py-3">
@@ -278,17 +316,19 @@ export default function LeaderboardPage() {
                           </div>
                           <span className="font-medium text-white">{player.username}</span>
                           {player.isCurrentUser && (
-                            <span className="rounded bg-teal/20 px-2 py-0.5 text-xs text-teal">You</span>
+                            <span className={`rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-white">{getMainStat(player, activeTab)}</td>
-                      <td className="px-4 py-3 text-body-gray">{getSecondaryStat(player, activeTab)}</td>
-                      <td className="px-4 py-3">
-                        <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
-                          {player.trend === "up" ? "↑" : "↓"}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3 font-semibold text-white">{isPractice ? player.totalMatches : getMainStat(player, activeTab)}</td>
+                      <td className="px-4 py-3 text-body-gray">{isPractice ? `${Math.round(player.winRate)}%` : getSecondaryStat(player, activeTab)}</td>
+                      {!isPractice && (
+                        <td className="px-4 py-3">
+                          <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
+                            {player.trend === "up" ? "↑" : "↓"}
+                          </span>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -304,7 +344,7 @@ export default function LeaderboardPage() {
                 <div
                   key={player.id}
                   className={`card-border flex items-center justify-between gap-3 rounded-card p-4 ${
-                    player.isCurrentUser ? "border-teal/30 bg-teal/10" : ""
+                    player.isCurrentUser ? (isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10") : ""
                   }`}
                 >
                   <p className="w-8 shrink-0 text-body-gray">#{rank}</p>
@@ -316,17 +356,19 @@ export default function LeaderboardPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-white truncate">{player.username}</p>
-                      <p className="text-xs text-body-gray">{getSecondaryStat(player, activeTab)}</p>
+                      <p className="text-xs text-body-gray">{isPractice ? `${Math.round(player.winRate)}% win` : getSecondaryStat(player, activeTab)}</p>
                     </div>
                     {player.isCurrentUser && (
-                      <span className="shrink-0 rounded bg-teal/20 px-2 py-0.5 text-xs text-teal">You</span>
+                      <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-semibold text-white">{getMainStat(player, activeTab)}</p>
-                    <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
-                      {player.trend === "up" ? "↑" : "↓"}
-                    </span>
+                    <p className="font-semibold text-white">{isPractice ? player.totalMatches : getMainStat(player, activeTab)}</p>
+                    {!isPractice && (
+                      <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
+                        {player.trend === "up" ? "↑" : "↓"}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -346,13 +388,13 @@ export default function LeaderboardPage() {
           )}
         </div>
       </main>
-
-      {/* Your Rank sticky bar */}
+      <Footer />
+      {/* Your Rank sticky bar (sits above bottom tab bar on mobile) */}
       {currentUserRank != null && currentUserPlayer && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/5 bg-charcoal/95 backdrop-blur-sm">
-          <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4 border-l-4 border-teal px-4 py-3 sm:px-6">
+        <div className="fixed bottom-[60px] left-0 right-0 z-30 border-t border-white/5 bg-charcoal/95 backdrop-blur-sm md:bottom-0">
+          <div className={`mx-auto flex max-w-[1200px] items-center justify-between gap-4 border-l-4 px-4 py-3 sm:px-6 ${isPractice ? "border-purple-500" : "border-teal"}`}>
             <span className="text-sm text-body-gray">Your Rank:</span>
-            <span className="font-bold text-teal">#{currentUserRank}</span>
+            <span className={`font-bold ${isPractice ? "text-purple-400" : "text-teal"}`}>#{currentUserRank}</span>
             <div className="flex items-center gap-2">
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${currentUserPlayer.avatarGradient} text-sm font-bold text-white`}
@@ -361,7 +403,7 @@ export default function LeaderboardPage() {
               </div>
               <span className="font-medium text-white">{currentUserPlayer.username}</span>
             </div>
-            <span className="font-semibold text-white">{getMainStat(currentUserPlayer, activeTab)}</span>
+            <span className="font-semibold text-white">{isPractice ? `${currentUserPlayer.totalMatches} matches` : getMainStat(currentUserPlayer, activeTab)}</span>
           </div>
         </div>
       )}

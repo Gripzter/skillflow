@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   createEmptyBoard,
   dropDisc,
@@ -24,7 +24,9 @@ const RED_EDGE = "#CC0000";
 const YELLOW_CENTER = "#FFDD44";
 const YELLOW_EDGE = "#CCAA00";
 
-interface ConnectFourProps {
+import type { GameMultiplayerProps } from "./Chess";
+
+interface ConnectFourProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
   player2: { username: string; rating: number };
   onGameEnd: (winner: "player1" | "player2") => void;
@@ -46,6 +48,11 @@ export default function ConnectFour({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  isMultiplayer = false,
+  myRole = "player1",
+  sendGameEvent,
+  incomingEvent,
+  onEventProcessed,
 }: ConnectFourProps) {
   const [board, setBoard] = useState<Board>(() => createEmptyBoard());
   const [turn, setTurn] = useState<Player>(1);
@@ -58,8 +65,9 @@ export default function ConnectFour({
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const moveListEndRef = useRef<HTMLDivElement | null>(null);
-  const boardRef = useRef<HTMLDivElement>(null);
-  const [cellSize, setCellSize] = useState(56);
+  const boardColumnRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(48);
+  const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
   const validColumns = useMemo(() => getValidColumns(board), [board]);
   const isColumnFull = useCallback(
@@ -67,30 +75,61 @@ export default function ConnectFour({
     [board]
   );
 
-  useEffect(() => {
-    const el = boardRef.current;
-    if (!el) return;
-    const width = Math.min(500, window.innerWidth * 0.9);
-    const cell = Math.floor((width - 24 - (COLS + 1) * 3) / COLS);
-    setCellSize(Math.max(40, Math.min(cell, 64)));
+  // Size board from the actual board column so it never overflows or gets cut off.
+  // Board width = 7*cellSize + 24, board + preview height = 7*cellSize + 37.
+  const updateCellSize = useCallback(() => {
+    const col = boardColumnRef.current;
+    if (!col) return;
+    const w = col.clientWidth;
+    const h = col.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    const reservedHeight = 80; // player bar + gap + padding
+    const availableWidth = Math.max(200, w - 32);
+    const availableHeight = Math.max(200, h - reservedHeight);
+    const maxByWidth = (availableWidth - 24) / COLS;
+    const maxByHeight = (availableHeight - 37) / (ROWS + 1);
+    const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
+    if (!Number.isFinite(raw) || raw <= 0) return;
+    setCellSize(Math.max(40, Math.min(raw, 75)));
   }, []);
+
+  useLayoutEffect(() => {
+    updateCellSize();
+  }, [updateCellSize]);
+
+  useEffect(() => {
+    const el = boardColumnRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(updateCellSize);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [updateCellSize]);
+
+  useEffect(() => {
+    window.addEventListener("resize", updateCellSize);
+    return () => window.removeEventListener("resize", updateCellSize);
+  }, [updateCellSize]);
 
   const handleDrop = useCallback(
     (col: number) => {
-      if (gameOverRef.current || turn !== 1) return;
-      const result = dropDisc(board, col, 1);
+      if (gameOverRef.current) return;
+      const isMyTurn =
+        (turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2");
+      if (!isMyTurn) return;
+      const result = dropDisc(board, col, turn);
       if (!result) return;
-      setDropping({ col, row: result.row, player: 1 });
+      const playerName = turn === 1 ? player1.username : player2.username;
+      setDropping({ col, row: result.row, player: turn });
       setBoard(result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
-      setMoveHistory((prev) => [...prev, { player: 1, playerName: player1.username, col, ts }]);
+      setMoveHistory((prev) => [...prev, { player: turn, playerName, col, ts }]);
       const win = checkWin(result.board);
       if (win) {
         setTimeout(() => {
           setWinResult(win);
           setTimeout(() => {
             gameOverRef.current = true;
-            onGameEnd("player1");
+            onGameEnd(win.player === 1 ? "player1" : "player2");
           }, 1500);
         }, 520);
       } else if (isBoardFull(result.board)) {
@@ -100,16 +139,74 @@ export default function ConnectFour({
           onGameDraw();
         }, 520);
       } else {
-        setTurn(2);
+        setTurn(turn === 1 ? 2 : 1);
+      }
+      if (isMultiplayer && sendGameEvent) {
+        sendGameEvent({ type: "connect4_move", column: col }).catch(() => {});
       }
     },
-    [board, turn, player1.username, onGameEnd, onGameDraw]
+    [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent]
   );
+
+  // Incoming multiplayer events: apply opponent move or handle resign
+  useEffect(() => {
+    if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
+    const type = incomingEvent.type as string | undefined;
+    if (type === "connect4_move") {
+      const column = incomingEvent.column as number | undefined;
+      if (typeof column !== "number" || column < 0 || column > 6 || gameOverRef.current) {
+        onEventProcessed();
+        return;
+      }
+      const nextRow = getNextRow(board, column);
+      if (nextRow < 0) {
+        onEventProcessed();
+        return;
+      }
+      lastProcessedEventRef.current = incomingEvent;
+      const result = dropDisc(board, column, turn);
+      if (!result) {
+        onEventProcessed();
+        return;
+      }
+      const playerName = turn === 1 ? player1.username : player2.username;
+      setDropping({ col: column, row: result.row, player: turn });
+      setBoard(result.board);
+      const ts = (Date.now() - gameStartTimeRef.current) / 1000;
+      setMoveHistory((prev) => [...prev, { player: turn, playerName, col: column, ts }]);
+      const win = checkWin(result.board);
+      if (win) {
+        setTimeout(() => {
+          setWinResult(win);
+          setTimeout(() => {
+            gameOverRef.current = true;
+            onGameEnd(win.player === 1 ? "player1" : "player2");
+          }, 1500);
+        }, 520);
+      } else if (isBoardFull(result.board)) {
+        setTimeout(() => {
+          setIsDraw(true);
+          gameOverRef.current = true;
+          onGameDraw();
+        }, 520);
+      } else {
+        setTurn(turn === 1 ? 2 : 1);
+      }
+      onEventProcessed();
+      return;
+    }
+    if (type === "resign") {
+      lastProcessedEventRef.current = incomingEvent;
+      gameOverRef.current = true;
+      onGameEnd(myRole);
+      onEventProcessed();
+    }
+  }, [incomingEvent, onEventProcessed, board, turn, player1.username, player2.username, myRole, onGameEnd, onGameDraw]);
 
   const boardKey = board.map((r) => r.join("")).join("|");
   useEffect(() => {
     if (dropping) return;
-    if (!isPlayer2Bot || turn !== 2 || gameOverRef.current) return;
+    if (isMultiplayer || !isPlayer2Bot || turn !== 2 || gameOverRef.current) return;
     setBotThinking(true);
     const delay = getConnect4BotDelayMs();
     const t = setTimeout(() => {
@@ -148,7 +245,7 @@ export default function ConnectFour({
       setBotThinking(false);
     }, delay);
     return () => clearTimeout(t);
-  }, [boardKey, turn, isPlayer2Bot, board, player2.username, onGameEnd, onGameDraw, dropping]);
+  }, [boardKey, turn, isPlayer2Bot, isMultiplayer, board, player2.username, onGameEnd, onGameDraw, dropping]);
 
   useEffect(() => {
     if (dropping) {
@@ -170,10 +267,13 @@ export default function ConnectFour({
   const boardHeight = cellSize * ROWS + (ROWS + 1) * 3;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-6">
-      <div className="flex flex-1 flex-col items-center gap-3 py-4 lg:min-w-0">
+    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-4">
+      <div
+        ref={boardColumnRef}
+        className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden py-4 lg:min-w-0"
+      >
         {/* Player bar */}
-        <div className="flex w-full max-w-[min(500px,90vw)] items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
+        <div className="flex w-full max-w-[min(500px,90vw)] shrink-0 items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
           <div className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white font-bold text-sm">
               {player1.username.charAt(0)}
@@ -194,21 +294,26 @@ export default function ConnectFour({
             {isPlayer2Bot && (
               <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-body-gray">🤖 BOT</span>
             )}
-            {botThinking && <span className="animate-pulse text-body-gray text-sm">...</span>}
+            {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))) && (
+              <span className="animate-pulse text-body-gray text-sm">
+                {isMultiplayer ? "Opponent's turn..." : "..."}
+              </span>
+            )}
             <div className="h-9 w-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-gray-900 font-bold text-sm">
               {player2.username.charAt(0)}
             </div>
           </div>
         </div>
 
-        {/* Board container: hover preview above + grid */}
-        <div ref={boardRef} className="flex flex-col items-center relative">
+        {/* Board container: centered, never overflows */}
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+          <div className="flex flex-col items-center relative shrink-0">
           {/* Hover disc preview above board */}
           <div
             className="relative flex justify-center"
             style={{ width: boardWidth, height: cellSize + 16 }}
           >
-            {hoverCol !== null && !isColumnFull(hoverCol) && turn === 1 && !dropping && !gameOverRef.current && (
+            {hoverCol !== null && !isColumnFull(hoverCol) && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2")) && !dropping && !gameOverRef.current && (
               <div
                 className="absolute rounded-full opacity-50 pointer-events-none"
                 style={{
@@ -216,7 +321,9 @@ export default function ConnectFour({
                   height: cellSize - 6,
                   left: 3 + hoverCol * (cellSize + 3) + (cellSize - (cellSize - 6)) / 2,
                   top: 8,
-                  background: `radial-gradient(circle at 30% 30%, ${RED_CENTER}, ${RED_EDGE})`,
+                  background: turn === 1
+                    ? `radial-gradient(circle at 30% 30%, ${RED_CENTER}, ${RED_EDGE})`
+                    : `radial-gradient(circle at 30% 30%, ${YELLOW_CENTER}, ${YELLOW_EDGE})`,
                   boxShadow: "inset -2px -2px 4px rgba(0,0,0,0.3), inset 2px 2px 4px rgba(255,255,255,0.2)",
                 }}
               />
@@ -225,17 +332,26 @@ export default function ConnectFour({
 
           {/* Board */}
           <div
-            className="rounded-2xl p-3 flex flex-col gap-[3px] relative"
+            className="rounded-2xl p-3 flex flex-col gap-[3px] relative overflow-hidden"
             style={{
               backgroundColor: BOARD_BG,
               boxShadow: "0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
               width: boardWidth,
               height: boardHeight,
-              cursor: hoverCol !== null && turn === 1 ? (isColumnFull(hoverCol) ? "not-allowed" : "pointer") : "default",
+              cursor:
+                hoverCol !== null && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2"))
+                  ? isColumnFull(hoverCol)
+                    ? "not-allowed"
+                    : "pointer"
+                  : "default",
             }}
           >
             {[0, 1, 2, 3, 4, 5].map((row) => (
-              <div key={row} className="flex gap-[3px]" style={{ height: cellSize + 3 }}>
+              <div
+                key={row}
+                className="flex gap-[3px] flex-none"
+                style={{ height: cellSize + 3, width: boardWidth - 6 }}
+              >
                 {[0, 1, 2, 3, 4, 5, 6].map((col) => {
                   const cell = board[row][col];
                   const isWinCell = winSet?.has(`${row},${col}`);
@@ -249,7 +365,7 @@ export default function ConnectFour({
                       key={`${row}-${col}`}
                       data-col={col}
                       data-row={row}
-                      className="rounded-full flex items-center justify-center transition-opacity"
+                      className="rounded-full flex items-center justify-center transition-opacity flex-none"
                       style={{
                         width: cellSize + 3,
                         height: cellSize + 3,
@@ -304,13 +420,14 @@ export default function ConnectFour({
               </svg>
             )}
           </div>
+          </div>
         </div>
       </div>
 
       {/* Move log */}
-      <div className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 lg:w-[32%] lg:min-w-[240px] min-h-0">
+      <div className="flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 lg:w-[280px] lg:flex-shrink-0 min-h-0 h-full">
         <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col" style={{ maxHeight: 400 }}>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col">
           <p className="text-center text-xs text-body-gray py-2 shrink-0">
             🔴🟡 Game Started • {player1.username} vs {player2.username}
             {isPlayer2Bot ? " 🤖" : ""}

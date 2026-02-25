@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getWalletBalance } from "@/lib/api";
+import ConnectionBadge from "@/components/ConnectionBadge";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -17,7 +19,7 @@ interface AppNavbarProps {
   isDevMode: boolean;
   onLogout: () => void;
   loggingOut: boolean;
-  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external";
+  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings";
 }
 
 export default function AppNavbar({
@@ -27,6 +29,7 @@ export default function AppNavbar({
   loggingOut,
   currentPage,
 }: AppNavbarProps) {
+  const { isPractice } = usePlayMode();
   const [balance, setBalance] = useState(0);
 
   useEffect(() => {
@@ -47,59 +50,71 @@ export default function AppNavbar({
   const balanceFormatted = balance.toFixed(2);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-white/5 bg-charcoal/95 backdrop-blur-sm px-4 py-3 sm:px-6 lg:px-8">
+    <header className="navbar sticky top-0 z-50 border-b border-white/5 bg-charcoal/95 backdrop-blur-sm px-4 py-3 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
         <div className="flex items-center gap-6">
-          <Link href="/" className="shrink-0 text-xl font-bold tracking-tight">
+          <Link href="/" className="logo shrink-0 text-xl font-bold tracking-tight">
             <span className="text-white">Skill</span>
             <span className="text-teal">Flow</span>
           </Link>
           <nav className="hidden items-center gap-1 sm:flex">
           <Link
             href="/dashboard"
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               currentPage === "dashboard"
-                ? "bg-white/10 text-white"
+                ? "active bg-white/10 text-white"
                 : "text-body-gray hover:text-white"
             }`}
           >
             Dashboard
           </Link>
+          {!isPractice && (
           <Link
             href="/wallet"
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               currentPage === "wallet"
-                ? "bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
+                  ? "active bg-white/10 text-white"
+                  : "text-body-gray hover:text-white"
             }`}
           >
             Wallet
           </Link>
+          )}
           <Link
             href="/play"
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               currentPage === "play"
-                ? "bg-white/10 text-white"
+                ? "active bg-white/10 text-white"
                 : "text-body-gray hover:text-white"
             }`}
           >
             Play
           </Link>
-          <Link
-            href="/external"
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "external"
-                ? "bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Arena
-          </Link>
+          {!isPractice && (
+            <>
+              <Link
+                href="/last-touch"
+                className="rounded-lg px-3 py-2 text-sm font-medium transition-colors text-teal hover:text-teal/90"
+              >
+                Last Touch
+              </Link>
+              <Link
+                href="/external"
+                className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  currentPage === "external"
+                    ? "active bg-white/10 text-white"
+                    : "text-body-gray hover:text-white"
+                }`}
+              >
+                Arena
+              </Link>
+            </>
+          )}
           <Link
             href="/leaderboard"
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               currentPage === "leaderboard"
-                ? "bg-white/10 text-white"
+                ? "active bg-white/10 text-white"
                 : "text-body-gray hover:text-white"
             }`}
           >
@@ -108,11 +123,14 @@ export default function AppNavbar({
           </nav>
         </div>
 
-        <div className="flex items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-            <span className="text-sm font-medium text-white">${balanceFormatted}</span>
-          </div>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <ConnectionBadge />
+          {!isPractice && (
+            <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
+              <span className="text-sm font-medium text-white">${balanceFormatted}</span>
+            </div>
+          )}
 
           <Link
             href="/profile"
@@ -124,6 +142,17 @@ export default function AppNavbar({
                 DEV
               </span>
             )}
+          </Link>
+
+          <Link
+            href="/settings"
+            className="settings-link flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-body-gray transition-colors hover:bg-white/5 hover:text-white"
+            aria-label="Settings"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
           </Link>
 
           <Link

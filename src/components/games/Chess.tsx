@@ -13,7 +13,15 @@ import {
 } from "@/lib/games/chess-utils";
 import { getChessBotMove, getChessBotDelayMs } from "@/lib/games/bot-engine";
 
-interface ChessProps {
+export interface GameMultiplayerProps {
+  isMultiplayer?: boolean;
+  myRole?: "player1" | "player2";
+  sendGameEvent?: (event: Record<string, unknown>) => Promise<void>;
+  incomingEvent?: Record<string, unknown> | null;
+  onEventProcessed?: () => void;
+}
+
+interface ChessProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
   player2: { username: string; rating: number };
   onGameEnd: (winner: "player1" | "player2") => void;
@@ -55,6 +63,11 @@ export default function Chess({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  isMultiplayer = false,
+  myRole = "player1",
+  sendGameEvent,
+  incomingEvent,
+  onEventProcessed,
 }: ChessProps) {
   const [game, setGame] = useState(() => new ChessEngine());
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -77,9 +90,12 @@ export default function Chess({
   const [botThinking, setBotThinking] = useState(false);
   const [showAllMoves, setShowAllMoves] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [drawOfferReceived, setDrawOfferReceived] = useState(false);
+  const [drawOfferSent, setDrawOfferSent] = useState(false);
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const moveListEndRef = useRef<HTMLDivElement | null>(null);
+  const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   useEffect(() => {
     const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 1024);
     check();
@@ -135,15 +151,20 @@ export default function Chess({
             (result as { flags?: string }).flags
           );
           setMoveHistory((prev) => [...prev, { player, playerName, description, san: result.san, ts }]);
-          console.log("[Chess] move", { from, to, success: true, fen: next.fen() });
-        } else {
-          console.log("[Chess] move", { from, to, success: false, fen: game.fen() });
+          if (isMultiplayer && sendGameEvent) {
+            sendGameEvent({
+              type: "chess_move",
+              from,
+              to,
+              promotion: promotion ?? null,
+            }).catch(() => {});
+          }
         }
       } catch (e) {
         console.log("[Chess] move", { from, to, success: false, error: e, fen: game.fen() });
       }
     },
-    [game, player1.username, player2.username]
+    [game, player1.username, player2.username, isMultiplayer, sendGameEvent]
   );
 
   const handleSquareClick = useCallback(
@@ -230,11 +251,77 @@ export default function Chess({
     moveListEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [moveHistory.length]);
 
-  // Bot plays when it's Black's turn. Do NOT include botThinking in deps — setting it
-  // would re-run the effect and clear the timeout before the bot moves.
+  // Incoming multiplayer events: apply opponent move, handle resign, draw
+  useEffect(() => {
+    if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
+    const type = incomingEvent.type as string | undefined;
+    if (type === "chess_move") {
+      const from = incomingEvent.from as string | undefined;
+      const to = incomingEvent.to as string | undefined;
+      const promotion = incomingEvent.promotion as PieceType | undefined;
+      if (from && to && !gameOverRef.current) {
+        const next = new ChessEngine(game.fen());
+        const moveOpt: { from: string; to: string; promotion?: "q" | "r" | "b" | "n" } = { from, to };
+        if (promotion) moveOpt.promotion = promotion as "q" | "r" | "b" | "n";
+        try {
+          const result = next.move(moveOpt);
+          if (result) {
+            lastProcessedEventRef.current = incomingEvent;
+            if (result.captured) {
+              if (result.color === "w") setCapturedBlack((prev) => [...prev, result.captured as PieceType]);
+              else setCapturedWhite((prev) => [...prev, result.captured as PieceType]);
+            }
+            setLastMove({ from, to });
+            setSelectedSquare(null);
+            setGame(next);
+            const ts = (Date.now() - gameStartTimeRef.current) / 1000;
+            const player: 1 | 2 = result.color === "w" ? 1 : 2;
+            const playerName = result.color === "w" ? player1.username : player2.username;
+            const description = getMoveDescriptionForChat(
+              result.piece as PieceType,
+              result.from,
+              result.to,
+              !!result.captured,
+              result.san,
+              (result as { flags?: string }).flags
+            );
+            setMoveHistory((prev) => [...prev, { player, playerName, description, san: result.san, ts }]);
+            onEventProcessed();
+          }
+        } catch {
+          // invalid move, ignore
+        }
+      }
+      return;
+    }
+    if (type === "resign") {
+      lastProcessedEventRef.current = incomingEvent;
+      gameOverRef.current = true;
+      onGameEnd(myRole);
+      onEventProcessed();
+      return;
+    }
+    if (type === "draw_offer") {
+      lastProcessedEventRef.current = incomingEvent;
+      setDrawOfferReceived(true);
+      onEventProcessed();
+      return;
+    }
+    if (type === "draw_response") {
+      lastProcessedEventRef.current = incomingEvent;
+      setDrawOfferReceived(false);
+      if ((incomingEvent as { accepted?: boolean }).accepted) {
+        gameOverRef.current = true;
+        onGameDraw();
+      }
+      onEventProcessed();
+    }
+  }, [incomingEvent, onEventProcessed, game, player1.username, player2.username, myRole, onGameEnd, onGameDraw]);
+
+  // Bot plays when it's Black's turn (only when not multiplayer).
   const fen = game.fen();
   useEffect(() => {
-    if (!isPlayer2Bot || turn !== "b" || promotionPending || gameOverRef.current) return;
+    if (isMultiplayer || !isPlayer2Bot || turn !== "b" || promotionPending || gameOverRef.current) return;
     setBotThinking(true);
     const delay = getChessBotDelayMs();
     const t = setTimeout(() => {
@@ -245,7 +332,7 @@ export default function Chess({
       setBotThinking(false);
     }, delay);
     return () => clearTimeout(t);
-  }, [fen, turn, isPlayer2Bot, promotionPending, game, executeMove]);
+  }, [fen, turn, isPlayer2Bot, isMultiplayer, promotionPending, game, executeMove]);
 
   const boardContainerRef = useRef<HTMLDivElement>(null);
   const [boardSize, setBoardSize] = useState(400);
@@ -294,8 +381,10 @@ export default function Chess({
                     🤖 BOT
                   </span>
                 )}
-                {botThinking && (
-                  <span className="ml-1.5 inline-flex animate-pulse text-body-gray">...</span>
+                {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))) && (
+                  <span className="ml-1.5 inline-flex animate-pulse text-body-gray">
+                    {isMultiplayer ? "thinking..." : "..."}
+                  </span>
                 )}
               </p>
               <p className="text-xs text-body-gray">Rating {player2.rating}</p>
@@ -334,6 +423,7 @@ export default function Chess({
             onPieceDragEnd={handlePieceDragEnd}
             dragging={dragging}
             turn={turn}
+            flipped={isMultiplayer && myRole === "player2"}
           />
         </div>
 
@@ -376,7 +466,57 @@ export default function Chess({
         {inStalemate && (
           <p className="text-sm font-semibold text-body-gray">Stalemate — Draw!</p>
         )}
+        {isMultiplayer && !gameOverRef.current && !inCheckmate && !inStalemate && !inDraw && (
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (sendGameEvent && !drawOfferSent) {
+                  setDrawOfferSent(true);
+                  sendGameEvent({ type: "draw_offer" }).catch(() => {});
+                }
+              }}
+              disabled={drawOfferSent}
+              className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-body-gray hover:bg-white/10 disabled:opacity-50"
+            >
+              {drawOfferSent ? "Draw offered" : "Offer Draw"}
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Draw offer received modal */}
+      {drawOfferReceived && sendGameEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="card-border w-full max-w-sm rounded-card bg-card p-6">
+            <p className="text-center font-medium text-white">Opponent offers a draw. Accept?</p>
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawOfferReceived(false);
+                  sendGameEvent({ type: "draw_response", accepted: false }).catch(() => {});
+                }}
+                className="flex-1 rounded-lg border border-white/20 py-2.5 text-white hover:bg-white/10"
+              >
+                Decline
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawOfferReceived(false);
+                  gameOverRef.current = true;
+                  sendGameEvent({ type: "draw_response", accepted: true }).catch(() => {});
+                  onGameDraw();
+                }}
+                className="flex-1 rounded-lg bg-teal py-2.5 font-medium text-charcoal hover:shadow-teal-glow"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Right: Chat-style move log — persisted moveHistory, append-only */}
       <div className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 lg:w-[32%] lg:min-w-[240px] min-h-0">
