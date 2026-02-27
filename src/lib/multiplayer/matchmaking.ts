@@ -48,23 +48,82 @@ export async function findOrCreateMatch(options: MatchmakingOptions): Promise<Ma
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase not configured");
 
+  const normalizedGameType = gameType.toLowerCase().trim();
+  const stake = Number(stakeAmount);
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("[matchmaking] No authenticated user — cannot use real matchmaking");
+      throw new Error("Not authenticated");
+    }
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Starting matchmaking", {
+        gameType,
+        normalizedGameType,
+        stakeAmount,
+        stake,
+        userId,
+        supabaseUserId: user.id,
+        username,
+        rating,
+      });
+    }
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.error("[matchmaking] auth.getUser() failed", err);
+    }
+    throw err;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[matchmaking] Looking for waiting matches…", {
+      game_type: normalizedGameType,
+      stake_amount: stake,
+      status: "waiting",
+    });
+  }
+
   const { data: waitingMatches, error: findError } = await supabase
     .from("matches")
     .select("*")
-    .eq("game_type", gameType)
-    .eq("stake_amount", stakeAmount)
+    .eq("game_type", normalizedGameType)
+    .eq("stake_amount", stake)
     .eq("status", "waiting")
     .neq("player1_id", userId)
     .order("created_at", { ascending: true })
     .limit(1);
 
-  if (findError) throw findError;
+  if (findError) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.error("[matchmaking] Error while searching for waiting matches", findError);
+    }
+    throw findError;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[matchmaking] Found waiting matches:", waitingMatches);
+  }
 
   if (waitingMatches && waitingMatches.length > 0) {
     const match = waitingMatches[0] as DbMatch;
     const totalPot = match.stake_amount * 2;
     const platformFee = Math.round(totalPot * 0.03 * 100) / 100;
     const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Found match, attempting to join", {
+        matchId: match.id,
+      });
+    }
 
     const { data: updatedMatch, error: updateError } = await supabase
       .from("matches")
@@ -82,30 +141,61 @@ export async function findOrCreateMatch(options: MatchmakingOptions): Promise<Ma
       .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.error("[matchmaking] Error while joining match", updateError);
+      }
+      throw updateError;
+    }
 
     if (!updatedMatch) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.warn("[matchmaking] Match was taken; retrying…", { matchId: match.id });
+      }
       return findOrCreateMatch(options);
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Joined match as player2", { matchId: updatedMatch.id });
     }
 
     return { match: updatedMatch as DbMatch, role: "player2" };
   }
 
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[matchmaking] No waiting match found, creating new one…");
+  }
+
   const { data: newMatch, error: createError } = await supabase
     .from("matches")
     .insert({
-      game_type: gameType,
+      game_type: normalizedGameType,
       player1_id: userId,
       player1_username: username,
       player1_rating: rating,
-      stake_amount: stakeAmount,
+      stake_amount: stake,
       status: "waiting",
     })
     .select()
     .single();
 
-  if (createError) throw createError;
+  if (createError) {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.error("[matchmaking] Failed to create waiting match", createError);
+    }
+    throw createError;
+  }
   if (!newMatch) throw new Error("Failed to create match");
+
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[matchmaking] Created new waiting match", { matchId: newMatch.id });
+  }
 
   return { match: newMatch as DbMatch, role: "player1" };
 }
