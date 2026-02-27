@@ -14,6 +14,7 @@ import {
   logout as apiLogout,
 } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
+import { createClient } from "@/lib/supabase";
 
 const MIN_DEPOSIT = 5;
 const MAX_DEPOSIT = 500;
@@ -49,6 +50,7 @@ export default function WalletPage() {
 
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [showDevTopUp, setShowDevTopUp] = useState(false);
 
   async function refreshFromApi() {
     try {
@@ -71,6 +73,27 @@ export default function WalletPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
+        // Ensure wallet exists with 0 balance for new users
+        const supabase = createClient();
+        if (supabase) {
+          const { data: wallets } = await supabase
+            .from("wallets")
+            .select("id")
+            .eq("user_id", user.id);
+          if (!wallets || wallets.length === 0) {
+            await supabase
+              .from("wallets")
+              .insert({ user_id: user.id, balance: 0 });
+          }
+        }
+        const isDevEnv = process.env.NODE_ENV !== "production";
+        let isDevHost = false;
+        if (typeof window !== "undefined") {
+          const host = window.location.hostname;
+          isDevHost =
+            host.includes("localhost") || host.includes("vercel.app");
+        }
+        setShowDevTopUp(isDevEnv || isDevHost || (user.isDevMode ?? false));
         await refreshFromApi();
       } catch {
         router.push("/login");
@@ -153,6 +176,67 @@ export default function WalletPage() {
     }
   }
 
+  async function handleAddTestBalance() {
+    try {
+      // Dev-mode (localStorage wallet)
+      const isDev =
+        typeof window !== "undefined" &&
+        window.localStorage.getItem("skillflow_dev_mode") === "true";
+      if (isDev) {
+        const newBalance = await apiDeposit(50);
+        setBalance(newBalance);
+        const txs = await getTransactions();
+        setTransactions(txs);
+        dispatchWalletUpdated();
+        showToast("Added $50 test balance", "success");
+        return;
+      }
+
+      // Real Supabase accounts
+      const supabase = createClient();
+      if (!supabase) {
+        showToast("Supabase is not configured", "error");
+        return;
+      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: wallets, error: walletError } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .single();
+      if (walletError && walletError.code !== "PGRST116") {
+        // PGRST116 = no rows
+        throw walletError;
+      }
+      if (wallets) {
+        await supabase
+          .from("wallets")
+          .update({ balance: Number(wallets.balance ?? 0) + 50 })
+          .eq("user_id", user.id);
+      } else {
+        await supabase
+          .from("wallets")
+          .insert({ user_id: user.id, balance: 50 });
+      }
+
+      await supabase.from("transactions").insert({
+        user_id: user.id,
+        type: "deposit",
+        amount: 50,
+        description: "Test balance (development)",
+      });
+
+      await refreshFromApi();
+      showToast("Added $50 test balance", "success");
+    } catch {
+      showToast("Failed to add test balance", "error");
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
@@ -209,6 +293,27 @@ export default function WalletPage() {
             </p>
           </div>
         </section>
+
+        {showDevTopUp && (
+          <section className="mt-4">
+            <div className="rounded-card border border-amber-400/70 border-dashed bg-amber-500/5 p-4 text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/80 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                <span>DEV TOOL</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddTestBalance}
+                className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_16px_rgba(245,158,11,0.45)] transition hover:bg-amber-400 sm:w-auto"
+              >
+                🧪 Add $50 Test Balance
+              </button>
+              <p className="mt-2 text-xs text-amber-100/80">
+                Development only — will be removed in production.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* Quick Deposit */}
         <section id="quick-deposit" className="mt-8">

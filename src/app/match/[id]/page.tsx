@@ -24,6 +24,7 @@ import ConnectFour from "@/components/games/ConnectFour";
 import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
+import GameChat, { type ChatMessage } from "@/components/GameChat";
 
 const OPPONENT_RECONNECT_SEC = 30;
 
@@ -49,9 +50,14 @@ export default function MatchPage() {
   const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
   const [wonByForfeit, setWonByForfeit] = useState(false);
   const [incomingEvent, setIncomingEvent] = useState<Record<string, unknown> | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
+  const botChatCountRef = useRef(0);
+  const botFreeTextUsedRef = useRef(false);
   matchRef.current = match;
 
   const {
@@ -65,6 +71,33 @@ export default function MatchPage() {
       const e = event as { type?: string };
       if (e.type === "opponent_disconnected") {
         setOpponentDisconnectedAt((t) => (t === null ? Date.now() : t));
+        return;
+      }
+      if (e.type === "chat_message") {
+        const ev = event as {
+          message?: string;
+          isPreset?: boolean;
+          senderId?: string;
+          senderName?: string;
+          timestamp?: number;
+        };
+        if (ev.message && ev.senderId && ev.timestamp) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              senderId: ev.senderId,
+              senderName: ev.senderName || "Opponent",
+              message: ev.message,
+              isPreset: !!ev.isPreset,
+              timestamp: ev.timestamp,
+              reported: false,
+            },
+          ]);
+          if (!chatOpen) {
+            setUnreadCount((c) => c + 1);
+          }
+        }
         return;
       }
       setIncomingEvent(event as Record<string, unknown>);
@@ -138,6 +171,104 @@ export default function MatchPage() {
     }
   }, [opponentConnected]);
 
+  const isRealMultiplayer = match?.isRealMultiplayer ?? false;
+
+  const sendLocalChatMessage = useCallback(
+    (text: string, isPreset: boolean, senderId: string, senderName: string) => {
+      const msg: ChatMessage = {
+        id: crypto.randomUUID(),
+        senderId,
+        senderName,
+        message: text,
+        isPreset,
+        timestamp: Date.now(),
+        reported: false,
+      };
+      setChatMessages((prev) => [...prev, msg]);
+      if (!chatOpen && senderId !== userId && senderId !== "system") {
+        setUnreadCount((c) => c + 1);
+      }
+    },
+    [chatOpen, userId]
+  );
+
+  const handleSendChatMessage = useCallback(
+    (message: string, isPreset: boolean) => {
+      if (!message.trim()) return;
+      const senderName = username || "Player";
+      sendLocalChatMessage(message, isPreset, userId, senderName);
+      const payload = {
+        type: "chat_message",
+        message,
+        isPreset,
+        senderId: userId,
+        senderName,
+        timestamp: Date.now(),
+      };
+      if (isRealMultiplayer && sendGameEvent) {
+        sendGameEvent(payload).catch(() => {});
+      }
+    },
+    [isRealMultiplayer, sendGameEvent, sendLocalChatMessage, userId, username]
+  );
+
+  const handleReportMessage = useCallback(
+    (id: string) => {
+      setChatMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, reported: true } : m))
+      );
+      try {
+        if (typeof window !== "undefined") {
+          const key = "skillflow_chat_reports";
+          const existing = JSON.parse(
+            window.localStorage.getItem(key) ?? "[]"
+          ) as unknown[];
+          const reported = chatMessages.find((m) => m.id === id);
+          const entry = reported
+            ? {
+                id: reported.id,
+                senderId: reported.senderId,
+                senderName: reported.senderName,
+                message: reported.message,
+                timestamp: reported.timestamp,
+              }
+            : { id, timestamp: Date.now() };
+          window.localStorage.setItem(
+            key,
+            JSON.stringify([...existing, entry])
+          );
+        }
+      } catch {
+        // ignore
+      }
+      // lightweight confirmation
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          senderId: "system",
+          senderName: "System",
+          message: "Message reported. We'll review it.",
+          isPreset: false,
+          timestamp: Date.now(),
+          reported: false,
+        },
+      ]);
+    },
+    [chatMessages]
+  );
+
+  const sendBotChat = useCallback(
+    (text: string, isPreset: boolean) => {
+      if (!matchRef.current || isRealMultiplayer) return;
+      if (botChatCountRef.current >= 5) return;
+      botChatCountRef.current += 1;
+      const botName = matchRef.current.player2.username || "Bot";
+      sendLocalChatMessage(text, isPreset, "bot", botName);
+    },
+    [isRealMultiplayer, sendLocalChatMessage]
+  );
+
   // Real multiplayer: when both connected, set match status to in_progress in DB (once)
   useEffect(() => {
     if (!match?.isRealMultiplayer || !realtimeConnected || !opponentConnected) return;
@@ -174,6 +305,19 @@ export default function MatchPage() {
     return () => clearInterval(interval);
   }, [match?.isRealMultiplayer, opponentDisconnectedAt]);
 
+  // Bot greeting at match start
+  useEffect(() => {
+    if (!match || match.status !== "in_progress") return;
+    if (isRealMultiplayer) return;
+    if (botChatCountRef.current > 0) return;
+    if (Math.random() < 0.3) {
+      const delay = 2000 + Math.floor(Math.random() * 1000);
+      setTimeout(() => {
+        sendBotChat("👋 GL HF", true);
+      }, delay);
+    }
+  }, [match, isRealMultiplayer, sendBotChat]);
+
   const handleWin = useCallback(async () => {
     if (!match) return;
     try {
@@ -183,6 +327,22 @@ export default function MatchPage() {
     } catch {
       setOutcome("victory");
       dispatchWalletUpdated();
+    }
+    // Bot match end chat
+    if (!isRealMultiplayer) {
+      const r = Math.random();
+      if (r < 0.5) {
+        const delay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+          sendBotChat("🔥 GG", true);
+        }, delay);
+      } else if (!botFreeTextUsedRef.current && Math.random() < 0.1) {
+        botFreeTextUsedRef.current = true;
+        const delay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+          sendBotChat("gg wp", false);
+        }, delay);
+      }
     }
   }, [match]);
 
@@ -194,6 +354,21 @@ export default function MatchPage() {
       // no wallet change
     }
     setOutcome("defeat");
+    if (!isRealMultiplayer) {
+      const r = Math.random();
+      if (r < 0.4) {
+        const delay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+          sendBotChat("🔥 GG", true);
+        }, delay);
+      } else if (!botFreeTextUsedRef.current && Math.random() < 0.1) {
+        botFreeTextUsedRef.current = true;
+        const delay = 1000 + Math.floor(Math.random() * 2000);
+        setTimeout(() => {
+          sendBotChat("that was tough", false);
+        }, delay);
+      }
+    }
   }, [match]);
 
   const handleDraw = useCallback(async () => {
@@ -290,7 +465,6 @@ export default function MatchPage() {
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   const shortId = match.id.slice(0, 8);
-  const isRealMultiplayer = match.isRealMultiplayer ?? false;
   const myRole: "player1" | "player2" =
     isRealMultiplayer && match.player1Id && match.player2Id
       ? match.player1Id === userId
@@ -571,7 +745,7 @@ export default function MatchPage() {
       </div>
 
       {/* Victory overlay */}
-      {outcome === "victory" && (
+      {outcome === "victory" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
           <div className="animate-fade-in relative text-center">
@@ -615,7 +789,7 @@ export default function MatchPage() {
       )}
 
       {/* Draw overlay */}
-      {outcome === "draw" && (
+      {outcome === "draw" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className="animate-fade-in text-center">
             <p className="text-2xl font-semibold text-white">Draw!</p>
@@ -646,7 +820,7 @@ export default function MatchPage() {
       )}
 
       {/* Defeat overlay */}
-      {outcome === "defeat" && (
+      {outcome === "defeat" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className="animate-fade-in text-center">
             <p className="text-2xl font-semibold text-white">Better luck next time{match.isPractice ? "!" : ""}</p>
@@ -709,6 +883,24 @@ export default function MatchPage() {
           </div>
         </div>
       )}
+
+      {/* Global game chat */}
+      <GameChat
+        messages={chatMessages}
+        onSendMessage={handleSendChatMessage}
+        onReportMessage={handleReportMessage}
+        playerName={username}
+        opponentName={match.player2.username}
+        playerId={userId}
+        unreadCount={unreadCount}
+        isOpen={chatOpen}
+        onToggle={() => {
+          setChatOpen((open) => !open);
+          if (!chatOpen) {
+            setUnreadCount(0);
+          }
+        }}
+      />
     </div>
   );
 }
