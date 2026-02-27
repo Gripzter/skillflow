@@ -106,6 +106,13 @@ export default function PlayGamePage() {
   // When real matchmaking finds opponent, show VS then navigate
   useEffect(() => {
     if (realMatchStatus !== "matched" || !realMatch || realMatchNavRef.current) return;
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[PlayGamePage] Matched, navigating to match room", {
+        matchId: realMatch.id,
+        role: realRole,
+      });
+    }
     realMatchNavRef.current = realMatch.id;
     const t = setTimeout(() => {
       router.push(`/match/${realMatch.id}`);

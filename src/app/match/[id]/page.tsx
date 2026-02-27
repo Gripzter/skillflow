@@ -473,6 +473,19 @@ export default function MatchPage() {
       : "player1";
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
 
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[MatchPage] Loaded match room", {
+      matchId: match.id,
+      gameType: match.gameType,
+      player1Id: match.player1Id,
+      player2Id: match.player2Id,
+      myUserId: userId,
+      myRole,
+      isRealMultiplayer,
+    });
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-charcoal">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />

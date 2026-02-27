@@ -32,6 +32,14 @@ export function useMatchmaking() {
       const result = await findOrCreateMatch(options);
       setMatch(result.match);
       setRole(result.role);
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[useMatchmaking] Match result", {
+          id: result.match.id,
+          status: result.match.status,
+          role: result.role,
+        });
+      }
 
       if (result.match.status === "matched") {
         setStatus("matched");
@@ -39,6 +47,13 @@ export function useMatchmaking() {
       }
 
       unsubscribeRef.current = subscribeToMatch(result.match.id, (updatedMatch: DbMatch) => {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[useMatchmaking] Match updated via subscription", {
+            id: updatedMatch.id,
+            status: updatedMatch.status,
+          });
+        }
         setMatch(updatedMatch);
         setStatus("matched");
         if (unsubscribeRef.current) {
