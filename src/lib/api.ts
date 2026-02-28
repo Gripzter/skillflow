@@ -338,7 +338,7 @@ export async function getTransactions(): Promise<StoredTransaction[]> {
   if (!user) return [];
   const { data, error } = await supabase
     .from("transactions")
-    .select("id, type, amount, balance_after, description, created_at")
+    .select("id, type, amount, balance_after, description, created_at, status")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   if (error) return [];
@@ -349,6 +349,7 @@ export async function getTransactions(): Promise<StoredTransaction[]> {
     balance_after: Number(r.balance_after),
     description: r.description ?? undefined,
     created_at: r.created_at,
+    status: (r as { status?: string }).status ?? undefined,
   }));
 }
 

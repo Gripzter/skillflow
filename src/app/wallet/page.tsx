@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
@@ -10,19 +11,14 @@ import {
   getWalletBalance,
   getTransactions,
   deposit as apiDeposit,
-  withdraw as apiWithdraw,
   logout as apiLogout,
 } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import { createClient } from "@/lib/supabase";
 
-const MIN_DEPOSIT = 5;
-const MAX_DEPOSIT = 500;
 const MIN_WITHDRAWAL = 10;
 
 type TransactionType = StoredTransaction["type"];
-
-const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
 
 const TYPE_BADGE_CLASS: Record<TransactionType, string> = {
   deposit: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
@@ -43,13 +39,6 @@ export default function WalletPage() {
 
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
-
-  const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
-  const [customAmount, setCustomAmount] = useState("");
-  const [depositLoading, setDepositLoading] = useState(false);
-
-  const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [showDevTopUp, setShowDevTopUp] = useState(false);
 
   async function refreshFromApi() {
@@ -114,65 +103,6 @@ export default function WalletPage() {
     } catch {
       showToast("Something went wrong", "error");
       setLoggingOut(false);
-    }
-  }
-
-  function getDepositAmount(): number {
-    if (selectedPreset != null) return selectedPreset;
-    const n = parseFloat(customAmount);
-    return Number.isFinite(n) ? n : 0;
-  }
-
-  async function handleDeposit() {
-    const amount = getDepositAmount();
-    if (amount < MIN_DEPOSIT) {
-      showToast(`Minimum deposit is $${MIN_DEPOSIT}.00`, "error");
-      return;
-    }
-    if (amount > MAX_DEPOSIT) {
-      showToast(`Maximum deposit is $${MAX_DEPOSIT}.00`, "error");
-      return;
-    }
-    setDepositLoading(true);
-    try {
-      const newBalance = await apiDeposit(amount);
-      setBalance(newBalance);
-      const txs = await getTransactions();
-      setTransactions(txs);
-      dispatchWalletUpdated();
-      setSelectedPreset(null);
-      setCustomAmount("");
-      showToast(`Successfully deposited $${amount.toFixed(2)}!`, "success");
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Deposit failed", "error");
-    } finally {
-      setDepositLoading(false);
-    }
-  }
-
-  async function handleWithdraw() {
-    const amount = parseFloat(withdrawAmount);
-    if (!Number.isFinite(amount) || amount < MIN_WITHDRAWAL) {
-      showToast(`Minimum withdrawal is $${MIN_WITHDRAWAL}.00`, "error");
-      return;
-    }
-    if (amount > balance) {
-      showToast("Insufficient balance", "error");
-      return;
-    }
-    setWithdrawLoading(true);
-    try {
-      const newBalance = await apiWithdraw(amount);
-      setBalance(newBalance);
-      const txs = await getTransactions();
-      setTransactions(txs);
-      dispatchWalletUpdated();
-      setWithdrawAmount("");
-      showToast(`Withdrawal of $${amount.toFixed(2)} submitted.`, "success");
-    } catch (e) {
-      showToast(e instanceof Error ? e.message : "Withdrawal failed", "error");
-    } finally {
-      setWithdrawLoading(false);
     }
   }
 
@@ -273,20 +203,27 @@ export default function WalletPage() {
               ${balance.toFixed(2)}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <button
-                type="button"
-                onClick={() => document.getElementById("quick-deposit")?.scrollIntoView({ behavior: "smooth" })}
-                className="pressable w-full rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
+              <Link
+                href="/wallet/deposit"
+                className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
               >
-                Deposit
-              </button>
-              <button
-                type="button"
-                onClick={() => document.getElementById("withdraw-funds")?.scrollIntoView({ behavior: "smooth" })}
-                className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
-              >
-                Withdraw
-              </button>
+                💰 Deposit
+              </Link>
+              {balance < MIN_WITHDRAWAL ? (
+                <span
+                  title="Minimum withdrawal: $10"
+                  className="flex w-full cursor-not-allowed justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 font-semibold text-white/60 sm:w-auto"
+                >
+                  💸 Withdraw
+                </span>
+              ) : (
+                <Link
+                  href="/wallet/withdraw"
+                  className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
+                >
+                  💸 Withdraw
+                </Link>
+              )}
             </div>
             <p className="mt-4 text-xs text-body-gray">
               Minimum deposit: $5.00 • Minimum withdrawal: $10.00
@@ -315,54 +252,6 @@ export default function WalletPage() {
           </section>
         )}
 
-        {/* Quick Deposit */}
-        <section id="quick-deposit" className="mt-8">
-          <h2 className="text-xl font-bold text-white">Quick Deposit</h2>
-          <div className="card-border mt-4 rounded-card bg-card p-6">
-            <div className="flex flex-wrap gap-2">
-              {PRESET_AMOUNTS.map((amt) => (
-                <button
-                  key={amt}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPreset(selectedPreset === amt ? null : amt);
-                    setCustomAmount("");
-                  }}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition-all active:scale-95 ${
-                    selectedPreset === amt
-                      ? "border-teal bg-teal text-charcoal"
-                      : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
-                  }`}
-                >
-                  ${amt}
-                </button>
-              ))}
-            </div>
-            <p className="mt-4 text-sm text-body-gray">Or enter custom amount</p>
-            <input
-              type="number"
-              min={MIN_DEPOSIT}
-              max={MAX_DEPOSIT}
-              step="0.01"
-              placeholder="0.00"
-              value={customAmount}
-              onChange={(e) => {
-                setCustomAmount(e.target.value);
-                setSelectedPreset(null);
-              }}
-              className="mt-2 w-full max-w-xs rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
-            />
-            <button
-              type="button"
-              onClick={handleDeposit}
-              disabled={depositLoading || getDepositAmount() < MIN_DEPOSIT}
-              className="mt-4 w-full max-w-xs rounded-lg bg-teal py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8"
-            >
-              {depositLoading ? "Processing…" : "Deposit"}
-            </button>
-          </div>
-        </section>
-
         {/* Transaction History */}
         <section className="mt-10">
           <h2 className="text-xl font-bold text-white">Transaction History</h2>
@@ -381,6 +270,7 @@ export default function WalletPage() {
                         <th className="px-4 py-3 font-medium text-body-gray">Type</th>
                         <th className="px-4 py-3 font-medium text-body-gray">Description</th>
                         <th className="px-4 py-3 font-medium text-body-gray">Amount</th>
+                        <th className="px-4 py-3 font-medium text-body-gray">Status</th>
                         <th className="px-4 py-3 font-medium text-body-gray">Balance After</th>
                       </tr>
                     </thead>
@@ -413,6 +303,23 @@ export default function WalletPage() {
                               {tx.amount >= 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
                             </span>
                           </td>
+                          <td className="px-4 py-3">
+                            {tx.type === "withdrawal" && tx.status ? (
+                              <span
+                                className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                                  tx.status === "completed"
+                                    ? "bg-emerald-500/20 text-emerald-400"
+                                    : tx.status === "processing"
+                                      ? "bg-amber-500/20 text-amber-400"
+                                      : "bg-white/10 text-body-gray"
+                                }`}
+                              >
+                                {tx.status}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-white">${tx.balance_after.toFixed(2)}</td>
                         </tr>
                       ))}
@@ -431,6 +338,9 @@ export default function WalletPage() {
                         >
                           {tx.type.replace("_", " ")}
                         </span>
+                        {tx.type === "withdrawal" && tx.status && (
+                          <span className="text-xs text-body-gray">{tx.status}</span>
+                        )}
                         <span className="text-body-gray">{tx.description ?? "—"}</span>
                       </div>
                       <div className="text-right">
@@ -453,38 +363,6 @@ export default function WalletPage() {
           </div>
         </section>
 
-        {/* Withdraw */}
-        <section id="withdraw-funds" className="mt-10">
-          <h2 className="text-xl font-bold text-white">Withdraw Funds</h2>
-          <div className="card-border mt-4 rounded-card bg-card p-6">
-            <input
-              type="number"
-              min={MIN_WITHDRAWAL}
-              max={balance}
-              step="0.01"
-              placeholder="0.00"
-              value={withdrawAmount}
-              onChange={(e) => setWithdrawAmount(e.target.value)}
-              className="w-full max-w-xs rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
-            />
-            <button
-              type="button"
-              onClick={handleWithdraw}
-              disabled={
-                withdrawLoading ||
-                !withdrawAmount ||
-                parseFloat(withdrawAmount) < MIN_WITHDRAWAL ||
-                parseFloat(withdrawAmount) > balance
-              }
-              className="mt-4 rounded-lg border border-white/30 bg-transparent px-6 py-3 font-semibold text-white transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {withdrawLoading ? "Processing…" : "Withdraw"}
-            </button>
-            <p className="mt-4 text-xs text-body-gray">
-              Withdrawals are processed within 1–3 business days.
-            </p>
-          </div>
-        </section>
       </main>
       <Footer />
     </div>

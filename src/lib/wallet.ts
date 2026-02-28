@@ -21,6 +21,8 @@ export interface StoredTransaction {
   balance_after: number;
   description?: string;
   created_at: string;
+  /** For withdrawals: 'pending' | 'processing' | 'completed' */
+  status?: string;
 }
 
 export function getWalletBalance(): number {
