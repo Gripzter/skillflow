@@ -141,6 +141,14 @@ export async function findOrCreateMatch(options: MatchmakingOptions): Promise<Ma
       .select()
       .single();
 
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Join result", {
+        updatedMatch: updatedMatch ?? null,
+        updateError: updateError?.message ?? null,
+      });
+    }
+
     if (updateError) {
       if (process.env.NODE_ENV !== "production") {
         // eslint-disable-next-line no-console
@@ -201,6 +209,21 @@ export async function findOrCreateMatch(options: MatchmakingOptions): Promise<Ma
 }
 
 /**
+ * Fetch a match by ID (for polling when waiting for opponent).
+ */
+export async function fetchMatch(matchId: string): Promise<DbMatch | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("id", matchId)
+    .single();
+  if (error || !data) return null;
+  return data as DbMatch;
+}
+
+/**
  * Cancel a waiting match (creator only). Caller should refund stake after.
  */
 export async function cancelMatch(matchId: string): Promise<void> {
@@ -238,12 +261,21 @@ export function subscribeToMatch(
         filter: `id=eq.${matchId}`,
       },
       (payload: { new: DbMatch }) => {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Realtime update received", payload);
+        }
         if (payload.new?.status === "matched") {
           onMatched(payload.new);
         }
       }
     )
-    .subscribe();
+    .subscribe((status: string) => {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Realtime subscription status", status);
+      }
+    });
 
   return () => {
     channel.unsubscribe();

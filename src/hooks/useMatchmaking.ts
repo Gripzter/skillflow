@@ -5,11 +5,14 @@ import {
   findOrCreateMatch,
   cancelMatch,
   subscribeToMatch,
+  fetchMatch,
   type MatchmakingOptions,
   type DbMatch,
 } from "@/lib/multiplayer/matchmaking";
 
 export type MatchmakingStatus = "idle" | "searching" | "matched" | "error";
+
+const POLL_INTERVAL_MS = 2000;
 
 export function useMatchmaking() {
   const [status, setStatus] = useState<MatchmakingStatus>("idle");
@@ -17,16 +20,25 @@ export function useMatchmaking() {
   const [role, setRole] = useState<"player1" | "player2" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearWaitingState = useCallback(() => {
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
 
   const startMatchmaking = useCallback(async (options: MatchmakingOptions) => {
     setStatus("searching");
     setError(null);
     setMatch(null);
     setRole(null);
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
+    clearWaitingState();
 
     try {
       const result = await findOrCreateMatch(options);
@@ -46,33 +58,47 @@ export function useMatchmaking() {
         return;
       }
 
-      unsubscribeRef.current = subscribeToMatch(result.match.id, (updatedMatch: DbMatch) => {
+      const matchId = result.match.id;
+
+      const onMatched = (updatedMatch: DbMatch) => {
         if (process.env.NODE_ENV !== "production") {
           // eslint-disable-next-line no-console
-          console.log("[useMatchmaking] Match updated via subscription", {
+          console.log("[useMatchmaking] Match matched", {
             id: updatedMatch.id,
             status: updatedMatch.status,
           });
         }
+        clearWaitingState();
         setMatch(updatedMatch);
         setStatus("matched");
-        if (unsubscribeRef.current) {
-          unsubscribeRef.current();
-          unsubscribeRef.current = null;
+      };
+
+      unsubscribeRef.current = subscribeToMatch(matchId, onMatched);
+
+      pollIntervalRef.current = setInterval(async () => {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[useMatchmaking] Polling match status…", matchId);
         }
-      });
+        const fetched = await fetchMatch(matchId);
+        if (fetched && fetched.status === "matched") {
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log("[useMatchmaking] Match found via polling");
+          }
+          onMatched(fetched);
+        }
+      }, POLL_INTERVAL_MS);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Matchmaking failed";
       setError(message);
       setStatus("error");
+      clearWaitingState();
     }
-  }, []);
+  }, [clearWaitingState]);
 
   const cancelSearching = useCallback(async () => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
+    clearWaitingState();
     if (match && match.status === "waiting") {
       try {
         await cancelMatch(match.id);
@@ -84,19 +110,16 @@ export function useMatchmaking() {
     setMatch(null);
     setRole(null);
     setError(null);
-  }, [match]);
+  }, [match, clearWaitingState]);
 
   useEffect(() => {
     return () => {
-      if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-      }
+      clearWaitingState();
       if (match?.status === "waiting") {
         cancelMatch(match.id).catch(() => {});
       }
     };
-  }, [match?.id, match?.status]);
+  }, [match?.id, match?.status, clearWaitingState]);
 
   return { status, match, role, error, startMatchmaking, cancelSearching };
 }
