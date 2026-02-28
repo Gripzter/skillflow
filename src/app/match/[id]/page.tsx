@@ -318,69 +318,75 @@ export default function MatchPage() {
     }
   }, [match, isRealMultiplayer, sendBotChat]);
 
-  const handleWin = useCallback(async () => {
-    if (!match) return;
-    try {
-      await completeMatchAndSettle(match, "player1");
-      dispatchWalletUpdated();
-      setOutcome("victory");
-    } catch {
-      setOutcome("victory");
-      dispatchWalletUpdated();
-    }
-    // Bot match end chat
-    if (!isRealMultiplayer) {
-      const r = Math.random();
-      if (r < 0.5) {
-        const delay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-          sendBotChat("🔥 GG", true);
-        }, delay);
-      } else if (!botFreeTextUsedRef.current && Math.random() < 0.1) {
-        botFreeTextUsedRef.current = true;
-        const delay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-          sendBotChat("gg wp", false);
-        }, delay);
-      }
-    }
-  }, [match]);
+  /**
+   * Unified game end: winner is 'player1' or 'player2'.
+   * Compare winner ID with current user to show the correct result to each player.
+   * Only Player 1 persists the result (completeMatchAndSettle) to avoid double-writes.
+   */
+  const handleGameEnd = useCallback(
+    async (winner: "player1" | "player2") => {
+      if (!match) return;
+      const isReal = match.isRealMultiplayer ?? false;
+      const myRole: "player1" | "player2" =
+        isReal && match.player1Id && match.player2Id
+          ? match.player1Id === userId
+            ? "player1"
+            : "player2"
+          : "player1";
+      const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
+      const iWon = winnerId === userId;
 
-  const handleLoss = useCallback(async () => {
-    if (!match) return;
-    try {
-      await completeMatchAndSettle(match, "player2");
-    } catch {
-      // no wallet change
-    }
-    setOutcome("defeat");
-    if (!isRealMultiplayer) {
-      const r = Math.random();
-      if (r < 0.4) {
-        const delay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-          sendBotChat("🔥 GG", true);
-        }, delay);
-      } else if (!botFreeTextUsedRef.current && Math.random() < 0.1) {
-        botFreeTextUsedRef.current = true;
-        const delay = 1000 + Math.floor(Math.random() * 2000);
-        setTimeout(() => {
-          sendBotChat("that was tough", false);
-        }, delay);
+      if (myRole === "player1") {
+        try {
+          await completeMatchAndSettle(match, winner);
+          dispatchWalletUpdated();
+        } catch {
+          dispatchWalletUpdated();
+        }
       }
-    }
-  }, [match]);
+      setOutcome(iWon ? "victory" : "defeat");
+
+      if (!isReal) {
+        const r = Math.random();
+        if (iWon && r < 0.5) {
+          const delay = 1000 + Math.floor(Math.random() * 2000);
+          setTimeout(() => sendBotChat("🔥 GG", true), delay);
+        } else if (iWon && !botFreeTextUsedRef.current && Math.random() < 0.1) {
+          botFreeTextUsedRef.current = true;
+          setTimeout(() => sendBotChat("gg wp", false), 1000 + Math.floor(Math.random() * 2000));
+        } else if (!iWon && r < 0.4) {
+          setTimeout(() => sendBotChat("🔥 GG", true), 1000 + Math.floor(Math.random() * 2000));
+        } else if (!iWon && !botFreeTextUsedRef.current && Math.random() < 0.1) {
+          botFreeTextUsedRef.current = true;
+          setTimeout(() => sendBotChat("that was tough", false), 1000 + Math.floor(Math.random() * 2000));
+        }
+      }
+    },
+    [match, userId]
+  );
+
+  const handleWin = useCallback(() => handleGameEnd("player1"), [handleGameEnd]);
+  const handleLoss = useCallback(() => handleGameEnd("player2"), [handleGameEnd]);
 
   const handleDraw = useCallback(async () => {
     if (!match) return;
-    try {
-      await completeMatchAndSettle(match, "draw");
-      dispatchWalletUpdated();
-    } catch {
-      dispatchWalletUpdated();
+    const isReal = match.isRealMultiplayer ?? false;
+    const myRole: "player1" | "player2" =
+      isReal && match.player1Id && match.player2Id
+        ? match.player1Id === userId
+          ? "player1"
+          : "player2"
+        : "player1";
+    if (myRole === "player1") {
+      try {
+        await completeMatchAndSettle(match, "draw");
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
+      }
     }
     setOutcome("draw");
-  }, [match]);
+  }, [match, userId]);
 
   const handleForfeitConfirm = useCallback(async () => {
     if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
@@ -471,6 +477,8 @@ export default function MatchPage() {
         ? "player1"
         : "player2"
       : "player1";
+  const opponentUsername =
+    myRole === "player1" ? (match.player2?.username ?? "Opponent") : (match.player1?.username ?? "Opponent");
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
 
   if (process.env.NODE_ENV !== "production") {
@@ -556,10 +564,7 @@ export default function MatchPage() {
               <Chess
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
                 isMultiplayer={isRealMultiplayer}
@@ -581,10 +586,7 @@ export default function MatchPage() {
               <ConnectFour
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
                 isMultiplayer={isRealMultiplayer}
@@ -603,10 +605,7 @@ export default function MatchPage() {
               <ReactionDuel
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
                 isMultiplayer={isRealMultiplayer}
@@ -628,10 +627,7 @@ export default function MatchPage() {
               <MemoryMatch
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
               />
@@ -648,10 +644,7 @@ export default function MatchPage() {
               <SpellingBee
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
                 isMultiplayer={isRealMultiplayer}
@@ -679,10 +672,7 @@ export default function MatchPage() {
               <EightBallPool
                 player1={{ username: match.player1.username, rating: match.player1.rating }}
                 player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={(winner) => {
-                  if (winner === "player1") handleWin();
-                  else handleLoss();
-                }}
+                onGameEnd={handleGameEnd}
                 isPlayer2Bot={!isRealMultiplayer}
               />
             ) : match.status === "in_progress" && !outcome ? (
@@ -757,7 +747,7 @@ export default function MatchPage() {
         </div>
       </div>
 
-      {/* Victory overlay */}
+      {/* Victory overlay — only shown when THIS player won */}
       {outcome === "victory" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
@@ -768,25 +758,33 @@ export default function MatchPage() {
             {wonByForfeit && (
               <p className="mt-4 text-xl font-semibold text-amber-400">Opponent left the match. You win by forfeit!</p>
             )}
-            {!match.isPractice && !wonByForfeit && (
-              <p className="mt-4 text-2xl font-bold text-teal">You won ${match.winnerPayout.toFixed(2)}!</p>
+            {!wonByForfeit && (
+              <p className="mt-4 text-lg text-white/90">
+                {match.isPractice ? "Nice work!" : "Congratulations! You outplayed your opponent!"}
+              </p>
             )}
-            {!match.isPractice && wonByForfeit && (
-              <p className="mt-2 text-lg font-semibold text-teal">You won ${match.winnerPayout.toFixed(2)}!</p>
+            {!match.isPractice && (
+              <p className="mt-3 text-2xl font-bold text-teal">+${match.winnerPayout.toFixed(2)}</p>
             )}
-            <p className="mt-2 text-body-gray">Defeated {match.player2.username}</p>
+            <p className="mt-2 text-body-gray">Defeated {opponentUsername}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <Link
-                href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
-              >
-                Back to Lobby
-              </Link>
               <Link
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                {match.isPractice ? "Play Again (Practice)" : "Play Again"}
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
               </Link>
               {match.isPractice && (
                 <Link
@@ -804,56 +802,76 @@ export default function MatchPage() {
       {/* Draw overlay */}
       {outcome === "draw" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
-          <div className="animate-fade-in text-center">
-            <p className="text-2xl font-semibold text-white">Draw!</p>
+          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/5 via-transparent to-amber-500/5" aria-hidden />
+          <div className="animate-fade-in relative text-center">
+            <p className="text-4xl font-bold text-white sm:text-5xl">🤝 It&apos;s a Draw!</p>
             {match.isPractice ? (
-              <p className="mt-2 text-lg text-purple-400">Practice match — no stakes.</p>
+              <p className="mt-4 text-lg text-purple-400">Practice match — no stakes.</p>
             ) : (
               <>
-                <p className="mt-2 text-lg text-teal">Stakes refunded.</p>
-                <p className="mt-1 text-body-gray">Your ${match.stakeAmount.toFixed(2)} has been returned to your wallet.</p>
+                <p className="mt-4 text-lg text-white/90">Evenly matched! Your stake has been returned.</p>
+                <p className="mt-2 text-xl font-semibold text-amber-400">${match.stakeAmount.toFixed(2)} returned</p>
               </>
             )}
             <div className="mt-8 flex flex-wrap justify-center gap-4">
               <Link
-                href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
-              >
-                Back to Lobby
-              </Link>
-              <Link
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                Play Again
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
               </Link>
             </div>
           </div>
         </div>
       )}
 
-      {/* Defeat overlay */}
+      {/* Defeat overlay — only shown when THIS player lost (respectful, encouraging) */}
       {outcome === "defeat" && match.gameType !== "spelling-bee" && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
-          <div className="animate-fade-in text-center">
-            <p className="text-2xl font-semibold text-white">Better luck next time{match.isPractice ? "!" : ""}</p>
+          <div className="absolute inset-0 bg-gradient-to-t from-red-500/5 via-transparent to-red-500/5" aria-hidden />
+          <div className="animate-fade-in relative text-center">
+            <p className="text-4xl font-bold text-white sm:text-5xl">Defeated</p>
+            <p className="mt-4 text-lg text-white/90">Good effort! Every match makes you better.</p>
             {!match.isPractice && (
-              <p className="mt-2 text-lg text-red-400">You lost ${match.stakeAmount.toFixed(2)}</p>
+              <p className="mt-2 text-base text-red-400/90">-${match.stakeAmount.toFixed(2)}</p>
             )}
-            <p className="mt-1 text-body-gray">{match.player2.username} won</p>
-            {match.isPractice && <p className="mt-1 text-body-gray">Try again?</p>}
+            <p className="mt-1 text-body-gray">{opponentUsername} won</p>
+            {!match.isPractice && (
+              <p className="mt-4 max-w-sm text-sm text-body-gray">
+                Tip: Practice mode is great for sharpening your skills!
+              </p>
+            )}
+            {match.isPractice && <p className="mt-2 text-body-gray">Try again?</p>}
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              <Link
-                href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
-              >
-                Back to Lobby
-              </Link>
               <Link
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                {match.isPractice ? "Play Again (Practice)" : "Try Again"}
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
               </Link>
               {match.isPractice && (
                 <Link
