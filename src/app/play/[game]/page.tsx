@@ -52,7 +52,6 @@ export default function PlayGamePage() {
   const [match, setMatch] = useState<StoredMatch | null>(null);
   const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const realMatchNavRef = useRef<string | null>(null);
 
   const { isPractice } = usePlayMode();
   const {
@@ -70,6 +69,7 @@ export default function PlayGamePage() {
   const useRealMatchmaking = !isDevMode && !isPractice;
   const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
   const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
+  const realMatchmakingTimeout = realMatchStatus === "timeout";
 
   useEffect(() => {
     async function load() {
@@ -103,22 +103,7 @@ export default function PlayGamePage() {
     return () => clearInterval(timer);
   }, [matchmaking, useRealMatchmaking]);
 
-  // When real matchmaking finds opponent, show VS then navigate
-  useEffect(() => {
-    if (realMatchStatus !== "matched" || !realMatch || realMatchNavRef.current) return;
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[PlayGamePage] Matched, navigating to match room", {
-        matchId: realMatch.id,
-        role: realRole,
-      });
-    }
-    realMatchNavRef.current = realMatch.id;
-    const t = setTimeout(() => {
-      router.push(`/match/${realMatch.id}`);
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [realMatchStatus, realMatch, router]);
+  // Navigation for real matchmaking is handled by onMatchReady (called after 2s VS delay)
 
   const player1 = useMemo<PlayerInfo>(
     () => ({
@@ -154,6 +139,13 @@ export default function PlayGamePage() {
       }
     }
   }, [elapsedTimer, stakeAmount, isPractice, useRealMatchmaking, cancelSearching]);
+
+  const navigateToMatch = useCallback(
+    (matchId: string) => {
+      router.push(`/match/${matchId}`);
+    },
+    [router]
+  );
 
   const handleFindMatch = useCallback(async () => {
     if (isPractice) {
@@ -209,6 +201,7 @@ export default function PlayGamePage() {
           userId,
           username,
           rating: 1000,
+          onMatchReady: (match) => navigateToMatch(match.id),
         });
       } catch {
         await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
@@ -270,6 +263,7 @@ export default function PlayGamePage() {
     userId,
     username,
     startMatchmaking,
+    navigateToMatch,
   ]);
 
   const handlePlayAgainstBot = useCallback(async () => {
@@ -510,7 +504,45 @@ export default function PlayGamePage() {
               <p className="mt-6 text-body-gray">Starting match...</p>
             </>
           )}
-          {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && (
+          {realMatchmakingTimeout && useRealMatchmaking && (
+            <>
+              <p className="text-xl font-semibold text-white">No opponent found</p>
+              <p className="mt-2 text-body-gray">Keep waiting, play a bot, or cancel and get a refund.</p>
+              <div className="mt-6 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    startMatchmaking({
+                      gameType: gameSlug,
+                      stakeAmount,
+                      userId,
+                      username,
+                      rating: 1000,
+                      onMatchReady: (match) => navigateToMatch(match.id),
+                    });
+                  }}
+                  className="rounded-lg bg-teal px-6 py-2.5 font-semibold text-charcoal hover:shadow-teal-glow"
+                >
+                  Keep Waiting
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePlayAgainstBot}
+                  className="rounded-lg border border-teal/50 bg-teal/10 px-6 py-2.5 font-semibold text-teal hover:bg-teal/20"
+                >
+                  Play against bot
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelMatchmaking}
+                  className="rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+                >
+                  Cancel (refund)
+                </button>
+              </div>
+            </>
+          )}
+          {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && !realMatchmakingTimeout && (
             <>
               <div className="relative flex h-24 w-24 items-center justify-center">
                 <div className={`absolute h-20 w-20 animate-ping rounded-full border-2 ${isPractice ? "border-purple-500/40" : "border-teal/40"}`} />
@@ -518,41 +550,28 @@ export default function PlayGamePage() {
                 <div className={`h-3 w-3 rounded-full ${isPractice ? "bg-purple-500" : "bg-teal"}`} />
               </div>
               <p className="mt-6 text-xl font-semibold text-white">
-                {isPractice ? "Finding practice opponent..." : "Finding your opponent..."}
+                {realMatchStatus === "waiting"
+                  ? "Waiting for opponent..."
+                  : isPractice
+                    ? "Finding practice opponent..."
+                    : "Searching for opponent..."}
               </p>
               <p className="mt-2 text-body-gray">
                 {isPractice ? `${gameName} • Free play` : `Stake: $${stakeAmount.toFixed(2)} • ${gameName} • Ranked 1v1`}
               </p>
-              <p className="mt-2 text-sm text-body-gray">Searching... {formatTime(matchmakingElapsed)}</p>
-              {slowMessage && !timeoutReached && (
+              <p className="mt-2 text-sm text-body-gray">
+                {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}
+              </p>
+              {slowMessage && !timeoutReached && realMatchStatus === "searching" && (
                 <p className="mt-2 text-sm text-amber-400">Taking longer than usual...</p>
               )}
-              {timeoutReached && useRealMatchmaking ? (
-                <div className="mt-6 flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePlayAgainstBot}
-                    className="rounded-lg bg-teal px-6 py-2.5 font-semibold text-charcoal hover:shadow-teal-glow"
-                  >
-                    Play against bot
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelMatchmaking}
-                    className="rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
-                  >
-                    Cancel (refund)
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCancelMatchmaking}
-                  className="mt-8 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleCancelMatchmaking}
+                className="mt-8 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
             </>
           )}
           {opponentFound && match && (

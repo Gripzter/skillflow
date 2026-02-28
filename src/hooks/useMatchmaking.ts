@@ -1,125 +1,120 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
 import {
-  findOrCreateMatch,
-  cancelMatch,
-  subscribeToMatch,
-  fetchMatch,
-  type MatchmakingOptions,
+  startMatchmaking as startMatchmakingApi,
+  cancelMatchmaking,
   type DbMatch,
 } from "@/lib/multiplayer/matchmaking";
 
-export type MatchmakingStatus = "idle" | "searching" | "matched" | "error";
+export type MatchmakingStatus =
+  | "idle"
+  | "searching"
+  | "waiting"
+  | "matched"
+  | "timeout"
+  | "error";
 
-const POLL_INTERVAL_MS = 2000;
+export interface MatchmakingOptions {
+  gameType: string;
+  stakeAmount: number;
+  userId: string;
+  username: string;
+  rating: number;
+  onMatchReady?: (match: DbMatch, role: "player1" | "player2") => void;
+}
 
 export function useMatchmaking() {
   const [status, setStatus] = useState<MatchmakingStatus>("idle");
   const [match, setMatch] = useState<DbMatch | null>(null);
   const [role, setRole] = useState<"player1" | "player2" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const unsubscribeRef = useRef<(() => void) | null>(null);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const clearWaitingState = useCallback(() => {
-    if (unsubscribeRef.current) {
-      unsubscribeRef.current();
-      unsubscribeRef.current = null;
-    }
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-  }, []);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   const startMatchmaking = useCallback(async (options: MatchmakingOptions) => {
     setStatus("searching");
     setError(null);
     setMatch(null);
     setRole(null);
-    clearWaitingState();
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase not configured");
+      setStatus("error");
+      return;
+    }
 
     try {
-      const result = await findOrCreateMatch(options);
-      setMatch(result.match);
-      setRole(result.role);
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.log("[useMatchmaking] Match result", {
-          id: result.match.id,
-          status: result.match.status,
-          role: result.role,
-        });
-      }
-
-      if (result.match.status === "matched") {
-        setStatus("matched");
-        return;
-      }
-
-      const matchId = result.match.id;
-
-      const onMatched = (updatedMatch: DbMatch) => {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.log("[useMatchmaking] Match matched", {
-            id: updatedMatch.id,
-            status: updatedMatch.status,
-          });
+      cleanupRef.current = await startMatchmakingApi(
+        supabase,
+        options.gameType,
+        options.stakeAmount,
+        options.userId,
+        options.username,
+        options.rating,
+        (updateStatus, matchData) => {
+          setStatus(updateStatus as MatchmakingStatus);
+          if (matchData) setMatch(matchData);
+        },
+        (matchData, matchRole) => {
+          setMatch(matchData);
+          setRole(matchRole);
+          setStatus("matched");
+          options.onMatchReady?.(matchData, matchRole);
+        },
+        (err) => {
+          setError(err);
+          setStatus("error");
         }
-        clearWaitingState();
-        setMatch(updatedMatch);
-        setStatus("matched");
-      };
-
-      unsubscribeRef.current = subscribeToMatch(matchId, onMatched);
-
-      pollIntervalRef.current = setInterval(async () => {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.log("[useMatchmaking] Polling match status…", matchId);
-        }
-        const fetched = await fetchMatch(matchId);
-        if (fetched && fetched.status === "matched") {
-          if (process.env.NODE_ENV !== "production") {
-            // eslint-disable-next-line no-console
-            console.log("[useMatchmaking] Match found via polling");
-          }
-          onMatched(fetched);
-        }
-      }, POLL_INTERVAL_MS);
+      );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Matchmaking failed";
       setError(message);
       setStatus("error");
-      clearWaitingState();
     }
-  }, [clearWaitingState]);
+  }, []);
 
   const cancelSearching = useCallback(async () => {
-    clearWaitingState();
-    if (match && match.status === "waiting") {
-      try {
-        await cancelMatch(match.id);
-      } catch {
-        // best effort
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    const currentMatch = match;
+    if (currentMatch?.status === "waiting") {
+      const supabase = createClient();
+      if (supabase) {
+        try {
+          await cancelMatchmaking(supabase, currentMatch.id);
+        } catch {
+          // best effort
+        }
       }
     }
     setStatus("idle");
     setMatch(null);
     setRole(null);
     setError(null);
-  }, [match, clearWaitingState]);
+  }, [match]);
 
   useEffect(() => {
     return () => {
-      clearWaitingState();
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
       if (match?.status === "waiting") {
-        cancelMatch(match.id).catch(() => {});
+        const supabase = createClient();
+        if (supabase) {
+          cancelMatchmaking(supabase, match.id).catch(() => {});
+        }
       }
     };
-  }, [match?.id, match?.status, clearWaitingState]);
+  }, [match?.id, match?.status]);
 
   return { status, match, role, error, startMatchmaking, cancelSearching };
 }

@@ -1,18 +1,10 @@
 /**
- * Real matchmaking: find or create matches in Supabase, subscribe to match updates.
- * Used only for non–dev-mode (real Supabase) users.
+ * Real matchmaking: find or create matches in Supabase.
+ * Polling-only — no Supabase Realtime for matchmaking.
+ * Realtime is only used inside the match room for game events.
  */
 
-import { createClient } from "@/lib/supabase";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-
-export interface MatchmakingOptions {
-  gameType: string;
-  stakeAmount: number;
-  userId: string;
-  username: string;
-  rating: number;
-}
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface DbMatch {
   id: string;
@@ -34,265 +26,239 @@ export interface DbMatch {
   completed_at: string | null;
 }
 
-export type MatchmakingResult = { match: DbMatch; role: "player1" | "player2" };
+const POLL_INTERVAL_MS = 2000;
+const MATCH_READY_DELAY_MS = 2000;
+const MATCHMAKING_TIMEOUT_MS = 60000;
 
-function getSupabase() {
-  return createClient();
-}
+export type MatchmakingStatus = "searching" | "waiting" | "matched" | "timeout";
 
 /**
- * Find an existing waiting match with same game type and stake, or create a new one.
+ * Start matchmaking: search for waiting match → join or create → poll until ready.
+ * Returns a cleanup function. Call it on cancel or unmount.
  */
-export async function findOrCreateMatch(options: MatchmakingOptions): Promise<MatchmakingResult> {
-  const { gameType, stakeAmount, userId, username, rating } = options;
-  const supabase = getSupabase();
-  if (!supabase) throw new Error("Supabase not configured");
+export async function startMatchmaking(
+  supabase: SupabaseClient,
+  gameType: string,
+  stakeAmount: number,
+  userId: string,
+  username: string,
+  rating: number,
+  onStatusUpdate: (status: MatchmakingStatus, match?: DbMatch) => void,
+  onMatchReady: (match: DbMatch, role: "player1" | "player2") => void,
+  onError: (error: string) => void
+): Promise<() => void> {
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let matchId: string | null = null;
+  let cancelled = false;
 
-  const normalizedGameType = gameType.toLowerCase().trim();
-  const stake = Number(stakeAmount);
+  const cleanup = () => {
+    cancelled = true;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  };
 
   try {
+    onStatusUpdate("searching");
+
+    const normalizedGameType = gameType.toLowerCase().trim();
+    const stake = Number(stakeAmount);
+
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      console.error("[matchmaking] No authenticated user — cannot use real matchmaking");
-      throw new Error("Not authenticated");
-    }
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[matchmaking] Starting matchmaking", {
-        gameType,
-        normalizedGameType,
-        stakeAmount,
-        stake,
-        userId,
-        supabaseUserId: user.id,
-        username,
-        rating,
-      });
-    }
-  } catch (err) {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.error("[matchmaking] auth.getUser() failed", err);
-    }
-    throw err;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.log("[matchmaking] Looking for waiting matches…", {
-      game_type: normalizedGameType,
-      stake_amount: stake,
-      status: "waiting",
-    });
-  }
-
-  const { data: waitingMatches, error: findError } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("game_type", normalizedGameType)
-    .eq("stake_amount", stake)
-    .eq("status", "waiting")
-    .neq("player1_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1);
-
-  if (findError) {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.error("[matchmaking] Error while searching for waiting matches", findError);
-    }
-    throw findError;
-  }
-
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.log("[matchmaking] Found waiting matches:", waitingMatches);
-  }
-
-  if (waitingMatches && waitingMatches.length > 0) {
-    const match = waitingMatches[0] as DbMatch;
-    const totalPot = match.stake_amount * 2;
-    const platformFee = Math.round(totalPot * 0.03 * 100) / 100;
-    const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
-
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[matchmaking] Found match, attempting to join", {
-        matchId: match.id,
-      });
+      onError("Not authenticated");
+      return cleanup;
     }
 
-    const { data: updatedMatch, error: updateError } = await supabase
+    const { data: waitingMatches, error: findError } = await supabase
       .from("matches")
-      .update({
-        player2_id: userId,
-        player2_username: username,
-        player2_rating: rating,
-        status: "matched",
-        total_pot: totalPot,
-        platform_fee: platformFee,
-        winner_payout: winnerPayout,
-      })
-      .eq("id", match.id)
+      .select("*")
+      .eq("game_type", normalizedGameType)
+      .eq("stake_amount", stake)
       .eq("status", "waiting")
+      .neq("player1_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (findError) {
+      onError(findError.message ?? "Failed to search for matches");
+      return cleanup;
+    }
+
+    if (waitingMatches && waitingMatches.length > 0) {
+      const match = waitingMatches[0] as DbMatch;
+      const totalPot = match.stake_amount * 2;
+      const platformFee = Math.round(totalPot * 0.03 * 100) / 100;
+      const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
+
+      const { data: updated, error: joinError } = await supabase
+        .from("matches")
+        .update({
+          player2_id: userId,
+          player2_username: username,
+          player2_rating: rating,
+          status: "matched",
+          total_pot: totalPot,
+          platform_fee: platformFee,
+          winner_payout: winnerPayout,
+        })
+        .eq("id", match.id)
+        .eq("status", "waiting")
+        .select()
+        .single();
+
+      if (joinError || !updated) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Match was taken, retrying…");
+        }
+        return startMatchmaking(
+          supabase,
+          gameType,
+          stakeAmount,
+          userId,
+          username,
+          rating,
+          onStatusUpdate,
+          onMatchReady,
+          onError
+        );
+      }
+
+      matchId = (updated as DbMatch).id;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Joined match as Player 2:", matchId);
+      }
+
+      onStatusUpdate("matched", updated as DbMatch);
+
+      const readyTimer = setTimeout(() => {
+        if (!cancelled) onMatchReady(updated as DbMatch, "player2");
+      }, MATCH_READY_DELAY_MS);
+
+      return () => {
+        cleanup();
+        clearTimeout(readyTimer);
+      };
+    }
+
+    const { data: newMatch, error: createError } = await supabase
+      .from("matches")
+      .insert({
+        game_type: normalizedGameType,
+        stake_amount: stake,
+        player1_id: userId,
+        player1_username: username,
+        player1_rating: rating,
+        status: "waiting",
+      })
       .select()
       .single();
 
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[matchmaking] Join result", {
-        updatedMatch: updatedMatch ?? null,
-        updateError: updateError?.message ?? null,
-      });
+    if (createError) {
+      onError(createError.message ?? "Failed to create match");
+      return cleanup;
+    }
+    if (!newMatch) {
+      onError("Failed to create match");
+      return cleanup;
     }
 
-    if (updateError) {
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.error("[matchmaking] Error while joining match", updateError);
+    matchId = (newMatch as DbMatch).id;
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Created match as Player 1:", matchId);
+    }
+    onStatusUpdate("waiting", newMatch as DbMatch);
+
+    pollInterval = setInterval(async () => {
+      if (cancelled) return;
+
+      try {
+        const { data: freshMatch } = await supabase
+          .from("matches")
+          .select("*")
+          .eq("id", matchId)
+          .single();
+
+        if (
+          freshMatch &&
+          (freshMatch as DbMatch).status === "matched" &&
+          (freshMatch as DbMatch).player2_id
+        ) {
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log("[matchmaking] Opponent joined, match ready");
+          }
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+
+          onStatusUpdate("matched", freshMatch as DbMatch);
+
+          setTimeout(() => {
+            if (!cancelled) onMatchReady(freshMatch as DbMatch, "player1");
+          }, MATCH_READY_DELAY_MS);
+        }
+      } catch (pollErr) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.error("[matchmaking] Polling error:", pollErr);
+        }
       }
-      throw updateError;
-    }
+    }, POLL_INTERVAL_MS);
 
-    if (!updatedMatch) {
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.warn("[matchmaking] Match was taken; retrying…", { matchId: match.id });
+    const timeoutId = setTimeout(() => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
       }
-      return findOrCreateMatch(options);
-    }
+      if (!cancelled) onStatusUpdate("timeout");
+    }, MATCHMAKING_TIMEOUT_MS);
 
+    return () => {
+      cleanup();
+      clearTimeout(timeoutId);
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Matchmaking failed";
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
-      console.log("[matchmaking] Joined match as player2", { matchId: updatedMatch.id });
+      console.error("[matchmaking] Error:", err);
     }
-
-    return { match: updatedMatch as DbMatch, role: "player2" };
+    onError(message);
+    return cleanup;
   }
-
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.log("[matchmaking] No waiting match found, creating new one…");
-  }
-
-  const { data: newMatch, error: createError } = await supabase
-    .from("matches")
-    .insert({
-      game_type: normalizedGameType,
-      player1_id: userId,
-      player1_username: username,
-      player1_rating: rating,
-      stake_amount: stake,
-      status: "waiting",
-    })
-    .select()
-    .single();
-
-  if (createError) {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.error("[matchmaking] Failed to create waiting match", createError);
-    }
-    throw createError;
-  }
-  if (!newMatch) throw new Error("Failed to create match");
-
-  if (process.env.NODE_ENV !== "production") {
-    // eslint-disable-next-line no-console
-    console.log("[matchmaking] Created new waiting match", { matchId: newMatch.id });
-  }
-
-  return { match: newMatch as DbMatch, role: "player1" };
 }
 
 /**
- * Fetch a match by ID (for polling when waiting for opponent).
+ * Cancel a waiting match (e.g. when Player 1 clicks Cancel).
  */
-export async function fetchMatch(matchId: string): Promise<DbMatch | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("matches")
-    .select("*")
-    .eq("id", matchId)
-    .single();
-  if (error || !data) return null;
-  return data as DbMatch;
-}
-
-/**
- * Cancel a waiting match (creator only). Caller should refund stake after.
- */
-export async function cancelMatch(matchId: string): Promise<void> {
-  const supabase = getSupabase();
-  if (!supabase) throw new Error("Supabase not configured");
-
-  const { error } = await supabase
+export async function cancelMatchmaking(
+  supabase: SupabaseClient,
+  matchId: string
+): Promise<void> {
+  await supabase
     .from("matches")
     .update({ status: "cancelled" })
     .eq("id", matchId)
     .eq("status", "waiting");
-
-  if (error) throw error;
 }
 
 /**
- * Subscribe to match row updates (e.g. when opponent joins and status becomes 'matched').
- * Returns unsubscribe function.
- */
-export function subscribeToMatch(
-  matchId: string,
-  onMatched: (match: DbMatch) => void
-): () => void {
-  const supabase = getSupabase();
-  if (!supabase) return () => {};
-
-  const channel: RealtimeChannel = supabase
-    .channel(`matchmaking:${matchId}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "matches",
-        filter: `id=eq.${matchId}`,
-      },
-      (payload: { new: DbMatch }) => {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.log("[matchmaking] Realtime update received", payload);
-        }
-        if (payload.new?.status === "matched") {
-          onMatched(payload.new);
-        }
-      }
-    )
-    .subscribe((status: string) => {
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.log("[matchmaking] Realtime subscription status", status);
-      }
-    });
-
-  return () => {
-    channel.unsubscribe();
-  };
-}
-
-/**
- * Mark match as completed with winner and result. Caller should credit winner / refund draw via API.
+ * Mark match as completed with winner and result (used from match room / API).
  */
 export async function completeMatch(
+  supabase: SupabaseClient,
   matchId: string,
   winnerId: string | null,
   result: "player1_win" | "player2_win" | "draw"
 ): Promise<DbMatch> {
-  const supabase = getSupabase();
-  if (!supabase) throw new Error("Supabase not configured");
-
   const { data, error } = await supabase
     .from("matches")
     .update({
