@@ -31,6 +31,8 @@ export function useMatchmaking() {
   const [role, setRole] = useState<"player1" | "player2" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const matchRef = useRef<DbMatch | null>(null);
+  matchRef.current = match;
 
   const startMatchmaking = useCallback(async (options: MatchmakingOptions) => {
     setStatus("searching");
@@ -84,7 +86,7 @@ export function useMatchmaking() {
       cleanupRef.current();
       cleanupRef.current = null;
     }
-    const currentMatch = match;
+    const currentMatch = matchRef.current;
     if (currentMatch?.status === "waiting") {
       const supabase = createClient();
       if (supabase) {
@@ -99,22 +101,24 @@ export function useMatchmaking() {
     setMatch(null);
     setRole(null);
     setError(null);
-  }, [match]);
+  }, []);
 
+  // Cleanup only on unmount — do NOT depend on match/status or we kill the 2s delay before onMatchReady
   useEffect(() => {
     return () => {
       if (cleanupRef.current) {
         cleanupRef.current();
         cleanupRef.current = null;
       }
-      if (match?.status === "waiting") {
+      const currentMatch = matchRef.current;
+      if (currentMatch?.status === "waiting") {
         const supabase = createClient();
         if (supabase) {
-          cancelMatchmaking(supabase, match.id).catch(() => {});
+          cancelMatchmaking(supabase, currentMatch.id).catch(() => {});
         }
       }
     };
-  }, [match?.id, match?.status]);
+  }, []);
 
   return { status, match, role, error, startMatchmaking, cancelSearching };
 }

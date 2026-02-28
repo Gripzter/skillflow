@@ -129,15 +129,20 @@ export async function startMatchmaking(
       }
 
       matchId = (updated as DbMatch).id;
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.log("[matchmaking] Joined match as Player 2:", matchId);
-      }
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Joined match as Player 2:", matchId);
 
       onStatusUpdate("matched", updated as DbMatch);
 
       const readyTimer = setTimeout(() => {
-        if (!cancelled) onMatchReady(updated as DbMatch, "player2");
+        if (cancelled) {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Player 2: cancelled, skipping onMatchReady");
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Player 2: calling onMatchReady", matchId);
+        onMatchReady(updated as DbMatch, "player2");
       }, MATCH_READY_DELAY_MS);
 
       return () => {
@@ -176,24 +181,40 @@ export async function startMatchmaking(
     onStatusUpdate("waiting", newMatch as DbMatch);
 
     pollInterval = setInterval(async () => {
-      if (cancelled) return;
+      if (cancelled) {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Polling cancelled, stopping");
+        return;
+      }
 
       try {
-        const { data: freshMatch } = await supabase
+        const { data: freshMatch, error: pollError } = await supabase
           .from("matches")
           .select("*")
           .eq("id", matchId)
           .single();
+
+        if (pollError) {
+          // eslint-disable-next-line no-console
+          console.error("[matchmaking] Poll query error:", pollError);
+          return;
+        }
+
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] POLL RESULT:", {
+          id: (freshMatch as DbMatch)?.id,
+          status: (freshMatch as DbMatch)?.status,
+          player1_id: (freshMatch as DbMatch)?.player1_id,
+          player2_id: (freshMatch as DbMatch)?.player2_id,
+        });
 
         if (
           freshMatch &&
           (freshMatch as DbMatch).status === "matched" &&
           (freshMatch as DbMatch).player2_id
         ) {
-          if (process.env.NODE_ENV !== "production") {
-            // eslint-disable-next-line no-console
-            console.log("[matchmaking] Opponent joined, match ready");
-          }
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] MATCH FOUND! Stopping poll, calling onMatchReady for Player 1");
           if (pollInterval) {
             clearInterval(pollInterval);
             pollInterval = null;
@@ -202,14 +223,19 @@ export async function startMatchmaking(
           onStatusUpdate("matched", freshMatch as DbMatch);
 
           setTimeout(() => {
-            if (!cancelled) onMatchReady(freshMatch as DbMatch, "player1");
+            if (cancelled) {
+              // eslint-disable-next-line no-console
+              console.log("[matchmaking] Player 1: cancelled, skipping onMatchReady");
+              return;
+            }
+            // eslint-disable-next-line no-console
+            console.log("[matchmaking] Player 1: calling onMatchReady", (freshMatch as DbMatch).id);
+            onMatchReady(freshMatch as DbMatch, "player1");
           }, MATCH_READY_DELAY_MS);
         }
       } catch (pollErr) {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.error("[matchmaking] Polling error:", pollErr);
-        }
+        // eslint-disable-next-line no-console
+        console.error("[matchmaking] Poll error:", pollErr);
       }
     }, POLL_INTERVAL_MS);
 

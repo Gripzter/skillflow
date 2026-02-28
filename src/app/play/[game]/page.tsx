@@ -52,6 +52,7 @@ export default function PlayGamePage() {
   const [match, setMatch] = useState<StoredMatch | null>(null);
   const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [navigateToMatchId, setNavigateToMatchId] = useState<string | null>(null);
 
   const { isPractice } = usePlayMode();
   const {
@@ -103,7 +104,26 @@ export default function PlayGamePage() {
     return () => clearInterval(timer);
   }, [matchmaking, useRealMatchmaking]);
 
-  // Navigation for real matchmaking is handled by onMatchReady (called after 2s VS delay)
+  // State-based navigation so it survives re-renders and isn't killed by effect cleanup
+  useEffect(() => {
+    if (!navigateToMatchId) return;
+    const matchUrl = `/match/${navigateToMatchId}`;
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[PlayGamePage] Navigating to match room:", matchUrl);
+    }
+    router.push(matchUrl);
+    const fallback = setTimeout(() => {
+      if (typeof window !== "undefined" && window.location.pathname !== matchUrl) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[PlayGamePage] Backup navigation via window.location");
+        }
+        window.location.href = matchUrl;
+      }
+    }, 1500);
+    return () => clearTimeout(fallback);
+  }, [navigateToMatchId, router]);
 
   const player1 = useMemo<PlayerInfo>(
     () => ({
@@ -122,6 +142,7 @@ export default function PlayGamePage() {
       clearTimeout(findMatchTimeoutRef.current);
       findMatchTimeoutRef.current = null;
     }
+    setNavigateToMatchId(null);
     if (useRealMatchmaking) {
       await cancelSearching();
     }
@@ -140,12 +161,13 @@ export default function PlayGamePage() {
     }
   }, [elapsedTimer, stakeAmount, isPractice, useRealMatchmaking, cancelSearching]);
 
-  const navigateToMatch = useCallback(
-    (matchId: string) => {
-      router.push(`/match/${matchId}`);
-    },
-    [router]
-  );
+  const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[PlayGamePage] onMatchReady called", match?.id, _role);
+    }
+    if (match?.id) setNavigateToMatchId(match.id);
+  }, []);
 
   const handleFindMatch = useCallback(async () => {
     if (isPractice) {
@@ -201,7 +223,7 @@ export default function PlayGamePage() {
           userId,
           username,
           rating: 1000,
-          onMatchReady: (match) => navigateToMatch(match.id),
+          onMatchReady: handleMatchReady,
         });
       } catch {
         await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
@@ -263,7 +285,7 @@ export default function PlayGamePage() {
     userId,
     username,
     startMatchmaking,
-    navigateToMatch,
+    handleMatchReady,
   ]);
 
   const handlePlayAgainstBot = useCallback(async () => {
@@ -518,7 +540,7 @@ export default function PlayGamePage() {
                       userId,
                       username,
                       rating: 1000,
-                      onMatchReady: (match) => navigateToMatch(match.id),
+                      onMatchReady: handleMatchReady,
                     });
                   }}
                   className="rounded-lg bg-teal px-6 py-2.5 font-semibold text-charcoal hover:shadow-teal-glow"
