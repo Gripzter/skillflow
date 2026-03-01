@@ -1,12 +1,35 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase";
+
+const AGE_CHECK_FAILED_KEY = "skillflow_age_check_failed";
+const FORM_DISABLED_KEY = "skillflow_signup_form_disabled";
+
+function calculateAge(birthDate: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+function getDaysInMonth(month: number, year: number): number {
+  if (!month || !year) return 31;
+  return new Date(year, month, 0).getDate();
+}
+
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
 interface FormErrors {
   username?: string;
@@ -25,10 +48,26 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [dob, setDob] = useState("");
+  const [month, setMonth] = useState<number | "">("");
+  const [day, setDay] = useState<number | "">("");
+  const [year, setYear] = useState<number | "">("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [formDisabled, setFormDisabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem(FORM_DISABLED_KEY) === "true";
+  });
+
+  const currentYear = new Date().getFullYear();
+  const years = useMemo(() => {
+    const arr: number[] = [];
+    for (let y = currentYear; y >= currentYear - 100; y--) arr.push(y);
+    return arr;
+  }, [currentYear]);
+
+  const maxDay = useMemo(() => getDaysInMonth(month || 1, year || currentYear), [month, year, currentYear]);
+  const dayOptions = useMemo(() => Array.from({ length: maxDay }, (_, i) => i + 1), [maxDay]);
 
   function validate(): boolean {
     const newErrors: FormErrors = {};
@@ -57,18 +96,13 @@ export default function SignUpPage() {
       newErrors.confirmPassword = "Passwords do not match";
     }
 
-    if (!dob) {
+    if (month === "" || day === "" || year === "") {
       newErrors.dob = "Date of birth is required";
     } else {
-      const birthDate = new Date(dob);
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
+      const birthDate = new Date(year, month - 1, day);
+      const age = calculateAge(birthDate);
       if (age < 18) {
-        newErrors.dob = "You must be at least 18 years old to use SkillFlow";
+        newErrors.dob = "You must be 18 or older to use SkillFlow. This is a legal requirement for skill-based wagering platforms.";
       }
     }
 
@@ -82,7 +116,23 @@ export default function SignUpPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (formDisabled) return;
     if (!validate()) return;
+
+    const birthDate = new Date(year as number, (month as number) - 1, day as number);
+    const age = calculateAge(birthDate);
+    if (age < 18) {
+      const msg = "You must be 18 or older to create an account.";
+      setErrors((prev) => ({ ...prev, dob: msg }));
+      try {
+        localStorage.setItem(AGE_CHECK_FAILED_KEY, JSON.stringify({ at: Date.now() }));
+        sessionStorage.setItem(FORM_DISABLED_KEY, "true");
+        setFormDisabled(true);
+      } catch {
+        setFormDisabled(true);
+      }
+      return;
+    }
 
     setLoading(true);
     try {
@@ -95,37 +145,56 @@ export default function SignUpPage() {
         setLoading(false);
         return;
       }
-      const { error } = await supabase.auth.signUp({
+
+      const dobISO = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             username: username.trim(),
-            date_of_birth: dob,
+            date_of_birth: dobISO,
           },
         },
       });
 
       if (error) {
         showToast(error.message, "error");
-      } else {
-        showToast("Check your email to verify your account!", "success");
-        setUsername("");
-        setEmail("");
-        setPassword("");
-        setConfirmPassword("");
-        setDob("");
-        setTermsAccepted(false);
-        setErrors({});
-        router.push("/dashboard");
-        router.refresh();
+        setLoading(false);
+        return;
       }
+
+      if (data?.user) {
+        await supabase
+          .from("profiles")
+          .update({
+            date_of_birth: dobISO,
+            age_verified: true,
+            age_verified_at: new Date().toISOString(),
+          })
+          .eq("id", data.user.id);
+      }
+
+      showToast("Check your email to verify your account!", "success");
+      setUsername("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setMonth("");
+      setDay("");
+      setYear("");
+      setTermsAccepted(false);
+      setErrors({});
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       showToast("Something went wrong. Please try again.", "error");
     } finally {
       setLoading(false);
     }
   }
+
+  const under18Error = errors.dob && (month !== "" && day !== "" && year !== "" && calculateAge(new Date(year as number, (month as number) - 1, day as number)) < 18);
 
   return (
     <AuthLayout heading="Create your account" subtitle="Join the arena. Bet on yourself.">
@@ -140,7 +209,8 @@ export default function SignUpPage() {
               setUsername(e.target.value);
               if (errors.username) setErrors((prev) => ({ ...prev, username: undefined }));
             }}
-            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray transition-colors focus:outline-none ${
+            disabled={formDisabled}
+            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray transition-colors focus:outline-none disabled:opacity-60 ${
               errors.username
                 ? "border-red-500/50 focus:border-red-500"
                 : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
@@ -159,7 +229,8 @@ export default function SignUpPage() {
               setEmail(e.target.value);
               if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
             }}
-            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray transition-colors focus:outline-none ${
+            disabled={formDisabled}
+            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray transition-colors focus:outline-none disabled:opacity-60 ${
               errors.email
                 ? "border-red-500/50 focus:border-red-500"
                 : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
@@ -178,6 +249,7 @@ export default function SignUpPage() {
               if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
             }}
             error={errors.password}
+            disabled={formDisabled}
           />
           {errors.password && <p className="mt-1.5 text-sm text-red-400">{errors.password}</p>}
         </div>
@@ -193,6 +265,7 @@ export default function SignUpPage() {
                 setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
             }}
             error={errors.confirmPassword}
+            disabled={formDisabled}
           />
           {errors.confirmPassword && (
             <p className="mt-1.5 text-sm text-red-400">{errors.confirmPassword}</p>
@@ -202,20 +275,88 @@ export default function SignUpPage() {
         {/* Date of Birth */}
         <div>
           <label className="mb-1.5 block text-sm text-body-gray">Date of Birth</label>
-          <input
-            type="date"
-            value={dob}
-            onChange={(e) => {
-              setDob(e.target.value);
-              if (errors.dob) setErrors((prev) => ({ ...prev, dob: undefined }));
-            }}
-            className={`w-full rounded-lg border bg-[#1A1D27] px-4 py-3 text-white transition-colors focus:outline-none [color-scheme:dark] ${
-              errors.dob
-                ? "border-red-500/50 focus:border-red-500"
-                : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
-            }`}
-          />
-          {errors.dob && <p className="mt-1.5 text-sm text-red-400">{errors.dob}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <select
+              value={month === "" ? "" : month}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : "";
+                setMonth(v);
+                if (v && day > getDaysInMonth(v, year || currentYear)) setDay("");
+                if (errors.dob) setErrors((prev) => ({ ...prev, dob: undefined }));
+              }}
+              disabled={formDisabled}
+              className={`rounded-lg border bg-[#1A1D27] px-3 py-3 text-white focus:outline-none disabled:opacity-60 [color-scheme:dark] ${
+                errors.dob
+                  ? "border-red-500/50 focus:border-red-500"
+                  : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
+              }`}
+            >
+              <option value="">Month</option>
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <select
+              value={day === "" ? "" : day}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : "";
+                setDay(v);
+                if (errors.dob) setErrors((prev) => ({ ...prev, dob: undefined }));
+              }}
+              disabled={formDisabled}
+              className={`rounded-lg border bg-[#1A1D27] px-3 py-3 text-white focus:outline-none disabled:opacity-60 [color-scheme:dark] ${
+                errors.dob
+                  ? "border-red-500/50 focus:border-red-500"
+                  : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
+              }`}
+            >
+              <option value="">Day</option>
+              {dayOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <select
+              value={year === "" ? "" : year}
+              onChange={(e) => {
+                const v = e.target.value ? Number(e.target.value) : "";
+                setYear(v);
+                if (v && month && day > getDaysInMonth(month, v)) setDay("");
+                if (errors.dob) setErrors((prev) => ({ ...prev, dob: undefined }));
+              }}
+              disabled={formDisabled}
+              className={`rounded-lg border bg-[#1A1D27] px-3 py-3 text-white focus:outline-none disabled:opacity-60 [color-scheme:dark] ${
+                errors.dob
+                  ? "border-red-500/50 focus:border-red-500"
+                  : "border-white/10 focus:border-teal focus:ring-1 focus:ring-teal"
+              }`}
+            >
+              <option value="">Year</option>
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1 text-xs text-body-gray">
+            You must be 18+ to play. This is required by law.
+          </p>
+          {errors.dob && (
+            <div className="mt-2">
+              <p className={`text-sm ${under18Error ? "font-medium text-red-400" : "text-red-400"}`}>
+                {errors.dob}
+              </p>
+              {under18Error && (
+                <p className="mt-2 text-sm text-body-gray">
+                  If you believe this is an error, please contact support.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Terms checkbox */}
@@ -228,10 +369,11 @@ export default function SignUpPage() {
                 setTermsAccepted(e.target.checked);
                 if (errors.terms) setErrors((prev) => ({ ...prev, terms: undefined }));
               }}
-              className="mt-1 h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-[#1A1D27] checked:border-teal checked:bg-teal transition-colors focus:ring-1 focus:ring-teal focus:ring-offset-0"
+              disabled={formDisabled}
+              className="mt-1 h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-[#1A1D27] checked:border-teal checked:bg-teal transition-colors focus:ring-1 focus:ring-teal focus:ring-offset-0 disabled:opacity-60"
             />
             <span className="text-sm text-body-gray">
-              I confirm that I am at least 18 years old and agree to the{" "}
+              I confirm I am at least 18 years old and agree to the{" "}
               <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
                 Terms of Service
               </Link>{" "}
@@ -248,7 +390,7 @@ export default function SignUpPage() {
         {/* Submit */}
         <button
           type="submit"
-          disabled={loading || !termsAccepted}
+          disabled={loading || !termsAccepted || formDisabled}
           className="w-full rounded-lg bg-teal py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? (
@@ -259,6 +401,8 @@ export default function SignUpPage() {
               </svg>
               Creating Account...
             </span>
+          ) : formDisabled ? (
+            "Registration unavailable"
           ) : (
             "Create Account"
           )}

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
+import GeoBlockModal from "@/components/GeoBlockModal";
+import { useGeo } from "@/contexts/GeoContext";
 import {
   getCurrentUser,
   getWalletBalance,
@@ -39,6 +41,8 @@ export default function WalletPage() {
   const [balance, setBalance] = useState(0);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
   const [showDevTopUp, setShowDevTopUp] = useState(false);
+  const [showGeoModal, setShowGeoModal] = useState(false);
+  const { isRestricted } = useGeo();
 
   async function refreshFromApi() {
     try {
@@ -202,28 +206,40 @@ export default function WalletPage() {
               ${balance.toFixed(2)}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Link
-                href="/wallet/deposit"
-                className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
-              >
-                💰 Deposit
-              </Link>
-              {balance < MIN_WITHDRAWAL ? (
-                <span
-                  title="Minimum withdrawal: $10"
-                  className="flex w-full cursor-not-allowed justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 font-semibold text-white/60 sm:w-auto"
+              {isRestricted ? (
+                <button
+                  type="button"
+                  onClick={() => setShowGeoModal(true)}
+                  className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
                 >
-                  💸 Withdraw
-                </span>
+                  💰 Deposit
+                </button>
               ) : (
                 <Link
-                  href="/wallet/withdraw"
-                  className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
+                  href="/wallet/deposit"
+                  className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
                 >
-                  💸 Withdraw
+                  💰 Deposit
                 </Link>
               )}
+              {!isRestricted &&
+                (balance < MIN_WITHDRAWAL ? (
+                  <span
+                    title="Minimum withdrawal: $10"
+                    className="flex w-full cursor-not-allowed justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 font-semibold text-white/60 sm:w-auto"
+                  >
+                    💸 Withdraw
+                  </span>
+                ) : (
+                  <Link
+                    href="/wallet/withdraw"
+                    className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
+                  >
+                    💸 Withdraw
+                  </Link>
+                ))}
             </div>
+            {showGeoModal && <GeoBlockModal onClose={() => setShowGeoModal(false)} />}
             <p className="mt-4 text-xs text-body-gray">
               Minimum deposit: $5.00 • Minimum withdrawal: $10.00
             </p>

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
+import GeoBlockModal from "@/components/GeoBlockModal";
+import { useGeo } from "@/contexts/GeoContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
@@ -18,6 +20,7 @@ export default function DepositPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<number | null>(25);
   const [customAmount, setCustomAmount] = useState("");
+  const { isRestricted } = useGeo();
 
   const amount =
     selectedPreset != null ? selectedPreset : parseFloat(customAmount) || 0;
@@ -43,7 +46,7 @@ export default function DepositPage() {
   }, [router]);
 
   async function handleDeposit() {
-    if (!validAmount) return;
+    if (!validAmount || isRestricted) return;
     setError(null);
     setDepositLoading(true);
 
@@ -101,6 +104,7 @@ export default function DepositPage() {
 
   return (
     <div className="min-h-screen bg-charcoal">
+      {isRestricted && <GeoBlockModal onClose={() => router.push("/wallet")} />}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username=""
@@ -187,7 +191,7 @@ export default function DepositPage() {
         <button
           type="button"
           onClick={handleDeposit}
-          disabled={depositLoading || !validAmount}
+          disabled={depositLoading || !validAmount || isRestricted}
           className="mt-8 w-full rounded-lg bg-teal py-3.5 text-lg font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50"
         >
           {depositLoading ? "Redirecting…" : `Deposit $${amount.toFixed(2)}`}

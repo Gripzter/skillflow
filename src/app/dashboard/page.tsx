@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance, getMatches, getPracticeMatches, getPracticeStats, logout as apiLogout } from "@/lib/api";
 
@@ -32,6 +33,7 @@ export default function DashboardPage() {
   const [matches, setMatches] = useState<{ id: string; status: string; winner?: string }[]>([]);
   const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
   const { isPractice } = usePlayMode();
+  const { isRestricted } = useGeo();
 
   useEffect(() => {
     async function load() {
@@ -98,6 +100,11 @@ export default function DashboardPage() {
       />
       <ModeToggleBarContent />
       <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
+        {isRestricted && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            ⚠️ Real money play is not available in your region. Practice mode is available.
+          </div>
+        )}
         {/* Welcome banner */}
         <section className="welcome-banner animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -175,22 +182,26 @@ export default function DashboardPage() {
             {/* Quick actions */}
             <section className="mt-8">
               <div className="-mx-4 flex gap-3 overflow-x-auto pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
-                <Link
-                  href="/wallet"
-                  className="action-card pressable card-border group ml-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-teal-glow/20 sm:ml-0"
-                >
-                  <div className="top-accent h-1 w-12 rounded-full bg-teal" />
-                  <p className="mt-4 text-lg font-semibold text-white">💰 Deposit</p>
-                  <p className="mt-1 text-sm text-body-gray">Add funds to your wallet</p>
-                </Link>
-                <Link
-                  href="/play"
-                  className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-glow/20"
-                >
-                  <div className="top-accent h-1 w-12 rounded-full bg-purple" />
-                  <p className="mt-4 text-lg font-semibold text-white">🎮 Quick Match</p>
-                  <p className="mt-1 text-sm text-body-gray">Find an opponent now</p>
-                </Link>
+                {!isRestricted && (
+                  <>
+                    <Link
+                      href="/wallet"
+                      className="action-card pressable card-border group ml-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-teal-glow/20 sm:ml-0"
+                    >
+                      <div className="top-accent h-1 w-12 rounded-full bg-teal" />
+                      <p className="mt-4 text-lg font-semibold text-white">💰 Deposit</p>
+                      <p className="mt-1 text-sm text-body-gray">Add funds to your wallet</p>
+                    </Link>
+                    <Link
+                      href="/play"
+                      className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-glow/20"
+                    >
+                      <div className="top-accent h-1 w-12 rounded-full bg-purple" />
+                      <p className="mt-4 text-lg font-semibold text-white">🎮 Quick Match</p>
+                      <p className="mt-1 text-sm text-body-gray">Find an opponent now</p>
+                    </Link>
+                  </>
+                )}
                 <Link
                   href="/external"
                   className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card border-orange-500/30 bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10"

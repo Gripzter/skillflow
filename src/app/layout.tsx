@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
+import { GeoProvider } from "@/contexts/GeoContext";
 import { PlayModeProvider } from "@/contexts/PlayModeContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ConnectionMonitor from "@/components/ConnectionMonitor";
@@ -44,13 +45,15 @@ export default function RootLayout({
       </head>
       <body className="font-sans">
         <ThemeProvider>
-          <ConnectionMonitor />
-          <ToastProvider>
-            <PlayModeProvider>
-              {children}
-              <MobileTabBar />
-            </PlayModeProvider>
-          </ToastProvider>
+          <GeoProvider>
+            <ConnectionMonitor />
+            <ToastProvider>
+              <PlayModeProvider>
+                {children}
+                <MobileTabBar />
+              </PlayModeProvider>
+            </ToastProvider>
+          </GeoProvider>
         </ThemeProvider>
       </body>
     </html>

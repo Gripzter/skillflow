@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
@@ -55,6 +56,8 @@ export default function PlayGamePage() {
   const [navigateToMatchId, setNavigateToMatchId] = useState<string | null>(null);
 
   const { isPractice } = usePlayMode();
+  const { isRestricted } = useGeo();
+  const effectivePractice = isPractice || isRestricted;
   const {
     status: realMatchStatus,
     match: realMatch,
@@ -66,8 +69,8 @@ export default function PlayGamePage() {
 
   const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
   const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
-  const insufficientBalance = !isPractice && balance < stakeAmount;
-  const useRealMatchmaking = !isDevMode && !isPractice;
+  const insufficientBalance = !effectivePractice && balance < stakeAmount;
+  const useRealMatchmaking = !isDevMode && !isPractice && !isRestricted;
   const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
   const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
   const realMatchmakingTimeout = realMatchStatus === "timeout";
@@ -150,7 +153,7 @@ export default function PlayGamePage() {
     setOpponentFound(null);
     setMatch(null);
     setMatchmakingElapsed(0);
-    if (!isPractice) {
+    if (!isPractice && !isRestricted) {
       try {
         await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
         setBalance(await getWalletBalance());
@@ -159,7 +162,7 @@ export default function PlayGamePage() {
         dispatchWalletUpdated();
       }
     }
-  }, [elapsedTimer, stakeAmount, isPractice, useRealMatchmaking, cancelSearching]);
+  }, [elapsedTimer, stakeAmount, isPractice, isRestricted, useRealMatchmaking, cancelSearching]);
 
   const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
     if (process.env.NODE_ENV !== "production") {
@@ -170,7 +173,7 @@ export default function PlayGamePage() {
   }, []);
 
   const handleFindMatch = useCallback(async () => {
-    if (isPractice) {
+    if (isPractice || isRestricted) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
@@ -279,6 +282,7 @@ export default function PlayGamePage() {
     gameSlug,
     insufficientBalance,
     isPractice,
+    isRestricted,
     player1,
     router,
     useRealMatchmaking,
@@ -385,7 +389,7 @@ export default function PlayGamePage() {
             </svg>
             {gameName}
           </Link>
-          {!isPractice && (
+          {!effectivePractice && (
             <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
               <span className="text-sm font-medium text-white">${balance.toFixed(2)}</span>
@@ -393,14 +397,14 @@ export default function PlayGamePage() {
           )}
         </div>
 
-        {isPractice && (
+        {effectivePractice && (
           <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
             <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
             <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
           </div>
         )}
 
-        {!isPractice && (
+        {!effectivePractice && (
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <p className="mt-1 text-body-gray">
@@ -453,7 +457,7 @@ export default function PlayGamePage() {
           </section>
         )}
 
-        {!isPractice && (
+        {!effectivePractice && (
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Match Settings</h2>
             <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -471,14 +475,14 @@ export default function PlayGamePage() {
           <button
             type="button"
             onClick={handleFindMatch}
-            disabled={!isPractice && (insufficientBalance || stakeAmount < 1)}
+            disabled={!effectivePractice && (insufficientBalance || stakeAmount < 1)}
             className={`pressable h-14 w-full rounded-lg text-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
-              isPractice
+              effectivePractice
                 ? "bg-gradient-to-r from-[#7C5CFC] to-purple-600 text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
                 : "bg-teal text-charcoal hover:shadow-teal-glow"
             }`}
           >
-            {isPractice ? "Find Practice Match" : `Find Match — $${stakeAmount.toFixed(2)}`}
+            {effectivePractice ? "Find Practice Match" : `Find Match — $${stakeAmount.toFixed(2)}`}
           </button>
         </div>
       </main>
@@ -567,19 +571,19 @@ export default function PlayGamePage() {
           {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && !realMatchmakingTimeout && (
             <>
               <div className="relative flex h-24 w-24 items-center justify-center">
-                <div className={`absolute h-20 w-20 animate-ping rounded-full border-2 ${isPractice ? "border-purple-500/40" : "border-teal/40"}`} />
-                <div className={`absolute h-16 w-16 animate-pulse rounded-full border-2 ${isPractice ? "border-purple-500" : "border-teal"}`} />
-                <div className={`h-3 w-3 rounded-full ${isPractice ? "bg-purple-500" : "bg-teal"}`} />
+                <div className={`absolute h-20 w-20 animate-ping rounded-full border-2 ${effectivePractice ? "border-purple-500/40" : "border-teal/40"}`} />
+                <div className={`absolute h-16 w-16 animate-pulse rounded-full border-2 ${effectivePractice ? "border-purple-500" : "border-teal"}`} />
+                <div className={`h-3 w-3 rounded-full ${effectivePractice ? "bg-purple-500" : "bg-teal"}`} />
               </div>
               <p className="mt-6 text-xl font-semibold text-white">
                 {realMatchStatus === "waiting"
                   ? "Waiting for opponent..."
-                  : isPractice
+                  : effectivePractice
                     ? "Finding practice opponent..."
                     : "Searching for opponent..."}
               </p>
               <p className="mt-2 text-body-gray">
-                {isPractice ? `${gameName} • Free play` : `Stake: $${stakeAmount.toFixed(2)} • ${gameName} • Ranked 1v1`}
+                {effectivePractice ? `${gameName} • Free play` : `Stake: $${stakeAmount.toFixed(2)} • ${gameName} • Ranked 1v1`}
               </p>
               <p className="mt-2 text-sm text-body-gray">
                 {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}
@@ -598,7 +602,7 @@ export default function PlayGamePage() {
           )}
           {opponentFound && match && (
             <>
-              <p className={`text-2xl font-bold ${isPractice ? "text-purple-400" : "text-teal"}`}>Opponent Found!</p>
+              <p className={`text-2xl font-bold ${effectivePractice ? "text-purple-400" : "text-teal"}`}>Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-lg font-bold text-white">
@@ -607,7 +611,7 @@ export default function PlayGamePage() {
                   <p className="mt-2 font-medium text-white">{player1.username}</p>
                   <p className="text-xs text-body-gray">Rating {player1.rating}</p>
                 </div>
-                <span className={`text-2xl font-bold drop-shadow-lg ${isPractice ? "text-purple-400" : "text-teal"}`}>VS</span>
+                <span className={`text-2xl font-bold drop-shadow-lg ${effectivePractice ? "text-purple-400" : "text-teal"}`}>VS</span>
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-lg font-bold text-white">
                     {opponentFound.username.charAt(0)}
@@ -616,7 +620,7 @@ export default function PlayGamePage() {
                   <p className="text-xs text-body-gray">Rating {opponentFound.rating}</p>
                 </div>
               </div>
-              <p className="mt-6 text-body-gray">{isPractice ? "Starting practice match..." : "Starting match..."}</p>
+              <p className="mt-6 text-body-gray">{effectivePractice ? "Starting practice match..." : "Starting match..."}</p>
             </>
           )}
         </div>

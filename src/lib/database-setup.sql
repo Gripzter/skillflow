@@ -15,6 +15,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   date_of_birth DATE,
+  age_verified BOOLEAN DEFAULT false,
+  age_verified_at TIMESTAMP WITH TIME ZONE,
   avatar_url TEXT,
   avatar_color TEXT DEFAULT '#7C5CFC',
   skill_rating INTEGER DEFAULT 1000,
