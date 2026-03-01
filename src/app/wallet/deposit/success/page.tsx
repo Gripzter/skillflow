@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 
-export default function DepositSuccessPage() {
+function DepositSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -87,5 +86,22 @@ export default function DepositSuccessPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DepositSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-charcoal">
+          <div className="text-center">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-teal border-t-transparent" />
+            <p className="text-body-gray">Confirming your deposit…</p>
+          </div>
+        </div>
+      }
+    >
+      <DepositSuccessContent />
+    </Suspense>
   );
 }
