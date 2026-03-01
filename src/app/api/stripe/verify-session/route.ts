@@ -72,6 +72,12 @@ export async function GET(req: NextRequest) {
           stripe_payment_id: paymentIntentId,
           status: "completed",
         });
+
+        const { recordDeposit } = await import("@/lib/responsible-gaming");
+        await recordDeposit(supabaseAdmin, userId, amount);
+
+        const { completeReferral } = await import("@/lib/referrals");
+        await completeReferral(supabaseAdmin, userId, amount);
       }
     }
 

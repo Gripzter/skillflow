@@ -19,7 +19,7 @@ interface AppNavbarProps {
   isDevMode: boolean;
   onLogout: () => void;
   loggingOut: boolean;
-  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings";
+  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals";
 }
 
 export default function AppNavbar({
@@ -119,6 +119,16 @@ export default function AppNavbar({
             }`}
           >
             Leaderboard
+          </Link>
+          <Link
+            href="/referrals"
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPage === "referrals"
+                ? "active bg-white/10 text-white"
+                : "text-body-gray hover:text-white"
+            }`}
+          >
+            🎁 Referrals
           </Link>
           </nav>
         </div>

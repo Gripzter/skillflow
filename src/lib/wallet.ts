@@ -12,7 +12,8 @@ export type TransactionType =
   | "match_entry"
   | "match_win"
   | "match_refund"
-  | "platform_fee";
+  | "platform_fee"
+  | "referral_bonus";
 
 export interface StoredTransaction {
   id: string;

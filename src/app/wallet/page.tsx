@@ -28,6 +28,7 @@ const TYPE_BADGE_CLASS: Record<TransactionType, string> = {
   match_win: "bg-teal/20 text-teal border-teal/30",
   match_refund: "bg-purple/20 text-purple border-purple/30",
   platform_fee: "bg-white/10 text-body-gray border-white/10",
+  referral_bonus: "bg-teal/20 text-teal border-teal/30",
 };
 
 export default function WalletPage() {

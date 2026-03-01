@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, FormEvent, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, FormEvent, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase";
+import { ensureReferralCode } from "@/lib/referrals";
+
+const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
 
 const AGE_CHECK_FAILED_KEY = "skillflow_age_check_failed";
 const FORM_DISABLED_KEY = "skillflow_signup_form_disabled";
@@ -58,6 +61,21 @@ export default function SignUpPage() {
     if (typeof window === "undefined") return false;
     return sessionStorage.getItem(FORM_DISABLED_KEY) === "true";
   });
+  const searchParams = useSearchParams();
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get("ref")?.trim()?.toLowerCase();
+    if (fromUrl) {
+      setReferralCode(fromUrl);
+      if (typeof window !== "undefined") window.localStorage.setItem(REFERRAL_STORAGE_KEY, fromUrl);
+      return;
+    }
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem(REFERRAL_STORAGE_KEY)?.trim()?.toLowerCase();
+      if (stored) setReferralCode(stored);
+    }
+  }, [searchParams]);
 
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
@@ -165,6 +183,7 @@ export default function SignUpPage() {
       }
 
       if (data?.user) {
+        const newUserId = data.user.id;
         await supabase
           .from("profiles")
           .update({
@@ -172,7 +191,33 @@ export default function SignUpPage() {
             age_verified: true,
             age_verified_at: new Date().toISOString(),
           })
-          .eq("id", data.user.id);
+          .eq("id", newUserId);
+        await ensureReferralCode(supabase, newUserId, username.trim());
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("referred_by")
+          .eq("id", newUserId)
+          .single();
+        if (!existingProfile?.referred_by && referralCode) {
+          const { data: referrer } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("referral_code", referralCode)
+            .maybeSingle();
+          if (referrer && referrer.id !== newUserId) {
+            await supabase
+              .from("profiles")
+              .update({ referred_by: referralCode })
+              .eq("id", newUserId);
+            await supabase.from("referrals").insert({
+              referrer_id: referrer.id,
+              referred_id: newUserId,
+              referral_code: referralCode,
+              status: "pending",
+            });
+          }
+        }
+        if (typeof window !== "undefined") window.localStorage.removeItem(REFERRAL_STORAGE_KEY);
       }
 
       showToast("Check your email to verify your account!", "success");
@@ -198,6 +243,11 @@ export default function SignUpPage() {
 
   return (
     <AuthLayout heading="Create your account" subtitle="Join the arena. Bet on yourself.">
+      {referralCode && (
+        <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          🎁 You&apos;ll get a $5 bonus after your first deposit ($5+)!
+        </div>
+      )}
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {/* Username */}
         <div>

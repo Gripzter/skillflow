@@ -93,6 +93,9 @@ export async function POST(req: NextRequest) {
       const { recordDeposit } = await import("@/lib/responsible-gaming");
       await recordDeposit(supabaseAdmin, userId, amount);
 
+      const { completeReferral } = await import("@/lib/referrals");
+      await completeReferral(supabaseAdmin, userId, amount);
+
       console.log("[Stripe webhook] Wallet updated for user:", userId);
     }
   }

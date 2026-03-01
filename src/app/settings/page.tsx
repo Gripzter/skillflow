@@ -72,6 +72,19 @@ export default function SettingsPage() {
       <main className="settings-page-default mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
 
+        {/* Referrals */}
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-white">Referrals</h2>
+          <p className="mt-1 text-sm text-body-gray">Invite friends and earn $5 for each one who deposits.</p>
+          <Link
+            href="/referrals"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors hover:border-teal/40 hover:bg-teal/5"
+          >
+            <span aria-hidden>🎁</span>
+            Referrals
+          </Link>
+        </section>
+
         {/* Responsible Gaming */}
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-white">Responsible Gaming</h2>

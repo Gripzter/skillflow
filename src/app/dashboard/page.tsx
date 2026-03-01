@@ -37,6 +37,11 @@ export default function DashboardPage() {
     daily_deposit_limit: number | null;
     daily_deposited: number;
   } | null>(null);
+  const [totalReferrals, setTotalReferrals] = useState<number | null>(null);
+  const [referralBannerDismissed, setReferralBannerDismissed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("skillflow_referral_banner_dismissed") === "true";
+  });
   const { isPractice } = usePlayMode();
   const { isRestricted } = useGeo();
 
@@ -50,7 +55,7 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        const [bal, matchList, rgRes] = await Promise.all([
+        const [bal, matchList, rgRes, refCount] = await Promise.all([
           getWalletBalance(),
           getMatches(),
           (async () => {
@@ -64,10 +69,22 @@ export default function DashboardPage() {
               .maybeSingle();
             return data;
           })(),
+          (async () => {
+            const { createClient } = await import("@/lib/supabase");
+            const supabase = createClient();
+            if (!supabase) return null;
+            const { data } = await supabase
+              .from("profiles")
+              .select("total_referrals")
+              .eq("id", user.id)
+              .single();
+            return data?.total_referrals ?? 0;
+          })(),
         ]);
         setBalance(bal);
         setMatches(matchList);
         setRg(rgRes ?? null);
+        setTotalReferrals(refCount ?? 0);
         const pStats = getPracticeStats(user.username);
         setPracticeStats(pStats);
       } catch {
@@ -153,6 +170,31 @@ export default function DashboardPage() {
             }
             return null;
           })()
+        )}
+        {!referralBannerDismissed && (totalReferrals === null || totalReferrals === 0) && (
+          <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-teal/30 bg-teal/5 px-4 py-3 text-sm text-teal-100">
+            <span>
+              🎁 Invite friends and earn $5 for each one!{" "}
+              <Link href="/referrals" className="font-medium text-teal hover:underline">
+                Share Your Link →
+              </Link>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setReferralBannerDismissed(true);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("skillflow_referral_banner_dismissed", "true");
+                }
+              }}
+              className="shrink-0 rounded p-1 text-body-gray hover:text-white"
+              aria-label="Dismiss"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         )}
         {/* Welcome banner */}
         <section className="welcome-banner animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
