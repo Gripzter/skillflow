@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { stripe } from "@/lib/stripe";
 import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
+import { checkDepositAllowed } from "@/lib/responsible-gaming";
+
+const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export async function POST(req: NextRequest) {
   if (!stripe) {
@@ -31,6 +40,16 @@ export async function POST(req: NextRequest) {
         { error: "User ID is required" },
         { status: 400 }
       );
+    }
+
+    if (supabaseAdmin) {
+      const limitCheck = await checkDepositAllowed(supabaseAdmin, userId, depositAmount);
+      if (!limitCheck.allowed) {
+        return NextResponse.json(
+          { error: limitCheck.reason ?? "Deposit not allowed." },
+          { status: 403 }
+        );
+      }
     }
 
     const amountInCents = Math.round(depositAmount * 100);

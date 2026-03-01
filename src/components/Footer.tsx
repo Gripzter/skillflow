@@ -20,6 +20,10 @@ export default function Footer() {
             Responsible Play
           </Link>
           <span className="hidden text-body-gray/50 sm:inline">•</span>
+          <Link href="/responsible-gaming" className="hover:text-white">
+            Responsible Gaming
+          </Link>
+          <span className="hidden text-body-gray/50 sm:inline">•</span>
           <Link href="/fairplay" className="hover:text-white">
             Fair Play
           </Link>

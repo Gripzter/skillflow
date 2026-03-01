@@ -61,7 +61,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -69,6 +69,31 @@ export default function LoginPage() {
       if (error) {
         showToast(error.message, "error");
       } else {
+        const user = authData.user;
+        const { data: rg } = user
+          ? await supabase
+              .from("responsible_gaming")
+              .select("self_excluded, self_exclusion_until")
+              .eq("user_id", user.id)
+              .single()
+          : { data: null };
+        if (user && rg?.self_excluded) {
+          const until = rg.self_exclusion_until;
+          if (!until || new Date(until) > new Date()) {
+            await supabase.auth.signOut();
+            showToast(
+              `Your account is self-excluded${until ? ` until ${new Date(until).toLocaleDateString()}` : " permanently"}. If you need support, call 1-800-522-4700.`,
+              "error"
+            );
+            setLoading(false);
+            return;
+          }
+          await supabase.from("responsible_gaming").update({
+            self_excluded: false,
+            self_exclusion_until: null,
+            self_exclusion_type: null,
+          }).eq("user_id", user.id);
+        }
         showToast("Welcome back!", "success");
         router.push("/dashboard");
         router.refresh();

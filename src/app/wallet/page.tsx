@@ -243,6 +243,9 @@ export default function WalletPage() {
             <p className="mt-4 text-xs text-body-gray">
               Minimum deposit: $5.00 • Minimum withdrawal: $10.00
             </p>
+            <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-xs text-teal hover:underline">
+              🛡️ Set deposit limits
+            </Link>
           </div>
         </section>
 

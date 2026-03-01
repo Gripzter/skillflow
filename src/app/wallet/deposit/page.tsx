@@ -185,7 +185,12 @@ export default function DepositPage() {
         </div>
 
         {error && (
-          <p className="mt-4 text-sm text-red-400">{error}</p>
+          <div className="mt-4">
+            <p className="text-sm text-red-400">{error}</p>
+            <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-sm text-teal hover:underline">
+              Manage your limits in Responsible Gaming settings →
+            </Link>
+          </div>
         )}
 
         <button

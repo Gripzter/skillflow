@@ -72,6 +72,19 @@ export default function SettingsPage() {
       <main className="settings-page-default mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
 
+        {/* Responsible Gaming */}
+        <section className="mt-8">
+          <h2 className="text-lg font-semibold text-white">Responsible Gaming</h2>
+          <p className="mt-1 text-sm text-body-gray">Set deposit limits, cool-off periods, and self-exclusion.</p>
+          <Link
+            href="/settings/responsible-gaming"
+            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors hover:border-teal/40 hover:bg-teal/5"
+          >
+            <span aria-hidden>🛡️</span>
+            Gaming Limits
+          </Link>
+        </section>
+
         {/* Theme */}
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-white">App Theme</h2>

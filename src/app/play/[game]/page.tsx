@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { useToast } from "@/components/Toast";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
@@ -19,6 +20,8 @@ import {
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
+import { checkCanPlay } from "@/lib/responsible-gaming";
+import { createClient } from "@/lib/supabase";
 
 const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
 const MATCHMAKING_TIMEOUT_SEC = 60;
@@ -57,6 +60,7 @@ export default function PlayGamePage() {
 
   const { isPractice } = usePlayMode();
   const { isRestricted } = useGeo();
+  const { showToast } = useToast();
   const effectivePractice = isPractice || isRestricted;
   const {
     status: realMatchStatus,
@@ -206,6 +210,15 @@ export default function PlayGamePage() {
         }
       }, delay);
       return;
+    }
+
+    const supabase = createClient();
+    if (supabase && userId) {
+      const canPlay = await checkCanPlay(supabase, userId);
+      if (!canPlay.allowed) {
+        showToast(canPlay.reason ?? "Real money play is not allowed.", "error");
+        return;
+      }
     }
 
     if (useRealMatchmaking) {

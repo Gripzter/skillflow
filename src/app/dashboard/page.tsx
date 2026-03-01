@@ -32,6 +32,11 @@ export default function DashboardPage() {
   const [balance, setBalance] = useState(0);
   const [matches, setMatches] = useState<{ id: string; status: string; winner?: string }[]>([]);
   const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
+  const [rg, setRg] = useState<{
+    cool_off_until: string | null;
+    daily_deposit_limit: number | null;
+    daily_deposited: number;
+  } | null>(null);
   const { isPractice } = usePlayMode();
   const { isRestricted } = useGeo();
 
@@ -45,9 +50,24 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        const [bal, matchList] = await Promise.all([getWalletBalance(), getMatches()]);
+        const [bal, matchList, rgRes] = await Promise.all([
+          getWalletBalance(),
+          getMatches(),
+          (async () => {
+            const { createClient } = await import("@/lib/supabase");
+            const supabase = createClient();
+            if (!supabase) return null;
+            const { data } = await supabase
+              .from("responsible_gaming")
+              .select("cool_off_until, daily_deposit_limit, daily_deposited")
+              .eq("user_id", user.id)
+              .maybeSingle();
+            return data;
+          })(),
+        ]);
         setBalance(bal);
         setMatches(matchList);
+        setRg(rgRes ?? null);
         const pStats = getPracticeStats(user.username);
         setPracticeStats(pStats);
       } catch {
@@ -104,6 +124,35 @@ export default function DashboardPage() {
           <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             ⚠️ Real money play is not available in your region. Practice mode is available.
           </div>
+        )}
+        {rg?.cool_off_until && new Date(rg.cool_off_until) > new Date() && (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            ⏸️ Cool-off period active. Real money play disabled.{" "}
+            {(() => {
+              const hours = Math.ceil((new Date(rg.cool_off_until!).getTime() - Date.now()) / (1000 * 60 * 60));
+              const days = Math.floor(hours / 24);
+              const h = hours % 24;
+              return `${days > 0 ? `${days} day${days !== 1 ? "s" : ""}, ` : ""}${h} hour${h !== 1 ? "s" : ""} remaining.`;
+            })()}{" "}
+            Practice mode is available.
+          </div>
+        )}
+        {rg?.daily_deposit_limit != null && !rg.cool_off_until && (
+          (() => {
+            const used = Number(rg.daily_deposited ?? 0);
+            const limit = Number(rg.daily_deposit_limit);
+            if (used > 0 && used >= limit * 0.8) {
+              return (
+                <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                  💡 You&apos;ve used ${used} of your ${limit} daily deposit limit.{" "}
+                  <Link href="/settings/responsible-gaming" className="font-medium text-teal hover:underline">
+                    Manage limits
+                  </Link>
+                </div>
+              );
+            }
+            return null;
+          })()
         )}
         {/* Welcome banner */}
         <section className="welcome-banner animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
