@@ -1,36 +1,29 @@
-import Navbar from "@/components/Navbar";
-import Hero from "@/components/Hero";
-import HowItWorks from "@/components/HowItWorks";
-import Games from "@/components/Games";
-import Stats from "@/components/Stats";
-import FAQ from "@/components/FAQ";
-import FinalCTA from "@/components/FinalCTA";
-import Footer from "@/components/Footer";
-import ScrollReveal from "@/components/ScrollReveal";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getCurrentUser } from "@/lib/api";
+import LandingPage from "@/components/landing";
 
 export default function Home() {
-  return (
-    <>
-      <Navbar />
-      <main>
-        <Hero />
-        <ScrollReveal>
-          <HowItWorks />
-        </ScrollReveal>
-        <ScrollReveal delay={1}>
-          <Games />
-        </ScrollReveal>
-        <ScrollReveal>
-          <Stats />
-        </ScrollReveal>
-        <ScrollReveal delay={1}>
-          <FAQ />
-        </ScrollReveal>
-        <ScrollReveal>
-          <FinalCTA />
-        </ScrollReveal>
-        <Footer />
-      </main>
-    </>
-  );
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((user) => {
+        if (user) router.replace("/dashboard");
+      })
+      .finally(() => setChecking(false));
+  }, [router]);
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0A0E17]">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+      </div>
+    );
+  }
+
+  return <LandingPage />;
 }
