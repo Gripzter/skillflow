@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, Suspense, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
@@ -15,9 +15,18 @@ interface FormErrors {
   password?: string;
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
+  const [urlMessage, setUrlMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const message = searchParams.get("message");
+    const error = searchParams.get("error");
+    if (message) setUrlMessage(decodeURIComponent(message));
+    if (error) setUrlMessage(decodeURIComponent(error).replace(/_/g, " "));
+  }, [searchParams]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -134,6 +143,17 @@ export default function LoginPage() {
 
   return (
     <AuthLayout heading="Welcome back" subtitle="Log in to your account">
+      {urlMessage && (
+        <div
+          className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+            urlMessage.includes("error") || urlMessage.includes("failed")
+              ? "border-red-500/40 bg-red-500/10 text-red-200"
+              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
+          {urlMessage}
+        </div>
+      )}
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         {/* Email */}
         <div>
@@ -170,7 +190,7 @@ export default function LoginPage() {
 
         {/* Forgot password */}
         <div className="text-right">
-          <Link href="#" className="text-sm text-body-gray hover:text-teal transition-colors">
+          <Link href="/auth/reset-password" className="text-sm text-body-gray hover:text-teal transition-colors">
             Forgot password?
           </Link>
         </div>
@@ -254,5 +274,19 @@ export default function LoginPage() {
         </Link>
       </p>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-charcoal">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

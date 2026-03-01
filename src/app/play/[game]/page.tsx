@@ -43,6 +43,7 @@ export default function PlayGamePage() {
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
+  const [emailVerified, setEmailVerified] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -90,6 +91,7 @@ export default function PlayGamePage() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
+        setEmailVerified(user.emailVerified ?? true);
         const bal = await getWalletBalance();
         setBalance(bal);
       } catch {
@@ -209,6 +211,11 @@ export default function PlayGamePage() {
           setOpponentFound(null);
         }
       }, delay);
+      return;
+    }
+
+    if (!emailVerified) {
+      showToast("Please verify your email before playing for real money. Practice mode is available.", "error");
       return;
     }
 

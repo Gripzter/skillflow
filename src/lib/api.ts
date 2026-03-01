@@ -540,6 +540,7 @@ export async function getCurrentUser(): Promise<{
   email?: string;
   user_metadata?: { username?: string };
   isDevMode: boolean;
+  emailVerified: boolean;
 } | null> {
   if (isDevMode()) {
     try {
@@ -550,6 +551,7 @@ export async function getCurrentUser(): Promise<{
         email: devUser.email || "dev@skillflow.com",
         user_metadata: { username: devUser.username },
         isDevMode: true,
+        emailVerified: true,
       };
     } catch {
       return null;
@@ -565,6 +567,7 @@ export async function getCurrentUser(): Promise<{
     username: profile?.username ?? user.user_metadata?.username ?? "Player",
     user_metadata: { ...user.user_metadata, username: profile?.username ?? user.user_metadata?.username },
     isDevMode: false,
+    emailVerified: !!user.email_confirmed_at,
   };
 }
 

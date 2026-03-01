@@ -63,6 +63,11 @@ function SignupContent() {
     return sessionStorage.getItem(FORM_DISABLED_KEY) === "true";
   });
   const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [showVerificationScreen, setShowVerificationScreen] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [resendDisabled, setResendDisabled] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fromUrl = searchParams.get("ref")?.trim()?.toLowerCase();
@@ -76,6 +81,38 @@ function SignupContent() {
       if (stored) setReferralCode(stored);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!resendDisabled || resendCountdown <= 0) return;
+    const t = setInterval(() => {
+      setResendCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(t);
+          setResendDisabled(false);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [resendDisabled, resendCountdown]);
+
+  async function handleResendVerification() {
+    const supabase = createClient();
+    if (!supabase || !verificationEmail) return;
+    setResendMessage(null);
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: verificationEmail,
+    });
+    if (!error) {
+      setResendMessage("Verification email sent! Check your inbox.");
+      setResendDisabled(true);
+      setResendCountdown(60);
+    } else {
+      setResendMessage(error.message);
+    }
+  }
 
   const currentYear = new Date().getFullYear();
   const years = useMemo(() => {
@@ -165,10 +202,12 @@ function SignupContent() {
       }
 
       const dobISO = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: origin ? `${origin}/auth/callback` : undefined,
           data: {
             username: username.trim(),
             date_of_birth: dobISO,
@@ -220,18 +259,9 @@ function SignupContent() {
         if (typeof window !== "undefined") window.localStorage.removeItem(REFERRAL_STORAGE_KEY);
       }
 
+      setVerificationEmail(email);
+      setShowVerificationScreen(true);
       showToast("Check your email to verify your account!", "success");
-      setUsername("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-      setMonth("");
-      setDay("");
-      setYear("");
-      setTermsAccepted(false);
-      setErrors({});
-      router.push("/dashboard");
-      router.refresh();
     } catch {
       showToast("Something went wrong. Please try again.", "error");
     } finally {
@@ -240,6 +270,48 @@ function SignupContent() {
   }
 
   const under18Error = errors.dob && (month !== "" && day !== "" && year !== "" && calculateAge(new Date(year as number, (month as number) - 1, day as number)) < 18);
+
+  if (showVerificationScreen) {
+    return (
+      <AuthLayout heading="Check Your Email" subtitle="Verify your account to get started">
+        <div className="rounded-xl border border-white/10 bg-card p-8 text-center">
+          <span className="text-5xl" aria-hidden>📧</span>
+          <h2 className="mt-4 text-xl font-bold text-white">Check Your Email</h2>
+          <p className="mt-2 text-body-gray">
+            We&apos;ve sent a verification link to <strong className="text-white">{verificationEmail}</strong>
+          </p>
+          <p className="mt-3 text-sm text-body-gray">
+            Click the link in the email to verify your account and start playing.
+          </p>
+          <p className="mt-6 text-sm text-body-gray">Didn&apos;t receive it?</p>
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={resendDisabled}
+            className="mt-2 rounded-lg border border-teal/50 bg-teal/10 px-4 py-2 text-sm font-medium text-teal hover:bg-teal/20 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {resendDisabled && resendCountdown > 0
+              ? `Resend available in ${resendCountdown}s`
+              : "Resend Verification Email"}
+          </button>
+          {resendMessage && (
+            <p className={`mt-3 text-sm ${resendMessage.startsWith("Verification") ? "text-emerald-400" : "text-red-400"}`}>
+              {resendMessage}
+            </p>
+          )}
+          <p className="mt-6 text-xs text-body-gray">
+            Check your spam folder if you don&apos;t see it in your inbox.
+          </p>
+        </div>
+        <p className="mt-6 text-center text-sm text-body-gray">
+          Already have an account?{" "}
+          <Link href="/login" className="text-teal font-medium hover:underline">
+            Log in
+          </Link>
+        </p>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout heading="Create your account" subtitle="Join the arena. Bet on yourself.">

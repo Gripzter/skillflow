@@ -43,6 +43,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (supabaseAdmin) {
+      const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (authUser?.user && !authUser.user.email_confirmed_at) {
+        return NextResponse.json(
+          { error: "Please verify your email before making a deposit." },
+          { status: 403 }
+        );
+      }
       const limitCheck = await checkDepositAllowed(supabaseAdmin, userId, depositAmount);
       if (!limitCheck.allowed) {
         return NextResponse.json(

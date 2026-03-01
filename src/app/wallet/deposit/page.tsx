@@ -12,12 +12,41 @@ import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
 
 const PRESETS = [5, 10, 25, 50, 100];
 
+function ResendVerificationLink({ email }: { email: string }) {
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  async function handleResend() {
+    if (!email || loading || sent) return;
+    setLoading(true);
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.resend({ type: "signup", email });
+      setSent(true);
+    }
+    setLoading(false);
+  }
+  return (
+    <span className="mt-2 inline-block">
+      <button
+        type="button"
+        onClick={handleResend}
+        disabled={loading || sent}
+        className="text-sm text-teal hover:underline disabled:opacity-60"
+      >
+        {sent ? "Verification email sent!" : loading ? "Sending…" : "Resend verification email"}
+      </button>
+    </span>
+  );
+}
+
 export default function DepositPage() {
   const router = useRouter();
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [depositLoading, setDepositLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(25);
   const [customAmount, setCustomAmount] = useState("");
   const { isRestricted } = useGeo();
@@ -34,6 +63,8 @@ export default function DepositPage() {
           router.push("/login");
           return;
         }
+        setEmailVerified(user.emailVerified);
+        setUserEmail(user.email ?? "");
         const bal = await getWalletBalance();
         setBalance(bal);
       } catch {
@@ -47,6 +78,10 @@ export default function DepositPage() {
 
   async function handleDeposit() {
     if (!validAmount || isRestricted) return;
+    if (!emailVerified) {
+      setError("Please verify your email before making a deposit.");
+      return;
+    }
     setError(null);
     setDepositLoading(true);
 
@@ -184,12 +219,22 @@ export default function DepositPage() {
           <p className="mt-1">🔒 Secured by Stripe</p>
         </div>
 
+        {!emailVerified && (
+          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            📧 Please verify your email before making a deposit.{" "}
+            <ResendVerificationLink email={userEmail} />
+          </div>
+        )}
         {error && (
           <div className="mt-4">
             <p className="text-sm text-red-400">{error}</p>
-            <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-sm text-teal hover:underline">
-              Manage your limits in Responsible Gaming settings →
-            </Link>
+            {!emailVerified ? (
+              <ResendVerificationLink email={userEmail} />
+            ) : (
+              <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-sm text-teal hover:underline">
+                Manage your limits in Responsible Gaming settings →
+              </Link>
+            )}
           </div>
         )}
 

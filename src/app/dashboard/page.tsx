@@ -10,6 +10,7 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance, getMatches, getPracticeMatches, getPracticeStats, logout as apiLogout } from "@/lib/api";
+import { createClient } from "@/lib/supabase";
 
 const GAMES = [
   { name: "8 Ball Pool", slug: "8-ball-pool", tag: "1v1", gradient: "from-teal/30 to-purple/30", comingSoon: false },
@@ -21,6 +22,31 @@ const GAMES = [
   { name: "Spelling Bee", slug: "spelling-bee", tag: "1v1", gradient: "from-amber-500/30 to-yellow-600/30", comingSoon: false },
   { name: "Darts", slug: "darts", tag: "Coming Soon", gradient: "from-purple/20 to-pink-500/20", comingSoon: true },
 ];
+
+function DashboardResendLink({ email }: { email: string }) {
+  const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  async function handleResend() {
+    if (!email || loading || sent) return;
+    setLoading(true);
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.resend({ type: "signup", email });
+      setSent(true);
+    }
+    setLoading(false);
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleResend}
+      disabled={loading || sent}
+      className="font-medium text-teal hover:underline disabled:opacity-60"
+    >
+      {sent ? "Email sent!" : loading ? "Sending…" : "Resend Email"}
+    </button>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -38,6 +64,8 @@ export default function DashboardPage() {
     daily_deposited: number;
   } | null>(null);
   const [totalReferrals, setTotalReferrals] = useState<number | null>(null);
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
   const [referralBannerDismissed, setReferralBannerDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem("skillflow_referral_banner_dismissed") === "true";
@@ -55,6 +83,8 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
+        setEmailVerified(user.emailVerified);
+        setUserEmail(user.email ?? "");
         const [bal, matchList, rgRes, refCount] = await Promise.all([
           getWalletBalance(),
           getMatches(),
@@ -170,6 +200,14 @@ export default function DashboardPage() {
             }
             return null;
           })()
+        )}
+        {!emailVerified && (
+          <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <span>
+              📧 Please verify your email to unlock real money play.{" "}
+              <DashboardResendLink email={userEmail} />
+            </span>
+          </div>
         )}
         {!referralBannerDismissed && (totalReferrals === null || totalReferrals === 0) && (
           <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-teal/30 bg-teal/5 px-4 py-3 text-sm text-teal-100">
