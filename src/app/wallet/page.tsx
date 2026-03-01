@@ -15,8 +15,7 @@ import {
 } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import { createClient } from "@/lib/supabase";
-
-const MIN_WITHDRAWAL = 10;
+import { MIN_WITHDRAWAL } from "@/lib/constants";
 
 type TransactionType = StoredTransaction["type"];
 

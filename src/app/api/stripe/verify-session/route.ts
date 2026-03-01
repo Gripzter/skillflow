@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = session.metadata?.userId;
+    // Credit FULL amount from metadata (player chose e.g. $25 → credit $25). We absorb Stripe fees.
     const amount = parseFloat(session.metadata?.amount ?? "0");
     const paymentIntentId =
       typeof session.payment_intent === "string"

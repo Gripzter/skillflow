@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-
-const MIN_AMOUNT = 5;
-const MAX_AMOUNT = 500;
+import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   if (!stripe) {
@@ -21,9 +19,9 @@ export async function POST(req: NextRequest) {
     };
 
     const depositAmount = typeof amount === "number" ? amount : parseFloat(String(amount ?? 0));
-    if (Number.isNaN(depositAmount) || depositAmount < MIN_AMOUNT || depositAmount > MAX_AMOUNT) {
+    if (Number.isNaN(depositAmount) || depositAmount < MIN_DEPOSIT || depositAmount > MAX_DEPOSIT) {
       return NextResponse.json(
-        { error: `Invalid amount. Minimum $${MIN_AMOUNT}, maximum $${MAX_AMOUNT}.` },
+        { error: `Invalid amount. Minimum $${MIN_DEPOSIT}, maximum $${MAX_DEPOSIT}.` },
         { status: 400 }
       );
     }

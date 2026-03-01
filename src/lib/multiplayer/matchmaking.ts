@@ -5,6 +5,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
 
 export interface DbMatch {
   id: string;
@@ -91,7 +92,7 @@ export async function startMatchmaking(
     if (waitingMatches && waitingMatches.length > 0) {
       const match = waitingMatches[0] as DbMatch;
       const totalPot = match.stake_amount * 2;
-      const platformFee = Math.round(totalPot * 0.03 * 100) / 100;
+      const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
       const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
 
       const { data: updated, error: joinError } = await supabase

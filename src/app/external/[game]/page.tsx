@@ -259,7 +259,7 @@ export default function CS2LobbyPage() {
         <section className="mt-8">
           <h2 className="text-xl font-bold text-white">Stake Selection</h2>
           <p className="mt-1 text-body-gray">
-            Both players put up the same amount. Winner takes all minus 3% platform fee.
+            Both players put up the same amount. Winner takes all minus 5% platform fee.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {STAKE_PRESETS.map((amt) => (
@@ -295,8 +295,8 @@ export default function CS2LobbyPage() {
             <p className="text-body-gray">Your Stake: ${stakeAmount.toFixed(2)}</p>
             <p className="mt-1 text-body-gray">Opponent&apos;s Stake: ${stakeAmount.toFixed(2)}</p>
             <p className="mt-1 text-body-gray">Total Pot: ${totalPot.toFixed(2)}</p>
-            <p className="mt-1 text-body-gray">Platform Fee (3%): -${platformFee.toFixed(2)}</p>
-            <p className="mt-2 text-lg font-bold text-teal">Winner Takes: ${winnerPayout.toFixed(2)}</p>
+            <p className="mt-1 text-body-gray">Platform fee (5%): ${platformFee.toFixed(2)}</p>
+            <p className="mt-2 text-lg font-bold text-teal">Winner gets: ${winnerPayout.toFixed(2)}</p>
           </div>
         </section>
 

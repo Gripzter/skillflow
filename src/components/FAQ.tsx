@@ -13,7 +13,7 @@ const items = [
   },
   {
     q: "What's the platform fee?",
-    a: "We take a small 3% fee from each match pot. That's it. No hidden fees.",
+    a: "We take a 5% fee from each match pot. That's it. No hidden fees.",
   },
   {
     q: "How do I withdraw my winnings?",

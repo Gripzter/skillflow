@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-
-const MIN_WITHDRAWAL = 10;
+import { MIN_WITHDRAWAL, WITHDRAWAL_FEE_PERCENT } from "@/lib/constants";
 
 /**
  * Withdrawal request: deduct from wallet and create a pending transaction.
@@ -48,6 +47,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
     }
 
+    const processingFee = Math.round(withdrawAmount * WITHDRAWAL_FEE_PERCENT * 100) / 100;
+    const playerReceives = Math.round((withdrawAmount - processingFee) * 100) / 100;
     const newBalance = balance - withdrawAmount;
 
     await supabaseAdmin
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       type: "withdrawal",
       amount: -withdrawAmount,
       balance_after: newBalance,
-      description: `Withdrawal request: $${withdrawAmount.toFixed(2)}`,
+      description: `Withdrawal: $${playerReceives.toFixed(2)} (fee: $${processingFee.toFixed(2)})`,
       status: "pending",
       withdrawal_details: typeof withdrawalDetails === "string" ? withdrawalDetails : null,
     });
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       amount: withdrawAmount,
+      processingFee,
+      playerReceives,
       newBalance,
     });
   } catch (err: unknown) {

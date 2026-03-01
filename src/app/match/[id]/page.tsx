@@ -722,7 +722,7 @@ export default function MatchPage() {
           <p className="text-sm text-body-gray">
             {match.isPractice
               ? "Practice Match — No stakes"
-              : `Stake: $${match.stakeAmount.toFixed(2)} each • Winner gets: $${match.winnerPayout.toFixed(2)} • Platform fee: $${match.platformFee.toFixed(2)}`}
+              : `Stake: $${match.stakeAmount.toFixed(2)} each • Winner gets: $${match.winnerPayout.toFixed(2)}`}
           </p>
           <div className="flex gap-2">
             <button

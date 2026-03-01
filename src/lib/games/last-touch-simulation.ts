@@ -6,7 +6,7 @@
 
 export const ENTRY_FEE_TIERS_MINUTES = [0, 10, 20, 30, 40, 50, 60] as const;
 export const ENTRY_FEE_AMOUNTS = [1, 2, 5, 10, 25, 50] as const; // $ at each tier; 60+ = closed
-export const PLATFORM_FEE_PERCENT = 3;
+export const PLATFORM_FEE_PERCENT = 5;
 
 export function getEntryFeeAtMinute(minutes: number): number | null {
   if (minutes >= 60) return null;

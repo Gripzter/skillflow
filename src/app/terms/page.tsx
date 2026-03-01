@@ -151,7 +151,7 @@ export default function TermsOfServicePage() {
           <h2 className="text-xl font-semibold text-white">7. Fees</h2>
           <p className="mt-3">
             SkillFlow charges a platform fee on the total pot of each match. Unless otherwise stated in the product, the standard
-            fee is <span className="font-semibold">3%</span>.
+            fee is <span className="font-semibold">5%</span>.
           </p>
           <p className="mt-2">
             The fee is deducted from the winner’s payout. For example, if two players each wager $10 (total pot $20), the platform

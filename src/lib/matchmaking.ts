@@ -2,6 +2,7 @@
  * Matchmaking utilities for dev mode (simulated opponents and match storage).
  */
 
+import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
 import { generateId } from "./wallet";
 
 export const MATCHES_STORAGE_KEY = "skillflow_matches";
@@ -79,15 +80,13 @@ export function generateFakeOpponent(baseRating: number = 1000): PlayerInfo {
   };
 }
 
-const PLATFORM_FEE_RATE = 0.03;
-
 export function computePayout(stakeAmount: number): {
   totalPot: number;
   platformFee: number;
   winnerPayout: number;
 } {
   const totalPot = stakeAmount * 2;
-  const platformFee = Math.round(totalPot * PLATFORM_FEE_RATE * 100) / 100;
+  const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
   const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
   return { totalPot, platformFee, winnerPayout };
 }

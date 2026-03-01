@@ -365,7 +365,7 @@ export default function PlaySpellingBeePage() {
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <p className="mt-1 text-body-gray">
-              Both players put up the same amount. Winner takes all minus 3% platform fee.
+              Both players put up the same amount. Winner takes all minus 5% platform fee.
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {STAKE_PRESETS.map((amt) => (
@@ -402,8 +402,8 @@ export default function PlaySpellingBeePage() {
               <p className="text-body-gray">Your Stake: ${stakeAmount.toFixed(2)}</p>
               <p className="mt-1 text-body-gray">Opponent&apos;s Stake: ${stakeAmount.toFixed(2)}</p>
               <p className="mt-1 text-body-gray">Total Pot: ${totalPot.toFixed(2)}</p>
-              <p className="mt-1 text-body-gray">Platform Fee (3%): -${platformFee.toFixed(2)}</p>
-              <p className="mt-2 text-lg font-bold text-amber-400">Winner Takes: ${winnerPayout.toFixed(2)}</p>
+              <p className="mt-1 text-body-gray">Platform fee (5%): ${platformFee.toFixed(2)}</p>
+              <p className="mt-2 text-lg font-bold text-amber-400">Winner gets: ${winnerPayout.toFixed(2)}</p>
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (

@@ -6,9 +6,8 @@ import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
+import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
 
-const MIN_AMOUNT = 5;
-const MAX_AMOUNT = 500;
 const PRESETS = [5, 10, 25, 50, 100];
 
 export default function DepositPage() {
@@ -22,7 +21,7 @@ export default function DepositPage() {
 
   const amount =
     selectedPreset != null ? selectedPreset : parseFloat(customAmount) || 0;
-  const validAmount = amount >= MIN_AMOUNT && amount <= MAX_AMOUNT;
+  const validAmount = amount >= MIN_DEPOSIT && amount <= MAX_DEPOSIT;
 
   useEffect(() => {
     async function load() {
@@ -154,8 +153,8 @@ export default function DepositPage() {
           <p className="mt-4 text-sm text-body-gray">Other amount</p>
           <input
             type="number"
-            min={MIN_AMOUNT}
-            max={MAX_AMOUNT}
+            min={MIN_DEPOSIT}
+            max={MAX_DEPOSIT}
             step="0.01"
             placeholder="0.00"
             value={customAmount}
@@ -165,11 +164,11 @@ export default function DepositPage() {
             }}
             className="mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
           />
-          {amount > 0 && (amount < MIN_AMOUNT || amount > MAX_AMOUNT) && (
+          {amount > 0 && (amount < MIN_DEPOSIT || amount > MAX_DEPOSIT) && (
             <p className="mt-2 text-sm text-red-400">
-              {amount < MIN_AMOUNT
-                ? `Minimum is $${MIN_AMOUNT}.00`
-                : `Maximum is $${MAX_AMOUNT}.00`}
+              {amount < MIN_DEPOSIT
+                ? `Minimum is $${MIN_DEPOSIT}.00`
+                : `Maximum is $${MAX_DEPOSIT}.00`}
             </p>
           )}
         </div>
