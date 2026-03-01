@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useMemo, useEffect } from "react";
+import { useState, FormEvent, useMemo, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
@@ -43,9 +43,10 @@ interface FormErrors {
   terms?: string;
 }
 
-export default function SignUpPage() {
+function SignupContent() {
   const router = useRouter();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -61,7 +62,6 @@ export default function SignUpPage() {
     if (typeof window === "undefined") return false;
     return sessionStorage.getItem(FORM_DISABLED_KEY) === "true";
   });
-  const searchParams = useSearchParams();
   const [referralCode, setReferralCode] = useState<string | null>(null);
 
   useEffect(() => {
@@ -478,5 +478,19 @@ export default function SignUpPage() {
         </Link>
       </p>
     </AuthLayout>
+  );
+}
+
+export default function SignUpPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-charcoal">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
   );
 }
