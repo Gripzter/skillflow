@@ -1,124 +1,108 @@
-"use client";
+\"use client\";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { useToast } from "@/components/Toast";
-import AppNavbar from "@/components/AppNavbar";
-import Footer from "@/components/Footer";
-import ModeToggleBarContent from "@/components/ModeToggleBar";
-import { useGeo } from "@/contexts/GeoContext";
-import { usePlayMode } from "@/contexts/PlayModeContext";
-import { getCurrentUser, getWalletBalance, getMatches, getPracticeMatches, getPracticeStats, logout as apiLogout } from "@/lib/api";
-import { createClient } from "@/lib/supabase";
+import { useEffect, useMemo, useState } from \"react\";
+import { useRouter } from \"next/navigation\";
+import Link from \"next/link\";
+import { useToast } from \"@/components/Toast\";
+import AppNavbar from \"@/components/AppNavbar\";
+import Footer from \"@/components/Footer\";
+import ModeToggleBarContent from \"@/components/ModeToggleBar\";
+import { useGeo } from \"@/contexts/GeoContext\";
+import { usePlayMode } from \"@/contexts/PlayModeContext\";
+import {
+  getCurrentUser,
+  getWalletBalance,
+  getMatches,
+  getTransactions,
+  logout as apiLogout,
+} from \"@/lib/api\";
+import type { StoredMatch } from \"@/lib/matchmaking\";
+import type { StoredTransaction } from \"@/lib/wallet\";
+import { generateFakeLeaderboard, type LeaderboardPlayer } from \"@/lib/leaderboard-data\";
 
-const GAMES = [
-  { name: "8 Ball Pool", slug: "8-ball-pool", tag: "1v1", gradient: "from-teal/30 to-purple/30", comingSoon: false },
-  { name: "Chess", slug: "chess", tag: "1v1", gradient: "from-amber-500/20 to-rose-500/20", comingSoon: false },
-  { name: "Connect 4", slug: "connect-4", tag: "1v1", gradient: "from-red-500/30 to-amber-400/30", comingSoon: false },
-  { name: "Memory Match", slug: "memory-match", tag: "Coming Soon", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", comingSoon: true },
-  { name: "Mini Golf", slug: "mini-golf", tag: "Coming Soon", gradient: "from-emerald-500/20 to-teal/30", comingSoon: true },
-  { name: "Reaction Duel", slug: "reaction-duel", tag: "1v1", gradient: "from-orange-500/30 to-red-500/30", comingSoon: false },
-  { name: "Spelling Bee", slug: "spelling-bee", tag: "1v1", gradient: "from-amber-500/30 to-yellow-600/30", comingSoon: false },
-  { name: "Darts", slug: "darts", tag: "Coming Soon", gradient: "from-purple/20 to-pink-500/20", comingSoon: true },
+type GameConfig = {
+  slug: string;
+  name: string;
+  emoji: string;
+  color: string;
+  tag: string;
+};
+
+const GAME_CONFIGS: GameConfig[] = [
+  { slug: \"8-ball-pool\", name: \"8 Ball Pool\", emoji: \"🎱\", color: \"#10B981\", tag: \"Popular\" },
+  { slug: \"chess\", name: \"Chess\", emoji: \"♟️\", color: \"#8B5CF6\", tag: \"Classic\" },
+  { slug: \"connect-4\", name: \"Connect 4\", emoji: \"🔴\", color: \"#F59E0B\", tag: \"Quick\" },
+  { slug: \"reaction-duel\", name: \"Reaction Duel\", emoji: \"⚡\", color: \"#EF4444\", tag: \"Fast\" },
+  { slug: \"spelling-bee\", name: \"Spelling Bee\", emoji: \"🐝\", color: \"#F97316\", tag: \"New\" },
 ];
 
-function DashboardResendLink({ email }: { email: string }) {
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  async function handleResend() {
-    if (!email || loading || sent) return;
-    setLoading(true);
-    const supabase = createClient();
-    if (supabase) {
-      await supabase.auth.resend({ type: "signup", email });
-      setSent(true);
-    }
-    setLoading(false);
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleResend}
-      disabled={loading || sent}
-      className="font-medium text-teal hover:underline disabled:opacity-60"
-    >
-      {sent ? "Email sent!" : loading ? "Sending…" : "Resend Email"}
-    </button>
-  );
+const STAKE_OPTIONS = [1, 2, 5, 10, 25] as const;
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return \"Good morning\";
+  if (hour < 18) return \"Good afternoon\";
+  return \"Good evening\";
+}
+
+function formatCurrency(value: number) {
+  return value.toLocaleString(\"en-US\", { style: \"currency\", currency: \"USD\", minimumFractionDigits: 2 });
+}
+
+function formatTimeAgo(createdAt: string) {
+  const diffMs = Date.now() - new Date(createdAt).getTime();
+  const minutes = Math.floor(diffMs / (1000 * 60));
+  if (minutes < 1) return \"Just now\";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const { showToast } = useToast();
-  const [username, setUsername] = useState<string>("Player");
+  const { isRestricted } = useGeo();
+  const { isPractice } = usePlayMode();
+
+  const [username, setUsername] = useState(\"Player\");
+  const [userId, setUserId] = useState<string | null>(null);
   const [isDevMode, setIsDevMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [balance, setBalance] = useState(0);
-  const [matches, setMatches] = useState<{ id: string; status: string; winner?: string }[]>([]);
-  const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
-  const [rg, setRg] = useState<{
-    cool_off_until: string | null;
-    daily_deposit_limit: number | null;
-    daily_deposited: number;
-  } | null>(null);
-  const [totalReferrals, setTotalReferrals] = useState<number | null>(null);
-  const [emailVerified, setEmailVerified] = useState(true);
-  const [userEmail, setUserEmail] = useState("");
-  const [referralBannerDismissed, setReferralBannerDismissed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("skillflow_referral_banner_dismissed") === "true";
-  });
-  const { isPractice } = usePlayMode();
-  const { isRestricted } = useGeo();
+  const [matches, setMatches] = useState<StoredMatch[]>([]);
+  const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
+  const [selectedStake, setSelectedStake] = useState<number>(5);
+  const [onlineCount] = useState(() => 1200 + Math.floor(Math.random() * 1800)); // TODO: replace with real online count
 
   useEffect(() => {
     async function load() {
       try {
         const user = await getCurrentUser();
         if (!user) {
-          router.push("/login");
+          router.push(\"/login\");
           return;
         }
         setUsername(user.username);
+        setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        setEmailVerified(user.emailVerified);
-        setUserEmail(user.email ?? "");
-        const [bal, matchList, rgRes, refCount] = await Promise.all([
+
+        const [bal, matchList, txs] = await Promise.all([
           getWalletBalance(),
           getMatches(),
-          (async () => {
-            const { createClient } = await import("@/lib/supabase");
-            const supabase = createClient();
-            if (!supabase) return null;
-            const { data } = await supabase
-              .from("responsible_gaming")
-              .select("cool_off_until, daily_deposit_limit, daily_deposited")
-              .eq("user_id", user.id)
-              .maybeSingle();
-            return data;
-          })(),
-          (async () => {
-            const { createClient } = await import("@/lib/supabase");
-            const supabase = createClient();
-            if (!supabase) return null;
-            const { data } = await supabase
-              .from("profiles")
-              .select("total_referrals")
-              .eq("id", user.id)
-              .single();
-            return data?.total_referrals ?? 0;
-          })(),
+          getTransactions(),
         ]);
         setBalance(bal);
-        setMatches(matchList);
-        setRg(rgRes ?? null);
-        setTotalReferrals(refCount ?? 0);
-        const pStats = getPracticeStats(user.username);
-        setPracticeStats(pStats);
+        setMatches(matchList as StoredMatch[]);
+        setTransactions(txs);
+
+        const lb = generateFakeLeaderboard(user.username ?? null, 8);
+        setLeaderboard(lb);
       } catch {
-        router.push("/login");
+        router.push(\"/login\");
       } finally {
         setLoading(false);
       }
@@ -130,342 +114,499 @@ export default function DashboardPage() {
     setLoggingOut(true);
     try {
       await apiLogout();
-      showToast("Logged out successfully", "success");
-      router.push("/login");
+      showToast(\"Logged out successfully\", \"success\");
+      router.push(\"/login\");
       router.refresh();
     } catch {
-      showToast("Something went wrong", "error");
+      showToast(\"Something went wrong\", \"error\");
       setLoggingOut(false);
     }
   }
 
+  const completedMatches = useMemo(
+    () => matches.filter((m) => m.status === \"completed\" && !m.isPractice),
+    [matches]
+  );
+  const totalMatches = completedMatches.length;
+  const wins = completedMatches.filter((m) => m.winner === \"player1\").length;
+  const winRate = totalMatches ? Math.round((wins / totalMatches) * 100) : 0;
+
+  const netEarnings = useMemo(() => {
+    let income = 0;
+    let outgo = 0;
+    transactions.forEach((tx) => {
+      if (tx.type === \"match_win\" || tx.type === \"referral_bonus\") income += tx.amount;
+      if (tx.type === \"match_entry\" || tx.type === \"platform_fee\") outgo += tx.amount;
+    });
+    return income - outgo;
+  }, [transactions]);
+
+  const playerRank = useMemo(() => {
+    const idx = leaderboard.findIndex((p) => p.isCurrentUser || p.username === username);
+    return idx >= 0 ? idx + 1 : null;
+  }, [leaderboard, username]);
+
+  const recentActivity = useMemo(
+    () => completedMatches.slice(0, 5),
+    [completedMatches]
+  );
+
+  const payoutForStake = useMemo(() => {
+    const pot = selectedStake * 2;
+    const fee = pot * 0.05;
+    return pot - fee;
+  }, [selectedStake]);
+
+  const greeting = getGreeting();
+  const playerNumber = playerRank ?? 1847;
+
+  function handleQuickMatch() {
+    // For now, send to play hub; TODO: wire to random game matchmaking.
+    router.push(\"/play\");
+  }
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      <div className=\"flex min-h-screen items-center justify-center bg-[#050915]\">
+        <svg className=\"h-10 w-10 animate-spin text-teal\" viewBox=\"0 0 24 24\" fill=\"none\">
+          <circle className=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" strokeWidth=\"4\" />
+          <path className=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z\" />
         </svg>
       </div>
     );
   }
 
-  const completedMatches = matches.filter((m) => m.status === "completed");
-  const wins = completedMatches.filter((m) => m.winner === "player1").length;
-  const winRate = completedMatches.length ? Math.round((wins / completedMatches.length) * 100) : 0;
-  const totalEarnings = balance; // simplified; could sum from transactions if needed
-
   return (
-    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
-      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
+    <div
+      className=\"min-h-screen bg-[#050915] pb-20 md:pb-0\"
+      style={{
+        background: \"linear-gradient(135deg,#0A0E17 0%,#0D1321 40%,#0A1628 70%,#0A0E17 100%)\",
+      }}
+    >
+      {/* Ambient background effects */}
+      <div className=\"pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern opacity-40\" aria-hidden />
+      <div className=\"pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full bg-teal-500/20 blur-[80px] opacity-40\" aria-hidden />
+      <div className=\"pointer-events-none fixed bottom-[-6rem] right-[-4rem] h-64 w-64 rounded-full bg-purple-500/25 blur-[65px] opacity-40\" aria-hidden />
+
       <AppNavbar
         username={username}
         isDevMode={isDevMode}
         onLogout={handleLogout}
         loggingOut={loggingOut}
-        currentPage="dashboard"
+        currentPage=\"dashboard\"
       />
       <ModeToggleBarContent />
-      <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
-        {isRestricted && (
-          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            ⚠️ Real money play is not available in your region. Practice mode is available.
+
+      <main className=\"relative mx-auto max-w-7xl px-4 py-6 pb-24 md:px-6 space-y-6\">
+        {/* Top bar */}
+        <section className=\"flex flex-col gap-4 md:flex-row md:items-center md:justify-between\">
+          <div>
+            <p className=\"text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500\">
+              {greeting}
+            </p>
+            <div className=\"mt-1 flex items-baseline gap-2\">
+              <h1 className=\"text-2xl font-bold tracking-tight text-gray-100 md:text-3xl\">
+                {username}
+              </h1>
+              <span className=\"text-sm text-gray-600\">#{playerNumber}</span>
+            </div>
           </div>
-        )}
-        {rg?.cool_off_until && new Date(rg.cool_off_until) > new Date() && (
-          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            ⏸️ Cool-off period active. Real money play disabled.{" "}
-            {(() => {
-              const hours = Math.ceil((new Date(rg.cool_off_until!).getTime() - Date.now()) / (1000 * 60 * 60));
-              const days = Math.floor(hours / 24);
-              const h = hours % 24;
-              return `${days > 0 ? `${days} day${days !== 1 ? "s" : ""}, ` : ""}${h} hour${h !== 1 ? "s" : ""} remaining.`;
-            })()}{" "}
-            Practice mode is available.
-          </div>
-        )}
-        {rg?.daily_deposit_limit != null && !rg.cool_off_until && (
-          (() => {
-            const used = Number(rg.daily_deposited ?? 0);
-            const limit = Number(rg.daily_deposit_limit);
-            if (used > 0 && used >= limit * 0.8) {
-              return (
-                <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
-                  💡 You&apos;ve used ${used} of your ${limit} daily deposit limit.{" "}
-                  <Link href="/settings/responsible-gaming" className="font-medium text-teal hover:underline">
-                    Manage limits
-                  </Link>
-                </div>
-              );
-            }
-            return null;
-          })()
-        )}
-        {!emailVerified && (
-          <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            <span>
-              📧 Please verify your email to unlock real money play.{" "}
-              <DashboardResendLink email={userEmail} />
-            </span>
-          </div>
-        )}
-        {!referralBannerDismissed && (totalReferrals === null || totalReferrals === 0) && (
-          <div className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-teal/30 bg-teal/5 px-4 py-3 text-sm text-teal-100">
-            <span>
-              🎁 Invite friends and earn $5 for each one!{" "}
-              <Link href="/referrals" className="font-medium text-teal hover:underline">
-                Share Your Link →
-              </Link>
-            </span>
+          <div className=\"flex flex-wrap items-center gap-3 md:gap-4\">
+            <div className=\"inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-200\">
+              <span className=\"relative flex h-2 w-2\">
+                <span className=\"animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75\" />
+                <span className=\"relative inline-flex h-2 w-2 rounded-full bg-emerald-400\" />
+              </span>
+              <span>{onlineCount.toLocaleString()} online</span>
+            </div>
             <button
-              type="button"
-              onClick={() => {
-                setReferralBannerDismissed(true);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("skillflow_referral_banner_dismissed", "true");
-                }
-              }}
-              className="shrink-0 rounded p-1 text-body-gray hover:text-white"
-              aria-label="Dismiss"
+              type=\"button\"
+              onClick={() => router.push(\"/wallet\")}
+              className=\"inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_0_18px_rgba(16,185,129,0.45)] transition-transform hover:-translate-y-0.5\"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <span role=\"img\" aria-hidden>
+                💰
+              </span>
+              <span>{formatCurrency(balance)}</span>
             </button>
           </div>
-        )}
-        {/* Welcome banner */}
-        <section className="welcome-banner animate-fade-in card-border rounded-card bg-card p-6 sm:p-8">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                Welcome back, {username}!
-              </h1>
-              <p className="mt-1 text-body-gray">
-                {isPractice ? "Practice mode — sharpen your skills!" : "Ready to compete?"}
-              </p>
+        </section>
+
+        {/* Quick stats row */}
+        <section className=\"grid grid-cols-2 gap-3 lg:grid-cols-4\">
+          {/* Win Rate */}
+          <div className=\"relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-400/70\">
+            <div className=\"absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-teal-400/10 blur-3xl\" aria-hidden />
+            <div className=\"relative p-3 sm:p-4\">
+              <div className=\"flex items-center justify-between gap-2\">
+                <span className=\"text-xs font-semibold uppercase tracking-[0.16em] text-gray-500\">
+                  📊 Win Rate
+                </span>
+                <span className=\"text-[10px] text-gray-600\">Last 30 days</span>
+              </div>
+              <p className=\"mt-2 text-xl font-bold text-teal-300 md:text-2xl\">{winRate || 0}%</p>
+              <p className=\"mt-1 text-[11px] text-gray-500\">Keep climbing the leaderboard.</p>
             </div>
-            <div className="flex flex-wrap gap-6 border-t border-white/5 pt-4 sm:border-t-0 sm:border-l sm:border-white/5 sm:pt-0 sm:pl-6">
-              {isPractice ? (
-                <>
-                  <div>
-                    <p className="stat-label text-xs text-body-gray">Practice Matches</p>
-                    <p className="stat-number text-lg font-semibold text-white">{practiceStats.practiceMatchesPlayed}</p>
-                  </div>
-                  <div>
-                    <p className="stat-label text-xs text-body-gray">Practice Win Rate</p>
-                    <p className="stat-number text-lg font-semibold text-purple-400">{practiceStats.practiceWinRate}%</p>
-                  </div>
-                </>
+          </div>
+
+          {/* Matches */}
+          <div className=\"relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-purple-400/70\">
+            <div className=\"absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-purple-500/15 blur-3xl\" aria-hidden />
+            <div className=\"relative p-3 sm:p-4\">
+              <div className=\"flex items-center justify-between gap-2\">
+                <span className=\"text-xs font-semibold uppercase tracking-[0.16em] text-gray-500\">
+                  🎮 Matches
+                </span>
+                <span className=\"text-[10px] text-gray-600\">Total played</span>
+              </div>
+              <p className=\"mt-2 text-xl font-bold text-purple-300 md:text-2xl\">{totalMatches}</p>
+              <p className=\"mt-1 text-[11px] text-gray-500\">Experience makes champions.</p>
+            </div>
+          </div>
+
+          {/* Earnings */}
+          <div className=\"relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-400/70\">
+            <div className=\"absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-emerald-500/15 blur-3xl\" aria-hidden />
+            <div className=\"relative p-3 sm:p-4\">
+              <div className=\"flex items-center justify-between gap-2\">
+                <span className=\"text-xs font-semibold uppercase tracking-[0.16em] text-gray-500\">
+                  💰 Earnings
+                </span>
+                <span className=\"text-[10px] text-gray-600\">Net profit</span>
+              </div>
+              <p className={`mt-2 text-xl font-bold md:text-2xl ${netEarnings >= 0 ? \"text-emerald-300\" : \"text-red-400\"}`}>
+                {formatCurrency(netEarnings)}
+              </p>
+              <p className=\"mt-1 text-[11px] text-gray-500\">Across your real money matches.</p>
+            </div>
+          </div>
+
+          {/* Rank */}
+          <div className=\"relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/70\">
+            <div className=\"absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-amber-400/20 blur-3xl\" aria-hidden />
+            <div className=\"relative p-3 sm:p-4\">
+              <div className=\"flex items-center justify-between gap-2\">
+                <span className=\"text-xs font-semibold uppercase tracking-[0.16em] text-gray-500\">
+                  🏆 Rank
+                </span>
+                <span className=\"text-[10px] text-gray-600\">Global</span>
+              </div>
+              <p className=\"mt-2 text-xl font-bold text-amber-300 md:text-2xl\">
+                {playerRank ? `#${playerRank.toLocaleString()}` : \"-\"}
+              </p>
+              <p className=\"mt-1 text-[11px] text-gray-500\">Climb the global ladder.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Main grid */}
+        <section className=\"grid gap-6 lg:grid-cols-3\">
+          {/* Left: games + recent activity */}
+          <div className=\"space-y-6 lg:col-span-2\">
+            {/* Choose Your Arena */}
+            <div className=\"flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 bg-opacity-40 p-4 backdrop-blur-sm\">
+              <div className=\"flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between\">
+                <div>
+                  <h2 className=\"text-lg font-semibold tracking-tight text-gray-100\">Choose Your Arena</h2>
+                  <p className=\"text-xs text-gray-500\">Pick a game, set your stake, dominate.</p>
+                </div>
+                <div className=\"mt-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-1 text-[11px] text-gray-400 sm:mt-0\">
+                  {STAKE_OPTIONS.map((amount) => (
+                    <button
+                      key={amount}
+                      type=\"button\"
+                      onClick={() => setSelectedStake(amount)}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        selectedStake === amount
+                          ? \"bg-teal-400/20 text-teal-200 border border-teal-400/60\"
+                          : \"text-gray-400 hover:text-gray-200 border border-transparent\"
+                      }`}
+                    >
+                      ${amount}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Game cards */}
+              <div className=\"mt-2 grid grid-cols-1 gap-3 md:grid-cols-2\">
+                {GAME_CONFIGS.map((game) => {
+                  const playerCount = 50 + Math.floor(Math.random() * 350);
+                  const canPlayReal = !isPractice && !isRestricted;
+                  return (
+                    <button
+                      key={game.slug}
+                      type=\"button\"
+                      onClick={() => router.push(`/play/${game.slug}`)}
+                      className=\"group flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-left backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--game-color)] hover:bg-white/[0.06]\"
+                      style={{ // per-card accent via CSS variable
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        \"--game-color\": game.color,
+                      }}
+                    >
+                      {/* Left emoji box */}
+                      <div
+                        className=\"flex h-12 w-12 items-center justify-center rounded-xl text-xl font-semibold\"
+                        style={{ backgroundColor: `${game.color}26` }}
+                      >
+                        <span aria-hidden>{game.emoji}</span>
+                      </div>
+                      {/* Middle content */}
+                      <div className=\"flex flex-1 flex-col gap-1\">
+                        <div className=\"flex items-center gap-2\">
+                          <p className=\"text-sm font-semibold text-gray-100\">{game.name}</p>
+                          <span
+                            className=\"rounded-full px-2 py-0.5 text-[10px] font-medium\"
+                            style={{ backgroundColor: `${game.color}33`, color: game.color }}
+                          >
+                            {game.tag}
+                          </span>
+                        </div>
+                        <div className=\"flex flex-wrap items-center gap-2 text-[11px] text-gray-500\">
+                          <span className=\"inline-flex items-center gap-1\">
+                            <span className=\"relative flex h-2 w-2\">
+                              <span className=\"animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75\" />
+                              <span className=\"relative inline-flex h-2 w-2 rounded-full bg-emerald-400\" />
+                            </span>
+                            {playerCount} playing
+                          </span>
+                          <span className=\"hidden text-gray-600 sm:inline\">•</span>
+                          <span className=\"text-emerald-300\">
+                            Win {formatCurrency(payoutForStake)}
+                          </span>
+                        </div>
+                      </div>
+                      {/* Right play button */}
+                      <div>
+                        <span
+                          className=\"inline-flex items-center rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-gray-200 transition-colors group-hover:border-transparent group-hover:bg-white group-hover:text-slate-900\"
+                        >
+                          {canPlayReal ? \"Play\" : \"Practice\"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Recent activity */}
+            <div className=\"rounded-xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm\">
+              <div className=\"flex items-center justify-between\">
+                <h2 className=\"text-lg font-semibold text-gray-100\">Recent Activity</h2>
+                <Link href=\"/profile\" className=\"text-xs font-medium text-teal-300 hover:text-teal-200\">
+                  View history →
+                </Link>
+              </div>
+              {recentActivity.length === 0 ? (
+                <div className=\"mt-6 flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-500\">
+                  <span className=\"text-3xl\" aria-hidden>
+                    🎯
+                  </span>
+                  <p>No matches yet. Play your first game!</p>
+                  <button
+                    type=\"button\"
+                    onClick={() => router.push(\"/play\")}
+                    className=\"mt-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold text-slate-900 hover:bg-teal-300\"
+                  >
+                    Play now
+                  </button>
+                </div>
               ) : (
-                <>
-                  <div>
-                    <p className="stat-label text-xs text-body-gray">Matches Played</p>
-                    <p className="stat-number text-lg font-semibold text-white">{matches.length}</p>
-                  </div>
-                  <div>
-                    <p className="stat-label text-xs text-body-gray">Win Rate</p>
-                    <p className="stat-number text-lg font-semibold text-white">{winRate}%</p>
-                  </div>
-                  <div>
-                    <p className="stat-label text-xs text-body-gray">Total Earnings</p>
-                    <p className="stat-number text-lg font-semibold text-white">${totalEarnings.toFixed(2)}</p>
-                  </div>
-                </>
+                <div className=\"mt-4 divide-y divide-white/5\">
+                  {recentActivity.map((match) => {
+                    const isWin = match.winner === \"player1\";
+                    const stake = match.stakeAmount;
+                    const profit = isWin ? match.winnerPayout - stake : -stake;
+                    const color = isWin ? \"text-emerald-400\" : \"text-red-400\";
+                    const bgIcon = isWin ? \"bg-emerald-500/15\" : \"bg-red-500/15\";
+                    const icon = isWin ? \"✓\" : \"✕\";
+                    return (
+                      <div
+                        key={match.id}
+                        className=\"flex items-center justify-between gap-3 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5/10 hover:bg-white/5\"
+                      >
+                        <div className=\"flex items-center gap-3\">
+                          <div className={`flex h-7 w-7 items-center justify-center rounded-md ${bgIcon}`}>
+                            <span className={color}>{icon}</span>
+                          </div>
+                          <div className=\"flex flex-col\">
+                            <span className=\"text-sm font-medium text-gray-100\">
+                              {match.gameDisplayName} vs {match.player2.username}
+                            </span>
+                            <span className=\"text-[11px] text-gray-500\">{formatTimeAgo(match.createdAt)}</span>
+                          </div>
+                        </div>
+                        <div className=\"text-right\">
+                          <span className={`text-sm font-bold ${color}`}>
+                            {profit >= 0 ? \"+\" : \"\"}
+                            {formatCurrency(profit)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
-        </section>
 
-        {!isPractice && (
-          <>
-            {/* Last Touch — featured event banner */}
-            <section className="mt-8">
-              <Link
-                href="/last-touch"
-                className="last-touch-banner group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
-                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Right sidebar */}
+          <div className=\"space-y-6\">
+            {/* Wallet card */}
+            <div className=\"relative overflow-hidden rounded-xl border border-teal-400/40 bg-gradient-to-br from-teal-500/10 via-purple-500/10 to-slate-900/40 p-4 backdrop-blur-md\">
+              <div className=\"absolute -right-10 -top-10 h-32 w-32 rounded-full bg-teal-400/25 blur-3xl\" aria-hidden />
+              <div className=\"absolute -bottom-12 right-[-4rem] h-32 w-32 rounded-full bg-purple-500/20 blur-3xl\" aria-hidden />
+              <div className=\"relative flex flex-col gap-4\">
+                <div className=\"flex items-center justify-between\">
                   <div>
-                    <h2 className="title bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
-                      LAST TOUCH
-                    </h2>
-                    <p className="mt-1 text-body-gray">Hold your ground. Win it all.</p>
-                    <p className="mt-2 text-sm text-teal">Next game in: 14:32 • Prize pool grows in real time</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="text-xs text-body-gray">Prize Pool</p>
-                      <p className="text-xl font-bold text-white">$1,247</p>
-                    </div>
-                    <span className="join-btn rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(0,229,199,0.4)]">
-                      Join Now
-                    </span>
-                  </div>
-                </div>
-                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal/20 blur-2xl" />
-              </Link>
-            </section>
-
-            {/* Quick actions */}
-            <section className="mt-8">
-              <div className="-mx-4 flex gap-3 overflow-x-auto pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 md:grid-cols-4">
-                {!isRestricted && (
-                  <>
-                    <Link
-                      href="/wallet"
-                      className="action-card pressable card-border group ml-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-teal-glow/20 sm:ml-0"
-                    >
-                      <div className="top-accent h-1 w-12 rounded-full bg-teal" />
-                      <p className="mt-4 text-lg font-semibold text-white">💰 Deposit</p>
-                      <p className="mt-1 text-sm text-body-gray">Add funds to your wallet</p>
-                    </Link>
-                    <Link
-                      href="/play"
-                      className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-purple-glow/20"
-                    >
-                      <div className="top-accent h-1 w-12 rounded-full bg-purple" />
-                      <p className="mt-4 text-lg font-semibold text-white">🎮 Quick Match</p>
-                      <p className="mt-1 text-sm text-body-gray">Find an opponent now</p>
-                    </Link>
-                  </>
-                )}
-                <Link
-                  href="/external"
-                  className="action-card pressable card-border group inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card border-orange-500/30 bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10"
-                >
-                  <div className="top-accent h-1 w-12 rounded-full bg-orange-500" />
-                  <p className="mt-4 text-lg font-semibold text-white">⚔️ Arena</p>
-                  <p className="mt-1 text-sm text-body-gray">Wager on CS2, Sim Racing & more</p>
-                </Link>
-                <Link
-                  href="/leaderboard"
-                  className="action-card pressable card-border group mr-4 inline-flex min-w-[200px] max-w-[260px] flex-1 animate-fade-in rounded-card bg-card p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-amber-500/10 sm:mr-0"
-                >
-                  <div className="top-accent h-1 w-12 rounded-full bg-amber-500" />
-                  <p className="mt-4 text-lg font-semibold text-white">🏆 Leaderboard</p>
-                  <p className="mt-1 text-sm text-body-gray">See top players</p>
-                </Link>
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* Available games */}
-        <section className={isPractice ? "mt-8" : "mt-10"}>
-          <h2 className="section-title text-xl font-bold text-white">Choose Your Game</h2>
-          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-            {(isPractice
-              ? GAMES.filter(
-                  (g) => !g.comingSoon && ["8-ball-pool", "chess", "connect-4", "reaction-duel", "spelling-bee"].includes(g.slug)
-                )
-              : GAMES
-            ).map((game, i) => {
-              const tagLabel = game.comingSoon
-                ? game.tag
-                : isPractice
-                  ? "1v1 • Free Play"
-                  : "1v1 • $1–$100 stakes";
-              const accentClass = game.comingSoon
-                ? "bg-white/10 text-body-gray"
-                : isPractice
-                  ? "bg-purple-500/20 text-purple-400"
-                  : "bg-teal/20 text-teal";
-              const hoverBorder = game.comingSoon ? "" : isPractice ? "hover:border-purple-500/30 hover:shadow-purple-500/10" : "hover:border-teal/30 hover:shadow-teal-glow/10";
-              const content = (
-                <div
-                  className={`game-card card-border relative flex min-h-[120px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
-                    game.comingSoon
-                      ? "cursor-not-allowed opacity-60"
-                      : `hover:-translate-y-0.5 ${hoverBorder}`
-                  }`}
-                >
-                  <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${game.gradient} opacity-40`} />
-                  <div className="relative">
-                    <p className="font-semibold text-white">{game.name}</p>
-                    <span
-                      className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${accentClass}`}
-                    >
-                      {tagLabel}
-                    </span>
-                  </div>
-                  {game.comingSoon ? (
-                    <div className="relative mt-2 flex items-center gap-1.5 text-body-gray">
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      <span className="text-xs">Coming soon</span>
-                    </div>
-                  ) : (
-                    <p className={`relative mt-2 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100 ${isPractice ? "text-purple-400" : "text-teal"}`}>
-                      Play Now →
+                    <p className=\"text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-200/80\">
+                      Your Balance
                     </p>
-                  )}
-                </div>
-              );
-              return game.comingSoon ? (
-                <div key={game.slug} className="animate-fade-in">
-                  {content}
-                </div>
-              ) : (
-                <Link key={game.slug} href={`/play/${game.slug}`} className="group animate-fade-in">
-                  {content}
-                </Link>
-              );
-            })}
-          </div>
-
-          {!isPractice && (
-            <div className="mt-8 border-t border-white/10 pt-8">
-              <h3 className="section-title text-lg font-bold text-white">External Games</h3>
-              <p className="mt-1 text-sm text-body-gray">Wager on real games. Play externally, win on SkillFlow.</p>
-              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-                <Link href="/external/cs2" className="group animate-fade-in">
-                  <div className="card-border relative flex min-h-[120px] flex-col justify-between rounded-card border-orange-500/20 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-orange-500/10">
-                    <div className="absolute inset-0 rounded-card bg-gradient-to-br from-blue-900/40 to-orange-600/40 opacity-60" />
-                    <div className="relative">
-                      <p className="font-semibold text-white">Counter-Strike 2</p>
-                      <span className="mt-2 inline-block w-fit rounded-full bg-orange-500/20 px-2.5 py-0.5 text-xs font-medium text-orange-400">
-                        Arena
-                      </span>
-                    </div>
-                    <p className="relative mt-2 text-xs font-medium text-teal opacity-0 transition-opacity group-hover:opacity-100">
-                      Wager on real CS2 →
+                    <p className=\"mt-2 text-3xl font-bold text-teal-300\">
+                      {formatCurrency(balance)}
                     </p>
                   </div>
-                </Link>
+                </div>
+                <div className=\"mt-2 flex gap-2\">
+                  <button
+                    type=\"button\"
+                    onClick={() => router.push(\"/wallet/deposit\")}
+                    className=\"flex-1 rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_0_18px_rgba(45,212,191,0.45)] transition hover:bg-teal-300\"
+                  >
+                    Deposit
+                  </button>
+                  <button
+                    type=\"button\"
+                    onClick={() => router.push(\"/wallet/withdraw\")}
+                    className=\"flex-1 rounded-lg border border-white/25 bg-black/20 px-4 py-2.5 text-sm font-semibold text-gray-100 hover:bg-white/5\"
+                  >
+                    Withdraw
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-        </section>
 
-        {!isPractice && (
-          <>
-        {/* Recent matches */}
-        <section className="mt-10">
-          <h2 className="section-title text-xl font-bold text-white">Recent Matches</h2>
-          <div className="card-border mt-4 flex min-h-[160px] flex-col items-center justify-center rounded-card bg-card py-12">
-            {matches.length === 0 ? (
-              <>
-                <span className="text-4xl" aria-hidden>🎯</span>
-                <p className="mt-3 text-body-gray">No matches yet. Play your first game!</p>
-              </>
-            ) : (
-              <p className="text-body-gray">Last {Math.min(5, matches.length)} match(es) — see Profile for full history</p>
-            )}
+            {/* Leaderboard card */}
+            <div className=\"rounded-xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm\">
+              <div className=\"flex items-center justify-between\">
+                <h2 className=\"text-sm font-semibold text-gray-100\">Top Players</h2>
+                <Link href=\"/leaderboard\" className=\"text-xs font-medium text-teal-300 hover:text-teal-200\">
+                  View all →
+                </Link>
+              </div>
+              <div className=\"mt-3 space-y-2 text-sm\">
+                {leaderboard.slice(0, 5).map((p, idx) => {
+                  const rank = idx + 1;
+                  let rankColor = \"text-gray-400\";
+                  if (rank === 1) rankColor = \"text-yellow-400\";
+                  if (rank === 2) rankColor = \"text-gray-300\";
+                  if (rank === 3) rankColor = \"text-amber-600\";
+                  const isCurrent = p.isCurrentUser || p.username === username;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
+                        isCurrent ? \"bg-teal-500/10 border border-teal-500/40\" : \"border border-transparent\"
+                      }`}
+                    >
+                      <div className=\"flex items-center gap-2 overflow-hidden\">
+                        <span className={`w-5 text-xs font-semibold ${rankColor}`}>#{rank}</span>
+                        <div
+                          className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${p.avatarGradient}`}
+                        >
+                          <span className=\"text-xs font-semibold text-white\">
+                            {p.username.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className=\"max-w-[90px] truncate text-sm text-gray-100 sm:max-w-[120px]\">
+                          {isCurrent ? \"You\" : p.username}
+                        </span>
+                      </div>
+                      <div className=\"text-right text-[11px] text-gray-400\">
+                        <div className=\"text-xs font-semibold text-emerald-300\">
+                          {formatCurrency(p.totalEarnings)}
+                        </div>
+                        <div className=\"text-[10px]\">
+                          {p.winRate}% WR • {p.totalMatches.toLocaleString()} matches
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Referral card */}
+            <div className=\"relative overflow-hidden rounded-xl border border-orange-400/40 bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-slate-900/30 p-4 backdrop-blur-md\">
+              <div className=\"pointer-events-none absolute -right-6 top-4 text-6xl opacity-20\" aria-hidden>
+                🎁
+              </div>
+              <div className=\"relative space-y-2\">
+                <h2 className=\"text-sm font-semibold text-gray-100\">Invite &amp; Earn</h2>
+                <p className=\"text-xs text-amber-100/90\">
+                  You both get <span className=\"font-semibold\">$5</span> when your friend makes their first deposit.
+                </p>
+                <button
+                  type=\"button\"
+                  onClick={() => router.push(\"/referrals\")}
+                  className=\"mt-2 inline-flex items-center gap-2 rounded-lg bg-orange-400 px-4 py-2 text-xs font-semibold text-slate-900 shadow-[0_0_18px_rgba(251,146,60,0.45)] hover:bg-orange-300\"
+                >
+                  Share Your Link
+                </button>
+              </div>
+            </div>
+
+            {/* Quick match CTA */}
+            <div className=\"rounded-xl border border-teal-400/40 bg-teal-500/10 p-[1px] shadow-[0_0_28px_rgba(45,212,191,0.45)]\">
+              <button
+                type=\"button\"
+                onClick={handleQuickMatch}
+                className=\"relative flex w-full items-center justify-between overflow-hidden rounded-xl bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 px-4 py-3 text-left text-slate-900 transition-transform hover:-translate-y-0.5\"
+              >
+                <div className=\"relative z-10 flex flex-col\">
+                  <span className=\"text-sm font-semibold\">
+                    ⚡ Quick Match — {formatCurrency(selectedStake)}
+                  </span>
+                  <span className=\"text-[11px] text-slate-800/80\">
+                    We&apos;ll find you a game instantly at this stake.
+                  </span>
+                </div>
+                <div className=\"relative z-10 text-xs font-semibold uppercase tracking-[0.14em] text-slate-900/80\">
+                  Play now
+                </div>
+                <div className=\"pointer-events-none absolute inset-0\">
+                  <div className=\"absolute inset-y-0 -left-1 w-1/3 shimmer\" />
+                </div>
+              </button>
+            </div>
           </div>
         </section>
 
-        {/* Live matches */}
-        <section className="mt-10">
-          <h2 className="section-title text-xl font-bold text-white">Live Now 🔴</h2>
-          <div className="card-border mt-4 flex min-h-[100px] items-center justify-center rounded-card bg-card py-8">
-            <p className="text-body-gray">No live matches right now</p>
+        {/* Practice mode banner */}
+        <section className=\"mt-4 rounded-xl border border-purple-400/40 bg-purple-500/10 px-4 py-4 backdrop-blur-sm\">
+          <div className=\"flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center\">
+            <div className=\"flex items-start gap-3\">
+              <span className=\"mt-0.5 text-2xl\" aria-hidden>
+                🎯
+              </span>
+              <div>
+                <h3 className=\"text-sm font-semibold text-gray-100\">Practice Mode</h3>
+                <p className=\"text-xs text-gray-400\">
+                  Sharpen your skills with free matches — no money required.
+                </p>
+              </div>
+            </div>
+            <button
+              type=\"button\"
+              onClick={() => router.push(\"/play?practice=1\")}
+              className=\"rounded-lg bg-purple-500/90 px-4 py-2 text-xs font-semibold text-white shadow-[0_0_14px_rgba(168,85,247,0.6)] hover:bg-purple-400\"
+            >
+              Play Free
+            </button>
           </div>
         </section>
-          </>
-        )}
       </main>
       <Footer />
     </div>
