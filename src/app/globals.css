@@ -5,16 +5,23 @@
 html {
   scroll-behavior: smooth;
   overscroll-behavior: none;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 body {
   @apply bg-charcoal text-white antialiased;
   overscroll-behavior: none;
   padding-bottom: env(safe-area-inset-bottom);
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 * {
   -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
 }
 
 input,
@@ -29,6 +36,14 @@ a,
 input[type="button"],
 input[type="submit"] {
   touch-action: manipulation;
+}
+
+.page-container,
+main,
+#root,
+#__next {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Subtle grid background pattern */
