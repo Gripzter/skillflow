@@ -31,7 +31,7 @@ export default function RootLayout({
       <head>
         <meta
           name="viewport"
-          content="width=device-width, initial-scale=1"
+          content="width=device-width, initial-scale=1.0"
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -41,6 +41,23 @@ export default function RootLayout({
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"
+        />
+        <script
+          // TEMP: debug horizontal overflow on mobile; remove after fixing
+          dangerouslySetInnerHTML={{
+            __html: `
+if (typeof window !== 'undefined') {
+  window.addEventListener('load', function () {
+    const docWidth = document.documentElement.clientWidth;
+    document.querySelectorAll('*').forEach(function (el) {
+      if (el.scrollWidth > docWidth + 1) {
+        console.log('OVERFLOW ELEMENT:', el.tagName, el.className, el.scrollWidth, 'vs', docWidth);
+      }
+    });
+  });
+}
+`,
+          }}
         />
       </head>
       <body className="font-sans">

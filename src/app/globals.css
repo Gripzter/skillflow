@@ -6,22 +6,30 @@ html {
   scroll-behavior: smooth;
   overscroll-behavior: none;
   overflow-x: hidden; /* only horizontal, NOT vertical */
+  width: 100%;
 }
 
 body {
   @apply bg-charcoal text-white antialiased;
   overscroll-behavior: none;
-  padding-bottom: env(safe-area-inset-bottom);
   overflow-x: hidden; /* only horizontal */
   overflow-y: auto;  /* MUST allow vertical scroll */
   width: 100%;
   min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   -webkit-overflow-scrolling: touch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 * {
   -webkit-tap-highlight-color: transparent;
-  box-sizing: border-box;
 }
 
 input,
@@ -36,6 +44,14 @@ a,
 input[type="button"],
 input[type="submit"] {
   touch-action: manipulation;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .page-container,
