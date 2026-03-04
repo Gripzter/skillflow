@@ -38,6 +38,59 @@ const GAME_CONFIGS: GameConfig[] = [
 
 const STAKE_OPTIONS = [1, 2, 5, 10, 25] as const;
 
+const announcements = [
+  {
+    id: 1,
+    icon: "🎁",
+    text: "Invite a friend and you BOTH get $5 bonus!",
+    action: "Share Link →",
+    link: "/referrals",
+    bgGradient: "linear-gradient(135deg, rgba(249,115,22,0.1), rgba(245,158,11,0.05))",
+    borderColor: "rgba(249,115,22,0.2)",
+    accentColor: "#F97316",
+  },
+  {
+    id: 2,
+    icon: "🐝",
+    text: "Spelling Bee — Can you spell 'floccinaucinihilipilification' for $50?",
+    action: "Play Now →",
+    link: "/play/spelling-bee",
+    bgGradient: "linear-gradient(135deg, rgba(234,179,8,0.1), rgba(245,158,11,0.05))",
+    borderColor: "rgba(234,179,8,0.2)",
+    accentColor: "#EAB308",
+  },
+  {
+    id: 3,
+    icon: "⚡",
+    text: "Reaction Duel — Test your reflexes. Fastest finger wins real cash!",
+    action: "Play Now →",
+    link: "/play/reaction-duel",
+    bgGradient: "linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05))",
+    borderColor: "rgba(239,68,68,0.2)",
+    accentColor: "#EF4444",
+  },
+  {
+    id: 4,
+    icon: "♟️",
+    text: "Chess Masters — $25 stake matches now live. Prove your rating.",
+    action: "Play Now →",
+    link: "/play/chess",
+    bgGradient: "linear-gradient(135deg, rgba(139,92,246,0.1), rgba(139,92,246,0.05))",
+    borderColor: "rgba(139,92,246,0.2)",
+    accentColor: "#8B5CF6",
+  },
+  {
+    id: 5,
+    icon: "🔥",
+    text: "New to SkillFlow? Deposit $10+ and get a free practice session!",
+    action: "Deposit →",
+    link: "/wallet/deposit",
+    bgGradient: "linear-gradient(135deg, rgba(0,229,199,0.1), rgba(0,229,199,0.05))",
+    borderColor: "rgba(0,229,199,0.2)",
+    accentColor: "#00E5C7",
+  },
+] as const;
+
 function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -77,6 +130,9 @@ export default function DashboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [selectedStake, setSelectedStake] = useState<number>(5);
   const [onlineCount] = useState(() => 1200 + Math.floor(Math.random() * 1800)); // TODO: replace with real online count
+  const [currentAnnouncement, setCurrentAnnouncement] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isAnnouncementHovered, setIsAnnouncementHovered] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -165,6 +221,18 @@ export default function DashboardPage() {
     router.push("/play");
   }
 
+  useEffect(() => {
+    if (isAnnouncementHovered) return;
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentAnnouncement((prev) => (prev + 1) % announcements.length);
+        setIsTransitioning(false);
+      }, 300);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isAnnouncementHovered]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#050915]">
@@ -231,6 +299,66 @@ export default function DashboardPage() {
             </button>
           </div>
         </section>
+
+        {/* Rotating announcement banner */}
+        {announcements.length > 0 && (
+          <section
+            className="mt-1"
+            onMouseEnter={() => setIsAnnouncementHovered(true)}
+            onMouseLeave={() => setIsAnnouncementHovered(false)}
+          >
+            {(() => {
+              const announcement = announcements[currentAnnouncement];
+              return (
+                <div
+                  className="mb-2 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01]"
+                  onClick={() => router.push(announcement.link)}
+                  style={{
+                    background: announcement.bgGradient,
+                    border: `1px solid ${announcement.borderColor}`,
+                  }}
+                >
+                  <div
+                    className={`flex items-center justify-between px-4 py-3 transition-opacity duration-300 ${
+                      isTransitioning ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ transition: "opacity 0.3s, transform 0.3s" }}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <span className="flex-shrink-0 text-lg" aria-hidden>
+                        {announcement.icon}
+                      </span>
+                      <p className="truncate text-sm font-medium text-gray-200">
+                        {announcement.text}
+                      </p>
+                    </div>
+                    <span
+                      className="ml-3 hidden flex-shrink-0 text-xs font-bold sm:inline"
+                      style={{ color: announcement.accentColor }}
+                    >
+                      {announcement.action}
+                    </span>
+                  </div>
+                  <div className="flex justify-center gap-1.5 pb-2">
+                    {announcements.map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-1 rounded-full transition-all duration-300"
+                        style={{
+                          width: i === currentAnnouncement ? "16px" : "4px",
+                          background:
+                            i === currentAnnouncement
+                              ? announcement.accentColor
+                              : "rgba(255,255,255,0.15)",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </section>
+        )}
 
         {/* Quick stats row */}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
