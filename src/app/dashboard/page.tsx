@@ -269,14 +269,14 @@ export default function DashboardPage() {
         {/* Top bar */}
         <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
               {greeting}
             </p>
             <div className="mt-1 flex items-baseline gap-2">
               <h1 className="text-2xl font-bold tracking-tight text-gray-100 md:text-3xl">
                 {username}
               </h1>
-              <span className="text-sm text-gray-600">#{playerNumber}</span>
+              <span className="text-sm text-gray-400">#{playerNumber}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 md:gap-4">
@@ -367,13 +367,13 @@ export default function DashboardPage() {
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-teal-400/10 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
                   📊 Win Rate
                 </span>
-                <span className="text-[10px] text-gray-600">Last 30 days</span>
+                <span className="text-[10px] text-gray-400">Last 30 days</span>
               </div>
               <p className="mt-2 text-xl font-bold text-teal-300 md:text-2xl">{winRate || 0}%</p>
-              <p className="mt-1 text-[11px] text-gray-500">Keep climbing the leaderboard.</p>
+              <p className="mt-1 text-[11px] text-gray-400">Keep climbing the leaderboard.</p>
             </div>
           </div>
 
@@ -382,13 +382,13 @@ export default function DashboardPage() {
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-purple-500/15 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
                   🎮 Matches
                 </span>
-                <span className="text-[10px] text-gray-600">Total played</span>
+                <span className="text-[10px] text-gray-400">Total played</span>
               </div>
               <p className="mt-2 text-xl font-bold text-purple-300 md:text-2xl">{totalMatches}</p>
-              <p className="mt-1 text-[11px] text-gray-500">Experience makes champions.</p>
+              <p className="mt-1 text-[11px] text-gray-400">Experience makes champions.</p>
             </div>
           </div>
 
@@ -397,15 +397,15 @@ export default function DashboardPage() {
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-emerald-500/15 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
                   💰 Earnings
                 </span>
-                <span className="text-[10px] text-gray-600">Net profit</span>
+                <span className="text-[10px] text-gray-400">Net profit</span>
               </div>
               <p className={`mt-2 text-xl font-bold md:text-2xl ${netEarnings >= 0 ? "text-emerald-300" : "text-red-400"}`}>
                 {formatCurrency(netEarnings)}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">Across your real money matches.</p>
+              <p className="mt-1 text-[11px] text-gray-400">Across your real money matches.</p>
             </div>
           </div>
 
@@ -414,15 +414,15 @@ export default function DashboardPage() {
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-amber-400/20 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
                   🏆 Rank
                 </span>
-                <span className="text-[10px] text-gray-600">Global</span>
+                <span className="text-[10px] text-gray-400">Global</span>
               </div>
               <p className="mt-2 text-xl font-bold text-amber-300 md:text-2xl">
                 {playerRank ? `#${playerRank.toLocaleString()}` : "-"}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">Climb the global ladder.</p>
+              <p className="mt-1 text-[11px] text-gray-400">Climb the global ladder.</p>
             </div>
           </div>
         </section>
@@ -436,7 +436,7 @@ export default function DashboardPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-lg font-semibold tracking-tight text-gray-100">Choose Your Arena</h2>
-                  <p className="text-xs text-gray-500">Pick a game, set your stake, dominate.</p>
+                  <p className="text-xs text-gray-400">Pick a game, set your stake, dominate.</p>
                 </div>
                 <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-1 text-[11px] text-gray-400 sm:mt-0">
                   {STAKE_OPTIONS.map((amount) => (
@@ -491,7 +491,7 @@ export default function DashboardPage() {
                             {game.tag}
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
                           <span className="inline-flex items-center gap-1">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -499,7 +499,7 @@ export default function DashboardPage() {
                             </span>
                             {playerCount} playing
                           </span>
-                          <span className="hidden text-gray-600 sm:inline">•</span>
+                          <span className="hidden text-gray-400 sm:inline">•</span>
                           <span className="text-emerald-300">
                             Win {formatCurrency(payoutForStake)}
                           </span>
@@ -528,7 +528,7 @@ export default function DashboardPage() {
                 </Link>
               </div>
               {recentActivity.length === 0 ? (
-                <div className="mt-6 flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-500">
+                <div className="mt-6 flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-400">
                   <span className="text-3xl" aria-hidden>
                     🎯
                   </span>
@@ -563,7 +563,7 @@ export default function DashboardPage() {
                             <span className="text-sm font-medium text-gray-100">
                               {match.gameDisplayName} vs {match.player2.username}
                             </span>
-                            <span className="text-[11px] text-gray-500">{formatTimeAgo(match.createdAt)}</span>
+                            <span className="text-[11px] text-gray-400">{formatTimeAgo(match.createdAt)}</span>
                           </div>
                         </div>
                         <div className="text-right">

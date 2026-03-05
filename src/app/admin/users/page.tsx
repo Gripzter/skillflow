@@ -262,7 +262,7 @@ export default function AdminUsersPage() {
             type="button"
             disabled={currentPage === 0}
             onClick={() => setPage((p) => p - 1)}
-            className="rounded border border-white/10 px-3 py-1 text-sm text-white disabled:opacity-40"
+            className="rounded border border-white/10 px-3 py-1 text-sm text-admin-body disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/5"
           >
             Previous
           </button>
@@ -270,7 +270,7 @@ export default function AdminUsersPage() {
             type="button"
             disabled={currentPage >= totalPages - 1}
             onClick={() => setPage((p) => p + 1)}
-            className="rounded border border-white/10 px-3 py-1 text-sm text-white disabled:opacity-40"
+            className="rounded border border-white/10 px-3 py-1 text-sm text-admin-body disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/5"
           >
             Next
           </button>
