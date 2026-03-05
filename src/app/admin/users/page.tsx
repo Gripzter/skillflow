@@ -69,7 +69,8 @@ export default function AdminUsersPage() {
             email: "developer@skillflow.dev",
             joined: new Date().toISOString().slice(0, 10),
             matches: matches.length,
-            winRate: completed ? Math.round((wins / completed) * 100) : 0,
+            // Real matches win rate as percentage with one decimal place
+            winRate: completed ? Math.round((wins / completed) * 1000) / 10 : 0,
             balance: parseFloat(localStorage.getItem("skillflow_wallet_balance") || "0") || 0,
             totalWagered: matches.reduce((s, m) => s + m.stakeAmount * 2, 0),
             status: "Active" as UserStatus,
@@ -205,7 +206,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-3 text-admin-body">{u.email}</td>
                   <td className="px-4 py-3 text-admin-body">{u.joined}</td>
                   <td className="px-4 py-3 text-admin-body">{u.matches}</td>
-                  <td className="px-4 py-3 text-admin-body">{u.winRate}%</td>
+                  <td className="px-4 py-3 text-admin-body">{u.winRate.toFixed(1)}%</td>
                   <td className="px-4 py-3 text-admin-body">${u.balance.toFixed(2)}</td>
                   <td className="px-4 py-3 text-admin-body">${u.totalWagered.toFixed(2)}</td>
                   <td className="px-4 py-3">

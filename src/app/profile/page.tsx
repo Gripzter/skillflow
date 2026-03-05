@@ -67,7 +67,8 @@ function computeProfileStats(
   const won = (m: StoredMatch) => m.winner === "player1" && isPlayer1(m) || m.winner === "player2" && !isPlayer1(m);
   const totalWins = completed.filter(won).length;
   const totalLosses = completed.length - totalWins;
-  const winRate = completed.length ? (totalWins / completed.length) * 100 : 0;
+  // Store win rate as a numeric percentage with one decimal place
+  const winRate = completed.length ? Math.round((totalWins / completed.length) * 1000) / 10 : 0;
   const matchWinSum = transactions.filter((t) => t.type === "match_win").reduce((s, t) => s + t.amount, 0);
   const matchEntrySum = transactions.filter((t) => t.type === "match_entry").reduce((s, t) => s + Math.abs(t.amount), 0);
   const totalEarnings = matchWinSum - matchEntrySum;
@@ -186,10 +187,11 @@ export default function ProfilePage() {
         ? Number(Object.entries(stakeCounts).sort((a, b) => b[1] - a[1])[0][0])
         : 0;
     const avgDuration = list.length ? 3 + Math.random() * 5 : 0;
+    const winRate = list.length ? Math.round((wins / list.length) * 1000) / 10 : 0;
     return {
       played: list.length,
       wins,
-      winRate: list.length ? (wins / list.length) * 100 : 0,
+      winRate,
       avgDuration: list.length ? `${avgDuration.toFixed(1)} min` : "—",
       highestStakeWon: maxWon,
       favoriteStake,
@@ -308,7 +310,7 @@ export default function ProfilePage() {
         <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
             { label: "Total Matches", value: stats.matches.length, icon: "🎮" },
-            { label: "Win Rate", value: `${stats.winRate.toFixed(0)}%`, icon: "📊" },
+            { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%`, icon: "📊" },
             { label: "Total Earnings", value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`, icon: "💰" },
             { label: "Win Streak", value: stats.bestStreak, icon: "🔥" },
           ].map((card, i) => (
@@ -339,7 +341,9 @@ export default function ProfilePage() {
             </div>
             <div className="rounded-lg bg-white/5 p-4">
               <p className="text-xs text-body-gray">Practice Win Rate</p>
-              <p className="mt-1 text-xl font-bold text-purple-400">{practiceStats.practiceWinRate}%</p>
+              <p className="mt-1 text-xl font-bold text-purple-400">
+                {practiceStats.practiceWinRate.toFixed(1)}%
+              </p>
             </div>
           </div>
         </section>
@@ -364,7 +368,7 @@ export default function ProfilePage() {
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {[
               { label: "Matches played", value: gameStats.played },
-              { label: "Win rate", value: `${gameStats.winRate.toFixed(0)}%` },
+              { label: "Win rate", value: `${gameStats.winRate.toFixed(1)}%` },
               { label: "Avg. duration", value: gameStats.avgDuration },
               { label: "Highest stake won", value: `$${gameStats.highestStakeWon.toFixed(2)}` },
               { label: "Favorite stake", value: `$${gameStats.favoriteStake.toFixed(2)}` },

@@ -170,7 +170,12 @@ export default function AdminDisputesPage() {
                     <div><dt className="text-admin-body">Score</dt><dd className="text-white">{selected.player1.score}</dd></div>
                     <div><dt className="text-admin-body">Evidence</dt><dd className="text-white">{selected.player1.proof}</dd></div>
                     <div><dt className="text-admin-body">Connection</dt><dd className="text-white">{selected.player1.connectionQuality}</dd></div>
-                    <div><dt className="text-admin-body">Win rate / Disputes filed</dt><dd className="text-white">{selected.player1.winRate}% / {selected.player1.disputesFiled}</dd></div>
+                    <div>
+                      <dt className="text-admin-body">Win rate / Disputes filed</dt>
+                      <dd className="text-white">
+                        {selected.player1.winRate.toFixed(1)}% / {selected.player1.disputesFiled}
+                      </dd>
+                    </div>
                   </dl>
                   <div className="mt-4 h-24 rounded border border-white/10 bg-admin-bg flex items-center justify-center text-admin-body text-sm">
                     Screenshot placeholder
@@ -183,7 +188,12 @@ export default function AdminDisputesPage() {
                     <div><dt className="text-admin-body">Score</dt><dd className="text-white">{selected.player2.score}</dd></div>
                     <div><dt className="text-admin-body">Evidence</dt><dd className="text-white">{selected.player2.proof}</dd></div>
                     <div><dt className="text-admin-body">Connection</dt><dd className="text-white">{selected.player2.connectionQuality}</dd></div>
-                    <div><dt className="text-admin-body">Win rate / Disputes filed</dt><dd className="text-white">{selected.player2.winRate}% / {selected.player2.disputesFiled}</dd></div>
+                    <div>
+                      <dt className="text-admin-body">Win rate / Disputes filed</dt>
+                      <dd className="text-white">
+                        {selected.player2.winRate.toFixed(1)}% / {selected.player2.disputesFiled}
+                      </dd>
+                    </div>
                   </dl>
                   <div className="mt-4 h-24 rounded border border-white/10 bg-admin-bg flex items-center justify-center text-admin-body text-sm">
                     Screenshot placeholder

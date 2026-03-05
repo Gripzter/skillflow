@@ -22,8 +22,6 @@ const TABS: { id: LeaderboardTab; label: string }[] = [
   { id: "matches", label: "Most Matches" },
   { id: "rating", label: "Skill Rating" },
 ];
-
-const GAME_FILTERS = ["All Games", "8 Ball Pool", "Chess"];
 const PAGE_SIZE = 20;
 
 export default function LeaderboardPage() {
@@ -36,7 +34,6 @@ export default function LeaderboardPage() {
   const [rawPlayers, setRawPlayers] = useState<LeaderboardPlayer[]>([]);
   const [practicePlayers, setPracticePlayers] = useState<LeaderboardPlayer[]>([]);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("earnings");
-  const [gameFilter, setGameFilter] = useState("All Games");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { isPractice } = usePlayMode();
@@ -73,7 +70,8 @@ export default function LeaderboardPage() {
             avatarGradient: "from-purple-500/40 to-pink-500/40",
             skillRating: 1000,
             totalMatches: s.matches,
-            winRate: s.matches ? (s.wins / s.matches) * 100 : 0,
+            // Store practice win rate as a numeric percentage with one decimal place
+            winRate: s.matches ? Math.round((s.wins / s.matches) * 1000) / 10 : 0,
             totalEarnings: 0,
             trend: "up",
             isCurrentUser: username === user.username,
@@ -166,46 +164,26 @@ export default function LeaderboardPage() {
         </p>
 
         {!isPractice && (
-          <>
-            {/* Tabs */}
-            <div className="mt-6 flex flex-nowrap gap-2 overflow-x-auto border-b border-white/5 pb-4">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setPage(1);
-                  }}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
-                    activeTab === tab.id
-                      ? "bg-teal text-charcoal"
-                      : "bg-card text-body-gray hover:text-white"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Game filter */}
-            <div className="mt-4 flex flex-nowrap items-center gap-2 overflow-x-auto">
-              {GAME_FILTERS.map((game) => (
-                <button
-                  key={game}
-                  type="button"
-                  onClick={() => setGameFilter(game)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    gameFilter === game
-                      ? "border-teal/50 bg-teal/10 text-teal"
-                      : "border-white/10 text-body-gray hover:text-white"
-                  }`}
-                >
-                  {game}
-                </button>
-              ))}
-            </div>
-          </>
+          // Real-money leaderboard: only show overall tabs, no per-game filters
+          <div className="mt-6 flex flex-nowrap gap-2 overflow-x-auto border-b border-white/5 pb-4">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setPage(1);
+                }}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                  activeTab === tab.id
+                    ? "bg-teal text-charcoal"
+                    : "bg-card text-body-gray hover:text-white"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Podium - Top 3 */}
@@ -329,7 +307,9 @@ export default function LeaderboardPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 font-semibold text-white">{player.totalMatches}</td>
-                        <td className="px-4 py-3 text-body-gray">{`${Math.round(player.winRate)}%`}</td>
+                        <td className="px-4 py-3 text-body-gray">
+                          {player.totalMatches > 0 ? `${player.winRate.toFixed(1)}%` : "0.0%"}
+                        </td>
                       </tr>
                     );
                   }
@@ -400,7 +380,13 @@ export default function LeaderboardPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-white truncate">{player.username}</p>
-                      <p className="text-xs text-body-gray">{isPractice ? `${Math.round(player.winRate)}% win` : getSecondaryStat(player, activeTab)}</p>
+                      <p className="text-xs text-body-gray">
+                        {isPractice
+                          ? player.totalMatches > 0
+                            ? `${player.winRate.toFixed(1)}% win`
+                            : "0.0% win"
+                          : getSecondaryStat(player, activeTab)}
+                      </p>
                     </div>
                     {player.isCurrentUser && (
                       <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>

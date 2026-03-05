@@ -3,7 +3,8 @@ import type { LeaderboardPlayer } from "@/lib/leaderboard-data";
 
 function mapSeedPlayerToLeaderboard(seed: SeedPlayer, gradientIndex: number, gradients: string[]): LeaderboardPlayer {
   const totalMatches = seed.wins + seed.losses;
-  const winRate = totalMatches ? (seed.wins / totalMatches) * 100 : 0;
+  // Store seed win rate as a numeric percentage with one decimal place for consistent display
+  const winRate = totalMatches ? Math.round((seed.wins / totalMatches) * 1000) / 10 : 0;
   const gradient = gradients[gradientIndex % gradients.length];
   return {
     id: seed.id,

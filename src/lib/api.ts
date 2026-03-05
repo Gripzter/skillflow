@@ -529,7 +529,7 @@ export async function getLeaderboard(
       avatarGradient: "from-teal/40 to-purple/40",
       skillRating: p.skill_rating ?? 1000,
       totalMatches,
-      winRate: totalMatches ? (wins / totalMatches) * 100 : 0,
+      winRate: totalMatches ? Math.round((wins / totalMatches) * 1000) / 10 : 0,
       totalEarnings: Number(p.total_earnings ?? 0),
       trend: "up",
       wins,

@@ -113,6 +113,13 @@ export function generateFakeLeaderboard(
   return players;
 }
 
+/** Format win rate for display: one decimal, e.g. "61.9%" or "0.0%" when no matches */
+export function formatWinRate(rate: number): string {
+  const n = Number(rate);
+  if (Number.isNaN(n) || n < 0) return "0.0%";
+  return `${n.toFixed(1)}%`;
+}
+
 export type LeaderboardTab = "earnings" | "winRate" | "matches" | "rating";
 
 export function sortAndRankPlayers(
@@ -141,7 +148,7 @@ export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): str
     case "earnings":
       return `$${player.totalEarnings.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case "winRate":
-      return `${player.winRate}%`;
+      return formatWinRate(player.winRate);
     case "matches":
       return player.totalMatches;
     case "rating":

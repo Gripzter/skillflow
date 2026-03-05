@@ -97,6 +97,6 @@ export function getPracticeStats(username: string): PracticeStats {
   return {
     practiceMatchesPlayed: played,
     practiceWins: wins,
-    practiceWinRate: played ? Math.round((wins / played) * 100) : 0,
+    practiceWinRate: played ? Math.round((wins / played) * 1000) / 10 : 0,
   };
 }
