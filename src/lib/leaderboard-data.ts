@@ -49,6 +49,10 @@ export interface LeaderboardPlayer {
   winRate: number;
   totalEarnings: number;
   trend: "up" | "down";
+  wins?: number;
+  losses?: number;
+  topGame?: string;
+  isPlaceholder?: boolean;
   isCurrentUser?: boolean;
 }
 

@@ -519,16 +519,23 @@ export async function getLeaderboard(
     .order(sortBy === "skill_rating" ? "skill_rating" : "total_earnings", { ascending: false })
     .limit(50);
   if (error) return null;
-  const players: LeaderboardPlayer[] = (data || []).map((p, i) => ({
-    id: p.id,
-    username: p.username,
-    avatarGradient: "from-teal/40 to-purple/40",
-    skillRating: p.skill_rating ?? 1000,
-    totalMatches: p.total_matches ?? 0,
-    winRate: p.total_matches ? ((p.total_wins ?? 0) / p.total_matches) * 100 : 0,
-    totalEarnings: Number(p.total_earnings ?? 0),
-    trend: "up",
-  }));
+  const players: LeaderboardPlayer[] = (data || []).map((p) => {
+    const totalMatches = p.total_matches ?? 0;
+    const wins = p.total_wins ?? 0;
+    const losses = Math.max(0, totalMatches - wins);
+    return {
+      id: p.id,
+      username: p.username,
+      avatarGradient: "from-teal/40 to-purple/40",
+      skillRating: p.skill_rating ?? 1000,
+      totalMatches,
+      winRate: totalMatches ? (wins / totalMatches) * 100 : 0,
+      totalEarnings: Number(p.total_earnings ?? 0),
+      trend: "up",
+      wins,
+      losses,
+    };
+  });
   return players;
 }
 

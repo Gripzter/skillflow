@@ -14,11 +14,13 @@ import {
   getWalletBalance,
   getMatches,
   getTransactions,
+  getLeaderboard,
   logout as apiLogout,
 } from "@/lib/api";
 import type { StoredMatch } from "@/lib/matchmaking";
 import type { StoredTransaction } from "@/lib/wallet";
-import { generateFakeLeaderboard, type LeaderboardPlayer } from "@/lib/leaderboard-data";
+import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
+import { buildLeaderboard } from "@/lib/leaderboard-seeding";
 
 type GameConfig = {
   slug: string;
@@ -146,17 +148,22 @@ export default function DashboardPage() {
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
 
-        const [bal, matchList, txs] = await Promise.all([
+        const [bal, matchList, txs, apiLeaderboard] = await Promise.all([
           getWalletBalance(),
           getMatches(),
           getTransactions(),
+          getLeaderboard("total_earnings"),
         ]);
         setBalance(bal);
         setMatches(matchList as StoredMatch[]);
         setTransactions(txs);
 
-        const lb = generateFakeLeaderboard(user.username ?? null, 8);
-        setLeaderboard(lb);
+        const basePlayers: LeaderboardPlayer[] =
+          apiLeaderboard?.map((p) => ({
+            ...p,
+            isCurrentUser: p.username === user.username,
+          })) ?? [];
+        setLeaderboard(buildLeaderboard(basePlayers));
       } catch {
         router.push("/login");
       } finally {
@@ -626,7 +633,7 @@ export default function DashboardPage() {
                   const isCurrent = p.isCurrentUser || p.username === username;
                   return (
                     <div
-                      key={p.id}
+                      key={`${p.id}-top-${rank}`}
                       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
                         isCurrent ? "bg-teal-500/10 border border-teal-500/40" : "border border-transparent"
                       }`}
@@ -655,6 +662,40 @@ export default function DashboardPage() {
                     </div>
                   );
                 })}
+                {playerRank && playerRank > 5 && (() => {
+                  const current = leaderboard.find((p) => p.isCurrentUser || p.username === username);
+                  if (!current) return null;
+                  return (
+                    <div
+                      key={`${current.id}-you`}
+                      className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-teal/50 bg-teal/10 px-2 py-1.5"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="w-5 text-xs font-semibold text-teal">
+                          #{playerRank.toLocaleString()}
+                        </span>
+                        <div
+                          className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${current.avatarGradient}`}
+                        >
+                          <span className="text-xs font-semibold text-white">
+                            {current.username.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="max-w-[90px] truncate text-sm text-gray-100 sm:max-w-[120px]">
+                          You
+                        </span>
+                      </div>
+                      <div className="text-right text-[11px] text-gray-400">
+                        <div className="text-xs font-semibold text-emerald-300">
+                          {formatCurrency(current.totalEarnings)}
+                        </div>
+                        <div className="text-[10px]">
+                          {current.winRate}% WR • {current.totalMatches.toLocaleString()} matches
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

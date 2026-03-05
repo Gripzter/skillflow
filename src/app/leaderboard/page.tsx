@@ -8,13 +8,13 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
 import {
-  generateFakeLeaderboard,
   sortAndRankPlayers,
   getMainStat,
   getSecondaryStat,
   type LeaderboardPlayer,
   type LeaderboardTab,
 } from "@/lib/leaderboard-data";
+import { buildLeaderboard, getTopGameEmoji } from "@/lib/leaderboard-seeding";
 
 const TABS: { id: LeaderboardTab; label: string }[] = [
   { id: "earnings", label: "Top Earners" },
@@ -52,15 +52,12 @@ export default function LeaderboardPage() {
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
         const apiPlayers = await getLeaderboard("total_earnings");
-        if (apiPlayers == null) {
-          setRawPlayers(generateFakeLeaderboard(user.username, 15 + Math.floor(Math.random() * 16)));
-        } else {
-          const withCurrent = apiPlayers.map((p) => ({
+        const basePlayers: LeaderboardPlayer[] =
+          apiPlayers?.map((p) => ({
             ...p,
             isCurrentUser: p.username === user.username,
-          }));
-          setRawPlayers(withCurrent);
-        }
+          })) ?? [];
+        setRawPlayers(buildLeaderboard(basePlayers));
         const practice = getPracticeMatches();
         const byUser: Record<string, { wins: number; matches: number }> = {};
         practice.filter((m) => m.status === "completed").forEach((m) => {
@@ -286,25 +283,68 @@ export default function LeaderboardPage() {
           <div className="card-border hidden overflow-hidden rounded-card md:block">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-white/5 bg-card">
-                  <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
-                  <th className="px-4 py-3 font-medium text-body-gray">Player</th>
-                  <th className="px-4 py-3 font-medium text-body-gray">
-                    {isPractice ? "Practice Matches" : (activeTab === "earnings" && "Total Earnings") || (activeTab === "winRate" && "Win Rate") || (activeTab === "matches" && "Matches") || (activeTab === "rating" && "Rating")}
-                  </th>
-                  <th className="px-4 py-3 font-medium text-body-gray">{isPractice ? "Win %" : "Secondary"}</th>
-                  {!isPractice && <th className="px-4 py-3 font-medium text-body-gray">Trend</th>}
-                </tr>
+                {isPractice ? (
+                  <tr className="border-b border-white/5 bg-card">
+                    <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Player</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Practice Matches</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Win %</th>
+                  </tr>
+                ) : (
+                  <tr className="border-b border-white/5 bg-card">
+                    <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Player</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Rating</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">W / L</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Top Game</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Earnings</th>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {visiblePlayers.map((player, i) => {
                   const rank = i + 4;
+                  const rowBaseClasses = `border-b border-white/5 transition-colors ${
+                    rank % 2 === 0 ? "bg-[#151821]" : "bg-[#1A1D27]"
+                  } ${player.isCurrentUser ? (isPractice ? "bg-purple-500/10" : "bg-teal/10") : ""}`;
+
+                  if (isPractice) {
+                    return (
+                      <tr
+                        key={player.id}
+                        className={`${rowBaseClasses} ${isPractice ? "hover:border-l-2 hover:border-l-purple-500" : ""}`}
+                      >
+                        <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
+                            >
+                              {player.username.charAt(0)}
+                            </div>
+                            <span className="font-medium text-white">{player.username}</span>
+                            {player.isCurrentUser && (
+                              <span className="rounded px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400">You</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-white">{player.totalMatches}</td>
+                        <td className="px-4 py-3 text-body-gray">{`${Math.round(player.winRate)}%`}</td>
+                      </tr>
+                    );
+                  }
+
+                  const wins = player.wins ?? Math.round((player.winRate / 100) * player.totalMatches);
+                  const losses = player.losses ?? Math.max(0, player.totalMatches - wins);
+                  const topGame = player.topGame ?? "All Games";
+                  const earnings = player.totalEarnings;
+                  const earningsClass =
+                    earnings > 0 ? "text-emerald-400" : earnings < 0 ? "text-red-400" : "text-body-gray";
+
                   return (
                     <tr
                       key={player.id}
-                      className={`border-b border-white/5 transition-colors hover:border-l-2 ${isPractice ? "hover:border-l-purple-500" : "hover:border-l-teal"} ${
-                        rank % 2 === 0 ? "bg-[#151821]" : "bg-[#1A1D27]"
-                      } ${player.isCurrentUser ? (isPractice ? "bg-purple-500/10" : "bg-teal/10") : ""}`}
+                      className={`${rowBaseClasses} hover:border-l-2 hover:border-l-teal`}
                     >
                       <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                       <td className="px-4 py-3">
@@ -316,19 +356,23 @@ export default function LeaderboardPage() {
                           </div>
                           <span className="font-medium text-white">{player.username}</span>
                           {player.isCurrentUser && (
-                            <span className={`rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
+                            <span className="rounded px-2 py-0.5 text-xs bg-teal/20 text-teal">You</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-white">{isPractice ? player.totalMatches : getMainStat(player, activeTab)}</td>
-                      <td className="px-4 py-3 text-body-gray">{isPractice ? `${Math.round(player.winRate)}%` : getSecondaryStat(player, activeTab)}</td>
-                      {!isPractice && (
-                        <td className="px-4 py-3">
-                          <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
-                            {player.trend === "up" ? "↑" : "↓"}
-                          </span>
-                        </td>
-                      )}
+                      <td className="px-4 py-3 font-semibold text-white">{player.skillRating}</td>
+                      <td className="px-4 py-3 text-body-gray">
+                        {wins}W - {losses}L
+                      </td>
+                      <td className="px-4 py-3 text-body-gray">
+                        {getTopGameEmoji(topGame)} {topGame}
+                      </td>
+                      <td className={`px-4 py-3 font-semibold ${earningsClass}`}>
+                        {`$${earnings.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`}
+                      </td>
                     </tr>
                   );
                 })}
