@@ -136,9 +136,11 @@ export default function AppNavbar({
         <div className="flex items-center gap-2 sm:gap-4">
           <ConnectionBadge />
           {!isPractice && (
-            <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
+            <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/15 bg-card/60 px-3 py-2 shadow-[0_0_16px_rgba(16,185,129,0.35)]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-              <span className="text-sm font-medium text-white">${balanceFormatted}</span>
+              <span className="text-sm font-bold text-white">
+                ${balanceFormatted}
+              </span>
             </div>
           )}
 

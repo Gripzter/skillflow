@@ -235,7 +235,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#050915]">
+      <div className="flex min-h-screen items-center justify-center bg-charcoal">
         <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
@@ -245,14 +245,9 @@ export default function DashboardPage() {
   }
 
   return (
-    <div
-      className="min-h-screen bg-[#050915] pb-20 md:pb-0"
-      style={{
-        background: "linear-gradient(135deg,#0A0E17 0%,#0D1321 40%,#0A1628 70%,#0A0E17 100%)",
-      }}
-    >
-      {/* Ambient background effects */}
-      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern opacity-40" aria-hidden />
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
+      {/* Ambient background effects (match wallet/play/leaderboard) */}
+      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <div className="pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full bg-teal-500/20 blur-[80px] opacity-40" aria-hidden />
       <div className="pointer-events-none fixed bottom-[-6rem] right-[-4rem] h-64 w-64 rounded-full bg-purple-500/25 blur-[65px] opacity-40" aria-hidden />
 
@@ -290,7 +285,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => router.push("/wallet")}
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_0_18px_rgba(16,185,129,0.45)] transition-transform hover:-translate-y-0.5"
+              className="pressable inline-flex items-center gap-2 rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-teal-glow transition-transform hover:-translate-y-0.5"
             >
               <span role="img" aria-hidden>
                 💰
@@ -363,7 +358,7 @@ export default function DashboardPage() {
         {/* Quick stats row */}
         <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {/* Win Rate */}
-          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-teal-400/70">
+          <div className="card-border relative overflow-hidden rounded-card bg-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-teal-400/10 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
@@ -372,13 +367,13 @@ export default function DashboardPage() {
                 </span>
                 <span className="text-[10px] text-gray-400">Last 30 days</span>
               </div>
-              <p className="mt-2 text-xl font-bold text-teal-300 md:text-2xl">{winRate || 0}%</p>
+              <p className="mt-2 text-xl font-bold text-white md:text-2xl">{winRate || 0}%</p>
               <p className="mt-1 text-[11px] text-gray-400">Keep climbing the leaderboard.</p>
             </div>
           </div>
 
           {/* Matches */}
-          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-purple-400/70">
+          <div className="card-border relative overflow-hidden rounded-card bg-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-purple-500/15 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
@@ -387,13 +382,13 @@ export default function DashboardPage() {
                 </span>
                 <span className="text-[10px] text-gray-400">Total played</span>
               </div>
-              <p className="mt-2 text-xl font-bold text-purple-300 md:text-2xl">{totalMatches}</p>
+              <p className="mt-2 text-xl font-bold text-white md:text-2xl">{totalMatches}</p>
               <p className="mt-1 text-[11px] text-gray-400">Experience makes champions.</p>
             </div>
           </div>
 
           {/* Earnings */}
-          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald-400/70">
+          <div className="card-border relative overflow-hidden rounded-card bg-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-emerald-500/15 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
@@ -410,7 +405,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Rank */}
-          <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5/5 bg-opacity-5 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-amber-400/70">
+          <div className="card-border relative overflow-hidden rounded-card bg-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
             <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-amber-400/20 blur-3xl" aria-hidden />
             <div className="relative p-3 sm:p-4">
               <div className="flex items-center justify-between gap-2">
@@ -432,13 +427,13 @@ export default function DashboardPage() {
           {/* Left: games + recent activity */}
           <div className="space-y-6 lg:col-span-2">
             {/* Choose Your Arena */}
-            <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 bg-opacity-40 p-4 backdrop-blur-sm">
+            <div className="card-border flex flex-col gap-3 rounded-card bg-card p-4 sm:p-5">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold tracking-tight text-gray-100">Choose Your Arena</h2>
-                  <p className="text-xs text-gray-400">Pick a game, set your stake, dominate.</p>
+                  <h2 className="text-lg font-semibold tracking-tight text-white">Choose Your Arena</h2>
+                  <p className="text-xs text-body-gray">Pick a game, set your stake, dominate.</p>
                 </div>
-                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-1 text-[11px] text-gray-400 sm:mt-0">
+                <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-1.5 py-1 text-[11px] text-body-gray sm:mt-0">
                   {STAKE_OPTIONS.map((amount) => (
                     <button
                       key={amount}
@@ -447,7 +442,7 @@ export default function DashboardPage() {
                       className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                         selectedStake === amount
                           ? "bg-teal-400/20 text-teal-200 border border-teal-400/60"
-                          : "text-gray-400 hover:text-gray-200 border border-transparent"
+                          : "text-body-gray hover:text-white border border-transparent"
                       }`}
                     >
                       ${amount}
@@ -466,7 +461,7 @@ export default function DashboardPage() {
                       key={game.slug}
                       type="button"
                       onClick={() => router.push(`/play/${game.slug}`)}
-                      className="group flex w-full items-center gap-4 rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3 text-left backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--game-color)] hover:bg-white/[0.06]"
+                      className="group card-border flex w-full items-center gap-4 rounded-card bg-card px-4 py-3 text-left transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--game-color)]"
                       style={{ // per-card accent via CSS variable
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                         // @ts-ignore
@@ -483,7 +478,7 @@ export default function DashboardPage() {
                       {/* Middle content */}
                       <div className="flex flex-1 flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-gray-100">{game.name}</p>
+                          <p className="text-sm font-semibold text-white">{game.name}</p>
                           <span
                             className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                             style={{ backgroundColor: `${game.color}33`, color: game.color }}
@@ -491,7 +486,7 @@ export default function DashboardPage() {
                             {game.tag}
                           </span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-body-gray">
                           <span className="inline-flex items-center gap-1">
                             <span className="relative flex h-2 w-2">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
@@ -499,7 +494,7 @@ export default function DashboardPage() {
                             </span>
                             {playerCount} playing
                           </span>
-                          <span className="hidden text-gray-400 sm:inline">•</span>
+                          <span className="hidden text-body-gray sm:inline">•</span>
                           <span className="text-emerald-300">
                             Win {formatCurrency(payoutForStake)}
                           </span>
@@ -520,15 +515,15 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent activity */}
-            <div className="rounded-xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
+            <div className="card-border rounded-card bg-card p-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-100">Recent Activity</h2>
+                <h2 className="text-lg font-semibold text-white">Recent Activity</h2>
                 <Link href="/profile" className="text-xs font-medium text-teal-300 hover:text-teal-200">
                   View history →
                 </Link>
               </div>
               {recentActivity.length === 0 ? (
-                <div className="mt-6 flex flex-col items-center justify-center gap-2 py-6 text-sm text-gray-400">
+                <div className="mt-6 flex flex-col items-center justify-center gap-2 py-6 text-sm text-body-gray">
                   <span className="text-3xl" aria-hidden>
                     🎯
                   </span>
@@ -536,7 +531,7 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => router.push("/play")}
-                    className="mt-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold text-slate-900 hover:bg-teal-300"
+                        className="mt-2 rounded-full bg-teal px-4 py-2 text-xs font-semibold text-charcoal hover:shadow-teal-glow"
                   >
                     Play now
                   </button>
@@ -553,17 +548,17 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={match.id}
-                        className="flex items-center justify-between gap-3 py-3 text-sm text-gray-300 transition-colors hover:bg-white/5/10 hover:bg-white/5"
+                        className="flex items-center justify-between gap-3 py-3 text-sm text-body-gray transition-colors hover:bg-white/5"
                       >
                         <div className="flex items-center gap-3">
                           <div className={`flex h-7 w-7 items-center justify-center rounded-md ${bgIcon}`}>
                             <span className={color}>{icon}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-sm font-medium text-gray-100">
+                            <span className="text-sm font-medium text-white">
                               {match.gameDisplayName} vs {match.player2.username}
                             </span>
-                            <span className="text-[11px] text-gray-400">{formatTimeAgo(match.createdAt)}</span>
+                            <span className="text-[11px] text-body-gray">{formatTimeAgo(match.createdAt)}</span>
                           </div>
                         </div>
                         <div className="text-right">
@@ -583,32 +578,29 @@ export default function DashboardPage() {
           {/* Right sidebar */}
           <div className="space-y-6">
             {/* Wallet card */}
-            <div className="relative overflow-hidden rounded-xl border border-teal-400/40 bg-gradient-to-br from-teal-500/10 via-purple-500/10 to-slate-900/40 p-4 backdrop-blur-md">
-              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-teal-400/25 blur-3xl" aria-hidden />
-              <div className="absolute -bottom-12 right-[-4rem] h-32 w-32 rounded-full bg-purple-500/20 blur-3xl" aria-hidden />
+            <div className="card-border relative overflow-hidden rounded-card bg-card p-4 sm:p-5">
+              <div className="absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r from-teal/20 via-transparent to-purple/20 opacity-60" />
               <div className="relative flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-200/80">
-                      Your Balance
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-teal-300">
-                      {formatCurrency(balance)}
-                    </p>
-                  </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-200/80">
+                    Your Balance
+                  </p>
+                  <p className="mt-2 text-3xl font-bold text-white">
+                    {formatCurrency(balance)}
+                  </p>
                 </div>
                 <div className="mt-2 flex gap-2">
                   <button
                     type="button"
                     onClick={() => router.push("/wallet/deposit")}
-                    className="flex-1 rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_0_18px_rgba(45,212,191,0.45)] transition hover:bg-teal-300"
+                    className="flex-1 rounded-lg bg-teal px-4 py-2.5 text-sm font-semibold text-charcoal shadow-teal-glow transition hover:shadow-teal-glow-lg"
                   >
                     Deposit
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push("/wallet/withdraw")}
-                    className="flex-1 rounded-lg border border-white/25 bg-black/20 px-4 py-2.5 text-sm font-semibold text-gray-100 hover:bg-white/5"
+                    className="flex-1 rounded-lg border border-white/30 bg-transparent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5"
                   >
                     Withdraw
                   </button>
@@ -617,9 +609,9 @@ export default function DashboardPage() {
             </div>
 
             {/* Leaderboard card */}
-            <div className="rounded-xl border border-white/10 bg-black/30 p-4 backdrop-blur-sm">
+            <div className="card-border rounded-card bg-card p-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-100">Top Players</h2>
+                <h2 className="text-sm font-semibold text-white">Top Players</h2>
                 <Link href="/leaderboard" className="text-xs font-medium text-teal-300 hover:text-teal-200">
                   View all →
                 </Link>
@@ -667,19 +659,19 @@ export default function DashboardPage() {
             </div>
 
             {/* Referral card */}
-            <div className="relative overflow-hidden rounded-xl border border-orange-400/40 bg-gradient-to-br from-orange-500/10 via-amber-500/10 to-slate-900/30 p-4 backdrop-blur-md">
+            <div className="card-border relative overflow-hidden rounded-card bg-card p-4">
               <div className="pointer-events-none absolute -right-6 top-4 text-6xl opacity-20" aria-hidden>
                 🎁
               </div>
               <div className="relative space-y-2">
-                <h2 className="text-sm font-semibold text-gray-100">Invite &amp; Earn</h2>
-                <p className="text-xs text-amber-100/90">
+                <h2 className="text-sm font-semibold text-white">Invite &amp; Earn</h2>
+                <p className="text-xs text-body-gray">
                   You both get <span className="font-semibold">$5</span> when your friend makes their first deposit.
                 </p>
                 <button
                   type="button"
                   onClick={() => router.push("/referrals")}
-                  className="mt-2 inline-flex items-center gap-2 rounded-lg bg-orange-400 px-4 py-2 text-xs font-semibold text-slate-900 shadow-[0_0_18px_rgba(251,146,60,0.45)] hover:bg-orange-300"
+                  className="mt-2 inline-flex items-center gap-2 rounded-lg bg-orange-400 px-4 py-2 text-xs font-semibold text-[#0A0E17] shadow-[0_0_18px_rgba(251,146,60,0.45)] hover:bg-orange-300"
                 >
                   Share Your Link
                 </button>
@@ -687,21 +679,21 @@ export default function DashboardPage() {
             </div>
 
             {/* Quick match CTA */}
-            <div className="rounded-xl border border-teal-400/40 bg-teal-500/10 p-[1px] shadow-[0_0_28px_rgba(45,212,191,0.45)]">
+            <div className="rounded-card border border-teal/40 bg-teal/10 p-[1px] shadow-[0_4px_20px_rgba(0,229,199,0.3)]">
               <button
                 type="button"
                 onClick={handleQuickMatch}
-                className="relative flex w-full items-center justify-between overflow-hidden rounded-xl bg-gradient-to-r from-teal-400 via-emerald-400 to-teal-500 px-4 py-3 text-left text-slate-900 transition-transform hover:-translate-y-0.5"
+                className="relative flex w-full items-center justify-between overflow-hidden rounded-card bg-gradient-to-r from-teal to-emerald-400 px-5 py-3.5 text-left text-[#0A0E17] transition-transform hover:-translate-y-0.5"
               >
                 <div className="relative z-10 flex flex-col">
-                  <span className="text-sm font-semibold">
+                  <span className="text-base font-bold md:text-lg">
                     ⚡ Quick Match — {formatCurrency(selectedStake)}
                   </span>
-                  <span className="text-[11px] text-slate-800/80">
+                  <span className="text-xs font-medium text-[#0A0E17]/80 md:text-sm">
                     We&apos;ll find you a game instantly at this stake.
                   </span>
                 </div>
-                <div className="relative z-10 text-xs font-semibold uppercase tracking-[0.14em] text-slate-900/80">
+                <div className="relative z-10 text-sm font-semibold uppercase tracking-[0.18em]">
                   Play now
                 </div>
                 <div className="pointer-events-none absolute inset-0">
