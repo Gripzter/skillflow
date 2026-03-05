@@ -52,11 +52,16 @@ export default function AppNavbar({
   return (
     <header className="navbar sticky top-0 z-50 border-b border-white/5 bg-charcoal/95 backdrop-blur-sm px-4 py-3 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6">
           <Link href="/" className="logo shrink-0 text-xl font-bold tracking-tight">
             <span className="text-white">Skill</span>
-            <span className="text-teal">Flow</span>
+            <span className={isPractice ? "text-[#8B5CF6]" : "text-teal"}>Flow</span>
           </Link>
+          {isPractice && (
+            <span className="hidden rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.15)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8B5CF6] sm:inline-flex">
+              Practice
+            </span>
+          )}
           <nav className="hidden items-center gap-1 sm:flex">
           <Link
             href="/dashboard"
@@ -69,16 +74,16 @@ export default function AppNavbar({
             Dashboard
           </Link>
           {!isPractice && (
-          <Link
-            href="/wallet"
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "wallet"
+            <Link
+              href="/wallet"
+              className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                currentPage === "wallet"
                   ? "active bg-white/10 text-white"
                   : "text-body-gray hover:text-white"
-            }`}
-          >
-            Wallet
-          </Link>
+              }`}
+            >
+              Wallet
+            </Link>
           )}
           <Link
             href="/play"

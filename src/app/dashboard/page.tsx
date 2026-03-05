@@ -278,7 +278,13 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${
+            isPractice ? "text-purple-400" : "text-teal"
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -290,7 +296,12 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       {/* Ambient background effects (match wallet/play/leaderboard) */}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
-      <div className="pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full bg-teal-500/20 blur-[80px] opacity-40" aria-hidden />
+      <div
+        className={`pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full blur-[80px] opacity-40 ${
+          isPractice ? "bg-purple-500/25" : "bg-teal-500/20"
+        }`}
+        aria-hidden
+      />
       <div className="pointer-events-none fixed bottom-[-6rem] right-[-4rem] h-64 w-64 rounded-full bg-purple-500/25 blur-[65px] opacity-40" aria-hidden />
 
       <AppNavbar
@@ -459,7 +470,12 @@ export default function DashboardPage() {
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {/* Win Rate */}
             <div className="card-border relative overflow-hidden rounded-card bg-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5">
-              <div className="absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full bg-teal-400/10 blur-3xl" aria-hidden />
+              <div
+                className={`absolute right-[-40px] top-[-40px] h-32 w-32 rounded-full blur-3xl ${
+                  isPractice ? "bg-purple-500/15" : "bg-teal-400/10"
+                }`}
+                aria-hidden
+              />
               <div className="relative p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
@@ -745,7 +761,7 @@ export default function DashboardPage() {
             {/* Wallet card (real money only) */}
             {!isPractice && (
               <div className="card-border relative overflow-hidden rounded-card bg-card p-4 sm:p-5">
-                <div className="absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r from-teal/20 via-transparent to-purple/20 opacity-60" />
+              <div className="absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r from-teal/20 via-transparent to-purple/20 opacity-60" />
                 <div className="relative flex flex-col gap-4">
                   <div>
                     <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-teal-200/80">
@@ -780,7 +796,14 @@ export default function DashboardPage() {
             <div className="card-border rounded-card bg-card p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-white">Top Players</h2>
-                <Link href="/leaderboard" className="text-xs font-medium text-teal-300 hover:text-teal-200">
+                <Link
+                  href="/leaderboard"
+                  className={`text-xs font-medium ${
+                    isPractice
+                      ? "text-purple-300 hover:text-purple-200"
+                      : "text-teal-300 hover:text-teal-200"
+                  }`}
+                >
                   View all →
                 </Link>
               </div>
@@ -796,7 +819,11 @@ export default function DashboardPage() {
                     <div
                       key={`${p.id}-top-${rank}`}
                       className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
-                        isCurrent ? "bg-teal-500/10 border border-teal-500/40" : "border border-transparent"
+                        isCurrent
+                          ? isPractice
+                            ? "bg-purple-500/10 border border-purple-500/40"
+                            : "bg-teal-500/10 border border-teal-500/40"
+                          : "border border-transparent"
                       }`}
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
@@ -830,10 +857,18 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={`${current.id}-you`}
-                      className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-teal/50 bg-teal/10 px-2 py-1.5"
+                      className={`mt-2 flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
+                        isPractice
+                          ? "border border-purple-500/60 bg-purple-500/10"
+                          : "border border-teal/50 bg-teal/10"
+                      }`}
                     >
                       <div className="flex items-center gap-2 overflow-hidden">
-                        <span className="w-5 text-xs font-semibold text-teal">
+                        <span
+                          className={`w-5 text-xs font-semibold ${
+                            isPractice ? "text-purple-400" : "text-teal"
+                          }`}
+                        >
                           #{playerRank.toLocaleString()}
                         </span>
                         <div

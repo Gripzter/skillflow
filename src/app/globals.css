@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --accent: #00E5C7;
+  --accent-light: rgba(0, 229, 199, 0.15);
+  --accent-glow: rgba(0, 229, 199, 0.3);
+  --accent-dark: #00B4A0;
+}
+
 html {
   scroll-behavior: smooth;
   overflow-x: hidden; /* only horizontal, NOT vertical */
@@ -28,6 +35,11 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 input,
@@ -139,8 +151,8 @@ main,
 
 /* Landing: CTA button subtle pulse */
 @keyframes cta-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 229, 199, 0.3); }
-  50% { box-shadow: 0 0 28px rgba(0, 229, 199, 0.45); }
+  0%, 100% { box-shadow: 0 0 20px var(--accent-glow); }
+  50% { box-shadow: 0 0 28px var(--accent-glow); }
 }
 .animate-cta-pulse {
   animation: cta-pulse 2.5s ease-in-out infinite;
