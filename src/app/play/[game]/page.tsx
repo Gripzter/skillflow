@@ -366,7 +366,11 @@ export default function PlayGamePage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${effectivePractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -625,7 +629,11 @@ export default function PlayGamePage() {
               <p className={`text-2xl font-bold ${effectivePractice ? "text-purple-400" : "text-teal"}`}>Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-lg font-bold text-white">
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br text-lg font-bold text-white ${
+                      effectivePractice ? "from-purple-500/40 to-fuchsia-500/40" : "from-teal/40 to-purple/40"
+                    }`}
+                  >
                     {player1.username.charAt(0)}
                   </div>
                   <p className="mt-2 font-medium text-white">{player1.username}</p>

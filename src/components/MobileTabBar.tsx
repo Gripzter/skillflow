@@ -42,7 +42,7 @@ export default function MobileTabBar() {
             key={tab.href}
             href={tab.href}
             className={`pressable relative flex flex-1 flex-col items-center justify-center gap-0.5 transition-colors ${
-              isActive ? "text-teal" : "text-body-gray"
+              isActive ? (isPractice ? "text-purple-400" : "text-teal") : "text-body-gray"
             }`}
           >
             <span className="relative inline-block text-lg" aria-hidden>

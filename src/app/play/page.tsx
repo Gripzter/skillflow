@@ -16,7 +16,7 @@ interface DisplayUser {
 }
 
 const GAMES = [
-  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-teal/30 to-purple/30", active: true },
+  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: true },
   { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
   { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
   { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: false },

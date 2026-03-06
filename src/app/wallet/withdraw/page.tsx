@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { MIN_WITHDRAWAL, WITHDRAWAL_FEE_PERCENT } from "@/lib/constants";
 
 export default function WithdrawPage() {
   const router = useRouter();
+  const { isPractice } = usePlayMode();
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -93,7 +95,11 @@ export default function WithdrawPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+        <div
+          className={`h-10 w-10 animate-spin rounded-full border-2 border-t-transparent ${
+            isPractice ? "border-purple-500" : "border-teal"
+          }`}
+        />
       </div>
     );
   }
@@ -112,12 +118,18 @@ export default function WithdrawPage() {
         <main className="relative mx-auto max-w-[500px] px-4 pt-8 pb-12">
           <div className="rounded-xl border border-white/10 bg-card p-8 text-center">
             <p className="text-2xl font-bold text-white">Withdrawal request submitted! ✅</p>
-            <p className="mt-4 text-xl font-semibold text-teal">You&apos;ll receive: ${playerReceives.toFixed(2)}</p>
+            <p className={`mt-4 text-xl font-semibold ${isPractice ? "text-purple-300" : "text-teal"}`}>
+              You&apos;ll receive: ${playerReceives.toFixed(2)}
+            </p>
             <p className="mt-2 text-body-gray">Status: Pending review</p>
             <p className="mt-1 text-sm text-body-gray">Processing time: 3–5 business days</p>
             <Link
               href="/wallet"
-              className="mt-6 inline-block w-full rounded-lg bg-teal py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+              className={`mt-6 inline-block w-full rounded-lg py-3 font-semibold text-charcoal ${
+                isPractice
+                  ? "bg-purple-500 text-white hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                  : "bg-teal hover:shadow-teal-glow"
+              }`}
             >
               Back to Wallet
             </Link>
@@ -170,7 +182,9 @@ export default function WithdrawPage() {
             placeholder="0.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+            className={`mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:outline-none focus:ring-1 ${
+              isPractice ? "focus:border-purple-500 focus:ring-purple-500" : "focus:border-teal focus:ring-teal"
+            }`}
           />
           <p className="mt-2 text-sm text-body-gray">
             Min: ${MIN_WITHDRAWAL}.00 • Max: ${balance.toFixed(2)}
@@ -187,7 +201,9 @@ export default function WithdrawPage() {
             placeholder="e.g. paypal@email.com or bank details"
             value={withdrawalDetails}
             onChange={(e) => setWithdrawalDetails(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+            className={`mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:outline-none focus:ring-1 ${
+              isPractice ? "focus:border-purple-500 focus:ring-purple-500" : "focus:border-teal focus:ring-teal"
+            }`}
           />
         </div>
 
@@ -206,7 +222,7 @@ export default function WithdrawPage() {
               <div className="border-t border-white/10 pt-2">
                 <div className="flex justify-between font-medium">
                   <span className="text-white">You receive</span>
-                  <span className="text-teal">${youReceive.toFixed(2)}</span>
+                  <span className={isPractice ? "text-purple-300" : "text-teal"}>${youReceive.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -220,7 +236,11 @@ export default function WithdrawPage() {
           type="button"
           onClick={handleSubmit}
           disabled={submitLoading || !validAmount}
-          className="mt-8 w-full rounded-lg bg-teal py-3.5 text-lg font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50"
+          className={`mt-8 w-full rounded-lg py-3.5 text-lg font-semibold text-charcoal transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            isPractice
+              ? "bg-purple-500 text-white hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+              : "bg-teal hover:shadow-teal-glow"
+          }`}
         >
           {submitLoading ? "Processing…" : "Confirm Withdrawal"}
         </button>

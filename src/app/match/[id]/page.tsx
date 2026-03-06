@@ -25,6 +25,7 @@ import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
 import GameChat, { type ChatMessage } from "@/components/GameChat";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 
 const OPPONENT_RECONNECT_SEC = 30;
 
@@ -34,6 +35,7 @@ export default function MatchPage() {
   const router = useRouter();
   const params = useParams();
   const matchId = (params?.id as string) || "";
+  const { isPractice } = usePlayMode();
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");

@@ -6,6 +6,7 @@ import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import { useToast } from "@/components/Toast";
 import { getCurrentUser } from "@/lib/api";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
 
@@ -23,6 +24,7 @@ interface ReferralRow {
 export default function ReferralsPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { isPractice } = usePlayMode();
   const [username, setUsername] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [stats, setStats] = useState({
@@ -130,7 +132,11 @@ export default function ReferralsPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -166,7 +172,11 @@ export default function ReferralsPage() {
             <button
               type="button"
               onClick={copyLink}
-              className="rounded-lg bg-teal px-4 py-2.5 text-sm font-semibold text-charcoal transition-all hover:shadow-teal-glow"
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-charcoal transition-all ${
+                isPractice
+                  ? "bg-purple-500 text-white hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                  : "bg-teal hover:shadow-teal-glow"
+              }`}
             >
               {copied ? "✓ Copied" : "📋 Copy"}
             </button>
@@ -225,7 +235,7 @@ export default function ReferralsPage() {
             </div>
             <div>
               <p className="text-xs text-body-gray">Successful</p>
-              <p className="text-xl font-bold text-teal">{stats.completed}</p>
+              <p className={`text-xl font-bold ${isPractice ? "text-purple-300" : "text-teal"}`}>{stats.completed}</p>
             </div>
             <div>
               <p className="text-xs text-body-gray">Total Earned</p>
@@ -261,7 +271,7 @@ export default function ReferralsPage() {
                     </span>
                   </div>
                   {row.status === "completed" && (
-                    <span className="text-sm font-medium text-teal">+$5</span>
+                    <span className={`text-sm font-medium ${isPractice ? "text-purple-300" : "text-teal"}`}>+$5</span>
                   )}
                 </li>
               ))}

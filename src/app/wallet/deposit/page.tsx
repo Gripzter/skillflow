@@ -6,6 +6,7 @@ import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import GeoBlockModal from "@/components/GeoBlockModal";
 import { useGeo } from "@/contexts/GeoContext";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
@@ -15,6 +16,7 @@ const PRESETS = [5, 10, 25, 50, 100];
 function ResendVerificationLink({ email }: { email: string }) {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { isPractice } = usePlayMode();
   async function handleResend() {
     if (!email || loading || sent) return;
     setLoading(true);
@@ -31,7 +33,9 @@ function ResendVerificationLink({ email }: { email: string }) {
         type="button"
         onClick={handleResend}
         disabled={loading || sent}
-        className="text-sm text-teal hover:underline disabled:opacity-60"
+        className={`text-sm hover:underline disabled:opacity-60 ${
+          isPractice ? "text-purple-400" : "text-teal"
+        }`}
       >
         {sent ? "Verification email sent!" : loading ? "Sending…" : "Resend verification email"}
       </button>
@@ -41,6 +45,7 @@ function ResendVerificationLink({ email }: { email: string }) {
 
 export default function DepositPage() {
   const router = useRouter();
+  const { isPractice } = usePlayMode();
   const [balance, setBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [depositLoading, setDepositLoading] = useState(false);
@@ -132,7 +137,11 @@ export default function DepositPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+        <div
+          className={`h-10 w-10 animate-spin rounded-full border-2 border-t-transparent ${
+            isPractice ? "border-purple-500" : "border-teal"
+          }`}
+        />
       </div>
     );
   }
@@ -181,8 +190,12 @@ export default function DepositPage() {
                 }}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
                   selectedPreset === amt
-                    ? "border-teal bg-teal text-charcoal"
-                    : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
+                    ? isPractice
+                      ? "border-purple-500 bg-purple-500 text-white"
+                      : "border-teal bg-teal text-charcoal"
+                    : isPractice
+                      ? "border-purple-500/50 bg-[#1A1D27] text-white hover:border-purple-500"
+                      : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                 }`}
               >
                 ${amt}
@@ -201,7 +214,9 @@ export default function DepositPage() {
               setCustomAmount(e.target.value);
               setSelectedPreset(null);
             }}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+            className={`mt-2 w-full rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-3 text-white placeholder:text-body-gray focus:outline-none focus:ring-1 ${
+              isPractice ? "focus:border-purple-500 focus:ring-purple-500" : "focus:border-teal focus:ring-teal"
+            }`}
           />
           {amount > 0 && (amount < MIN_DEPOSIT || amount > MAX_DEPOSIT) && (
             <p className="mt-2 text-sm text-red-400">
@@ -231,7 +246,12 @@ export default function DepositPage() {
             {!emailVerified ? (
               <ResendVerificationLink email={userEmail} />
             ) : (
-              <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-sm text-teal hover:underline">
+              <Link
+                href="/settings/responsible-gaming"
+                className={`mt-2 inline-block text-sm hover:underline ${
+                  isPractice ? "text-purple-400" : "text-teal"
+                }`}
+              >
                 Manage your limits in Responsible Gaming settings →
               </Link>
             )}
@@ -242,7 +262,11 @@ export default function DepositPage() {
           type="button"
           onClick={handleDeposit}
           disabled={depositLoading || !validAmount || isRestricted}
-          className="mt-8 w-full rounded-lg bg-teal py-3.5 text-lg font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50"
+          className={`mt-8 w-full rounded-lg py-3.5 text-lg font-semibold text-charcoal transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+            isPractice
+              ? "bg-purple-500 text-white hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+              : "bg-teal hover:shadow-teal-glow"
+          }`}
         >
           {depositLoading ? "Redirecting…" : `Deposit $${amount.toFixed(2)}`}
         </button>

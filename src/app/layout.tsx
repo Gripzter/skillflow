@@ -6,6 +6,7 @@ import { PlayModeProvider } from "@/contexts/PlayModeContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ConnectionMonitor from "@/components/ConnectionMonitor";
 import MobileTabBar from "@/components/MobileTabBar";
+import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import "./globals.css";
 import "@/styles/themes/sci-fi.css";
 
@@ -66,6 +67,7 @@ if (typeof window !== 'undefined') {
             <ConnectionMonitor />
             <ToastProvider>
               <PlayModeProvider>
+                <PracticeModeClassToggle />
                 {children}
                 <MobileTabBar />
               </PlayModeProvider>

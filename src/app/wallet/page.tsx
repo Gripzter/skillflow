@@ -8,6 +8,7 @@ import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import GeoBlockModal from "@/components/GeoBlockModal";
 import { useGeo } from "@/contexts/GeoContext";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
   getWalletBalance,
@@ -21,19 +22,31 @@ import { MIN_WITHDRAWAL } from "@/lib/constants";
 
 type TransactionType = StoredTransaction["type"];
 
-const TYPE_BADGE_CLASS: Record<TransactionType, string> = {
-  deposit: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  withdrawal: "bg-red-500/20 text-red-400 border-red-500/30",
-  match_entry: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  match_win: "bg-teal/20 text-teal border-teal/30",
-  match_refund: "bg-purple/20 text-purple border-purple/30",
-  platform_fee: "bg-white/10 text-body-gray border-white/10",
-  referral_bonus: "bg-teal/20 text-teal border-teal/30",
-};
+function getTypeBadgeClass(type: TransactionType, isPractice: boolean): string {
+  switch (type) {
+    case "deposit":
+      return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+    case "withdrawal":
+      return "bg-red-500/20 text-red-400 border-red-500/30";
+    case "match_entry":
+      return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+    case "match_win":
+    case "referral_bonus":
+      return isPractice
+        ? "bg-purple-500/20 text-purple-300 border-purple-500/30"
+        : "bg-teal/20 text-teal border-teal/30";
+    case "match_refund":
+      return "bg-purple/20 text-purple border-purple/30";
+    case "platform_fee":
+    default:
+      return "bg-white/10 text-body-gray border-white/10";
+  }
+}
 
 export default function WalletPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { isPractice } = usePlayMode();
   const [username, setUsername] = useState<string>("Player");
   const [isDevMode, setIsDevMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -174,7 +187,11 @@ export default function WalletPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -200,7 +217,11 @@ export default function WalletPage() {
       <main className="relative mx-auto max-w-[1000px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Balance card */}
         <section className="animate-fade-in relative overflow-hidden rounded-card border border-white/10 bg-card p-8 sm:p-10">
-          <div className="absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r from-teal/20 via-transparent to-purple/20 opacity-60" />
+          <div
+            className={`absolute inset-0 rounded-card border-2 border-transparent bg-gradient-to-r opacity-60 ${
+              isPractice ? "from-purple-500/25 via-transparent to-purple-500/20" : "from-teal/20 via-transparent to-purple/20"
+            }`}
+          />
           <div className="relative text-center">
             <p className="text-body-gray">Your Balance</p>
             <p className="mt-2 text-4xl font-bold text-white sm:text-5xl">
@@ -211,14 +232,22 @@ export default function WalletPage() {
                 <button
                   type="button"
                   onClick={() => setShowGeoModal(true)}
-                  className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
+                  className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
+                    isPractice
+                      ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                      : "bg-teal hover:shadow-teal-glow"
+                  }`}
                 >
                   💰 Deposit
                 </button>
               ) : (
                 <Link
                   href="/wallet/deposit"
-                  className="pressable w-full rounded-lg bg-teal px-6 py-3 text-center font-semibold text-charcoal transition-all hover:shadow-teal-glow sm:w-auto"
+                  className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
+                    isPractice
+                      ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                      : "bg-teal hover:shadow-teal-glow"
+                  }`}
                 >
                   💰 Deposit
                 </Link>
@@ -244,7 +273,12 @@ export default function WalletPage() {
             <p className="mt-4 text-xs text-body-gray">
               Minimum deposit: $5.00 • Minimum withdrawal: $10.00
             </p>
-            <Link href="/settings/responsible-gaming" className="mt-2 inline-block text-xs text-teal hover:underline">
+            <Link
+              href="/settings/responsible-gaming"
+              className={`mt-2 inline-block text-xs hover:underline ${
+                isPractice ? "text-purple-400" : "text-teal"
+              }`}
+            >
               🛡️ Set deposit limits
             </Link>
           </div>
@@ -307,7 +341,7 @@ export default function WalletPage() {
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${TYPE_BADGE_CLASS[tx.type]}`}
+                              className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${getTypeBadgeClass(tx.type, isPractice)}`}
                             >
                               {tx.type.replace("_", " ")}
                             </span>
@@ -353,7 +387,7 @@ export default function WalletPage() {
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${TYPE_BADGE_CLASS[tx.type]}`}
+                          className={`inline-block rounded border px-2 py-0.5 text-xs font-medium ${getTypeBadgeClass(tx.type, isPractice)}`}
                         >
                           {tx.type.replace("_", " ")}
                         </span>

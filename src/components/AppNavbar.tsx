@@ -55,11 +55,11 @@ export default function AppNavbar({
         <div className="flex items-center gap-4 sm:gap-6">
           <Link href="/" className="logo shrink-0 text-xl font-bold tracking-tight">
             <span className="text-white">Skill</span>
-            <span className={isPractice ? "text-[#8B5CF6]" : "text-teal"}>Flow</span>
+            <span className={isPractice ? "text-purple-500" : "text-teal"}>Flow</span>
           </Link>
           {isPractice && (
-            <span className="hidden rounded-full border border-[rgba(139,92,246,0.3)] bg-[rgba(139,92,246,0.15)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8B5CF6] sm:inline-flex">
-              Practice
+            <span className="hidden rounded-full border border-purple-500/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-purple-400 sm:inline-flex">
+              PRACTICE
             </span>
           )}
           <nav className="hidden items-center gap-1 sm:flex">
@@ -174,7 +174,9 @@ export default function AppNavbar({
 
           <Link
             href="/profile"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 ring-2 ring-white/10 transition-opacity hover:opacity-90"
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ring-2 ring-white/10 transition-opacity hover:opacity-90 ${
+              isPractice ? "from-purple-500/40 to-fuchsia-500/40" : "from-teal/40 to-purple/40"
+            }`}
             aria-label="Profile"
           >
             <span className="text-sm font-bold text-white">

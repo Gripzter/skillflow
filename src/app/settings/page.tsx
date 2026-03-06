@@ -6,10 +6,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { useTheme } from "@/contexts/ThemeContext";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { isPractice } = usePlayMode();
   const [user, setUser] = useState<{ user_metadata?: { username?: string } } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +50,11 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -78,7 +84,9 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-body-gray">Invite friends and earn $5 for each one who deposits.</p>
           <Link
             href="/referrals"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors hover:border-teal/40 hover:bg-teal/5"
+            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors ${
+              isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
+            }`}
           >
             <span aria-hidden>🎁</span>
             Referrals
@@ -91,7 +99,9 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-body-gray">Set deposit limits, cool-off periods, and self-exclusion.</p>
           <Link
             href="/settings/responsible-gaming"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors hover:border-teal/40 hover:bg-teal/5"
+            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors ${
+              isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
+            }`}
           >
             <span aria-hidden>🛡️</span>
             Gaming Limits
@@ -108,12 +118,14 @@ export default function SettingsPage() {
               onClick={() => setTheme("default")}
               className={`group relative flex flex-col rounded-xl border-2 p-5 text-left transition-all ${
                 theme === "default"
-                  ? "border-teal bg-teal/5 shadow-[0_0_20px_rgba(0,229,199,0.15)]"
+                  ? isPractice
+                    ? "border-purple-500 bg-purple-500/5 shadow-[0_0_20px_rgba(139,92,246,0.18)]"
+                    : "border-teal bg-teal/5 shadow-[0_0_20px_rgba(0,229,199,0.15)]"
                   : "border-white/10 bg-card hover:border-white/20"
               }`}
             >
               {theme === "default" && (
-                <span className="absolute right-3 top-3 text-teal" aria-hidden>
+                <span className={`absolute right-3 top-3 ${isPractice ? "text-purple-400" : "text-teal"}`} aria-hidden>
                   <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
@@ -122,12 +134,12 @@ export default function SettingsPage() {
               <div className="mb-4 h-16 w-full overflow-hidden rounded-lg bg-[#0D0F14] p-2">
                 <div className="flex gap-1">
                   <div className="h-2 flex-1 rounded bg-white/10" />
-                  <div className="h-2 w-8 rounded bg-teal/60" />
+                  <div className={`h-2 w-8 rounded ${isPractice ? "bg-purple-500/60" : "bg-teal/60"}`} />
                   <div className="h-2 w-6 rounded bg-purple/50" />
                 </div>
                 <div className="mt-2 flex gap-2">
                   <div className="h-6 flex-1 rounded bg-white/5" />
-                  <div className="h-6 w-12 rounded border border-teal/30 bg-teal/10" />
+                  <div className={`h-6 w-12 rounded border ${isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10"}`} />
                 </div>
               </div>
               <span className="font-semibold text-white">Default</span>
@@ -184,7 +196,11 @@ export default function SettingsPage() {
               <div key={item.label} className="flex items-center justify-between">
                 <span className="text-white">{item.label}</span>
                 <span className="inline-flex h-6 w-11 shrink-0 rounded-full bg-white/10 transition-colors">
-                  <span className={`inline-block h-5 w-5 translate-y-0.5 translate-x-0.5 rounded-full bg-white shadow ${item.on ? "translate-x-5 bg-teal" : ""}`} />
+                  <span
+                    className={`inline-block h-5 w-5 translate-y-0.5 translate-x-0.5 rounded-full bg-white shadow ${
+                      item.on ? `translate-x-5 ${isPractice ? "bg-purple-500" : "bg-teal"}` : ""
+                    }`}
+                  />
                 </span>
               </div>
             ))}

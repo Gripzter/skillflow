@@ -45,23 +45,6 @@ export function PlayModeProvider({ children }: { children: React.ReactNode }) {
     setModeState(readStored());
   }, []);
 
-  // Sync global accent CSS variables with current play mode
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const root = document.documentElement;
-    const isPractice = mode === "practice";
-    root.style.setProperty("--accent", isPractice ? "#8B5CF6" : "#00E5C7");
-    root.style.setProperty(
-      "--accent-light",
-      isPractice ? "rgba(139,92,246,0.15)" : "rgba(0,229,199,0.15)"
-    );
-    root.style.setProperty(
-      "--accent-glow",
-      isPractice ? "rgba(139,92,246,0.3)" : "rgba(0,229,199,0.3)"
-    );
-    root.style.setProperty("--accent-dark", isPractice ? "#7C3AED" : "#00B4A0");
-  }, [mode]);
-
   const setMode = useCallback((next: PlayMode) => {
     setModeState(next);
     writeStored(next);

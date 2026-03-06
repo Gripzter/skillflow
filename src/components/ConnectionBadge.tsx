@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   subscribeConnectionMetrics,
   runFullSpeedTest,
@@ -73,6 +74,7 @@ function MetricDot({ color }: { color: string }) {
 }
 
 export default function ConnectionBadge() {
+  const { isPractice } = usePlayMode();
   const [metrics, setMetrics] = useState<ConnectionMetrics>(getConnectionMetrics);
   const [open, setOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -195,7 +197,9 @@ export default function ConnectionBadge() {
               setOpen(false);
               setShowModal(true);
             }}
-            className="mt-2 w-full rounded-lg border border-white/10 py-1.5 text-xs text-teal hover:bg-white/5"
+            className={`mt-2 w-full rounded-lg border border-white/10 py-1.5 text-xs hover:bg-white/5 ${
+              isPractice ? "text-purple-400" : "text-teal"
+            }`}
           >
             Run full speed test
           </button>
@@ -230,7 +234,11 @@ export default function ConnectionBadge() {
               type="button"
               onClick={handleFullSpeedTest}
               disabled={fullTestRunning}
-              className="mt-6 w-full rounded-lg bg-teal py-3 font-semibold text-charcoal transition-all hover:shadow-teal-glow disabled:opacity-50"
+              className={`mt-6 w-full rounded-lg py-3 font-semibold text-charcoal transition-all disabled:opacity-50 ${
+                isPractice
+                  ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                  : "bg-teal hover:shadow-teal-glow"
+              }`}
             >
               {fullTestRunning ? "Running Full Speed Test..." : "Run Full Speed Test"}
             </button>

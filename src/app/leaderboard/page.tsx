@@ -135,7 +135,11 @@ export default function LeaderboardPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -253,7 +257,9 @@ export default function LeaderboardPage() {
               placeholder="Search player..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full max-w-xs rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-sm text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+              className={`w-full max-w-xs rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-sm text-white placeholder:text-body-gray focus:outline-none focus:ring-1 ${
+                isPractice ? "focus:border-purple-500 focus:ring-purple-500" : "focus:border-teal focus:ring-teal"
+              }`}
             />
           </div>
 
@@ -410,7 +416,11 @@ export default function LeaderboardPage() {
               <button
                 type="button"
                 onClick={() => setPage((p) => p + 1)}
-                className="rounded-lg border border-teal/50 bg-teal/10 px-6 py-2.5 font-medium text-teal hover:bg-teal/20"
+                className={`rounded-lg px-6 py-2.5 font-medium ${
+                  isPractice
+                    ? "border border-purple-500/50 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                    : "border border-teal/50 bg-teal/10 text-teal hover:bg-teal/20"
+                }`}
               >
                 Load More
               </button>

@@ -9,6 +9,13 @@
   --accent-dark: #00B4A0;
 }
 
+.practice-mode {
+  --accent: #8B5CF6;
+  --accent-light: rgba(139, 92, 246, 0.15);
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --accent-dark: #7C3AED;
+}
+
 html {
   scroll-behavior: smooth;
   overflow-x: hidden; /* only horizontal, NOT vertical */
@@ -33,12 +40,13 @@ body {
   box-sizing: border-box;
 }
 
-* {
+*,
+*::before,
+*::after {
   -webkit-tap-highlight-color: transparent;
   transition:
     background-color 0.3s ease,
     border-color 0.3s ease,
-    color 0.3s ease,
     box-shadow 0.3s ease;
 }
 

@@ -328,10 +328,24 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3 md:gap-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-xs font-medium text-emerald-200">
+            <div
+              className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+                isPractice
+                  ? "border border-purple-500/30 bg-purple-500/10 text-purple-200"
+                  : "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+              }`}
+            >
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    isPractice ? "bg-purple-400" : "bg-emerald-400"
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    isPractice ? "bg-purple-400" : "bg-emerald-400"
+                  }`}
+                />
               </span>
               <span>{onlineCount.toLocaleString()} online</span>
             </div>
@@ -713,7 +727,11 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     onClick={() => router.push("/play")}
-                    className="mt-2 rounded-full bg-teal px-4 py-2 text-xs font-semibold text-charcoal hover:shadow-teal-glow"
+                    className={`mt-2 rounded-full px-4 py-2 text-xs font-semibold text-charcoal ${
+                      isPractice
+                        ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                        : "bg-teal hover:shadow-teal-glow"
+                    }`}
                   >
                     {isPractice ? "Start practicing" : "Play now"}
                   </button>
@@ -970,14 +988,14 @@ export default function DashboardPage() {
 
         {/* Bottom banner */}
         {isPractice ? (
-          <section className="mt-4 rounded-xl border border-emerald-400/50 bg-gradient-to-r from-teal-500/15 via-emerald-500/15 to-green-500/15 px-4 py-4 backdrop-blur-sm">
+          <section className="mt-4 rounded-xl border border-purple-500/40 bg-gradient-to-r from-purple-500/15 via-fuchsia-500/10 to-purple-500/15 px-4 py-4 backdrop-blur-sm">
             <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div className="flex items-start gap-3">
                 <span className="mt-0.5 text-2xl" aria-hidden>
                   💰
                 </span>
                 <div>
-                  <h3 className="text-sm font-semibold text-emerald-300">Ready for Real Stakes?</h3>
+                  <h3 className="text-sm font-semibold text-purple-200">Ready for Real Stakes?</h3>
                   <p className="text-xs text-gray-300">
                     Switch to real money matches and compete for cash.
                   </p>
@@ -986,7 +1004,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setMode("real")}
-                className="rounded-lg bg-gradient-to-r from-teal-400 to-emerald-400 px-4 py-2 text-xs font-semibold text-[#0A0E17] shadow-[0_0_18px_rgba(16,185,129,0.65)] hover:brightness-110"
+                className="rounded-lg bg-gradient-to-r from-purple-500 to-fuchsia-500 px-4 py-2 text-xs font-semibold text-white shadow-[0_0_18px_rgba(139,92,246,0.45)] hover:brightness-110"
               >
                 Play for Real Money
               </button>

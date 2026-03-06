@@ -7,6 +7,7 @@ import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 
@@ -124,6 +125,7 @@ function fakeDuration(): string {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { isPractice } = usePlayMode();
   const [username, setUsername] = useState<string>("Player");
   const [memberSince, setMemberSince] = useState<string>("February 2026");
   const [loading, setLoading] = useState(true);
@@ -234,7 +236,11 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+        <svg
+          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
@@ -275,12 +281,18 @@ export default function ProfilePage() {
         <section
           className="animate-fade-in overflow-hidden rounded-card border border-white/10 bg-gradient-to-br from-[#0D0F14] via-[#151821] to-[#0D0F14]"
           style={{
-            backgroundImage: "linear-gradient(135deg, rgba(0,229,199,0.04) 0%, transparent 50%, rgba(124,92,252,0.04) 100%)",
+            backgroundImage: isPractice
+              ? "linear-gradient(135deg, rgba(139,92,246,0.05) 0%, transparent 50%, rgba(124,92,252,0.05) 100%)"
+              : "linear-gradient(135deg, rgba(0,229,199,0.04) 0%, transparent 50%, rgba(124,92,252,0.04) 100%)",
           }}
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-              <div className="h-20 w-20 shrink-0 rounded-full bg-gradient-to-br from-teal/50 to-purple/50 p-0.5 ring-2 ring-white/10">
+              <div
+                className={`h-20 w-20 shrink-0 rounded-full bg-gradient-to-br p-0.5 ring-2 ring-white/10 ${
+                  isPractice ? "from-purple-500/50 to-fuchsia-500/40" : "from-teal/50 to-purple/50"
+                }`}
+              >
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-charcoal">
                   <span className="text-3xl font-bold text-white">{username.charAt(0).toUpperCase()}</span>
                 </div>
@@ -288,7 +300,13 @@ export default function ProfilePage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-white sm:text-3xl">{username}</h1>
-                  <span className="rounded bg-teal/20 px-2 py-0.5 text-xs font-medium text-teal">Level 1</span>
+                  <span
+                    className={`rounded px-2 py-0.5 text-xs font-medium ${
+                      isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                    }`}
+                  >
+                    Level 1
+                  </span>
                 </div>
                 <p className="mt-1 text-sm text-body-gray">Joined {memberSince}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold text-white">
@@ -358,7 +376,11 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => setGameTab(tab.id)}
                 className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  gameTab === tab.id ? "bg-teal/20 text-teal" : "text-body-gray hover:text-white"
+                  gameTab === tab.id
+                    ? isPractice
+                      ? "bg-purple-500/20 text-purple-300"
+                      : "bg-teal/20 text-teal"
+                    : "text-body-gray hover:text-white"
                 }`}
               >
                 {tab.label}
@@ -387,7 +409,14 @@ export default function ProfilePage() {
           {stats.completed.length === 0 ? (
             <div className="card-border mt-4 rounded-card bg-card p-12 text-center">
               <p className="text-body-gray">No matches yet. Start playing to build your history!</p>
-              <Link href="/play" className="mt-4 inline-block rounded-lg bg-teal px-4 py-2 font-medium text-charcoal hover:shadow-teal-glow">
+              <Link
+                href="/play"
+                className={`mt-4 inline-block rounded-lg px-4 py-2 font-medium text-charcoal ${
+                  isPractice
+                    ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                    : "bg-teal hover:shadow-teal-glow"
+                }`}
+              >
                 Find a match
               </Link>
             </div>
@@ -421,7 +450,13 @@ export default function ProfilePage() {
                           </td>
                           <td className="py-3 pr-4">
                             {matchWon(m) ? (
-                              <span className="rounded bg-teal/20 px-2 py-0.5 text-xs font-medium text-teal">Won</span>
+                              <span
+                                className={`rounded px-2 py-0.5 text-xs font-medium ${
+                                  isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                                }`}
+                              >
+                                Won
+                              </span>
                             ) : (
                               <span className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">Lost</span>
                             )}
@@ -448,7 +483,13 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-white">{m.gameDisplayName}</span>
                         {matchWon(m) ? (
-                          <span className="rounded bg-teal/20 px-2 py-0.5 text-xs font-medium text-teal">Won</span>
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs font-medium ${
+                              isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                            }`}
+                          >
+                            Won
+                          </span>
                         ) : (
                           <span className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400">Lost</span>
                         )}
@@ -489,7 +530,9 @@ export default function ProfilePage() {
                   key={a.id}
                   className={`card-border rounded-card p-4 transition-all ${
                     unlocked
-                      ? "border-teal/40 bg-card shadow-[0_0_20px_rgba(0,229,199,0.1)]"
+                      ? isPractice
+                        ? "border-purple-500/40 bg-card shadow-[0_0_20px_rgba(139,92,246,0.16)]"
+                        : "border-teal/40 bg-card shadow-[0_0_20px_rgba(0,229,199,0.1)]"
                       : "border-white/10 bg-card/80 opacity-50"
                   }`}
                 >
