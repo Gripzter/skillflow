@@ -660,7 +660,7 @@ export default function MatchPage() {
         </main>
       ) : !waitingForOpponent && match.gameType === "8-ball-pool" && match.status === "in_progress" && !outcome ? (
         <main className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col px-4 py-6">
-          <div className="card-border flex w-full flex-col rounded-card bg-card p-4">
+          <div className="flex w-full flex-col bg-transparent">
             <EightBallPool
               player1={{ username: match.player1.username, rating: match.player1.rating }}
               player2={{ username: match.player2.username, rating: match.player2.rating }}

@@ -275,7 +275,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       if (!isTableImageReady()) {
         drawPockets(ctx, pockets, worldToCanvas, scale, calledPocketId, callPocketPhase);
         drawRailDiamonds(ctx, play.width, play.height, worldToCanvas, scale);
-      } else if (callPocketPhase || calledPocketId != null) {
+      } else if (callPocketPhase || calledPocketId !== null) {
         drawPockets(ctx, pockets, worldToCanvas, scale, calledPocketId, callPocketPhase);
       }
 
@@ -846,10 +846,10 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
           </div>
         </div>
       </div>
-      <div className="relative flex w-full items-center justify-center gap-0">
+      <div className="relative flex w-full items-center justify-center">
         <canvas
           ref={canvasRef}
-          className="touch-none rounded-lg w-full max-w-full"
+          className="touch-none w-full max-w-full"
           style={{ width: "100%", height: "auto", aspectRatio: "2/1" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
