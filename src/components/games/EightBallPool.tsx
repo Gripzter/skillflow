@@ -22,6 +22,7 @@ import {
   drawTable,
   drawPockets,
   drawRailDiamonds,
+  isTableImageReady,
   drawBall,
   drawAimLine,
   drawGhostBall,
@@ -257,8 +258,12 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       const assignmentAlpha = assignmentAlphaRef.current;
 
       drawTable(ctx, tableSize.width, tableSize.height, play.width, play.height, worldToCanvas, scale);
-      drawPockets(ctx, pockets, worldToCanvas, scale, calledPocketId, callPocketPhase);
-      drawRailDiamonds(ctx, play.width, play.height, worldToCanvas, scale);
+      if (!isTableImageReady()) {
+        drawPockets(ctx, pockets, worldToCanvas, scale, calledPocketId, callPocketPhase);
+        drawRailDiamonds(ctx, play.width, play.height, worldToCanvas, scale);
+      } else if (callPocketPhase || calledPocketId != null) {
+        drawPockets(ctx, pockets, worldToCanvas, scale, calledPocketId, callPocketPhase);
+      }
 
       const anyMoving = Array.from(ballsRef.current.values()).some((b) => {
         const v = b.velocity;

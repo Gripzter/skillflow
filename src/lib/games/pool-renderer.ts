@@ -8,6 +8,26 @@ import { BALL_COLORS, TABLE_FRAME, CUSHION_GREEN, FELT_GREEN, POCKET_DARK, POCKE
 
 export type WorldToCanvas = (wx: number, wy: number) => { x: number; y: number };
 
+let tableImage: HTMLImageElement | null = null;
+let tableImageLoaded = false;
+
+function getTableImage(): HTMLImageElement | null {
+  if (tableImageLoaded && tableImage) return tableImage;
+  if (!tableImage) {
+    const img = new Image();
+    img.onload = () => {
+      tableImageLoaded = true;
+    };
+    img.src = "/images/pool-table.jpg";
+    tableImage = img;
+  }
+  return tableImageLoaded ? tableImage : null;
+}
+
+export function isTableImageReady(): boolean {
+  return tableImageLoaded;
+}
+
 let feltPattern: CanvasPattern | null = null;
 
 function getFeltPattern(ctx: CanvasRenderingContext2D, width: number, height: number, scale: number): CanvasPattern | null {
@@ -38,6 +58,17 @@ export function drawTable(
   scale: number
 ) {
   ctx.imageSmoothingEnabled = true;
+
+  const img = getTableImage();
+  if (img) {
+    ctx.save();
+    ctx.translate(tableWidth / 2, tableHeight / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.drawImage(img, -tableHeight / 2, -tableWidth / 2, tableHeight, tableWidth);
+    ctx.restore();
+    return;
+  }
+
   const inset = FRAME_WIDTH + CUSHION_INSET;
   const railLeft = FRAME_WIDTH;
   const railTop = FRAME_WIDTH;
