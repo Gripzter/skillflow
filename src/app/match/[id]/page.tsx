@@ -658,6 +658,17 @@ export default function MatchPage() {
             </div>
           ) : null}
         </main>
+      ) : !waitingForOpponent && match.gameType === "8-ball-pool" && match.status === "in_progress" && !outcome ? (
+        <main className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col px-4 py-6">
+          <div className="card-border flex w-full flex-col rounded-card bg-card p-4">
+            <EightBallPool
+              player1={{ username: match.player1.username, rating: match.player1.rating }}
+              player2={{ username: match.player2.username, rating: match.player2.rating }}
+              onGameEnd={handleGameEnd}
+              isPlayer2Bot={!isRealMultiplayer}
+            />
+          </div>
+        </main>
       ) : !waitingForOpponent ? (
         <main className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-6 md:grid-cols-[1fr_2fr_1fr]">
           <div className="card-border rounded-card bg-card p-4 text-center">
@@ -670,14 +681,7 @@ export default function MatchPage() {
             <p className="text-xs text-body-gray">Score</p>
           </div>
           <div className="card-border flex flex-col items-center justify-center rounded-card bg-card p-4">
-            {match.gameType === "8-ball-pool" && match.status === "in_progress" && !outcome ? (
-              <EightBallPool
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
-                onGameEnd={handleGameEnd}
-                isPlayer2Bot={!isRealMultiplayer}
-              />
-            ) : match.status === "in_progress" && !outcome ? (
+            {match.status === "in_progress" && !outcome ? (
               <>
                 <p className="text-body-gray">Game in progress...</p>
                 <div className="mt-6 flex flex-wrap justify-center gap-4">

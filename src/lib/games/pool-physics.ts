@@ -82,7 +82,7 @@ export function getPocketRadiusSide(ballRadius: number): number {
  * Returns canvas width and height.
  */
 export function getTableSize(containerWidth: number): { width: number; height: number } {
-  const width = Math.max(600, (containerWidth || 800) - 40);
+  const width = Math.max(600, containerWidth || 800);
   return { width, height: width / 2 };
 }
 

@@ -139,19 +139,20 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     []
   );
 
-  const canvasToWorld = useCallback((clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const cx = (clientX - rect.left) * scaleX;
-    const cy = (clientY - rect.top) * scaleY;
-    return {
-      x: Math.max(0, Math.min(playWidth, cx - INSET)),
-      y: Math.max(0, Math.min(playHeight, cy - INSET)),
-    };
-  }, [playWidth, playHeight]);
+  const canvasToWorld = useCallback(
+    (clientX: number, clientY: number) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return { x: 0, y: 0 };
+      const rect = canvas.getBoundingClientRect();
+      const logicalX = (rect.width ? (clientX - rect.left) / rect.width : 0) * tableSize.width - INSET;
+      const logicalY = (rect.height ? (clientY - rect.top) / rect.height : 0) * tableSize.height - INSET;
+      return {
+        x: Math.max(0, Math.min(playWidth, logicalX)),
+        y: Math.max(0, Math.min(playHeight, logicalY)),
+      };
+    },
+    [playWidth, playHeight, tableSize.width, tableSize.height]
+  );
 
   useEffect(() => {
     const container = containerRef.current;
@@ -166,6 +167,16 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     setTableSize(getTableSize(w));
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !tableSize.width) return;
+    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    canvas.width = tableSize.width * dpr;
+    canvas.height = tableSize.height * dpr;
+    canvas.style.width = tableSize.width + "px";
+    canvas.style.height = tableSize.height + "px";
+  }, [tableSize]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -241,6 +252,9 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
+      const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+      ctx.save();
+      ctx.scale(dpr, dpr);
       const play = playSizeRef.current;
       const pockets = pocketsRef.current;
       const scale = 1;
@@ -433,6 +447,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         drawBallAssignment(ctx, assignmentNotice, tableSize.width, tableSize.height, assignmentAlpha);
       }
 
+      ctx.restore();
       rafId = requestAnimationFrame(render);
     }
     render();
@@ -769,7 +784,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     gameState.player2Group === "solid" ? "Solids" : gameState.player2Group === "stripe" ? "Stripes" : "—";
 
   return (
-    <div ref={containerRef} className="flex w-full flex-col items-center overflow-x-auto">
+    <div ref={containerRef} className="flex w-full flex-col items-center overflow-x-auto" style={{ width: "100%" }}>
       <div className="flex w-full items-center justify-between gap-2 px-2 py-2">
         <div
           className={`flex flex-col items-start gap-1 rounded-lg px-3 py-2 ${
@@ -831,13 +846,11 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
           </div>
         </div>
       </div>
-      <div className="relative flex items-center justify-center gap-0">
+      <div className="relative flex w-full items-center justify-center gap-0">
         <canvas
           ref={canvasRef}
-          width={tableSize.width}
-          height={tableSize.height}
-          className="touch-none rounded-lg min-w-[min(100%,600px)] w-full max-w-[100%]"
-          style={{ aspectRatio: "2/1", minWidth: 350 }}
+          className="touch-none rounded-lg w-full max-w-full"
+          style={{ width: "100%", height: "auto", aspectRatio: "2/1" }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
