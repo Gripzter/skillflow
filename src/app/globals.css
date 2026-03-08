@@ -176,3 +176,19 @@ main,
 .hero-word-2 { animation-delay: 0.25s; opacity: 0; }
 .hero-word-3 { animation-delay: 0.4s; opacity: 0; }
 .hero-word-4 { animation-delay: 0.55s; opacity: 0; }
+
+/* In-game chat: floating message animations */
+@keyframes chatFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes chatFadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+.animate-chat-fade-in {
+  animation: chatFadeIn 0.3s ease forwards;
+}
+.animate-chat-fade-out {
+  animation: chatFadeOut 0.5s ease forwards;
+}

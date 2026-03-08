@@ -325,7 +325,7 @@ function MatchPageContent() {
     if (Math.random() < 0.3) {
       const delay = 2000 + Math.floor(Math.random() * 1000);
       setTimeout(() => {
-        sendBotChat("👋 GL HF", true);
+        sendBotChat("GL HF", true);
       }, delay);
     }
   }, [match, isRealMultiplayer, sendBotChat]);
@@ -592,6 +592,27 @@ function MatchPageContent() {
           <p className="mt-2 text-body-gray">
             Waiting {reconnectCountdown}s for reconnection. If they don&apos;t return, you win by forfeit.
           </p>
+        </div>
+      )}
+
+      {/* In-game chat bar at top of game area — only when in progress */}
+      {!waitingForOpponent && match?.status === "in_progress" && !outcome && (
+        <div className="mx-auto w-full px-4 sm:px-6 lg:max-w-[1200px]">
+          <GameChat
+            messages={chatMessages}
+            onSendMessage={handleSendChatMessage}
+            onReportMessage={handleReportMessage}
+            playerName={username}
+            opponentName={safePlayer2.username}
+            playerId={userId}
+            unreadCount={unreadCount}
+            isOpen={chatOpen}
+            onToggle={() => {
+              setChatOpen((open) => !open);
+              if (!chatOpen) setUnreadCount(0);
+            }}
+            isPractice={!!match?.isPractice}
+          />
         </div>
       )}
 
@@ -961,24 +982,6 @@ function MatchPageContent() {
           </div>
         </div>
       )}
-
-      {/* Global game chat */}
-      <GameChat
-        messages={chatMessages}
-        onSendMessage={handleSendChatMessage}
-        onReportMessage={handleReportMessage}
-        playerName={username}
-        opponentName={safePlayer2.username}
-        playerId={userId}
-        unreadCount={unreadCount}
-        isOpen={chatOpen}
-        onToggle={() => {
-          setChatOpen((open) => !open);
-          if (!chatOpen) {
-            setUnreadCount(0);
-          }
-        }}
-      />
     </div>
   );
 }
