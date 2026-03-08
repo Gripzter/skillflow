@@ -103,14 +103,21 @@ export default function PlaySpellingBeePage() {
     return () => clearInterval(timer);
   }, [matchmaking, useRealMatchmaking]);
 
+  const handleMatchReady = useCallback((match: { id: string }) => {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[SpellingBee] onMatchReady — navigating with window.location.href to", `/match/${match?.id}`);
+    }
+    if (match?.id) {
+      window.location.href = `/match/${match.id}`;
+    }
+  }, []);
+
   useEffect(() => {
     if (realMatchStatus !== "matched" || !realMatch || realMatchNavRef.current) return;
     realMatchNavRef.current = realMatch.id;
-    const t = setTimeout(() => {
-      router.push(`/match/${realMatch.id}`);
-    }, 1500);
-    return () => clearTimeout(t);
-  }, [realMatchStatus, realMatch, router]);
+    window.location.href = `/match/${realMatch.id}`;
+  }, [realMatchStatus, realMatch]);
 
   const player1 = useMemo<PlayerInfo>(
     () => ({
@@ -202,6 +209,7 @@ export default function PlaySpellingBeePage() {
           userId,
           username,
           rating: 1000,
+          onMatchReady: handleMatchReady,
         });
       } catch {
         await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
@@ -230,6 +238,7 @@ export default function PlaySpellingBeePage() {
     userId,
     username,
     startMatchmaking,
+    handleMatchReady,
     botDifficulty,
   ]);
 

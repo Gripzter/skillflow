@@ -28,7 +28,6 @@ export interface DbMatch {
 }
 
 const POLL_INTERVAL_MS = 2000;
-const MATCH_READY_DELAY_MS = 2000;
 const MATCHMAKING_TIMEOUT_MS = 60000;
 
 export type MatchmakingStatus = "searching" | "waiting" | "matched" | "timeout";
@@ -74,6 +73,11 @@ export async function startMatchmaking(
       return cleanup;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Starting matchmaking...", { gameType: normalizedGameType, stake });
+    }
+
     const { data: waitingMatches, error: findError } = await supabase
       .from("matches")
       .select("*")
@@ -91,6 +95,10 @@ export async function startMatchmaking(
 
     if (waitingMatches && waitingMatches.length > 0) {
       const match = waitingMatches[0] as DbMatch;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Found waiting match:", match.id);
+      }
       const totalPot = match.stake_amount * 2;
       const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
       const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
@@ -114,7 +122,7 @@ export async function startMatchmaking(
       if (joinError || !updated) {
         if (process.env.NODE_ENV !== "production") {
           // eslint-disable-next-line no-console
-          console.log("[matchmaking] Match was taken, retrying…");
+          console.log("[matchmaking] Join failed (match taken?), retrying…", joinError?.message);
         }
         return startMatchmaking(
           supabase,
@@ -130,26 +138,20 @@ export async function startMatchmaking(
       }
 
       matchId = (updated as DbMatch).id;
-      // eslint-disable-next-line no-console
-      console.log("[matchmaking] Joined match as Player 2:", matchId);
-
-      onStatusUpdate("matched", updated as DbMatch);
-
-      const readyTimer = setTimeout(() => {
-        if (cancelled) {
-          // eslint-disable-next-line no-console
-          console.log("[matchmaking] Player 2: cancelled, skipping onMatchReady");
-          return;
-        }
+      if (process.env.NODE_ENV !== "production") {
         // eslint-disable-next-line no-console
-        console.log("[matchmaking] Player 2: calling onMatchReady", matchId);
+        console.log("[matchmaking] Player 2 joined match:", matchId, "— calling onMatchReady NOW (no delay)");
+      }
+      onStatusUpdate("matched", updated as DbMatch);
+      if (!cancelled) {
         onMatchReady(updated as DbMatch, "player2");
-      }, MATCH_READY_DELAY_MS);
+      }
+      return cleanup;
+    }
 
-      return () => {
-        cleanup();
-        clearTimeout(readyTimer);
-      };
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] No waiting match found, creating new...");
     }
 
     const { data: newMatch, error: createError } = await supabase
@@ -177,7 +179,7 @@ export async function startMatchmaking(
     matchId = (newMatch as DbMatch).id;
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
-      console.log("[matchmaking] Created match as Player 1:", matchId);
+      console.log("[matchmaking] Created match as Player 1:", matchId, "— starting polling every 2s");
     }
     onStatusUpdate("waiting", newMatch as DbMatch);
 
@@ -201,38 +203,28 @@ export async function startMatchmaking(
           return;
         }
 
-        // eslint-disable-next-line no-console
-        console.log("[matchmaking] POLL RESULT:", {
-          id: (freshMatch as DbMatch)?.id,
-          status: (freshMatch as DbMatch)?.status,
-          player1_id: (freshMatch as DbMatch)?.player1_id,
-          player2_id: (freshMatch as DbMatch)?.player2_id,
-        });
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Poll check:", (freshMatch as DbMatch)?.status, "player2_id:", (freshMatch as DbMatch)?.player2_id);
+        }
 
         if (
           freshMatch &&
           (freshMatch as DbMatch).status === "matched" &&
           (freshMatch as DbMatch).player2_id
         ) {
-          // eslint-disable-next-line no-console
-          console.log("[matchmaking] MATCH FOUND! Stopping poll, calling onMatchReady for Player 1");
           if (pollInterval) {
             clearInterval(pollInterval);
             pollInterval = null;
           }
-
-          onStatusUpdate("matched", freshMatch as DbMatch);
-
-          setTimeout(() => {
-            if (cancelled) {
-              // eslint-disable-next-line no-console
-              console.log("[matchmaking] Player 1: cancelled, skipping onMatchReady");
-              return;
-            }
+          if (process.env.NODE_ENV !== "production") {
             // eslint-disable-next-line no-console
-            console.log("[matchmaking] Player 1: calling onMatchReady", (freshMatch as DbMatch).id);
+            console.log("[matchmaking] Player 1 matched! Calling onMatchReady NOW (no delay), NAVIGATING TO:", `/match/${(freshMatch as DbMatch).id}`);
+          }
+          onStatusUpdate("matched", freshMatch as DbMatch);
+          if (!cancelled) {
             onMatchReady(freshMatch as DbMatch, "player1");
-          }, MATCH_READY_DELAY_MS);
+          }
         }
       } catch (pollErr) {
         // eslint-disable-next-line no-console

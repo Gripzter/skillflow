@@ -121,26 +121,12 @@ export default function PlayGamePage() {
     return () => clearInterval(timer);
   }, [matchmaking, useRealMatchmaking]);
 
-  // State-based navigation so it survives re-renders and isn't killed by effect cleanup
+  // Fallback: if navigateToMatchId was set (e.g. from a code path that didn't use handleMatchReady), navigate
   useEffect(() => {
     if (!navigateToMatchId) return;
     const matchUrl = `/match/${navigateToMatchId}`;
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[PlayGamePage] Navigating to match room:", matchUrl);
-    }
-    router.push(matchUrl);
-    const fallback = setTimeout(() => {
-      if (typeof window !== "undefined" && window.location.pathname !== matchUrl) {
-        if (process.env.NODE_ENV !== "production") {
-          // eslint-disable-next-line no-console
-          console.log("[PlayGamePage] Backup navigation via window.location");
-        }
-        window.location.href = matchUrl;
-      }
-    }, 1500);
-    return () => clearTimeout(fallback);
-  }, [navigateToMatchId, router]);
+    window.location.href = matchUrl;
+  }, [navigateToMatchId]);
 
   const player1 = useMemo<PlayerInfo>(
     () => ({
@@ -181,9 +167,12 @@ export default function PlayGamePage() {
   const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
-      console.log("[PlayGamePage] onMatchReady called", match?.id, _role);
+      console.log("[PlayGamePage] onMatchReady called", match?.id, _role, "— navigating with window.location.href");
     }
-    if (match?.id) setNavigateToMatchId(match.id);
+    if (match?.id) {
+      const matchUrl = `/match/${match.id}`;
+      window.location.href = matchUrl;
+    }
   }, []);
 
   const handleFindMatch = useCallback(async () => {
