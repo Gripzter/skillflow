@@ -16,7 +16,7 @@ import {
 
 export type WorldToCanvas = (wx: number, wy: number) => { x: number; y: number };
 
-const TABLE_RADIUS = 14;
+const TABLE_RADIUS = 10;
 const CUSHION_NOSE_WIDTH = 6;
 
 let feltPattern: CanvasPattern | null = null;
@@ -60,7 +60,7 @@ export function drawTable(
   ctx.shadowColor = "rgba(0,0,0,0.5)";
   ctx.shadowBlur = 30;
   ctx.shadowOffsetY = 10;
-  ctx.fillStyle = "#2C1810";
+  ctx.fillStyle = "#3D1F0B";
   ctx.beginPath();
   ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
   ctx.fill();
@@ -69,48 +69,48 @@ export function drawTable(
   ctx.shadowOffsetY = 0;
   ctx.restore();
 
-  // Layer 2 — wood frame
+  // Layer 2 — outer frame (dark mahogany)
   ctx.save();
-  const frameGrad = ctx.createLinearGradient(0, 0, 0, tableHeight);
-  frameGrad.addColorStop(0, "#4A2A1A");
-  frameGrad.addColorStop(0.5, "#2C1810");
-  frameGrad.addColorStop(1, "#1E0F08");
-  ctx.fillStyle = frameGrad;
+  ctx.fillStyle = "#3D1F0B";
   ctx.beginPath();
   ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
   ctx.fill();
-  for (let i = 0; i < 12; i++) {
-    ctx.strokeStyle = "rgba(0,0,0,0.06)";
+  for (let i = 0; i < 10; i++) {
+    ctx.strokeStyle = "rgba(0,0,0,0.05)";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, (tableHeight * (i + 1)) / 13);
-    ctx.lineTo(tableWidth, (tableHeight * (i + 1)) / 13);
+    ctx.moveTo(0, (tableHeight * (i + 1)) / 11);
+    ctx.lineTo(tableWidth, (tableHeight * (i + 1)) / 11);
     ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(TABLE_RADIUS, 2);
   ctx.lineTo(tableWidth - TABLE_RADIUS, 2);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(0,0,0,0.2)";
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
   ctx.beginPath();
   ctx.moveTo(TABLE_RADIUS, tableHeight - 2);
   ctx.lineTo(tableWidth - TABLE_RADIUS, tableHeight - 2);
   ctx.stroke();
   ctx.restore();
 
-  // Layer 3 — inner rail / cushion border
+  // Layer 3 — rail cushions (medium brown wood)
   ctx.save();
   const railLeft = FRAME_WIDTH;
   const railTop = FRAME_WIDTH;
   const railW = tableWidth - 2 * FRAME_WIDTH;
   const railH = tableHeight - 2 * FRAME_WIDTH;
-  ctx.fillStyle = "#0A6B35";
+  const railGrad = ctx.createLinearGradient(railLeft, railTop, railLeft + railW, railTop + railH);
+  railGrad.addColorStop(0, "#5C3310");
+  railGrad.addColorStop(0.5, "#4A2A0E");
+  railGrad.addColorStop(1, "#5C3310");
+  ctx.fillStyle = railGrad;
   ctx.beginPath();
   ctx.roundRect(railLeft, railTop, railW, railH, Math.max(0, TABLE_RADIUS - 4));
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(railLeft + 1, railTop);
@@ -118,7 +118,7 @@ export function drawTable(
   ctx.moveTo(railLeft, railTop + 1);
   ctx.lineTo(railLeft + railW, railTop + 1);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.strokeStyle = "rgba(255,255,255,0.06)";
   ctx.beginPath();
   ctx.moveTo(railLeft + railW - 1, railTop);
   ctx.lineTo(railLeft + railW - 1, railTop + railH);
@@ -127,36 +127,44 @@ export function drawTable(
   ctx.stroke();
   ctx.restore();
 
-  // Layer 4 — felt playing surface
+  // Layer 4 — felt playing surface (rich green, overhead lighting)
   ctx.save();
   const cx = feltLeft + feltW / 2;
   const cy = feltTop + feltH / 2;
-  const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(feltW, feltH) / 2);
-  feltGrad.addColorStop(0, "#1B9E5A");
-  feltGrad.addColorStop(1, "#0E8C45");
+  const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(feltW, feltH) * 0.7);
+  feltGrad.addColorStop(0, "#0C7E42");
+  feltGrad.addColorStop(1, "#0A6E3A");
   ctx.fillStyle = feltGrad;
   ctx.fillRect(feltLeft, feltTop, feltW, feltH);
   const pattern = getFeltPattern(ctx, feltW, feltH, scale);
   if (pattern) {
     ctx.fillStyle = pattern;
+    ctx.globalAlpha = 0.4;
     ctx.fillRect(feltLeft, feltTop, feltW, feltH);
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 
-  // Layer 5 — head string and foot spot
+  // Layer 5 — table markings (head string, foot spot, center spot)
   ctx.save();
   const headX = feltLeft + feltW * 0.25;
-  ctx.strokeStyle = "rgba(255,255,255,0.08)";
-  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(headX, feltTop);
-  ctx.lineTo(headX, feltTop + feltH);
+  ctx.moveTo(headX, feltTop + 2);
+  ctx.lineTo(headX, feltTop + feltH - 2);
   ctx.stroke();
   const footX = feltLeft + feltW * 0.75;
   const footY = feltTop + feltH * 0.5;
-  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  ctx.fillStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath();
   ctx.arc(footX, footY, 3, 0, Math.PI * 2);
+  ctx.fill();
+  const centerX = feltLeft + feltW / 2;
+  const centerY = feltTop + feltH / 2;
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -170,7 +178,7 @@ export function drawTable(
   const playRight = feltLeft + feltW - CUSHION_INSET;
   const playBottom = feltTop + feltH - CUSHION_INSET;
   const centerX = playLeft + playWidth / 2;
-  const cushionColor = "#0B7A3E";
+  const cushionColor = "#2D5A1E";
   const noseW = Math.max(4, Math.min(8, CUSHION_NOSE_WIDTH * scale));
 
   ctx.save();
@@ -267,12 +275,12 @@ export function drawPockets(
     const { x, y } = worldToCanvas(p.x, p.y);
     const r = p.radius * scale;
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
     ctx.shadowBlur = 4;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, "#030303");
-    grad.addColorStop(0.7, "#111");
-    grad.addColorStop(1, "#1a1a1a");
+    grad.addColorStop(0, "#000000");
+    grad.addColorStop(0.7, "#0A0A0A");
+    grad.addColorStop(1, "#1A1A1A");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -318,10 +326,7 @@ export function drawRailDiamonds(
   }
   positions.forEach((pos) => {
     const { x, y } = worldToCanvas(pos.x, pos.y);
-    const grad = ctx.createLinearGradient(x - size, y - size, x + size, y + size);
-    grad.addColorStop(0, "#E8DCC8");
-    grad.addColorStop(1, "#C8BAA0");
-    ctx.fillStyle = grad;
+    ctx.fillStyle = "rgba(255,255,200,0.6)";
     ctx.strokeStyle = "rgba(0,0,0,0.2)";
     ctx.lineWidth = 0.5;
     ctx.beginPath();
@@ -368,29 +373,22 @@ export function drawBall(
   ctx.save();
 
   if (!isPreview) {
-    ctx.shadowColor = "rgba(0,0,0,0.35)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = "rgba(0,0,0,0.15)";
     ctx.beginPath();
-    ctx.ellipse(x + 2, y + 3, r * 0.9, r * 0.5, 0, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.ellipse(x + 2, y + 2, r, r * 0.6, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
   }
 
   let baseFill = style.fill;
   if (style.stripe) {
     baseFill = "#FFFFFF";
   }
-  const highlightX = x - r * 0.35;
-  const highlightY = y - r * 0.35;
-  const grad = ctx.createRadialGradient(highlightX, highlightY, 0, x, y, r * 1.2);
-  grad.addColorStop(0, lighten(baseFill, 0.4));
-  grad.addColorStop(0.4, baseFill);
-  grad.addColorStop(1, darken(baseFill, 0.25));
+  const highlightX = x - r * 0.3;
+  const highlightY = y - r * 0.3;
+  const grad = ctx.createRadialGradient(highlightX, highlightY, 0, x, y, r * 1.1);
+  grad.addColorStop(0, lighten(baseFill, 0.35));
+  grad.addColorStop(0.45, baseFill);
+  grad.addColorStop(1, darken(baseFill, 0.2));
   ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.arc(x, y, r - 0.5, 0, Math.PI * 2);
@@ -399,45 +397,50 @@ export function drawBall(
   if (style.stripe) {
     ctx.fillStyle = style.fill;
     ctx.beginPath();
-    ctx.ellipse(x, y, r * 0.95, r * 0.45, 0, 0, Math.PI * 2);
+    ctx.ellipse(x, y, r * 0.95, r * 0.42, 0, 0, Math.PI * 2);
     ctx.fill();
     const bandGrad = ctx.createRadialGradient(highlightX, highlightY, 0, x, y, r);
-    bandGrad.addColorStop(0, lighten(style.fill, 0.3));
+    bandGrad.addColorStop(0, lighten(style.fill, 0.25));
     bandGrad.addColorStop(0.5, style.fill);
-    bandGrad.addColorStop(1, darken(style.fill, 0.2));
+    bandGrad.addColorStop(1, darken(style.fill, 0.15));
     ctx.fillStyle = bandGrad;
     ctx.fill();
   }
 
-  const shineGrad = ctx.createRadialGradient(
-    x - r * 0.4,
-    y - r * 0.4,
-    0,
-    x - r * 0.4,
-    y - r * 0.4,
-    r * 0.8
+  const specGrad = ctx.createRadialGradient(
+    highlightX,
+    highlightY,
+    r * 0.1,
+    x,
+    y,
+    r
   );
-  shineGrad.addColorStop(0, "rgba(255,255,255,0.55)");
-  shineGrad.addColorStop(0.5, "rgba(255,255,255,0.15)");
-  shineGrad.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = shineGrad;
+  specGrad.addColorStop(0, "rgba(255,255,255,0.3)");
+  specGrad.addColorStop(0.5, "rgba(255,255,255,0)");
+  specGrad.addColorStop(1, "rgba(0,0,0,0.2)");
+  ctx.fillStyle = specGrad;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.beginPath();
+  ctx.arc(highlightX, highlightY, r * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+
   if (ballNum > 0) {
-    const numR = r * 0.45;
+    const numR = r * 0.4;
     if (ballNum !== 8) {
-      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.fillStyle = "#FFFFFF";
       ctx.beginPath();
       ctx.arc(x, y, numR, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.fillStyle = ballNum === 8 ? "#FFFFFF" : "#1a1a1a";
-    ctx.font = `bold ${Math.max(10, r * 0.9)}px system-ui`;
+    ctx.fillStyle = ballNum === 8 ? "#FFFFFF" : "#000000";
+    ctx.font = `bold ${Math.max(10, r * 0.55)}px system-ui, Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(ballNum), x, y);
+    ctx.fillText(String(ballNum), x, y + 1);
   }
 
   if (isPreview) {
@@ -564,9 +567,10 @@ export function drawCueStick(
   const b = worldToCanvas(buttX, buttY);
   ctx.save();
   const grad = ctx.createLinearGradient(t.x, t.y, b.x, b.y);
-  grad.addColorStop(0, "#4A90D9");
-  grad.addColorStop(0.08, "#C4935A");
-  grad.addColorStop(1, "#3D2317");
+  grad.addColorStop(0, "#FFFFFF");
+  grad.addColorStop(0.03, "#F5DEB3");
+  grad.addColorStop(0.15, "#C4935A");
+  grad.addColorStop(1, "#5C3310");
   ctx.strokeStyle = grad;
   ctx.lineCap = "round";
   ctx.lineWidth = Math.max(3, 4 * scale);
