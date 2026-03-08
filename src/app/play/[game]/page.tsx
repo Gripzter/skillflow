@@ -15,7 +15,6 @@ import {
   debitWallet,
   creditWallet,
   createMatch,
-  generateFakeOpponent,
   computePayout,
   type PlayerInfo,
   type StoredMatch,
@@ -84,7 +83,7 @@ export default function PlayGamePage() {
   const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
   const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
   const insufficientBalance = !effectivePractice && balance < stakeAmount;
-  const useRealMatchmaking = !isDevMode && !isPractice && !isRestricted;
+  const useRealMatchmaking = !isPractice && !isRestricted;
   const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
   const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
   const realMatchmakingTimeout = realMatchStatus === "timeout";
@@ -265,46 +264,6 @@ export default function PlayGamePage() {
       }
       return;
     }
-
-    if (insufficientBalance || stakeAmount < 1) return;
-    try {
-      await debitWallet(stakeAmount, `Match entry – ${gameName}`);
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch (e) {
-      return;
-    }
-    setMatchmaking(true);
-    setMatchmakingElapsed(0);
-
-    const timer = setInterval(() => {
-      setMatchmakingElapsed((e) => e + 1);
-    }, 1000);
-    setElapsedTimer(timer);
-
-    const delay = 3000 + Math.floor(Math.random() * 5000);
-    findMatchTimeoutRef.current = setTimeout(async () => {
-      clearInterval(timer);
-      setElapsedTimer(null);
-      const opponent = generateFakeOpponent(1000);
-      setOpponentFound(opponent);
-      try {
-        const newMatch = await createMatch({
-          gameType: gameSlug,
-          gameDisplayName: gameName,
-          stakeAmount,
-          player1,
-          player2: opponent,
-        });
-        setMatch(newMatch);
-        setTimeout(() => router.push(`/match/${newMatch.id}`), 2000);
-      } catch {
-        await creditWallet(stakeAmount, "Match creation failed – stake refunded", "match_refund");
-        dispatchWalletUpdated();
-        setMatchmaking(false);
-        setOpponentFound(null);
-      }
-    }, delay);
   }, [
     balance,
     stakeAmount,
@@ -323,9 +282,12 @@ export default function PlayGamePage() {
     botDifficulty,
   ]);
 
-  const handlePlayAgainstBot = useCallback(async () => {
+  const handleSwitchToPractice = useCallback(async () => {
     await cancelSearching();
+    setMatchmaking(false);
     setMatchmakingElapsed(0);
+    setOpponentFound(null);
+    setMatch(null);
     try {
       await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
       setBalance(await getWalletBalance());
@@ -333,40 +295,9 @@ export default function PlayGamePage() {
     } catch {
       dispatchWalletUpdated();
     }
-    try {
-      await debitWallet(stakeAmount, `Match entry – ${gameName}`);
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch {
-      return;
-    }
-    const opponent = generateFakeOpponent(1000);
-    setOpponentFound(opponent);
-    try {
-      const newMatch = await createMatch({
-        gameType: gameSlug,
-        gameDisplayName: gameName,
-        stakeAmount,
-        player1,
-        player2: opponent,
-      });
-      setMatch(newMatch);
-      setMatchmaking(false);
-      setTimeout(() => router.push(`/match/${newMatch.id}`), 500);
-    } catch {
-      await creditWallet(stakeAmount, "Match creation failed – stake refunded", "match_refund");
-      dispatchWalletUpdated();
-      setMatchmaking(false);
-      setOpponentFound(null);
-    }
-  }, [
-    cancelSearching,
-    stakeAmount,
-    gameName,
-    player1,
-    router,
-    gameSlug,
-  ]);
+    router.push(`/play/${gameSlug}`);
+    showToast("Switched to lobby. Toggle Practice mode to play vs bot for free.", "success");
+  }, [cancelSearching, stakeAmount, gameSlug, router, showToast]);
 
   useEffect(() => {
     return () => {
@@ -616,10 +547,10 @@ export default function PlayGamePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handlePlayAgainstBot}
+                  onClick={handleSwitchToPractice}
                   className="rounded-lg border border-teal/50 bg-teal/10 px-6 py-2.5 font-semibold text-teal hover:bg-teal/20"
                 >
-                  Play against bot
+                  Switch to Practice Mode
                 </button>
                 <button
                   type="button"

@@ -13,10 +13,8 @@ import {
   type StoredMatch,
 } from "@/lib/api";
 import { updateMatch } from "@/lib/matchmaking";
-import { getConnectionMetrics } from "@/lib/connection-tester";
 import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
 import type { ConnectionSnapshot } from "@/lib/connection-logger";
-import { ConnectionCheckWarning, ConnectionCheckUnrecommended } from "@/components/ConnectionCheckModal";
 import { useMultiplayer } from "@/hooks/useMultiplayer";
 import EightBallPool from "@/components/games/EightBallPool";
 import Chess from "@/components/games/Chess";
@@ -49,6 +47,7 @@ function MatchPageContent() {
   const [forfeitConfirm, setForfeitConfirm] = useState(false);
   const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
   const [connectionCheckState, setConnectionCheckState] = useState<"checking" | "ok" | "warning" | "unrecommended">("checking");
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "poor" | "disconnected">("connecting");
   const [opponentDisconnectedAt, setOpponentDisconnectedAt] = useState<number | null>(null);
   const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
   const [wonByForfeit, setWonByForfeit] = useState(false);
@@ -60,8 +59,6 @@ function MatchPageContent() {
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
-  const botChatCountRef = useRef(0);
-  const botFreeTextUsedRef = useRef(false);
   matchRef.current = match;
 
   const {
@@ -131,6 +128,16 @@ function MatchPageContent() {
           setLoading(false);
           return;
         }
+        if (
+          (m.stakeAmount ?? 0) > 0 &&
+          !m.isPractice &&
+          m.status === "in_progress" &&
+          !m.player2Id
+        ) {
+          setLoadError("Invalid match — real money matches require a real opponent. Please start a new match.");
+          setLoading(false);
+          return;
+        }
         setMatch(m);
       } catch (err) {
         console.error("Failed to load match:", err);
@@ -142,19 +149,39 @@ function MatchPageContent() {
     load();
   }, [matchId, router]);
 
+  const isRealMultiplayerMatch = match?.isRealMultiplayer ?? false;
+  const realtimeConnectedRef = useRef(realtimeConnected);
+  realtimeConnectedRef.current = realtimeConnected;
+
   useEffect(() => {
     if (!match || match.status !== "in_progress" || loading) return;
-    const m = getConnectionMetrics();
-    const rating = m.overallRating;
-    if (rating === "good" || rating === "medium") {
+    if (!isRealMultiplayerMatch) {
       setConnectionCheckPassed(true);
       setConnectionCheckState("ok");
-    } else if (rating === "warning") {
-      setConnectionCheckState("warning");
-    } else {
-      setConnectionCheckState("unrecommended");
+      setConnectionStatus("connected");
+      return;
     }
-  }, [match, loading]);
+    const graceMs = 5000;
+    const graceTimeout = setTimeout(() => {
+      setConnectionCheckPassed(true);
+      setConnectionCheckState("ok");
+      setConnectionStatus(realtimeConnectedRef.current ? "connected" : "poor");
+    }, graceMs);
+    return () => clearTimeout(graceTimeout);
+  }, [match, loading, isRealMultiplayerMatch]);
+
+  useEffect(() => {
+    if (!connectionCheckPassed || !isRealMultiplayerMatch) return;
+    setConnectionStatus(realtimeConnected ? "connected" : "poor");
+  }, [connectionCheckPassed, isRealMultiplayerMatch, realtimeConnected]);
+
+  useEffect(() => {
+    if (!match || match.status !== "in_progress" || !isRealMultiplayerMatch) return;
+    const interval = setInterval(() => {
+      setConnectionStatus((prev) => (realtimeConnectedRef.current ? "connected" : prev === "disconnected" ? "disconnected" : "poor"));
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [match, isRealMultiplayerMatch]);
 
   useEffect(() => {
     if (!match || match.status !== "in_progress" || !connectionCheckPassed) return;
@@ -270,17 +297,6 @@ function MatchPageContent() {
     [chatMessages]
   );
 
-  const sendBotChat = useCallback(
-    (text: string, isPreset: boolean) => {
-      if (!matchRef.current || isRealMultiplayer) return;
-      if (botChatCountRef.current >= 5) return;
-      botChatCountRef.current += 1;
-      const botName = matchRef.current.player2.username || "Bot";
-      sendLocalChatMessage(text, isPreset, "bot", botName);
-    },
-    [isRealMultiplayer, sendLocalChatMessage]
-  );
-
   // Real multiplayer: when both connected, set match status to in_progress in DB (once)
   useEffect(() => {
     if (!match?.isRealMultiplayer || !realtimeConnected || !opponentConnected) return;
@@ -317,19 +333,6 @@ function MatchPageContent() {
     return () => clearInterval(interval);
   }, [match?.isRealMultiplayer, opponentDisconnectedAt]);
 
-  // Bot greeting at match start
-  useEffect(() => {
-    if (!match || match.status !== "in_progress") return;
-    if (isRealMultiplayer) return;
-    if (botChatCountRef.current > 0) return;
-    if (Math.random() < 0.3) {
-      const delay = 2000 + Math.floor(Math.random() * 1000);
-      setTimeout(() => {
-        sendBotChat("GL HF", true);
-      }, delay);
-    }
-  }, [match, isRealMultiplayer, sendBotChat]);
-
   /**
    * Unified game end: winner is 'player1' or 'player2'.
    * Compare winner ID with current user to show the correct result to each player.
@@ -357,22 +360,6 @@ function MatchPageContent() {
         }
       }
       setOutcome(iWon ? "victory" : "defeat");
-
-      if (!isReal) {
-        const r = Math.random();
-        if (iWon && r < 0.5) {
-          const delay = 1000 + Math.floor(Math.random() * 2000);
-          setTimeout(() => sendBotChat("🔥 GG", true), delay);
-        } else if (iWon && !botFreeTextUsedRef.current && Math.random() < 0.1) {
-          botFreeTextUsedRef.current = true;
-          setTimeout(() => sendBotChat("gg wp", false), 1000 + Math.floor(Math.random() * 2000));
-        } else if (!iWon && r < 0.4) {
-          setTimeout(() => sendBotChat("🔥 GG", true), 1000 + Math.floor(Math.random() * 2000));
-        } else if (!iWon && !botFreeTextUsedRef.current && Math.random() < 0.1) {
-          botFreeTextUsedRef.current = true;
-          setTimeout(() => sendBotChat("that was tough", false), 1000 + Math.floor(Math.random() * 2000));
-        }
-      }
     },
     [match, userId]
   );
@@ -407,22 +394,6 @@ function MatchPageContent() {
     handleLoss();
     setForfeitConfirm(false);
   }, [handleLoss, match?.isRealMultiplayer, match?.gameType, sendGameEvent]);
-
-  const handleConnectionContinue = useCallback(
-    (ack: { timestamp: string; rating: "warning" | "unrecommended" } | null) => {
-      if (ack && match) {
-        updateMatch(matchId, { connectionWarningAcknowledged: ack });
-        setMatch((prev) => (prev ? { ...prev, connectionWarningAcknowledged: ack } : null));
-      }
-      setConnectionCheckPassed(true);
-      setConnectionCheckState("ok");
-    },
-    [match, matchId]
-  );
-
-  const handleConnectionCancel = useCallback(() => {
-    router.replace("/play");
-  }, [router]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -473,40 +444,6 @@ function MatchPageContent() {
 
   const safePlayer1 = match.player1 ?? { username: "Player 1", rating: 1000 };
   const safePlayer2 = match.player2 ?? { username: "Opponent", rating: 1000 };
-
-  if (!connectionCheckPassed && match.status === "in_progress") {
-    const metrics = getConnectionMetrics();
-    if (connectionCheckState === "warning") {
-      return (
-        <div className="flex min-h-screen flex-col bg-charcoal">
-          <ConnectionCheckWarning
-            metrics={metrics}
-            onContinue={handleConnectionContinue}
-            onCancel={handleConnectionCancel}
-          />
-        </div>
-      );
-    }
-    if (connectionCheckState === "unrecommended") {
-      return (
-        <div className="flex min-h-screen flex-col bg-charcoal">
-          <ConnectionCheckUnrecommended
-            metrics={metrics}
-            onContinue={handleConnectionContinue}
-            onCancel={handleConnectionCancel}
-          />
-        </div>
-      );
-    }
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-          <p className="mt-4 text-body-gray">Checking connection quality...</p>
-        </div>
-      </div>
-    );
-  }
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   const shortId = match.id.slice(0, 8);
@@ -595,8 +532,32 @@ function MatchPageContent() {
         </div>
       )}
 
-      {/* In-game chat bar at top of game area — only when in progress */}
-      {!waitingForOpponent && match?.status === "in_progress" && !outcome && (
+      {/* Connection quality: small indicator only when actually poor (no modal at start) */}
+      {isRealMultiplayerMatch && match.status === "in_progress" && !outcome && connectionStatus === "poor" && (
+        <div
+          className="fixed right-2 top-[118px] z-30 rounded-md border px-2.5 py-1.5 text-[11px] font-medium text-amber-400"
+          style={{
+            background: "rgba(245, 158, 11, 0.15)",
+            borderColor: "rgba(245, 158, 11, 0.3)",
+          }}
+        >
+          ⚠️ Unstable connection
+        </div>
+      )}
+      {isRealMultiplayerMatch && match.status === "in_progress" && !outcome && connectionStatus === "disconnected" && (
+        <div
+          className="fixed left-0 right-0 top-[72px] z-30 border-b px-4 py-2 text-center text-[13px] font-medium text-red-400"
+          style={{
+            background: "rgba(239, 68, 68, 0.15)",
+            borderColor: "rgba(239, 68, 68, 0.3)",
+          }}
+        >
+          Connection lost — trying to reconnect...
+        </div>
+      )}
+
+      {/* In-game chat bar — only for real human vs human matches */}
+      {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && (
         <div className="mx-auto w-full px-4 sm:px-6 lg:max-w-[1200px]">
           <GameChat
             messages={chatMessages}
@@ -611,7 +572,7 @@ function MatchPageContent() {
               setChatOpen((open) => !open);
               if (!chatOpen) setUnreadCount(0);
             }}
-            isPractice={!!match?.isPractice}
+            isPractice={false}
           />
         </div>
       )}

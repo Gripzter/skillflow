@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { useToast } from "@/components/Toast";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
@@ -54,6 +55,7 @@ export default function PlaySpellingBeePage() {
   const realMatchNavRef = useRef<string | null>(null);
 
   const { isPractice } = usePlayMode();
+  const { showToast } = useToast();
   const {
     status: realMatchStatus,
     match: realMatch,
@@ -66,7 +68,7 @@ export default function PlaySpellingBeePage() {
   const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
   const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
   const insufficientBalance = !isPractice && balance < stakeAmount;
-  const useRealMatchmaking = !isDevMode && !isPractice;
+  const useRealMatchmaking = !isPractice;
   const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
   const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
 
@@ -217,35 +219,6 @@ export default function PlaySpellingBeePage() {
     } catch {
       return;
     }
-    setMatchmaking(true);
-    setMatchmakingElapsed(0);
-
-    const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
-    setElapsedTimer(timer);
-
-    const delay = 3000 + Math.floor(Math.random() * 5000);
-    findMatchTimeoutRef.current = setTimeout(async () => {
-      clearInterval(timer);
-      setElapsedTimer(null);
-      const opponent = generateFakeOpponent(1000);
-      setOpponentFound(opponent);
-      try {
-        const newMatch = await createMatch({
-          gameType: GAME_SLUG,
-          gameDisplayName: GAME_NAME,
-          stakeAmount,
-          player1,
-          player2: opponent,
-        });
-        setMatch(newMatch);
-        setTimeout(() => router.push(`/match/${newMatch.id}`), 2000);
-      } catch {
-        await creditWallet(stakeAmount, "Match creation failed – stake refunded", "match_refund");
-        dispatchWalletUpdated();
-        setMatchmaking(false);
-        setOpponentFound(null);
-      }
-    }, delay);
   }, [
     balance,
     stakeAmount,
@@ -260,9 +233,12 @@ export default function PlaySpellingBeePage() {
     botDifficulty,
   ]);
 
-  const handlePlayAgainstBot = useCallback(async () => {
+  const handleSwitchToPractice = useCallback(async () => {
     await cancelSearching();
+    setMatchmaking(false);
     setMatchmakingElapsed(0);
+    setOpponentFound(null);
+    setMatch(null);
     try {
       await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
       setBalance(await getWalletBalance());
@@ -270,33 +246,9 @@ export default function PlaySpellingBeePage() {
     } catch {
       dispatchWalletUpdated();
     }
-    try {
-      await debitWallet(stakeAmount, `Match entry – ${GAME_NAME}`);
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch {
-      return;
-    }
-    const opponent = generateFakeOpponent(1000);
-    setOpponentFound(opponent);
-    try {
-      const newMatch = await createMatch({
-        gameType: GAME_SLUG,
-        gameDisplayName: GAME_NAME,
-        stakeAmount,
-        player1,
-        player2: opponent,
-      });
-      setMatch(newMatch);
-      setMatchmaking(false);
-      setTimeout(() => router.push(`/match/${newMatch.id}`), 500);
-    } catch {
-      await creditWallet(stakeAmount, "Match creation failed – stake refunded", "match_refund");
-      dispatchWalletUpdated();
-      setMatchmaking(false);
-      setOpponentFound(null);
-    }
-  }, [cancelSearching, stakeAmount, player1, router]);
+    router.push("/play/spelling-bee");
+    showToast("Switched to lobby. Toggle Practice mode to play vs bot for free.", "success");
+  }, [cancelSearching, stakeAmount, router, showToast]);
 
   useEffect(() => {
     return () => {
@@ -550,10 +502,10 @@ export default function PlaySpellingBeePage() {
                 <div className="mt-6 flex flex-col gap-3">
                   <button
                     type="button"
-                    onClick={handlePlayAgainstBot}
+                    onClick={handleSwitchToPractice}
                     className="rounded-lg bg-amber-500 px-6 py-2.5 font-semibold text-charcoal hover:shadow-lg hover:shadow-amber-500/30"
                   >
-                    Play against bot
+                    Switch to Practice Mode
                   </button>
                   <button
                     type="button"

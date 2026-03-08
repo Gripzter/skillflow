@@ -27,9 +27,9 @@ const SPEED_TEST_INTERVAL_MS = 60000;
 const SPEED_TEST_SIZE = 100 * 1024; // 100KB
 
 const RATING_THRESHOLDS = {
-  good: { ping: 50, jitter: 15, packetLoss: 1 },
-  medium: { ping: 100, jitter: 30, packetLoss: 2 },
-  warning: { ping: 150, jitter: 50, packetLoss: 5 },
+  good: { ping: 150, jitter: 30, packetLoss: 2 },
+  medium: { ping: 300, jitter: 50, packetLoss: 5 },
+  warning: { ping: 450, jitter: 80, packetLoss: 10 },
 };
 
 function getRatingFromMetrics(ping: number, jitter: number, packetLoss: number): ConnectionRating {
