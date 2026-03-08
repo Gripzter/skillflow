@@ -25,6 +25,14 @@ const MATCHMAKING_SLOW_SEC = 30;
 const GAME_SLUG = "spelling-bee";
 const GAME_NAME = "Spelling Bee";
 
+type BotDifficulty = "rookie" | "gamer" | "professional";
+
+const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; emoji: string; description: string }[] = [
+  { value: "rookie", emoji: "🟢", label: "Rookie", description: "Learning the ropes. A great place to start." },
+  { value: "gamer", emoji: "🟡", label: "Gamer", description: "A solid opponent. Bring your A-game." },
+  { value: "professional", emoji: "🔴", label: "Professional", description: "Near-perfect play. Only the best can win." },
+];
+
 export default function PlaySpellingBeePage() {
   const router = useRouter();
   const [username, setUsername] = useState<string>("Player");
@@ -36,6 +44,7 @@ export default function PlaySpellingBeePage() {
 
   const [stake, setStake] = useState(5);
   const [customStake, setCustomStake] = useState("");
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("gamer");
   const [matchmaking, setMatchmaking] = useState(false);
   const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
   const [opponentFound, setOpponentFound] = useState<PlayerInfo | null>(null);
@@ -161,6 +170,7 @@ export default function PlaySpellingBeePage() {
             player1,
             player2: opponent,
             isPractice: true,
+            botDifficulty,
           });
           setMatch(newMatch);
           setTimeout(() => router.push(`/match/${newMatch.id}`), 1500);
@@ -247,6 +257,7 @@ export default function PlaySpellingBeePage() {
     userId,
     username,
     startMatchmaking,
+    botDifficulty,
   ]);
 
   const handlePlayAgainstBot = useCallback(async () => {
@@ -359,10 +370,38 @@ export default function PlaySpellingBeePage() {
         </div>
 
         {isPractice && (
-          <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
-            <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
-            <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
-          </div>
+          <>
+            <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
+              <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
+              <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
+            </div>
+            <section className="mt-8">
+              <h2 className="text-xl font-bold text-white">Select Difficulty</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {DIFFICULTY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setBotDifficulty(opt.value)}
+                    className={`pressable rounded-full border px-4 py-2.5 text-sm font-medium transition-all ${
+                      botDifficulty === opt.value
+                        ? opt.value === "rookie"
+                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                          : opt.value === "gamer"
+                            ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                            : "border-red-500 bg-red-500/20 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+                        : "border-white/20 bg-[#1A1D27] text-body-gray hover:border-white/40 hover:text-white"
+                    }`}
+                  >
+                    {opt.emoji} {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-body-gray">
+                &quot;{DIFFICULTY_OPTIONS.find((o) => o.value === botDifficulty)?.description}&quot;
+              </p>
+            </section>
+          </>
         )}
 
         {!isPractice && (
@@ -443,7 +482,7 @@ export default function PlaySpellingBeePage() {
                 : "bg-amber-500 text-charcoal hover:shadow-[0_0_24px_rgba(245,158,11,0.4)]"
             }`}
           >
-            {isPractice ? "Find Practice Match" : `Find Match — $${stakeAmount.toFixed(2)}`}
+            {isPractice ? "Start Practice" : `Find Match — $${stakeAmount.toFixed(2)}`}
           </button>
         </div>
       </main>

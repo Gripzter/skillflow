@@ -4,6 +4,9 @@
  */
 
 import type { Chess } from "chess.js";
+
+export type BotDifficulty = "rookie" | "gamer" | "professional";
+const DEFAULT_DIFFICULTY: BotDifficulty = "gamer";
 import type { Board } from "./connect4-logic";
 import type { SpellingDifficulty } from "./spelling-words";
 import { COLS, getValidColumns, dropDisc, checkWin } from "./connect4-logic";
@@ -44,11 +47,27 @@ function isDevelopMove(m: VerboseMove): boolean {
 }
 
 /**
- * Get a move for the chess bot (Player 2 / Black). Uses priority:
- * checkmate > capture queen > capture (highest value) > check (40%) > center (30%) > develop (25%) > random.
- * Always returns { from, to, promotion? } with promotion 'q' when move is a promotion.
+ * Score a move for ordering (higher = better). Used to get "top N" moves.
  */
-export function getChessBotMove(game: Chess): ChessBotMove | null {
+function scoreChessMove(m: VerboseMove): number {
+  let s = 0;
+  if (m.san.endsWith("#")) s += 10000;
+  if (m.capture === "q") s += 900;
+  if (m.capture) s += (PIECE_VALUE[m.capture] ?? 0) * 100;
+  if (m.san.endsWith("+")) s += 50;
+  if (CENTER_SQUARES.has(m.to)) s += 20;
+  if (isDevelopMove(m)) s += 15;
+  return s;
+}
+
+/**
+ * Get a move for the chess bot (Player 2 / Black).
+ * difficulty: rookie = top 5 + 30% blunder; gamer = top 3 + 10% mistake; professional = best (or top 2).
+ */
+export function getChessBotMove(
+  game: Chess,
+  difficulty: BotDifficulty = DEFAULT_DIFFICULTY
+): ChessBotMove | null {
   const moves = game.moves({ verbose: true }) as VerboseMove[];
   if (moves.length === 0) return null;
 
@@ -58,50 +77,37 @@ export function getChessBotMove(game: Chess): ChessBotMove | null {
     promotion: (m.promotion as "q") || undefined,
   });
 
-  // a) Checkmate
-  const checkmate = moves.find((m) => m.san.endsWith("#"));
-  if (checkmate) return withPromo(checkmate);
+  const sorted = [...moves].sort((a, b) => scoreChessMove(b) - scoreChessMove(a));
 
-  // b) Capture queen
-  const captureQueen = moves.find((m) => m.capture === "q");
-  if (captureQueen) return withPromo(captureQueen);
-
-  // c) Any capture — highest value first
-  const captures = moves.filter((m) => m.capture);
-  if (captures.length > 0) {
-    const best = captures.reduce((a, b) =>
-      (PIECE_VALUE[b.capture!] ?? 0) > (PIECE_VALUE[a.capture!] ?? 0) ? b : a
-    );
-    return withPromo(best);
+  if (difficulty === "rookie") {
+    if (Math.random() < 0.3) {
+      const m = moves[Math.floor(Math.random() * moves.length)];
+      return withPromo(m);
+    }
+    const topN = sorted.slice(0, Math.min(5, sorted.length));
+    return withPromo(topN[Math.floor(Math.random() * topN.length)]);
   }
 
-  // d) Check — 40% chance
-  const checks = moves.filter((m) => m.san.endsWith("+"));
-  if (checks.length > 0 && Math.random() < 0.4) {
-    return withPromo(checks[Math.floor(Math.random() * checks.length)]);
+  if (difficulty === "gamer") {
+    if (Math.random() < 0.1) {
+      const topN = sorted.slice(0, Math.min(5, sorted.length));
+      return withPromo(topN[Math.floor(Math.random() * topN.length)]);
+    }
+    const topN = sorted.slice(0, Math.min(3, sorted.length));
+    return withPromo(topN[Math.floor(Math.random() * topN.length)]);
   }
 
-  // e) Center control — 30% chance
-  const centerMoves = moves.filter((m) => CENTER_SQUARES.has(m.to));
-  if (centerMoves.length > 0 && Math.random() < 0.3) {
-    return withPromo(centerMoves[Math.floor(Math.random() * centerMoves.length)]);
-  }
-
-  // f) Develop pieces — 25% chance
-  const developMoves = moves.filter(isDevelopMove);
-  if (developMoves.length > 0 && Math.random() < 0.25) {
-    return withPromo(developMoves[Math.floor(Math.random() * developMoves.length)]);
-  }
-
-  // g) Random
-  const m = moves[Math.floor(Math.random() * moves.length)];
-  return withPromo(m);
+  // professional: best or top 2
+  const topN = sorted.slice(0, Math.min(2, sorted.length));
+  return withPromo(topN[Math.floor(Math.random() * topN.length)]);
 }
 
 /**
- * Random delay for bot "thinking" (ms).
+ * Random delay for bot "thinking" (ms). Rookie slower, professional faster.
  */
-export function getChessBotDelayMs(): number {
+export function getChessBotDelayMs(difficulty: BotDifficulty = DEFAULT_DIFFICULTY): number {
+  if (difficulty === "rookie") return 1000 + Math.floor(Math.random() * 1000);
+  if (difficulty === "professional") return 400 + Math.floor(Math.random() * 400);
   return 800 + Math.floor(Math.random() * 700);
 }
 
@@ -184,24 +190,36 @@ const COL_PRIORITY = [3, 2, 4, 1, 5, 0, 6];
 
 /**
  * Connect 4 bot (Player 2). Strategy:
- * 1. Win if possible
- * 2. Block player win
- * 3. Double threat 70%
- * 4. Center column 40%
- * 5. Prefer center columns
- * 6. Random valid
+ * 1. Win if possible 2. Block player win 3. Double threat 4. Center 5. Prefer center 6. Random.
+ * difficulty: rookie = 40% random, misses setup; gamer = current logic (depth ~3-4); professional = always win/block, strong.
  */
-export function getConnect4BotMove(board: Board): number | null {
+export function getConnect4BotMove(
+  board: Board,
+  difficulty: BotDifficulty = DEFAULT_DIFFICULTY
+): number | null {
   const valid = getValidColumns(board);
   if (valid.length === 0) return null;
 
+  // Always win if possible
   for (const col of valid) {
     const result = dropDisc(board, col, BOT_PLAYER as 1 | 2);
     if (result && checkWin(result.board)?.player === BOT_PLAYER) return col;
   }
-  for (const col of valid) {
+  // Always block if possible (except rookie 40% of the time we ignore)
+  const blockCols = valid.filter((col) => {
     const result = dropDisc(board, col, HUMAN_PLAYER as 1 | 2);
-    if (result && checkWin(result.board)?.player === HUMAN_PLAYER) return col;
+    return result && checkWin(result.board)?.player === HUMAN_PLAYER;
+  });
+  if (blockCols.length > 0) {
+    if (difficulty === "rookie" && Math.random() < 0.4) {
+      // skip block, fall through to random
+    } else {
+      return blockCols[Math.floor(Math.random() * blockCols.length)];
+    }
+  }
+
+  if (difficulty === "rookie") {
+    return valid[Math.floor(Math.random() * valid.length)];
   }
 
   const doubleThreatCols = valid.filter((col) => {
@@ -214,11 +232,13 @@ export function getConnect4BotMove(board: Board): number | null {
     }
     return wins >= 2;
   });
-  if (doubleThreatCols.length > 0 && Math.random() < 0.7) {
+  const useDoubleThreat = difficulty === "professional" ? 1 : 0.7;
+  if (doubleThreatCols.length > 0 && Math.random() < useDoubleThreat) {
     return doubleThreatCols[Math.floor(Math.random() * doubleThreatCols.length)];
   }
 
-  if (valid.includes(CENTER_COL) && Math.random() < 0.4) return CENTER_COL;
+  if (valid.includes(CENTER_COL) && Math.random() < (difficulty === "professional" ? 0.8 : 0.4))
+    return CENTER_COL;
 
   const nearCenter = COL_PRIORITY.filter((c) => valid.includes(c));
   if (nearCenter.length > 0) return nearCenter[0];
@@ -226,21 +246,28 @@ export function getConnect4BotMove(board: Board): number | null {
   return valid[Math.floor(Math.random() * valid.length)];
 }
 
-export function getConnect4BotDelayMs(): number {
+export function getConnect4BotDelayMs(difficulty: BotDifficulty = DEFAULT_DIFFICULTY): number {
+  if (difficulty === "rookie") return 800 + Math.floor(Math.random() * 800);
+  if (difficulty === "professional") return 300 + Math.floor(Math.random() * 300);
   return 600 + Math.floor(Math.random() * 600);
 }
 
 // --- Reaction Duel bot ---
 
 /**
- * Bot's simulated reaction time in ms. Called when target appears; bot "taps" after this delay.
- * 250–550ms normally; ~10% lucky 200ms; ~10% slow 600–800ms. Bot never false starts.
+ * Bot's simulated reaction time in ms.
+ * Rookie: 400–700ms; Gamer: 250–400ms; Professional: 150–250ms.
  */
-export function getReactionBotResponseMs(): number {
-  const r = Math.random();
-  if (r < 0.1) return 200; // lucky fast
-  if (r < 0.2) return 600 + Math.floor(Math.random() * 201); // slow
-  return 250 + Math.floor(Math.random() * 301); // 250–550
+export function getReactionBotResponseMs(
+  difficulty: BotDifficulty = DEFAULT_DIFFICULTY
+): number {
+  if (difficulty === "rookie") {
+    return 400 + Math.floor(Math.random() * 301); // 400–700
+  }
+  if (difficulty === "professional") {
+    return 150 + Math.floor(Math.random() * 101); // 150–250
+  }
+  return 250 + Math.floor(Math.random() * 151); // 250–400
 }
 
 // --- Memory Match bot ---
@@ -405,29 +432,36 @@ export interface SpellingBeeBotInput {
   word: string;
   difficulty: SpellingDifficulty;
   commonMisspellings?: string[];
+  /** Practice mode bot strength; overrides effective accuracy. */
+  botDifficulty?: BotDifficulty;
 }
 
 /**
  * Spelling Bee bot: returns answer and simulated response time.
- * Accuracy: easy 90%, medium 70%, hard 50%, expert 30%.
- * When wrong: uses commonMisspellings or applies realistic misspelling patterns.
- * 5% chance expert words result in timeout (timedOut: true).
+ * Word difficulty (easy/medium/hard/expert) scales base accuracy; botDifficulty then scales:
+ * rookie 40–50%, gamer 65–75%, professional 85–95%. Professional: faster typing.
  */
 export function getSpellingBeeBotAnswer(input: SpellingBeeBotInput): {
   answer: string;
   timeMs: number;
   timedOut?: boolean;
 } {
-  const { word, difficulty, commonMisspellings } = input;
+  const { word, difficulty, commonMisspellings, botDifficulty = DEFAULT_DIFFICULTY } = input;
   const correct = word.trim().toLowerCase();
 
-  const accuracyByDifficulty: Record<SpellingDifficulty, number> = {
+  const baseByWord: Record<SpellingDifficulty, number> = {
     easy: 0.9,
     medium: 0.7,
     hard: 0.5,
     expert: 0.3,
   };
-  const chance = accuracyByDifficulty[difficulty];
+  const baseChance = baseByWord[difficulty];
+  const botScale: Record<BotDifficulty, number> = {
+    rookie: 0.45,
+    gamer: 0.7,
+    professional: 0.9,
+  };
+  const chance = Math.min(0.95, baseChance * botScale[botDifficulty]);
   const spellCorrectly = Math.random() < chance;
 
   const timeRangeByDifficulty: Record<SpellingDifficulty, [number, number]> = {
@@ -436,9 +470,16 @@ export function getSpellingBeeBotAnswer(input: SpellingBeeBotInput): {
     hard: [5000, 10000],
     expert: [7000, 14000],
   };
-  const [minMs, maxMs] = timeRangeByDifficulty[difficulty];
+  let [minMs, maxMs] = timeRangeByDifficulty[difficulty];
+  if (botDifficulty === "professional") {
+    minMs = Math.floor(minMs * 0.5);
+    maxMs = Math.floor(maxMs * 0.6);
+  } else if (botDifficulty === "rookie") {
+    minMs = Math.floor(minMs * 1.2);
+    maxMs = Math.floor(maxMs * 1.3);
+  }
 
-  const timedOut = difficulty === "expert" && Math.random() < 0.05;
+  const timedOut = difficulty === "expert" && botDifficulty !== "professional" && Math.random() < 0.05;
   if (timedOut) {
     return {
       answer: "",

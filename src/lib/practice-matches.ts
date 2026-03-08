@@ -7,6 +7,8 @@ import type { PlayerInfo } from "./matchmaking";
 
 export const PRACTICE_MATCHES_STORAGE_KEY = "skillflow_practice_matches";
 
+export type BotDifficulty = "rookie" | "gamer" | "professional";
+
 export interface PracticeMatch {
   id: string;
   type: "practice";
@@ -22,6 +24,7 @@ export interface PracticeMatch {
   winner?: "player1" | "player2";
   createdAt: string;
   durationMs?: number;
+  botDifficulty?: BotDifficulty;
 }
 
 export function getPracticeMatches(): PracticeMatch[] {
@@ -55,7 +58,8 @@ export function createPracticeMatch(
   player1: PlayerInfo,
   player2: PlayerInfo,
   gameType: string,
-  gameDisplayName: string
+  gameDisplayName: string,
+  botDifficulty: BotDifficulty = "gamer"
 ): PracticeMatch {
   const match: PracticeMatch = {
     id: generateId(),
@@ -70,6 +74,7 @@ export function createPracticeMatch(
     winnerPayout: 0,
     status: "in_progress",
     createdAt: new Date().toISOString(),
+    botDifficulty,
   };
   savePracticeMatch(match);
   return match;

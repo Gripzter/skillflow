@@ -55,6 +55,7 @@ export default function MatchPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
@@ -108,6 +109,7 @@ export default function MatchPage() {
 
   useEffect(() => {
     async function load() {
+      setLoadError(null);
       try {
         const user = await getCurrentUser();
         if (!user) {
@@ -119,12 +121,19 @@ export default function MatchPage() {
         setIsDevMode(user.isDevMode ?? false);
         const m = await getMatch(matchId);
         if (!m) {
-          router.replace("/play");
+          setLoadError("Match not found. It may have been cancelled or the link is invalid.");
+          setLoading(false);
+          return;
+        }
+        if (!m.player1 || !m.player2) {
+          setLoadError("Invalid match data. Please try again.");
+          setLoading(false);
           return;
         }
         setMatch(m);
-      } catch {
-        router.replace("/play");
+      } catch (err) {
+        console.error("Failed to load match:", err);
+        setLoadError("Failed to load match. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -426,6 +435,30 @@ export default function MatchPage() {
     }
   }
 
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-charcoal px-4">
+        <div className="text-center">
+          <p className="text-lg font-medium text-white">{loadError}</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-4">
+            <Link
+              href="/play"
+              className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+            >
+              Back to Play
+            </Link>
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+            >
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading || !match) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-charcoal">
@@ -436,6 +469,9 @@ export default function MatchPage() {
       </div>
     );
   }
+
+  const safePlayer1 = match.player1 ?? { username: "Player 1", rating: 1000 };
+  const safePlayer2 = match.player2 ?? { username: "Opponent", rating: 1000 };
 
   if (!connectionCheckPassed && match.status === "in_progress") {
     const metrics = getConnectionMetrics();
@@ -480,7 +516,7 @@ export default function MatchPage() {
         : "player2"
       : "player1";
   const opponentUsername =
-    myRole === "player1" ? (match.player2?.username ?? "Opponent") : (match.player1?.username ?? "Opponent");
+    myRole === "player1" ? safePlayer2.username : safePlayer1.username;
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
 
   if (process.env.NODE_ENV !== "production") {
@@ -564,11 +600,12 @@ export default function MatchPage() {
           {match.status === "in_progress" && !outcome ? (
             <div className="card-border flex min-h-[500px] flex-1 flex-col rounded-card bg-card p-4">
               <Chess
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEvent}
@@ -586,11 +623,12 @@ export default function MatchPage() {
               style={{ height: "calc(100vh - 160px)" }}
             >
               <ConnectFour
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEvent}
@@ -605,11 +643,12 @@ export default function MatchPage() {
           {match.status === "in_progress" && !outcome ? (
             <div className="card-border flex min-h-[400px] flex-1 flex-col rounded-card bg-card p-4">
               <ReactionDuel
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEvent}
@@ -627,8 +666,8 @@ export default function MatchPage() {
               style={{ height: "calc(100vh - 160px)" }}
             >
               <MemoryMatch
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -644,11 +683,12 @@ export default function MatchPage() {
               style={{ minHeight: "calc(100vh - 160px)" }}
             >
               <SpellingBee
-                player1={{ username: match.player1.username, rating: match.player1.rating }}
-                player2={{ username: match.player2.username, rating: match.player2.rating }}
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEvent}
@@ -662,8 +702,8 @@ export default function MatchPage() {
         <main className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col px-4 py-6">
           <div className="flex w-full flex-col bg-transparent">
             <EightBallPool
-              player1={{ username: match.player1.username, rating: match.player1.rating }}
-              player2={{ username: match.player2.username, rating: match.player2.rating }}
+              player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+              player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
               onGameEnd={handleGameEnd}
               isPlayer2Bot={!isRealMultiplayer}
             />
@@ -673,10 +713,10 @@ export default function MatchPage() {
         <main className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-6 md:grid-cols-[1fr_2fr_1fr]">
           <div className="card-border rounded-card bg-card p-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-2xl font-bold text-white">
-              {match.player1.username.charAt(0)}
+              {safePlayer1.username.charAt(0)}
             </div>
-            <p className="mt-2 font-medium text-white">{match.player1.username}</p>
-            <p className="text-xs text-body-gray">Rating {match.player1.rating}</p>
+            <p className="mt-2 font-medium text-white">{safePlayer1.username}</p>
+            <p className="text-xs text-body-gray">Rating {safePlayer1.rating}</p>
             <p className="mt-4 text-3xl font-bold text-teal">0</p>
             <p className="text-xs text-body-gray">Score</p>
           </div>
@@ -705,17 +745,17 @@ export default function MatchPage() {
           </div>
           <div className="card-border rounded-card bg-card p-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-2xl font-bold text-white">
-              {match.player2.username.charAt(0)}
+              {safePlayer2.username.charAt(0)}
             </div>
             <p className="mt-2 font-medium text-white">
-              {match.player2.username}
+              {safePlayer2.username}
               {!isRealMultiplayer && (
                 <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
                   🤖 BOT
                 </span>
               )}
             </p>
-            <p className="text-xs text-body-gray">Rating {match.player2.rating}</p>
+            <p className="text-xs text-body-gray">Rating {safePlayer2.rating}</p>
             <p className="mt-4 text-3xl font-bold text-white">0</p>
             <p className="text-xs text-body-gray">Score</p>
           </div>
@@ -927,7 +967,7 @@ export default function MatchPage() {
         onSendMessage={handleSendChatMessage}
         onReportMessage={handleReportMessage}
         playerName={username}
-        opponentName={match.player2.username}
+        opponentName={safePlayer2.username}
         playerId={userId}
         unreadCount={unreadCount}
         isOpen={chatOpen}

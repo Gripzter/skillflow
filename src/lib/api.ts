@@ -59,6 +59,7 @@ function mapDbMatchToStoredMatch(row: {
   created_at: string;
   player2_id?: string | null;
   player1_id?: string | null;
+  bot_difficulty?: string | null;
 }): StoredMatch {
   const status = row.status === "completed" || row.status === "draw" ? "completed" : "in_progress";
   let winner: "player1" | "player2" | undefined;
@@ -90,6 +91,10 @@ function mapDbMatchToStoredMatch(row: {
     isRealMultiplayer: !!row.player2_id,
     player1Id: row.player1_id ?? undefined,
     player2Id: row.player2_id ?? undefined,
+    botDifficulty:
+      row.bot_difficulty === "rookie" || row.bot_difficulty === "gamer" || row.bot_difficulty === "professional"
+        ? row.bot_difficulty
+        : undefined,
   };
 }
 
@@ -362,13 +367,15 @@ export async function createMatch(params: {
   player1: PlayerInfo;
   player2: PlayerInfo;
   isPractice?: boolean;
+  botDifficulty?: "rookie" | "gamer" | "professional";
 }): Promise<StoredMatch> {
   if (params.isPractice) {
     const pm = createPracticeMatchLocal(
       params.player1,
       params.player2,
       params.gameType,
-      params.gameDisplayName
+      params.gameDisplayName,
+      params.botDifficulty ?? "gamer"
     );
     return { ...pm, isPractice: true } as StoredMatch;
   }

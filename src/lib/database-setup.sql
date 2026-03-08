@@ -8,6 +8,9 @@
 -- Dev mode (localStorage) will continue to work without this.
 -- This script creates: profiles, wallets, transactions, matches,
 -- game_stats, user_achievements, RLS policies, triggers, and indexes.
+--
+-- If you already have a matches table, add practice bot difficulty:
+--   ALTER TABLE matches ADD COLUMN IF NOT EXISTS bot_difficulty TEXT DEFAULT 'gamer';
 -- =============================================
 
 -- 1. PROFILES TABLE
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS matches (
   result TEXT CHECK (result IN ('player1_win', 'player2_win', 'draw', NULL)),
   status TEXT DEFAULT 'waiting' CHECK (status IN ('waiting', 'matched', 'in_progress', 'completed', 'cancelled', 'draw')),
   match_duration INTEGER,
+  bot_difficulty TEXT DEFAULT 'gamer',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE
 );

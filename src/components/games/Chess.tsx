@@ -11,7 +11,7 @@ import {
   type PieceType,
   type PieceColor,
 } from "@/lib/games/chess-utils";
-import { getChessBotMove, getChessBotDelayMs } from "@/lib/games/bot-engine";
+import { getChessBotMove, getChessBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 
 export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
@@ -27,6 +27,7 @@ interface ChessProps extends GameMultiplayerProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  botDifficulty?: BotDifficulty;
 }
 
 type PieceCode = string;
@@ -63,6 +64,7 @@ export default function Chess({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
@@ -323,16 +325,16 @@ export default function Chess({
   useEffect(() => {
     if (isMultiplayer || !isPlayer2Bot || turn !== "b" || promotionPending || gameOverRef.current) return;
     setBotThinking(true);
-    const delay = getChessBotDelayMs();
+    const delay = getChessBotDelayMs(botDifficulty);
     const t = setTimeout(() => {
-      const botMove = getChessBotMove(game);
+      const botMove = getChessBotMove(game, botDifficulty);
       if (botMove) {
         executeMove(botMove.from, botMove.to, botMove.promotion as PieceType | undefined);
       }
       setBotThinking(false);
     }, delay);
     return () => clearTimeout(t);
-  }, [fen, turn, isPlayer2Bot, isMultiplayer, promotionPending, game, executeMove]);
+  }, [fen, turn, isPlayer2Bot, botDifficulty, isMultiplayer, promotionPending, game, executeMove]);
 
   const boardContainerRef = useRef<HTMLDivElement>(null);
   const [boardSize, setBoardSize] = useState(400);

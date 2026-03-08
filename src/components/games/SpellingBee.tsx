@@ -18,7 +18,7 @@ import {
   getWordByIndex,
   getWordIndex,
 } from "@/lib/games/spelling-logic";
-import { getSpellingBeeBotAnswer } from "@/lib/games/bot-engine";
+import { getSpellingBeeBotAnswer, type BotDifficulty } from "@/lib/games/bot-engine";
 import {
   isSpeechSupported,
   pronounceWord as doPronounceWord,
@@ -45,6 +45,7 @@ interface SpellingBeeProps extends GameMultiplayerProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  botDifficulty?: BotDifficulty;
 }
 
 const DIFFICULTY_LABELS: Record<string, string> = {
@@ -67,6 +68,7 @@ export default function SpellingBee({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
@@ -274,6 +276,7 @@ export default function SpellingBee({
       word: effectiveWord.word,
       difficulty: effectiveWord.difficulty,
       commonMisspellings: effectiveWord.commonMisspellings,
+      botDifficulty,
     });
     botTimeoutRef.current = setTimeout(() => {
       botTimeoutRef.current = null;
@@ -281,7 +284,7 @@ export default function SpellingBee({
       setP2TimeMs(timeMs);
     }, Math.min(timeMs, ROUND_TIME_MS));
     return () => clearBotTimeout();
-  }, [phase, isTiebreaker, effectiveWord, isPlayer2Bot, p2Answer, clearBotTimeout]);
+  }, [phase, isTiebreaker, effectiveWord, isPlayer2Bot, botDifficulty, p2Answer, clearBotTimeout]);
 
   // Incoming multiplayer events
   useEffect(() => {

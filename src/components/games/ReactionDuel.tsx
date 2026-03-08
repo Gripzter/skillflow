@@ -10,7 +10,7 @@ import {
   getRoundWinner,
   getMatchWinner,
 } from "@/lib/games/reaction-logic";
-import { getReactionBotResponseMs } from "@/lib/games/bot-engine";
+import { getReactionBotResponseMs, type BotDifficulty } from "@/lib/games/bot-engine";
 
 const GAME_AREA_MIN = { w: 600, h: 400 };
 const TARGET_BASE = 70;
@@ -37,6 +37,7 @@ interface ReactionDuelProps extends GameMultiplayerProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  botDifficulty?: BotDifficulty;
 }
 
 type Phase = "countdown" | "get_ready" | "target" | "tapped" | "round_result" | "match_over";
@@ -48,6 +49,7 @@ export default function ReactionDuel({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
@@ -230,7 +232,7 @@ export default function ReactionDuel({
       targetAppearTimeRef.current = performance.now();
       setPhase("target");
       if (isPlayer2Bot) {
-        const botMs = getReactionBotResponseMs();
+        const botMs = getReactionBotResponseMs(botDifficulty);
         botTimeoutRef.current = setTimeout(() => {
           botTimeoutRef.current = null;
           setP2Reaction(botMs);
@@ -244,7 +246,7 @@ export default function ReactionDuel({
     return () => {
       if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
     };
-  }, [phase, round, isPlayer2Bot, isMultiplayer, myRole, sendGameEvent, baseTargetSize]);
+  }, [phase, round, isPlayer2Bot, botDifficulty, isMultiplayer, myRole, sendGameEvent, baseTargetSize]);
 
   const handleGameAreaTap = useCallback(
     (clientX: number, clientY: number) => {
@@ -262,7 +264,7 @@ export default function ReactionDuel({
           botTimeoutRef.current = null;
         }
         if (!isMultiplayer && isPlayer2Bot) {
-          const botMs = getReactionBotResponseMs();
+          const botMs = getReactionBotResponseMs(botDifficulty);
           setP2Reaction(botMs);
           setTimeout(() => {
             setPhase("round_result");
@@ -303,7 +305,7 @@ export default function ReactionDuel({
         sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
       }
     },
-    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, advanceRound]
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound]
   );
 
   const advanceRound = useCallback(

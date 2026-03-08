@@ -60,6 +60,8 @@ export interface StoredMatch {
   /** Real match: player user IDs for role resolution */
   player1Id?: string;
   player2Id?: string;
+  /** Practice only: bot difficulty */
+  botDifficulty?: "rookie" | "gamer" | "professional";
 }
 
 export function generateMatchId(): string {

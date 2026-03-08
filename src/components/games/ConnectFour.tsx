@@ -14,7 +14,7 @@ import {
   type Player,
   type WinResult,
 } from "@/lib/games/connect4-logic";
-import { getConnect4BotMove, getConnect4BotDelayMs } from "@/lib/games/bot-engine";
+import { getConnect4BotMove, getConnect4BotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 
 const BOARD_BG = "#1565C0";
 const CELL_BORDER = "#0D47A1";
@@ -32,6 +32,7 @@ interface ConnectFourProps extends GameMultiplayerProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  botDifficulty?: BotDifficulty;
 }
 
 type MoveHistoryEntry = { player: 1 | 2; playerName: string; col: number; ts: number };
@@ -48,6 +49,7 @@ export default function ConnectFour({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
@@ -208,9 +210,9 @@ export default function ConnectFour({
     if (dropping) return;
     if (isMultiplayer || !isPlayer2Bot || turn !== 2 || gameOverRef.current) return;
     setBotThinking(true);
-    const delay = getConnect4BotDelayMs();
+    const delay = getConnect4BotDelayMs(botDifficulty);
     const t = setTimeout(() => {
-      const col = getConnect4BotMove(board);
+      const col = getConnect4BotMove(board, botDifficulty);
       if (col === null) {
         setBotThinking(false);
         return;
@@ -245,7 +247,7 @@ export default function ConnectFour({
       setBotThinking(false);
     }, delay);
     return () => clearTimeout(t);
-  }, [boardKey, turn, isPlayer2Bot, isMultiplayer, board, player2.username, onGameEnd, onGameDraw, dropping]);
+  }, [boardKey, turn, isPlayer2Bot, botDifficulty, isMultiplayer, board, player2.username, onGameEnd, onGameDraw, dropping]);
 
   useEffect(() => {
     if (dropping) {
