@@ -177,7 +177,6 @@ export function drawTable(
   const playTop = feltTop + CUSHION_INSET;
   const playRight = feltLeft + feltW - CUSHION_INSET;
   const playBottom = feltTop + feltH - CUSHION_INSET;
-  const centerX = playLeft + playWidth / 2;
   const cushionColor = "#2D5A1E";
   const noseW = Math.max(4, Math.min(8, CUSHION_NOSE_WIDTH * scale));
 
