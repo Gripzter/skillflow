@@ -1,16 +1,33 @@
 /**
- * 8-ball pool table dimensions, ball definitions, pocket positions, and Matter.js physics config.
- * Table aspect ratio 2:1. Ball radius scales with table (playWidth / 56).
+ * 8-ball pool table dimensions per WPA (World Pool-Billiard Association) tournament specs.
+ * All dimensions in inches; converted to pixels via scale = tableWidth / WPA_OUTER_LENGTH.
  */
 
-export const TABLE_ASPECT = 2;
-export const FRAME_WIDTH = 40;
-export const CUSHION_INSET = 10;
-/** Total rail (frame + cushion) from table edge to play area. */
-export const RAIL_WIDTH = FRAME_WIDTH + CUSHION_INSET;
+/** WPA 9-foot table: outer 110" × 60", play surface 100" × 50" (2:1). */
+export const WPA = {
+  OUTER_LENGTH: 110,
+  OUTER_WIDTH: 60,
+  PLAY_LENGTH: 100,
+  PLAY_WIDTH: 50,
+  RAIL: 5,
+  CUSHION_DEPTH: 2,
+  BALL_DIAMETER: 2.25,
+  BALL_RADIUS: 1.125,
+  CORNER_POCKET_MOUTH: 4.5,
+  SIDE_POCKET_MOUTH: 5,
+  HEAD_STRING: 25,
+  FOOT_SPOT: 75,
+  CENTER: 50,
+} as const;
 
-/** Base ball radius when play width is 700 (scales with playWidth/56). */
-export const BALL_RADIUS_RATIO = 1 / 56;
+export const TABLE_ASPECT = WPA.OUTER_LENGTH / WPA.OUTER_WIDTH;
+
+/** @deprecated Use getInset(tableWidth) for WPA. */
+export const FRAME_WIDTH = 40;
+/** @deprecated Use getCushionInset(playLength) for WPA. */
+export const CUSHION_INSET = 10;
+/** @deprecated Use getInset(tableWidth) for WPA. */
+export const RAIL_WIDTH = 50;
 
 export const TABLE_FRAME = "#2C1810";
 export const CUSHION_GREEN = "#0B7A3E";
@@ -48,89 +65,101 @@ export const CUE_BALL_NUMBER = 0;
 export const BALL_COLORS: BallStyle[] = [
   { fill: "#FFFFFF", number: 0 },
   { fill: "#F5C518", number: 1 },
-  { fill: "#1E40AF", number: 2 },
+  { fill: "#1E3A8A", number: 2 },
   { fill: "#DC2626", number: 3 },
-  { fill: "#6B21A8", number: 4 },
+  { fill: "#581C87", number: 4 },
   { fill: "#EA580C", number: 5 },
   { fill: "#15803D", number: 6 },
   { fill: "#7C2D12", number: 7 },
   { fill: "#000000", number: 8 },
   { fill: "#F5C518", stripe: true, number: 9 },
-  { fill: "#1E40AF", stripe: true, number: 10 },
+  { fill: "#1E3A8A", stripe: true, number: 10 },
   { fill: "#DC2626", stripe: true, number: 11 },
-  { fill: "#6B21A8", stripe: true, number: 12 },
+  { fill: "#581C87", stripe: true, number: 12 },
   { fill: "#EA580C", stripe: true, number: 13 },
   { fill: "#15803D", stripe: true, number: 14 },
   { fill: "#7C2D12", stripe: true, number: 15 },
 ];
 
-/** Ball radius from play area width (standard ratio). */
-export function getBallRadius(playWidth: number): number {
-  return Math.max(6, playWidth * BALL_RADIUS_RATIO);
+/** Rail inset in pixels from table edge to play area (5" in WPA). */
+export function getInset(tableWidth: number): number {
+  return tableWidth * (WPA.RAIL / WPA.OUTER_LENGTH);
 }
 
-/** Pocket radius: corner = ballRadius * 2.2, side = ballRadius * 2.0 */
-export function getPocketRadiusCorner(ballRadius: number): number {
-  return ballRadius * 2.2;
+/** Cushion depth in pixels for physics walls (2" in WPA). */
+export function getCushionInset(playLength: number): number {
+  return playLength * (WPA.CUSHION_DEPTH / WPA.PLAY_LENGTH);
 }
+
+/** Ball radius in pixels (1.125" in WPA). playLength = 100-unit dimension in pixels. */
+export function getBallRadius(playLength: number): number {
+  return Math.max(4, playLength * (WPA.BALL_RADIUS / WPA.PLAY_LENGTH));
+}
+
+/** Corner pocket radius in pixels (4.5" / 2 in WPA). */
+export function getPocketRadiusCorner(ballRadius: number): number {
+  return ballRadius * (WPA.CORNER_POCKET_MOUTH / WPA.BALL_DIAMETER);
+}
+
+/** Side pocket radius in pixels (5" / 2 in WPA). */
 export function getPocketRadiusSide(ballRadius: number): number {
-  return ballRadius * 2.0;
+  return ballRadius * (WPA.SIDE_POCKET_MOUTH / WPA.BALL_DIAMETER);
 }
 
 /**
- * Table size from container: width = container - 40 padding, height = width/2, min width 600.
- * Returns canvas width and height.
+ * Table size in pixels. Outer aspect 110:60 (WPA).
  */
 export function getTableSize(containerWidth: number): { width: number; height: number } {
   const width = Math.max(600, containerWidth || 800);
-  return { width, height: width / 2 };
+  return { width, height: width * (WPA.OUTER_WIDTH / WPA.OUTER_LENGTH) };
 }
 
-/** Playable area (felt) inside rails. */
+/** Playable area in pixels (100×50 in WPA). */
 export function getPlayableSize(tableWidth: number, tableHeight: number): { width: number; height: number } {
   return {
-    width: tableWidth - 2 * RAIL_WIDTH - 2 * CUSHION_INSET,
-    height: tableHeight - 2 * RAIL_WIDTH - 2 * CUSHION_INSET,
+    width: tableWidth * (WPA.PLAY_LENGTH / WPA.OUTER_LENGTH),
+    height: tableHeight * (WPA.PLAY_WIDTH / WPA.OUTER_WIDTH),
   };
 }
 
 /**
- * Pocket positions in playable-area coordinates.
+ * Pocket positions in playable-area coordinates (WPA).
  * Order: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right.
  */
-export function getPocketPositions(playWidth: number, playHeight: number, ballRadius: number): Pocket[] {
+export function getPocketPositions(playLength: number, playWidth: number, ballRadius: number): Pocket[] {
   const cornerR = getPocketRadiusCorner(ballRadius);
   const sideR = getPocketRadiusSide(ballRadius);
-  const margin = cornerR + 4;
+  const marginCorner = cornerR;
+  const marginSide = sideR;
   return [
-    { x: margin, y: margin, radius: cornerR, id: 0 },
-    { x: playWidth / 2, y: margin, radius: sideR, id: 1 },
-    { x: playWidth - margin, y: margin, radius: cornerR, id: 2 },
-    { x: margin, y: playHeight - margin, radius: cornerR, id: 3 },
-    { x: playWidth / 2, y: playHeight - margin, radius: sideR, id: 4 },
-    { x: playWidth - margin, y: playHeight - margin, radius: cornerR, id: 5 },
+    { x: marginCorner, y: marginSide, radius: cornerR, id: 0 },
+    { x: playLength / 2, y: marginSide, radius: sideR, id: 1 },
+    { x: playLength - marginCorner, y: marginSide, radius: cornerR, id: 2 },
+    { x: marginCorner, y: playWidth - marginSide, radius: cornerR, id: 3 },
+    { x: playLength / 2, y: playWidth - marginSide, radius: sideR, id: 4 },
+    { x: playLength - marginCorner, y: playWidth - marginSide, radius: cornerR, id: 5 },
   ];
 }
 
-/** Cue ball starting position: 1/4 from left (head string), vertically centered. */
-export function getCueBallPosition(playWidth: number, playHeight: number): { x: number; y: number } {
-  return { x: playWidth * 0.25, y: playHeight * 0.5 };
+/** Cue ball starting position: behind head string (WPA 25" from head rail), vertically centered. */
+export function getCueBallPosition(playLength: number, playWidth: number): { x: number; y: number } {
+  return { x: playLength * (WPA.HEAD_STRING / WPA.PLAY_LENGTH), y: playWidth * 0.5 };
 }
 
 /** Head string X: cue ball must be placed left of this on break. */
-export function getHeadStringX(playWidth: number): number {
-  return playWidth * 0.25;
+export function getHeadStringX(playLength: number): number {
+  return playLength * (WPA.HEAD_STRING / WPA.PLAY_LENGTH);
 }
 
 export const RACK_ORDER = [1, 9, 2, 3, 8, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15];
 
 export function getRackPositionsOrdered(
+  playLength: number,
   playWidth: number,
-  playHeight: number,
   ballRadius: number
 ): { x: number; y: number; ballNumber: number }[] {
-  const cx = playWidth * 0.75;
-  const cy = playHeight * 0.5;
+  const cx = playLength * (WPA.FOOT_SPOT / WPA.PLAY_LENGTH);
+  const cy = playWidth * 0.5;
   const d = ballRadius * 2.02;
   const positions: { x: number; y: number; ballNumber: number }[] = [];
   let ballIdx = 0;

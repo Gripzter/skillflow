@@ -11,8 +11,8 @@ import {
   getBallRadius,
   getHeadStringX,
   PHYSICS,
-  RAIL_WIDTH,
-  CUSHION_INSET,
+  getInset,
+  getCushionInset,
   BALL_COLORS,
   rayCircleIntersect,
   raySegmentIntersect,
@@ -50,7 +50,6 @@ const MAX_POWER = 1;
 const VELOCITY_THRESHOLD = 0.05;
 const TURN_DELAY_MS = 500;
 const MAX_FORCE = 0.0018 * 120;
-const INSET = RAIL_WIDTH + CUSHION_INSET;
 
 interface EightBallPoolProps {
   player1: { username: string; rating: number };
@@ -68,6 +67,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
   const wallsRef = useRef<Matter.Body[]>([]);
   const pocketsRef = useRef<Pocket[]>([]);
   const playSizeRef = useRef({ width: 0, height: 0 });
+  const cushionInsetRef = useRef(10);
   const ballRadiusRef = useRef(12);
   const tableSizeRef = useRef({ width: 800, height: 400 });
 
@@ -124,18 +124,18 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
   assignmentNoticeRef.current = assignmentNotice;
   assignmentAlphaRef.current = assignmentAlpha;
 
-  const playWidth = tableSize.width - 2 * INSET;
-  const playHeight = tableSize.height - 2 * INSET;
-  const ballRadius = getBallRadius(playWidth);
+  const inset = getInset(tableSize.width);
+  const play = getPlayableSize(tableSize.width, tableSize.height);
+  const ballRadius = getBallRadius(play.width);
   ballRadiusRef.current = ballRadius;
   tableSizeRef.current = tableSize;
 
   const worldToCanvas = useCallback<WorldToCanvas>(
     (wx, wy) => ({
-      x: INSET + wx,
-      y: INSET + wy,
+      x: inset + wx,
+      y: inset + wy,
     }),
-    []
+    [inset]
   );
 
   const canvasToWorld = useCallback(
@@ -143,14 +143,14 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       const canvas = canvasRef.current;
       if (!canvas) return { x: 0, y: 0 };
       const rect = canvas.getBoundingClientRect();
-      const logicalX = (rect.width ? (clientX - rect.left) / rect.width : 0) * tableSize.width - INSET;
-      const logicalY = (rect.height ? (clientY - rect.top) / rect.height : 0) * tableSize.height - INSET;
+      const logicalX = (rect.width ? (clientX - rect.left) / rect.width : 0) * tableSize.width - inset;
+      const logicalY = (rect.height ? (clientY - rect.top) / rect.height : 0) * tableSize.height - inset;
       return {
-        x: Math.max(0, Math.min(playWidth, logicalX)),
-        y: Math.max(0, Math.min(playHeight, logicalY)),
+        x: Math.max(0, Math.min(play.width, logicalX)),
+        y: Math.max(0, Math.min(play.height, logicalY)),
       };
     },
-    [playWidth, playHeight, tableSize.width, tableSize.height]
+    [play.width, play.height, tableSize.width, tableSize.height, inset]
   );
 
   useEffect(() => {
@@ -184,6 +184,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
 
     const playSize = getPlayableSize(tableSize.width, tableSize.height);
     playSizeRef.current = playSize;
+    const cushionInset = getCushionInset(playSize.width);
+    cushionInsetRef.current = cushionInset;
     const br = getBallRadius(playSize.width);
     const pockets = getPocketPositions(playSize.width, playSize.height, br);
     pocketsRef.current = pockets;
@@ -200,13 +202,13 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       restitution: PHYSICS.cushionRestitution,
       friction: PHYSICS.cushionFriction,
     };
-    const w = playSize.width + 2 * CUSHION_INSET;
-    const h = playSize.height + 2 * CUSHION_INSET;
+    const w = playSize.width + 2 * cushionInset;
+    const h = playSize.height + 2 * cushionInset;
     const walls = [
-      Matter.Bodies.rectangle(CUSHION_INSET / 2, h / 2, CUSHION_INSET, h + 4, wallOptions),
-      Matter.Bodies.rectangle(w - CUSHION_INSET / 2, h / 2, CUSHION_INSET, h + 4, wallOptions),
-      Matter.Bodies.rectangle(w / 2, CUSHION_INSET / 2, w + 4, CUSHION_INSET, wallOptions),
-      Matter.Bodies.rectangle(w / 2, h - CUSHION_INSET / 2, w + 4, CUSHION_INSET, wallOptions),
+      Matter.Bodies.rectangle(cushionInset / 2, h / 2, cushionInset, h + 4, wallOptions),
+      Matter.Bodies.rectangle(w - cushionInset / 2, h / 2, cushionInset, h + 4, wallOptions),
+      Matter.Bodies.rectangle(w / 2, cushionInset / 2, w + 4, cushionInset, wallOptions),
+      Matter.Bodies.rectangle(w / 2, h - cushionInset / 2, w + 4, cushionInset, wallOptions),
     ];
     walls.forEach((b) => Matter.World.add(world, b));
     wallsRef.current = walls;
@@ -222,8 +224,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
 
     const cuePos = getCueBallPosition(playSize.width, playSize.height);
     const cueBall = Matter.Bodies.circle(
-      cuePos.x + CUSHION_INSET,
-      cuePos.y + CUSHION_INSET,
+      cuePos.x + cushionInset,
+      cuePos.y + cushionInset,
       br,
       { ...ballOptions, label: "ball-0" }
     );
@@ -234,8 +236,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     const rack = getRackPositionsOrdered(playSize.width, playSize.height, br);
     rack.forEach(({ x, y, ballNumber }) => {
       const body = Matter.Bodies.circle(
-        x + CUSHION_INSET,
-        y + CUSHION_INSET,
+        x + cushionInset,
+        y + cushionInset,
         br,
         { ...ballOptions, label: `ball-${ballNumber}` }
       );
@@ -282,8 +284,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
 
       ballsRef.current.forEach((body, ballNum) => {
         const pos = body.position;
-        const px = pos.x - CUSHION_INSET;
-        const py = pos.y - CUSHION_INSET;
+        const px = pos.x - cushionInsetRef.current;
+        const py = pos.y - cushionInsetRef.current;
         const v = body.velocity;
         if (Math.hypot(v.x, v.y) < PHYSICS.minVelocity && Math.hypot(v.x, v.y) > 0) {
           Matter.Body.setVelocity(body, { x: 0, y: 0 });
@@ -326,8 +328,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         ballsRef.current.has(0);
       if (canAim) {
         const cpos = cue.position;
-        const cx = cpos.x - CUSHION_INSET;
-        const cy = cpos.y - CUSHION_INSET;
+        const cx = cpos.x - cushionInsetRef.current;
+        const cy = cpos.y - cushionInsetRef.current;
         const dx = cursorWorld.x - cx;
         const dy = cursorWorld.y - cy;
         const len = Math.hypot(dx, dy) || 1;
@@ -340,8 +342,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         ballsRef.current.forEach((body, num) => {
           if (num === 0) return;
           const pos = body.position;
-          const bx = pos.x - CUSHION_INSET;
-          const by = pos.y - CUSHION_INSET;
+          const bx = pos.x - cushionInsetRef.current;
+          const by = pos.y - cushionInsetRef.current;
           const t = rayCircleIntersect(cx, cy, ux * rayLen, uy * rayLen, bx, by, ballRadiusRef.current);
           if (t !== null && t >= 0 && (firstHit === null || t < firstHit.t)) {
             firstHit = {
@@ -468,8 +470,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       const toRemove: { body: Matter.Body; ballNum: number; pocketIndex: number }[] = [];
       ballsRef.current.forEach((body, ballNum) => {
         const pos = body.position;
-        const px = pos.x - CUSHION_INSET;
-        const py = pos.y - CUSHION_INSET;
+        const px = pos.x - cushionInsetRef.current;
+        const py = pos.y - cushionInsetRef.current;
         for (let i = 0; i < pockets.length; i++) {
           const p = pockets[i];
           if (Math.hypot(px - p.x, py - p.y) < p.radius) {
@@ -606,13 +608,13 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         setBotThinking(false);
         return;
       }
-      const cueX = cue.position.x - CUSHION_INSET;
-      const cueY = cue.position.y - CUSHION_INSET;
+      const cueX = cue.position.x - cushionInsetRef.current;
+      const cueY = cue.position.y - cushionInsetRef.current;
       const ballMap = new Map<number, { x: number; y: number }>();
       balls.forEach((body, num) => {
         if (num === 0) return;
         const pos = body.position;
-        ballMap.set(num, { x: pos.x - CUSHION_INSET, y: pos.y - CUSHION_INSET });
+        ballMap.set(num, { x: pos.x - cushionInsetRef.current, y: pos.y - cushionInsetRef.current });
       });
       const shot = getPoolBotShot({
         cueX,
@@ -668,7 +670,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         wx = Math.max(ballRadiusRef.current, Math.min(play.width - ballRadiusRef.current, wx));
         wy = Math.max(ballRadiusRef.current, Math.min(play.height - ballRadiusRef.current, wy));
         if (engine) {
-          const newCue = Matter.Bodies.circle(wx + CUSHION_INSET, wy + CUSHION_INSET, ballRadiusRef.current, {
+          const newCue = Matter.Bodies.circle(wx + cushionInsetRef.current, wy + cushionInsetRef.current, ballRadiusRef.current, {
             restitution: PHYSICS.ballRestitution,
             friction: PHYSICS.ballFriction,
             frictionAir: PHYSICS.ballFrictionAir,
@@ -723,8 +725,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         ballsRef.current.forEach((body, num) => {
           if (num === 0) return;
           const pos = body.position;
-          const dx = (pos.x - CUSHION_INSET) - world.x;
-          const dy = (pos.y - CUSHION_INSET) - world.y;
+          const dx = (pos.x - cushionInsetRef.current) - world.x;
+          const dy = (pos.y - cushionInsetRef.current) - world.y;
           if (Math.hypot(dx, dy) < ballRadiusRef.current * 2.1) valid = false;
         });
         setPlaceValid(valid);
@@ -732,18 +734,18 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
       }
       if (powerMode && cueBallRef.current) {
         const cpos = cueBallRef.current.position;
-        const cx = cpos.x - CUSHION_INSET;
-        const cy = cpos.y - CUSHION_INSET;
+        const cx = cpos.x - cushionInsetRef.current;
+        const cy = cpos.y - cushionInsetRef.current;
         const dx = cx - world.x;
         const dy = cy - world.y;
         const dist = Math.hypot(dx, dy);
-        const maxDist = Math.min(playWidth, playHeight) * 0.4;
+        const maxDist = Math.min(play.width, play.height) * 0.4;
         const ratio = Math.min(1, dist / maxDist);
         const p = MIN_POWER + ratio * (MAX_POWER - MIN_POWER);
         setPower(p);
       }
     },
-    [placingCue, gameState, powerMode, playWidth, playHeight, canvasToWorld]
+    [placingCue, gameState, powerMode, play.width, play.height, canvasToWorld]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -751,8 +753,8 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     if (!powerMode || !cueBallRef.current || ballsMoving) return;
     const cue = cueBallRef.current;
     const cpos = cue.position;
-    const cx = cpos.x - CUSHION_INSET;
-    const cy = cpos.y - CUSHION_INSET;
+    const cx = cpos.x - cushionInsetRef.current;
+    const cy = cpos.y - cushionInsetRef.current;
     const cw = cursorWorld;
     if (!cw) {
       setPowerMode(false);

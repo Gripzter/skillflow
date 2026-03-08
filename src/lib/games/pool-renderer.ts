@@ -6,18 +6,28 @@
 import type { Pocket } from "./pool-physics";
 import {
   BALL_COLORS,
-  CUSHION_INSET,
-  FRAME_WIDTH,
+  WPA,
+  getInset,
   getBallRadius,
   getPocketRadiusCorner,
   getPocketRadiusSide,
-  RAIL_WIDTH,
 } from "./pool-physics";
 
 export type WorldToCanvas = (wx: number, wy: number) => { x: number; y: number };
 
-const TABLE_RADIUS = 10;
-const CUSHION_NOSE_WIDTH = 6;
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
 
 let feltPattern: CanvasPattern | null = null;
 
@@ -49,150 +59,49 @@ export function drawTable(
   scale: number
 ) {
   ctx.imageSmoothingEnabled = true;
-  const inset = FRAME_WIDTH + CUSHION_INSET;
+  const sc = tableWidth / WPA.OUTER_LENGTH;
+  const inset = getInset(tableWidth);
+  const cushionDepthPx = sc * WPA.CUSHION_DEPTH;
   const feltLeft = inset;
   const feltTop = inset;
-  const feltW = tableWidth - 2 * inset;
-  const feltH = tableHeight - 2 * inset;
+  const feltW = playWidth;
+  const feltH = playHeight;
+  const r = Math.max(2, tableWidth * 0.003);
 
-  // Layer 1 — outer shadow
+  // Layer 1 — outer frame (dark mahogany)
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.5)";
-  ctx.shadowBlur = 30;
-  ctx.shadowOffsetY = 10;
-  ctx.fillStyle = "#3D1F0B";
-  ctx.beginPath();
-  ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
+  const frameGrad = ctx.createLinearGradient(0, 0, 0, tableHeight);
+  frameGrad.addColorStop(0, "#4A2511");
+  frameGrad.addColorStop(1, "#3A1A0A");
+  ctx.fillStyle = frameGrad;
+  roundRect(ctx, 0, 0, tableWidth, tableHeight, r);
   ctx.fill();
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
   ctx.restore();
 
-  // Layer 2 — outer frame (dark mahogany)
+  // Layer 2 — rail surface (medium wood)
   ctx.save();
-  ctx.fillStyle = "#3D1F0B";
-  ctx.beginPath();
-  ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
-  ctx.fill();
-  for (let i = 0; i < 10; i++) {
-    ctx.strokeStyle = "rgba(0,0,0,0.05)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, (tableHeight * (i + 1)) / 11);
-    ctx.lineTo(tableWidth, (tableHeight * (i + 1)) / 11);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(TABLE_RADIUS, 2);
-  ctx.lineTo(tableWidth - TABLE_RADIUS, 2);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(0,0,0,0.15)";
-  ctx.beginPath();
-  ctx.moveTo(TABLE_RADIUS, tableHeight - 2);
-  ctx.lineTo(tableWidth - TABLE_RADIUS, tableHeight - 2);
-  ctx.stroke();
-  ctx.restore();
-
-  // Layer 3 — rail cushions (medium brown wood)
-  ctx.save();
-  const railLeft = FRAME_WIDTH;
-  const railTop = FRAME_WIDTH;
-  const railW = tableWidth - 2 * FRAME_WIDTH;
-  const railH = tableHeight - 2 * FRAME_WIDTH;
-  const railGrad = ctx.createLinearGradient(railLeft, railTop, railLeft + railW, railTop + railH);
-  railGrad.addColorStop(0, "#5C3310");
-  railGrad.addColorStop(0.5, "#4A2A0E");
-  railGrad.addColorStop(1, "#5C3310");
+  const railInset = sc * 0.5;
+  const railGrad = ctx.createLinearGradient(0, 0, 0, tableHeight);
+  railGrad.addColorStop(0, "#6B3A1F");
+  railGrad.addColorStop(1, "#5C3010");
   ctx.fillStyle = railGrad;
-  ctx.beginPath();
-  ctx.roundRect(railLeft, railTop, railW, railH, Math.max(0, TABLE_RADIUS - 4));
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.2)";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(railLeft + 1, railTop);
-  ctx.lineTo(railLeft + 1, railTop + railH);
-  ctx.moveTo(railLeft, railTop + 1);
-  ctx.lineTo(railLeft + railW, railTop + 1);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
-  ctx.beginPath();
-  ctx.moveTo(railLeft + railW - 1, railTop);
-  ctx.lineTo(railLeft + railW - 1, railTop + railH);
-  ctx.moveTo(railLeft, railTop + railH - 1);
-  ctx.lineTo(railLeft + railW, railTop + railH - 1);
-  ctx.stroke();
-  ctx.restore();
-
-  // Layer 4 — felt playing surface (rich green, overhead lighting)
-  ctx.save();
-  const cx = feltLeft + feltW / 2;
-  const cy = feltTop + feltH / 2;
-  const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(feltW, feltH) * 0.7);
-  feltGrad.addColorStop(0, "#0C7E42");
-  feltGrad.addColorStop(1, "#0A6E3A");
-  ctx.fillStyle = feltGrad;
-  ctx.fillRect(feltLeft, feltTop, feltW, feltH);
-  const pattern = getFeltPattern(ctx, feltW, feltH, scale);
-  if (pattern) {
-    ctx.fillStyle = pattern;
-    ctx.globalAlpha = 0.4;
-    ctx.fillRect(feltLeft, feltTop, feltW, feltH);
-    ctx.globalAlpha = 1;
-  }
-  ctx.restore();
-
-  // Layer 5 — table markings (head string, foot spot, center spot)
-  ctx.save();
-  const headX = feltLeft + feltW * 0.25;
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(headX, feltTop + 2);
-  ctx.lineTo(headX, feltTop + feltH - 2);
-  ctx.stroke();
-  const footX = feltLeft + feltW * 0.75;
-  const footY = feltTop + feltH * 0.5;
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
-  ctx.beginPath();
-  ctx.arc(footX, footY, 3, 0, Math.PI * 2);
-  ctx.fill();
-  const centerX = feltLeft + feltW / 2;
-  const centerY = feltTop + feltH / 2;
-  ctx.fillStyle = "rgba(255,255,255,0.15)";
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 2, 0, Math.PI * 2);
+  roundRect(ctx, railInset, railInset, tableWidth - railInset * 2, tableHeight - railInset * 2, Math.max(0, r - 1));
   ctx.fill();
   ctx.restore();
 
-  // Layer 6 — cushion noses
+  // Layer 3 — cushion rubber (gaps at pockets)
   const br = getBallRadius(playWidth);
   const cornerR = getPocketRadiusCorner(br);
   const sideR = getPocketRadiusSide(br);
-  const margin = cornerR + 4;
-  const playLeft = feltLeft + CUSHION_INSET;
-  const playTop = feltTop + CUSHION_INSET;
-  const playRight = feltLeft + feltW - CUSHION_INSET;
-  const playBottom = feltTop + feltH - CUSHION_INSET;
-  const cushionColor = "#2D5A1E";
-  const noseW = Math.max(4, Math.min(8, CUSHION_NOSE_WIDTH * scale));
-
+  const cushionCenterX = feltLeft + feltW / 2;
+  const topY = feltTop;
+  const bottomY = feltTop + feltH;
+  const noseW = Math.max(3, cushionDepthPx);
   ctx.save();
-  ctx.fillStyle = cushionColor;
-  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.fillStyle = "#1B5E20";
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
   ctx.lineWidth = 1;
-  function drawCushionSegment(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    intoFelt: { dx: number; dy: number }
-  ) {
-    const dx = intoFelt.dx;
-    const dy = intoFelt.dy;
+  function cushionSeg(x1: number, y1: number, x2: number, y2: number, dx: number, dy: number) {
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -202,63 +111,110 @@ export function drawTable(
     ctx.fill();
     ctx.stroke();
   }
-  const topY = feltTop;
-  const bottomY = feltTop + feltH;
-  const leftX = feltLeft;
-  const rightX = feltLeft + feltW;
-  drawCushionSegment(playLeft + margin, topY, centerX - sideR - 2, topY, { dx: 0, dy: noseW });
-  drawCushionSegment(centerX + sideR + 2, topY, playRight - margin, topY, { dx: 0, dy: noseW });
-  drawCushionSegment(playLeft + margin, bottomY, centerX - sideR - 2, bottomY, { dx: 0, dy: -noseW });
-  drawCushionSegment(centerX + sideR + 2, bottomY, playRight - margin, bottomY, { dx: 0, dy: -noseW });
-  drawCushionSegment(leftX, playTop + margin, leftX, playBottom - margin, { dx: noseW, dy: 0 });
-  drawCushionSegment(rightX, playTop + margin, rightX, playBottom - margin, { dx: -noseW, dy: 0 });
+  cushionSeg(feltLeft + cornerR, topY, cushionCenterX - sideR - 2, topY, 0, noseW);
+  cushionSeg(cushionCenterX + sideR + 2, topY, feltLeft + feltW - cornerR, topY, 0, noseW);
+  cushionSeg(feltLeft + cornerR, bottomY, cushionCenterX - sideR - 2, bottomY, 0, -noseW);
+  cushionSeg(cushionCenterX + sideR + 2, bottomY, feltLeft + feltW - cornerR, bottomY, 0, -noseW);
+  cushionSeg(feltLeft, feltTop + cornerR, feltLeft, bottomY - cornerR, noseW, 0);
+  cushionSeg(feltLeft + feltW, feltTop + cornerR, feltLeft + feltW, bottomY - cornerR, -noseW, 0);
   ctx.restore();
 
-  // Layer 9 — frame corner accents (brass)
-  const cornerSize = Math.min(20, tableWidth * 0.03);
+  // Layer 4 — playing surface (felt)
   ctx.save();
-  const brassGrad = (x0: number, y0: number, x1: number, y1: number) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1);
-    g.addColorStop(0, "#8B7355");
-    g.addColorStop(1, "#6B5A3E");
-    return g;
-  };
-  ctx.fillStyle = brassGrad(0, 0, cornerSize, cornerSize);
+  const cx = feltLeft + feltW / 2;
+  const cy = feltTop + feltH / 2;
+  const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(feltW, feltH) * 0.7);
+  feltGrad.addColorStop(0, "#0C7A3E");
+  feltGrad.addColorStop(1, "#0A6B35");
+  ctx.fillStyle = feltGrad;
+  ctx.fillRect(feltLeft, feltTop, feltW, feltH);
+  const pattern = getFeltPattern(ctx, feltW, feltH, scale);
+  if (pattern) {
+    ctx.fillStyle = pattern;
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(feltLeft, feltTop, feltW, feltH);
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // Layer 6 — diamond sights (WPA: 6 per long rail, 3 per short rail)
+  const diamondR = Math.max(1.5, sc * 0.4);
+  ctx.save();
+  ctx.fillStyle = "rgba(255,248,220,0.7)";
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 0.5;
+  for (let i = 1; i <= 6; i++) {
+    const tx = feltLeft + (feltW * i) / 7;
+    ctx.beginPath();
+    ctx.arc(tx, feltTop - cushionDepthPx * 0.5, diamondR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(tx, feltTop + feltH + cushionDepthPx * 0.5, diamondR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  for (let i = 1; i <= 3; i++) {
+    const ty = feltTop + (feltH * i) / 4;
+    ctx.beginPath();
+    ctx.arc(feltLeft - cushionDepthPx * 0.5, ty, diamondR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(feltLeft + feltW + cushionDepthPx * 0.5, ty, diamondR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Layer 7 — table markings
+  ctx.save();
+  const headX = feltLeft + feltW * (WPA.HEAD_STRING / WPA.PLAY_LENGTH);
+  ctx.strokeStyle = "rgba(255,255,255,0.15)";
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, TABLE_RADIUS);
-  ctx.lineTo(0, 0);
-  ctx.lineTo(TABLE_RADIUS, 0);
-  ctx.quadraticCurveTo(cornerSize, 0, cornerSize, cornerSize);
-  ctx.quadraticCurveTo(cornerSize, TABLE_RADIUS, TABLE_RADIUS, TABLE_RADIUS);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = brassGrad(tableWidth, 0, tableWidth - cornerSize, cornerSize);
+  ctx.moveTo(headX, feltTop + 2);
+  ctx.lineTo(headX, feltTop + feltH - 2);
+  ctx.stroke();
+  const footX = feltLeft + feltW * (WPA.FOOT_SPOT / WPA.PLAY_LENGTH);
+  const footY = feltTop + feltH * 0.5;
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
   ctx.beginPath();
-  ctx.moveTo(tableWidth - TABLE_RADIUS, 0);
-  ctx.lineTo(tableWidth, 0);
-  ctx.lineTo(tableWidth, TABLE_RADIUS);
-  ctx.quadraticCurveTo(tableWidth, cornerSize, tableWidth - cornerSize, cornerSize);
-  ctx.quadraticCurveTo(tableWidth - cornerSize, TABLE_RADIUS, tableWidth - TABLE_RADIUS, TABLE_RADIUS);
-  ctx.closePath();
+  ctx.arc(footX, footY, 1.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = brassGrad(0, tableHeight, cornerSize, tableHeight - cornerSize);
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
   ctx.beginPath();
-  ctx.moveTo(0, tableHeight - TABLE_RADIUS);
-  ctx.lineTo(0, tableHeight);
-  ctx.lineTo(TABLE_RADIUS, tableHeight);
-  ctx.quadraticCurveTo(cornerSize, tableHeight, cornerSize, tableHeight - cornerSize);
-  ctx.quadraticCurveTo(cornerSize, tableHeight - TABLE_RADIUS, TABLE_RADIUS, tableHeight - TABLE_RADIUS);
-  ctx.closePath();
+  ctx.arc(cx, cy, 1, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = brassGrad(tableWidth, tableHeight, tableWidth - cornerSize, tableHeight - cornerSize);
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
   ctx.beginPath();
-  ctx.moveTo(tableWidth - TABLE_RADIUS, tableHeight);
-  ctx.lineTo(tableWidth, tableHeight);
-  ctx.lineTo(tableWidth, tableHeight - TABLE_RADIUS);
-  ctx.quadraticCurveTo(tableWidth, tableHeight - cornerSize, tableWidth - cornerSize, tableHeight - cornerSize);
-  ctx.quadraticCurveTo(tableWidth - cornerSize, tableHeight - TABLE_RADIUS, tableWidth - TABLE_RADIUS, tableHeight - TABLE_RADIUS);
-  ctx.closePath();
+  ctx.arc(headX, cy, 1, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+
+  // Layer 8 — rail shadow on felt
+  ctx.save();
+  const shadowW = Math.min(sc * 3, feltW * 0.08);
+  const shadowGradT = ctx.createLinearGradient(feltLeft, feltTop, feltLeft, feltTop + shadowW);
+  shadowGradT.addColorStop(0, "rgba(0,0,0,0.15)");
+  shadowGradT.addColorStop(1, "transparent");
+  ctx.fillStyle = shadowGradT;
+  ctx.fillRect(feltLeft, feltTop, feltW, shadowW);
+  const shadowGradB = ctx.createLinearGradient(feltLeft, feltTop + feltH - shadowW, feltLeft, feltTop + feltH);
+  shadowGradB.addColorStop(0, "transparent");
+  shadowGradB.addColorStop(1, "rgba(0,0,0,0.15)");
+  ctx.fillStyle = shadowGradB;
+  ctx.fillRect(feltLeft, feltTop + feltH - shadowW, feltW, shadowW);
+  const shadowGradL = ctx.createLinearGradient(feltLeft, feltTop, feltLeft + shadowW, feltTop);
+  shadowGradL.addColorStop(0, "rgba(0,0,0,0.15)");
+  shadowGradL.addColorStop(1, "transparent");
+  ctx.fillStyle = shadowGradL;
+  ctx.fillRect(feltLeft, feltTop, shadowW, feltH);
+  const shadowGradR = ctx.createLinearGradient(feltLeft + feltW - shadowW, feltTop, feltLeft + feltW, feltTop);
+  shadowGradR.addColorStop(0, "transparent");
+  shadowGradR.addColorStop(1, "rgba(0,0,0,0.15)");
+  ctx.fillStyle = shadowGradR;
+  ctx.fillRect(feltLeft + feltW - shadowW, feltTop, shadowW, feltH);
   ctx.restore();
 }
 
@@ -315,13 +271,14 @@ export function drawRailDiamonds(
   ctx.save();
   const size = 4;
   const positions: { x: number; y: number }[] = [];
+  const railOff = 8;
   for (let i = 1; i <= 3; i++) {
-    positions.push({ x: (playWidth * i) / 4, y: -CUSHION_INSET - 4 });
-    positions.push({ x: (playWidth * i) / 4, y: playHeight + CUSHION_INSET + 4 });
+    positions.push({ x: (playWidth * i) / 4, y: -railOff });
+    positions.push({ x: (playWidth * i) / 4, y: playHeight + railOff });
   }
   for (let i = 1; i <= 2; i++) {
-    positions.push({ x: -CUSHION_INSET - 4, y: (playHeight * i) / 3 });
-    positions.push({ x: playWidth + CUSHION_INSET + 4, y: (playHeight * i) / 3 });
+    positions.push({ x: -railOff, y: (playHeight * i) / 3 });
+    positions.push({ x: playWidth + railOff, y: (playHeight * i) / 3 });
   }
   positions.forEach((pos) => {
     const { x, y } = worldToCanvas(pos.x, pos.y);
