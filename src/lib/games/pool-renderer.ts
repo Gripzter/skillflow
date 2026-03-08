@@ -4,29 +4,20 @@
  */
 
 import type { Pocket } from "./pool-physics";
-import { BALL_COLORS, TABLE_FRAME, CUSHION_GREEN, FELT_GREEN, POCKET_DARK, POCKET_LIP, RAIL_WIDTH, CUSHION_INSET, FRAME_WIDTH } from "./pool-physics";
+import {
+  BALL_COLORS,
+  CUSHION_INSET,
+  FRAME_WIDTH,
+  getBallRadius,
+  getPocketRadiusCorner,
+  getPocketRadiusSide,
+  RAIL_WIDTH,
+} from "./pool-physics";
 
 export type WorldToCanvas = (wx: number, wy: number) => { x: number; y: number };
 
-let tableImage: HTMLImageElement | null = null;
-let tableImageLoaded = false;
-
-function getTableImage(): HTMLImageElement | null {
-  if (tableImageLoaded && tableImage) return tableImage;
-  if (!tableImage) {
-    const img = new Image();
-    img.onload = () => {
-      tableImageLoaded = true;
-    };
-    img.src = "/images/pool-table.png";
-    tableImage = img;
-  }
-  return tableImageLoaded ? tableImage : null;
-}
-
-export function isTableImageReady(): boolean {
-  return tableImageLoaded;
-}
+const TABLE_RADIUS = 14;
+const CUSHION_NOSE_WIDTH = 6;
 
 let feltPattern: CanvasPattern | null = null;
 
@@ -58,50 +49,209 @@ export function drawTable(
   scale: number
 ) {
   ctx.imageSmoothingEnabled = true;
-
-  const img = getTableImage();
-  if (img) {
-    ctx.drawImage(img, 0, 0, tableWidth, tableHeight);
-    return;
-  }
-
   const inset = FRAME_WIDTH + CUSHION_INSET;
-  const railLeft = FRAME_WIDTH;
-  const railTop = FRAME_WIDTH;
-  const railW = tableWidth - 2 * FRAME_WIDTH;
-  const railH = tableHeight - 2 * FRAME_WIDTH;
   const feltLeft = inset;
   const feltTop = inset;
   const feltW = tableWidth - 2 * inset;
   const feltH = tableHeight - 2 * inset;
 
+  // Layer 1 — outer shadow
   ctx.save();
-
-  const r = 12;
-  ctx.fillStyle = TABLE_FRAME;
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#2C1810";
   ctx.beginPath();
-  ctx.roundRect(0, 0, tableWidth, tableHeight, r);
+  ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
   ctx.fill();
-  for (let i = 0; i < 8; i++) {
-    ctx.fillStyle = `rgba(0,0,0,${0.03})`;
-    ctx.fillRect((i * tableWidth) / 8, 0, tableWidth / 8 + 2, tableHeight);
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.restore();
+
+  // Layer 2 — wood frame
+  ctx.save();
+  const frameGrad = ctx.createLinearGradient(0, 0, 0, tableHeight);
+  frameGrad.addColorStop(0, "#4A2A1A");
+  frameGrad.addColorStop(0.5, "#2C1810");
+  frameGrad.addColorStop(1, "#1E0F08");
+  ctx.fillStyle = frameGrad;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, tableWidth, tableHeight, TABLE_RADIUS);
+  ctx.fill();
+  for (let i = 0; i < 12; i++) {
+    ctx.strokeStyle = "rgba(0,0,0,0.06)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, (tableHeight * (i + 1)) / 13);
+    ctx.lineTo(tableWidth, (tableHeight * (i + 1)) / 13);
+    ctx.stroke();
   }
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(TABLE_RADIUS, 2);
+  ctx.lineTo(tableWidth - TABLE_RADIUS, 2);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(0,0,0,0.2)";
+  ctx.beginPath();
+  ctx.moveTo(TABLE_RADIUS, tableHeight - 2);
+  ctx.lineTo(tableWidth - TABLE_RADIUS, tableHeight - 2);
+  ctx.stroke();
+  ctx.restore();
 
-  ctx.fillStyle = CUSHION_GREEN;
-  ctx.fillRect(railLeft, railTop, railW, railH);
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.fillRect(railLeft, railTop, railW, 2);
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
-  ctx.fillRect(railLeft, railTop + railH - 2, railW, 2);
+  // Layer 3 — inner rail / cushion border
+  ctx.save();
+  const railLeft = FRAME_WIDTH;
+  const railTop = FRAME_WIDTH;
+  const railW = tableWidth - 2 * FRAME_WIDTH;
+  const railH = tableHeight - 2 * FRAME_WIDTH;
+  ctx.fillStyle = "#0A6B35";
+  ctx.beginPath();
+  ctx.roundRect(railLeft, railTop, railW, railH, Math.max(0, TABLE_RADIUS - 4));
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(railLeft + 1, railTop);
+  ctx.lineTo(railLeft + 1, railTop + railH);
+  ctx.moveTo(railLeft, railTop + 1);
+  ctx.lineTo(railLeft + railW, railTop + 1);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.beginPath();
+  ctx.moveTo(railLeft + railW - 1, railTop);
+  ctx.lineTo(railLeft + railW - 1, railTop + railH);
+  ctx.moveTo(railLeft, railTop + railH - 1);
+  ctx.lineTo(railLeft + railW, railTop + railH - 1);
+  ctx.stroke();
+  ctx.restore();
 
-  ctx.fillStyle = FELT_GREEN;
+  // Layer 4 — felt playing surface
+  ctx.save();
+  const cx = feltLeft + feltW / 2;
+  const cy = feltTop + feltH / 2;
+  const feltGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(feltW, feltH) / 2);
+  feltGrad.addColorStop(0, "#1B9E5A");
+  feltGrad.addColorStop(1, "#0E8C45");
+  ctx.fillStyle = feltGrad;
   ctx.fillRect(feltLeft, feltTop, feltW, feltH);
   const pattern = getFeltPattern(ctx, feltW, feltH, scale);
   if (pattern) {
     ctx.fillStyle = pattern;
     ctx.fillRect(feltLeft, feltTop, feltW, feltH);
   }
+  ctx.restore();
 
+  // Layer 5 — head string and foot spot
+  ctx.save();
+  const headX = feltLeft + feltW * 0.25;
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(headX, feltTop);
+  ctx.lineTo(headX, feltTop + feltH);
+  ctx.stroke();
+  const footX = feltLeft + feltW * 0.75;
+  const footY = feltTop + feltH * 0.5;
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  ctx.beginPath();
+  ctx.arc(footX, footY, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Layer 6 — cushion noses
+  const br = getBallRadius(playWidth);
+  const cornerR = getPocketRadiusCorner(br);
+  const sideR = getPocketRadiusSide(br);
+  const margin = cornerR + 4;
+  const playLeft = feltLeft + CUSHION_INSET;
+  const playTop = feltTop + CUSHION_INSET;
+  const playRight = feltLeft + feltW - CUSHION_INSET;
+  const playBottom = feltTop + feltH - CUSHION_INSET;
+  const centerX = playLeft + playWidth / 2;
+  const cushionColor = "#0B7A3E";
+  const noseW = Math.max(4, Math.min(8, CUSHION_NOSE_WIDTH * scale));
+
+  ctx.save();
+  ctx.fillStyle = cushionColor;
+  ctx.strokeStyle = "rgba(255,255,255,0.1)";
+  ctx.lineWidth = 1;
+  function drawCushionSegment(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    intoFelt: { dx: number; dy: number }
+  ) {
+    const dx = intoFelt.dx;
+    const dy = intoFelt.dy;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x2 + dx, y2 + dy);
+    ctx.lineTo(x1 + dx, y1 + dy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  const topY = feltTop;
+  const bottomY = feltTop + feltH;
+  const leftX = feltLeft;
+  const rightX = feltLeft + feltW;
+  drawCushionSegment(playLeft + margin, topY, centerX - sideR - 2, topY, { dx: 0, dy: noseW });
+  drawCushionSegment(centerX + sideR + 2, topY, playRight - margin, topY, { dx: 0, dy: noseW });
+  drawCushionSegment(playLeft + margin, bottomY, centerX - sideR - 2, bottomY, { dx: 0, dy: -noseW });
+  drawCushionSegment(centerX + sideR + 2, bottomY, playRight - margin, bottomY, { dx: 0, dy: -noseW });
+  drawCushionSegment(leftX, playTop + margin, leftX, playBottom - margin, { dx: noseW, dy: 0 });
+  drawCushionSegment(rightX, playTop + margin, rightX, playBottom - margin, { dx: -noseW, dy: 0 });
+  ctx.restore();
+
+  // Layer 9 — frame corner accents (brass)
+  const cornerSize = Math.min(20, tableWidth * 0.03);
+  ctx.save();
+  const brassGrad = (x0: number, y0: number, x1: number, y1: number) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, "#8B7355");
+    g.addColorStop(1, "#6B5A3E");
+    return g;
+  };
+  ctx.fillStyle = brassGrad(0, 0, cornerSize, cornerSize);
+  ctx.beginPath();
+  ctx.moveTo(0, TABLE_RADIUS);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(TABLE_RADIUS, 0);
+  ctx.quadraticCurveTo(cornerSize, 0, cornerSize, cornerSize);
+  ctx.quadraticCurveTo(cornerSize, TABLE_RADIUS, TABLE_RADIUS, TABLE_RADIUS);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = brassGrad(tableWidth, 0, tableWidth - cornerSize, cornerSize);
+  ctx.beginPath();
+  ctx.moveTo(tableWidth - TABLE_RADIUS, 0);
+  ctx.lineTo(tableWidth, 0);
+  ctx.lineTo(tableWidth, TABLE_RADIUS);
+  ctx.quadraticCurveTo(tableWidth, cornerSize, tableWidth - cornerSize, cornerSize);
+  ctx.quadraticCurveTo(tableWidth - cornerSize, TABLE_RADIUS, tableWidth - TABLE_RADIUS, TABLE_RADIUS);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = brassGrad(0, tableHeight, cornerSize, tableHeight - cornerSize);
+  ctx.beginPath();
+  ctx.moveTo(0, tableHeight - TABLE_RADIUS);
+  ctx.lineTo(0, tableHeight);
+  ctx.lineTo(TABLE_RADIUS, tableHeight);
+  ctx.quadraticCurveTo(cornerSize, tableHeight, cornerSize, tableHeight - cornerSize);
+  ctx.quadraticCurveTo(cornerSize, tableHeight - TABLE_RADIUS, TABLE_RADIUS, tableHeight - TABLE_RADIUS);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = brassGrad(tableWidth, tableHeight, tableWidth - cornerSize, tableHeight - cornerSize);
+  ctx.beginPath();
+  ctx.moveTo(tableWidth - TABLE_RADIUS, tableHeight);
+  ctx.lineTo(tableWidth, tableHeight);
+  ctx.lineTo(tableWidth, tableHeight - TABLE_RADIUS);
+  ctx.quadraticCurveTo(tableWidth, tableHeight - cornerSize, tableWidth - cornerSize, tableHeight - cornerSize);
+  ctx.quadraticCurveTo(tableWidth - cornerSize, tableHeight - TABLE_RADIUS, tableWidth - TABLE_RADIUS, tableHeight - TABLE_RADIUS);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 
@@ -116,18 +266,23 @@ export function drawPockets(
   pockets.forEach((p, i) => {
     const { x, y } = worldToCanvas(p.x, p.y);
     const r = p.radius * scale;
-    const lip = Math.max(2, r * 0.15);
     ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.4)";
+    ctx.shadowBlur = 4;
     const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, "#0a0a0a");
-    grad.addColorStop(0.7, POCKET_DARK);
-    grad.addColorStop(1, "#222");
+    grad.addColorStop(0, "#030303");
+    grad.addColorStop(0.7, "#111");
+    grad.addColorStop(1, "#1a1a1a");
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = POCKET_LIP;
-    ctx.lineWidth = lip;
+    ctx.shadowBlur = 0;
+    const rimGrad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    rimGrad.addColorStop(0, "#A08860");
+    rimGrad.addColorStop(1, "#6B5A3E");
+    ctx.strokeStyle = rimGrad;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
     if (callPocketMode || highlightPocketId === i) {
       ctx.strokeStyle = "rgba(0,229,199,0.6)";
@@ -148,10 +303,10 @@ export function drawRailDiamonds(
   playWidth: number,
   playHeight: number,
   worldToCanvas: WorldToCanvas,
-  scale: number
+  _scale: number
 ) {
   ctx.save();
-  ctx.fillStyle = "rgba(255,255,255,0.25)";
+  const size = 4;
   const positions: { x: number; y: number }[] = [];
   for (let i = 1; i <= 3; i++) {
     positions.push({ x: (playWidth * i) / 4, y: -CUSHION_INSET - 4 });
@@ -163,13 +318,20 @@ export function drawRailDiamonds(
   }
   positions.forEach((pos) => {
     const { x, y } = worldToCanvas(pos.x, pos.y);
+    const grad = ctx.createLinearGradient(x - size, y - size, x + size, y + size);
+    grad.addColorStop(0, "#E8DCC8");
+    grad.addColorStop(1, "#C8BAA0");
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(x, y - 3);
-    ctx.lineTo(x + 3, y);
-    ctx.lineTo(x, y + 3);
-    ctx.lineTo(x - 3, y);
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x - size, y);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
   });
   ctx.restore();
 }
