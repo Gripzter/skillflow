@@ -136,7 +136,7 @@ export default function ChessBoard({
               const boardCol = displayCols[colIdx];
               const square = indicesToSquare(boardCol, boardRow);
               const piece = board[boardRow]?.[boardCol] ?? null;
-              const isLight = isLightSquare(col, row);
+              const isLight = isLightSquare(boardCol, boardRow);
               const isSelected = selectedSquare === square;
               const isLegal = legalMoveTargets.includes(square);
               const isCapture = isLegal && piece !== null;

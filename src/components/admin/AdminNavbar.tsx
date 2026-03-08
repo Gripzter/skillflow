@@ -1,19 +1,34 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { adminLogout } from "@/lib/admin-auth";
 
-const NAV_LINKS = [
+const NAV_LINKS: { href: string; label: string; badge?: string }[] = [
   { href: "/admin", label: "Overview" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/matches", label: "Matches" },
   { href: "/admin/disputes", label: "Disputes" },
   { href: "/admin/revenue", label: "Revenue" },
+  { href: "/admin/errors", label: "Errors", badge: "errors" },
 ];
 
 export default function AdminNavbar() {
   const pathname = usePathname();
+  const [unresolvedCount, setUnresolvedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (pathname !== "/admin/errors") {
+      fetch("/api/admin/error-reports")
+        .then((r) => r.ok ? r.json() : [])
+        .then((data: { resolved?: boolean }[]) => {
+          const n = Array.isArray(data) ? data.filter((x) => !x.resolved).length : 0;
+          setUnresolvedCount(n);
+        })
+        .catch(() => setUnresolvedCount(null));
+    }
+  }, [pathname]);
 
   function handleLogout() {
     adminLogout();
@@ -31,8 +46,9 @@ export default function AdminNavbar() {
             </span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
-            {NAV_LINKS.map(({ href, label }) => {
+            {NAV_LINKS.map(({ href, label, badge }) => {
               const isActive = href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+              const showBadge = badge === "errors" && unresolvedCount != null && unresolvedCount > 0;
               return (
                 <Link
                   key={href}
@@ -42,6 +58,11 @@ export default function AdminNavbar() {
                   }`}
                 >
                   {label}
+                  {showBadge && (
+                    <span className="ml-1.5 rounded-full bg-red-500/80 px-1.5 py-0.5 text-xs font-semibold text-white">
+                      {unresolvedCount}
+                    </span>
+                  )}
                   {isActive && (
                     <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-admin-accent" />
                   )}

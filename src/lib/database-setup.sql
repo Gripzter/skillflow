@@ -110,6 +110,21 @@ CREATE TABLE IF NOT EXISTS user_achievements (
   UNIQUE(user_id, achievement_key)
 );
 
+-- 6b. ERROR REPORTS (for global error boundary / user reports)
+CREATE TABLE IF NOT EXISTS error_reports (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),
+  username TEXT,
+  error_message TEXT,
+  error_stack TEXT,
+  page_url TEXT,
+  user_description TEXT,
+  device_info TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  resolved BOOLEAN DEFAULT false
+);
+ALTER TABLE error_reports DISABLE ROW LEVEL SECURITY;
+
 -- 7. Enable Row Level Security on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;

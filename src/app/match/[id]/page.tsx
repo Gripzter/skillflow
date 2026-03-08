@@ -26,12 +26,13 @@ import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
 import GameChat, { type ChatMessage } from "@/components/GameChat";
 import { usePlayMode } from "@/contexts/PlayModeContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const OPPONENT_RECONNECT_SEC = 30;
 
 type Outcome = null | "victory" | "defeat" | "draw";
 
-export default function MatchPage() {
+function MatchPageContent() {
   const router = useRouter();
   const params = useParams();
   const matchId = (params?.id as string) || "";
@@ -979,5 +980,13 @@ export default function MatchPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function MatchPage() {
+  return (
+    <ErrorBoundary>
+      <MatchPageContent />
+    </ErrorBoundary>
   );
 }
