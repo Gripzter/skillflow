@@ -18,7 +18,7 @@ function getTableImage(): HTMLImageElement | null {
     img.onload = () => {
       tableImageLoaded = true;
     };
-    img.src = "/images/pool-table.jpg";
+    img.src = "/images/pool-table.png";
     tableImage = img;
   }
   return tableImageLoaded ? tableImage : null;
@@ -61,11 +61,7 @@ export function drawTable(
 
   const img = getTableImage();
   if (img) {
-    ctx.save();
-    ctx.translate(tableWidth / 2, tableHeight / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.drawImage(img, -tableHeight / 2, -tableWidth / 2, tableHeight, tableWidth);
-    ctx.restore();
+    ctx.drawImage(img, 0, 0, tableWidth, tableHeight);
     return;
   }
 
