@@ -160,9 +160,7 @@ export default function DashboardPage() {
       {/* Ambient background effects (match wallet/play/leaderboard) */}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <div
-        className={`pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full blur-[80px] opacity-40 ${
-          isPractice ? "bg-purple-500/25" : "bg-teal-500/20"
-        }`}
+        className="pointer-events-none fixed -top-40 -left-32 h-72 w-72 rounded-full bg-teal-500/20 blur-[80px] opacity-40"
         aria-hidden
       />
       <div className="pointer-events-none fixed bottom-[-6rem] right-[-4rem] h-64 w-64 rounded-full bg-purple-500/25 blur-[65px] opacity-40" aria-hidden />
