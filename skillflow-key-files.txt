@@ -1,0 +1,1086 @@
+{
+  "name": "skillflow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@stripe/react-stripe-js": "^5.6.0",
+    "@stripe/stripe-js": "^8.8.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "chess.js": "^1.4.0",
+    "matter-js": "^0.20.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "stripe": "^20.4.0"
+  },
+  "devDependencies": {
+    "@types/matter-js": "^0.20.2",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8",
+    "eslint-config-next": "14.2.18",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
+/**
+ * Matchmaking utilities for dev mode (simulated opponents and match storage).
+ */
+
+import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
+import { generateId } from "./wallet";
+
+export const MATCHES_STORAGE_KEY = "skillflow_matches";
+
+const OPPONENT_NAMES = [
+  "xKiller99",
+  "PoolShark",
+  "ChessMaster",
+  "SniperElite",
+  "NoScope360",
+  "EzWin",
+  "TryHard_1",
+  "CasualPro",
+];
+
+export interface PlayerInfo {
+  username: string;
+  rating: number;
+  winRate: number;
+  matchesPlayed: number;
+}
+
+export interface ConnectionSnapshot {
+  timestamp: string;
+  ping: number;
+  jitter: number;
+  packetLoss: number;
+  rating: string;
+}
+
+export interface ConnectionWarningAck {
+  timestamp: string;
+  rating: "warning" | "unrecommended";
+}
+
+export interface StoredMatch {
+  id: string;
+  gameType: string;
+  gameDisplayName: string;
+  player1: PlayerInfo;
+  player2: PlayerInfo;
+  stakeAmount: number;
+  platformFee: number;
+  totalPot: number;
+  winnerPayout: number;
+  status: "in_progress" | "completed";
+  winner?: "player1" | "player2";
+  createdAt: string;
+  connectionLog?: ConnectionSnapshot[];
+  connectionWarningAcknowledged?: false | ConnectionWarningAck;
+  /** When true, match is from practice storage; no wallet impact */
+  isPractice?: boolean;
+  /** When true, match is real multiplayer (two humans); use realtime channel */
+  isRealMultiplayer?: boolean;
+  /** Real match: player user IDs for role resolution */
+  player1Id?: string;
+  player2Id?: string;
+  /** Practice only: bot difficulty */
+  botDifficulty?: "rookie" | "gamer" | "professional";
+}
+
+export function generateMatchId(): string {
+  return generateId();
+}
+
+export function generateFakeOpponent(baseRating: number = 1000): PlayerInfo {
+  const ratingOffset = Math.floor(Math.random() * 401) - 200;
+  const rating = Math.max(100, Math.min(2000, baseRating + ratingOffset));
+  const winRate = 0.4 + Math.random() * 0.35;
+  const matchesPlayed = 10 + Math.floor(Math.random() * 491);
+  const nameIndex = Math.floor(Math.random() * OPPONENT_NAMES.length);
+  return {
+    username: OPPONENT_NAMES[nameIndex],
+    rating,
+    winRate: Math.round(winRate * 100),
+    matchesPlayed,
+  };
+}
+
+export function computePayout(stakeAmount: number): {
+  totalPot: number;
+  platformFee: number;
+  winnerPayout: number;
+} {
+  const totalPot = stakeAmount * 2;
+  const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
+  const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
+  return { totalPot, platformFee, winnerPayout };
+}
+
+export function createMatch(
+  player1: PlayerInfo,
+  player2: PlayerInfo,
+  stakeAmount: number,
+  gameType: string,
+  gameDisplayName: string
+): StoredMatch {
+  const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
+  const match: StoredMatch = {
+    id: generateMatchId(),
+    gameType,
+    gameDisplayName,
+    player1,
+    player2,
+    stakeAmount,
+    platformFee,
+    totalPot,
+    winnerPayout,
+    status: "in_progress",
+    createdAt: new Date().toISOString(),
+  };
+  saveMatch(match);
+  return match;
+}
+
+export function getMatches(): StoredMatch[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(MATCHES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveMatch(match: StoredMatch): void {
+  const matches = getMatches();
+  const index = matches.findIndex((m) => m.id === match.id);
+  if (index >= 0) matches[index] = match;
+  else matches.unshift(match);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(MATCHES_STORAGE_KEY, JSON.stringify(matches));
+  }
+}
+
+export function getMatch(id: string): StoredMatch | null {
+  return getMatches().find((m) => m.id === id) ?? null;
+}
+
+export function updateMatch(id: string, updates: Partial<StoredMatch>): void {
+  const match = getMatch(id);
+  if (match) {
+    saveMatch({ ...match, ...updates });
+  }
+}
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import { realtimeManager } from "@/lib/multiplayer/realtime";
+import type { GameEventPayload } from "@/lib/multiplayer/realtime";
+
+export interface UseMultiplayerProps {
+  matchId: string;
+  userId: string;
+  onGameEvent: (event: GameEventPayload & { type?: string }) => void;
+}
+
+export function useMultiplayer({ matchId, userId, onGameEvent }: UseMultiplayerProps) {
+  const [connected, setConnected] = useState(false);
+  const [opponentConnected, setOpponentConnected] = useState(false);
+  const [playersOnline, setPlayersOnline] = useState<string[]>([]);
+  const eventHandlerRef = useRef(onGameEvent);
+  eventHandlerRef.current = onGameEvent;
+
+  useEffect(() => {
+    if (!matchId || !userId) return;
+
+    const handleEvent = (event: GameEventPayload & { type: string }) => {
+      if (event.type === "presence_sync") {
+        const players = (event as { players: string[] }).players ?? [];
+        setPlayersOnline(players);
+        setOpponentConnected(players.length >= 2);
+      } else if (event.type === "player_joined") {
+        setOpponentConnected(true);
+      } else if (event.type === "player_left") {
+        setOpponentConnected(false);
+        eventHandlerRef.current({ type: "opponent_disconnected" });
+      } else {
+        eventHandlerRef.current(event);
+      }
+    };
+
+    realtimeManager.joinChannel(matchId, userId, handleEvent).then((ch) => {
+      setConnected(!!ch);
+    });
+
+    return () => {
+      realtimeManager.leaveChannel();
+      setConnected(false);
+      setOpponentConnected(false);
+      setPlayersOnline([]);
+    };
+  }, [matchId, userId]);
+
+  const sendGameEvent = useCallback(async (event: GameEventPayload) => {
+    await realtimeManager.sendEvent(event);
+  }, []);
+
+  return { connected, opponentConnected, playersOnline, sendGameEvent };
+}
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  createInitialState,
+  addRealPlayer,
+  tickSimulation,
+  eliminateRealPlayer,
+  setRealPlayerHolding,
+  addRealPlayerWarning,
+  getEntryFeeAtMinute,
+  getNextTierMinutes,
+  formatHoldTime,
+  netPrizePool,
+  type LastTouchState,
+  type LastTouchFeedEntry,
+} from "@/lib/games/last-touch-simulation";
+
+const TICK_INTERVAL_MS = 2000;
+const COUNTDOWN_GAME_START_SEC = 5;
+const CHALLENGE_DURATION_SEC = 5;
+const CHALLENGE_MIN_INTERVAL_MS = 30_000;
+const CHALLENGE_MAX_INTERVAL_MS = 90_000;
+const MAX_WARNINGS = 3;
+const STATIONARY_ANTICHEAT_MS = 60_000;
+
+interface LastTouchProps {
+  username: string;
+  entryFee: number;
+  /** Called when user clicks Join. Parent should debit wallet and return true if success. */
+  onJoinRequest: (fee: number) => Promise<boolean>;
+  onWin: (amount: number) => void;
+  onEliminated: (rank: number, total: number) => void;
+}
+
+function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string }) {
+  const [display, setDisplay] = useState(value);
+  const prevRef = useRef(value);
+  useLayoutEffect(() => {
+    if (value === prevRef.current) return;
+    const start = prevRef.current;
+    prevRef.current = value;
+    const duration = 400;
+    const startTime = performance.now();
+    const step = (t: number) => {
+      const elapsed = t - startTime;
+      const p = Math.min(1, elapsed / duration);
+      const eased = 1 - (1 - p) * (1 - p);
+      setDisplay(Math.round(start + (value - start) * eased));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [value]);
+  return <>{prefix}{display.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+}
+
+export default function LastTouch({
+  username,
+  entryFee,
+  onJoinRequest,
+  onWin,
+  onEliminated,
+}: LastTouchProps) {
+  const [state, setState] = useState<LastTouchState>(() =>
+    createInitialState({
+      initialBotsCount: 300 + Math.floor(Math.random() * 501),
+      nextGameInSec: 14 * 60 + 32,
+    })
+  );
+  const [joined, setJoined] = useState(false);
+  const [countdownNum, setCountdownNum] = useState<number | null>(null);
+  const [holdStartMs, setHoldStartMs] = useState<number | null>(null);
+  const [isHolding, setIsHolding] = useState(false);
+  const [challengeActive, setChallengeActive] = useState(false);
+  const [challengeSecLeft, setChallengeSecLeft] = useState(0);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const touchZoneRef = useRef<HTMLDivElement>(null);
+  const lastTouchPosRef = useRef<{ x: number; y: number } | null>(null);
+  const stationarySinceRef = useRef<number | null>(null);
+  const challengeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const remaining = useMemo(
+    () => state.players.filter((p) => p.eliminatedAtMs == null),
+    [state.players]
+  );
+  const totalPlayers = state.players.length;
+  const realPlayer = state.players.find((p) => p.isReal);
+  const isEliminated = state.realPlayerEliminated;
+
+  // Lobby: next game countdown
+  useEffect(() => {
+    if (state.phase !== "lobby") return;
+    const t = setInterval(() => {
+      setState((s) => {
+        const next = Math.max(0, s.nextGameCountdownSec - 1);
+        return { ...s, nextGameCountdownSec: next };
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [state.phase]);
+
+  // Simulated lobby joins (fake feed)
+  useEffect(() => {
+    if (state.phase !== "lobby" || !joined) return;
+    const addJoin = () => {
+      setState((s) => {
+        const fee = getEntryFeeAtMinute(0) ?? 1;
+        const names = ["xKiller99", "ProGamer_Mike", "SnipeElite420", "NoScope360", "ChessMaster"];
+        const name = names[Math.floor(Math.random() * names.length)];
+        const entry = {
+          id: "feed-" + Date.now(),
+          type: "join" as const,
+          username: name,
+          message: `${name} just joined! ($${fee.toFixed(2)})`,
+          atMs: Date.now(),
+          amount: fee,
+        };
+        return {
+          ...s,
+          feed: [entry, ...s.feed].slice(0, 30),
+          prizePool: s.prizePool + fee,
+        };
+      });
+    };
+    const id = setInterval(addJoin, 1500 + Math.random() * 1500);
+    return () => clearInterval(id);
+  }, [state.phase, joined]);
+
+  // When lobby countdown hits 0 and joined → start game countdown
+  useEffect(() => {
+    if (state.phase !== "lobby" || !joined || state.nextGameCountdownSec > 0) return;
+    setState((s) => ({
+      ...s,
+      phase: "countdown",
+      gameStartMs: null,
+    }));
+    setCountdownNum(COUNTDOWN_GAME_START_SEC);
+  }, [state.phase, joined, state.nextGameCountdownSec]);
+
+  // If not joined when lobby countdown hits 0, reset for next session
+  useEffect(() => {
+    if (state.phase !== "lobby" || joined || state.nextGameCountdownSec !== 0) return;
+    setState((s) => ({ ...s, nextGameCountdownSec: 14 * 60 + 32 }));
+  }, [state.phase, joined, state.nextGameCountdownSec]);
+
+  // Countdown 5,4,3,2,1 then HOLD NOW
+  useEffect(() => {
+    if (countdownNum === null) return;
+    if (countdownNum === 0) {
+      setCountdownNum(null);
+      setState((s) => ({
+        ...s,
+        phase: "playing",
+        gameStartMs: Date.now(),
+      }));
+      return;
+    }
+    const t = setTimeout(() => setCountdownNum((n) => (n != null ? n - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [countdownNum]);
+
+  // Game tick: simulate bot eliminations and late entries
+  useEffect(() => {
+    if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
+    tickRef.current = setInterval(() => {
+      setState((s) => tickSimulation(s, Date.now(), isHolding));
+    }, TICK_INTERVAL_MS);
+    return () => {
+      if (tickRef.current) clearInterval(tickRef.current);
+    };
+  }, [state.phase, isHolding]);
+
+  const onWinCalledRef = useRef(false);
+  useEffect(() => {
+    if (state.phase !== "winner" || onWinCalledRef.current) return;
+    const onlyReal = remaining.length === 1 && remaining[0]?.isReal;
+    if (onlyReal && state.gameStartMs != null) {
+      onWinCalledRef.current = true;
+      const net = netPrizePool(state.prizePool);
+      onWin(net);
+    }
+  }, [state.phase, remaining, state.prizePool, state.gameStartMs, onWin]);
+
+  // Eliminated: callback
+  useEffect(() => {
+    if (!state.realPlayerEliminated || state.realPlayerRank == null) return;
+    onEliminated(state.realPlayerRank, totalPlayers);
+  }, [state.realPlayerEliminated, state.realPlayerRank, totalPlayers, onEliminated]);
+
+  // Touch zone: hold detection (mouse + touch)
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
+      if (isEliminated) return;
+      setIsHolding(true);
+      const now = Date.now();
+      setHoldStartMs(now);
+      setState((s) => setRealPlayerHolding(s, now));
+      lastTouchPosRef.current = { x: e.clientX, y: e.clientY };
+      stationarySinceRef.current = now;
+      if (navigator.vibrate) navigator.vibrate(10);
+    },
+    [state.phase, isEliminated]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault();
+      if (!isHolding || isEliminated) return;
+      const target = touchZoneRef.current;
+      if (target && !target.contains(e.target as Node)) return; // only eliminate if release inside zone? No - spec says if you lift you're out. So any lift = out.
+      setIsHolding(false);
+      setHoldStartMs(null);
+      setState((s) => eliminateRealPlayer(s, "lift", Date.now()));
+      if (navigator.vibrate) navigator.vibrate(50);
+    },
+    [isHolding, isEliminated]
+  );
+
+  const handlePointerLeave = useCallback(() => {
+    if (!isHolding || isEliminated) return;
+    // Mouse left zone while holding = warning
+    setState((s) => {
+      const next = addRealPlayerWarning(s);
+      const p = next.players.find((x) => x.isReal);
+      if (p && p.warnings >= MAX_WARNINGS)
+        return eliminateRealPlayer(next, "lift", Date.now());
+      return next;
+    });
+  }, [isHolding, isEliminated]);
+
+  // Global pointer up (catch release outside element)
+  useEffect(() => {
+    const up = (e: PointerEvent) => {
+      if (!isHolding || isEliminated) return;
+      const target = touchZoneRef.current;
+      if (target?.contains(e.target as Node)) return;
+      setIsHolding(false);
+      setHoldStartMs(null);
+      setState((s) => eliminateRealPlayer(s, "lift", Date.now()));
+    };
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  }, [isHolding, isEliminated]);
+
+  // Visibility: tab hidden = eliminated
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden" && isHolding && !isEliminated) {
+        setState((s) => eliminateRealPlayer(s, "visibility", Date.now()));
+        setIsHolding(false);
+        setHoldStartMs(null);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [isHolding, isEliminated]);
+
+  // Anti-cheat: random challenge every 30–90s
+  useEffect(() => {
+    if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
+    if (challengeActive || isEliminated) return;
+    const schedule = () => {
+      const delay = CHALLENGE_MIN_INTERVAL_MS + Math.random() * (CHALLENGE_MAX_INTERVAL_MS - CHALLENGE_MIN_INTERVAL_MS);
+      challengeTimerRef.current = setTimeout(() => {
+        setChallengeActive(true);
+        setChallengeSecLeft(CHALLENGE_DURATION_SEC);
+      }, delay);
+    };
+    schedule();
+    return () => {
+      if (challengeTimerRef.current) clearTimeout(challengeTimerRef.current);
+    };
+  }, [state.phase, challengeActive, isEliminated]);
+
+  useEffect(() => {
+    if (!challengeActive) return;
+    const t = setInterval(() => {
+      setChallengeSecLeft((n) => {
+        if (n <= 1) {
+          setChallengeActive(false);
+          return 0;
+        }
+        return n - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [challengeActive]);
+
+  const handleChallengeTap = useCallback(() => {
+    if (!challengeActive) return;
+    setChallengeActive(false);
+    setChallengeSecLeft(0);
+  }, []);
+
+  // Challenge timeout = warning
+  useEffect(() => {
+    if (!challengeActive || challengeSecLeft > 0) return;
+    setState((s) => {
+      const next = addRealPlayerWarning(s);
+      const p = next.players.find((x) => x.isReal);
+      if (p && p.warnings >= MAX_WARNINGS)
+        return eliminateRealPlayer(next, "challenge", Date.now());
+      return next;
+    });
+  }, [challengeActive, challengeSecLeft]);
+
+  const handleJoin = useCallback(async () => {
+    const ok = await onJoinRequest(entryFee);
+    if (!ok) return;
+    setJoined(true);
+    setState((s) => ({
+      ...s,
+      players: addRealPlayer(s.players, username, entryFee),
+      prizePool: s.prizePool + entryFee,
+      feed: [
+        {
+          id: "join-" + Date.now(),
+          type: "join",
+          username,
+          message: `${username} just joined! ($${entryFee.toFixed(2)})`,
+          atMs: Date.now(),
+          amount: entryFee,
+        },
+        ...s.feed,
+      ].slice(0, 50),
+    }));
+  }, [username, entryFee, onJoinRequest]);
+
+  const nextTier = state.phase === "lobby" ? getNextTierMinutes(0) : null;
+  const currentFee = state.phase === "lobby" ? (getEntryFeeAtMinute(0) ?? 1) : state.lateEntryFee;
+
+  // ----- Lobby -----
+  if (state.phase === "lobby") {
+    const mins = Math.floor(state.nextGameCountdownSec / 60);
+    const secs = state.nextGameCountdownSec % 60;
+    return (
+      <div className="flex flex-col gap-6 pb-8">
+        <div className="text-center">
+          <h1 className="bg-gradient-to-r from-teal via-[#00E5C7] to-purple-500 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
+            LAST TOUCH
+          </h1>
+          <p className="mt-2 text-body-gray">Hold your ground. Win it all.</p>
+          <div className="mt-4 inline-block animate-pulse text-4xl">👆</div>
+        </div>
+
+        <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-teal/50 bg-card/90 p-6 shadow-[0_0_40px_rgba(0,229,199,0.15)]">
+          <p className="text-center text-sm text-body-gray">Current Prize Pool</p>
+          <p className="mt-2 text-center text-4xl font-bold text-white tabular-nums">
+            $<AnimatedNumber value={state.prizePool} />
+          </p>
+          <p className="mt-1 text-center text-sm text-body-gray">
+            {state.players.length} Players Joined
+          </p>
+        </div>
+
+        <div className="card-border mx-auto w-full max-w-md rounded-xl bg-card/80 p-5">
+          <p className="text-sm text-body-gray">Entry Fee</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-400">${currentFee.toFixed(2)}</p>
+          {nextTier && (
+            <p className="mt-1 text-xs text-body-gray">
+              Price increases in: {Math.floor(state.nextGameCountdownSec / 60)}:
+              {(state.nextGameCountdownSec % 60).toString().padStart(2, "0")}
+            </p>
+          )}
+          <ul className="mt-4 space-y-1 text-xs text-body-gray">
+            <li>Now: $1.00 {!joined ? "← YOU ARE HERE" : ""}</li>
+            <li>After 10 min: $2.00</li>
+            <li>After 20 min: $5.00</li>
+            <li>After 30 min: $10.00</li>
+            <li>After 45 min: $25.00</li>
+            <li>After 60 min: $50.00 (FINAL) / Entries closed</li>
+          </ul>
+        </div>
+
+        <div className="text-center">
+          <p className="text-body-gray">Next Game Starts In</p>
+          <p className="mt-2 font-mono text-4xl font-bold text-white tabular-nums">
+            {mins}:{secs.toString().padStart(2, "0")}
+          </p>
+        </div>
+
+        {!joined && (
+          <div className="mx-auto w-full max-w-md">
+            <button
+              type="button"
+              onClick={handleJoin}
+              className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(0,229,199,0.4)] transition hover:opacity-95"
+            >
+              JOIN NOW — ${entryFee.toFixed(2)}
+            </button>
+            <p className="mt-2 text-center text-sm text-body-gray">
+              {state.players.length} players already joined
+            </p>
+          </div>
+        )}
+
+        <div className="mx-auto w-full max-w-md">
+          <button
+            type="button"
+            onClick={() => setHowItWorksOpen((o) => !o)}
+            className="w-full rounded-lg border border-white/10 py-2 text-sm text-body-gray"
+          >
+            How it works {howItWorksOpen ? "▲" : "▼"}
+          </button>
+          {howItWorksOpen && (
+            <div className="mt-2 rounded-lg bg-white/5 p-4 text-sm text-body-gray">
+              <p>1. Join by paying the entry fee.</p>
+              <p>2. When the game starts, press and HOLD the touch zone.</p>
+              <p>3. Don&apos;t lift your finger — if you do, you&apos;re out!</p>
+              <p>4. Last person holding wins the ENTIRE prize pool.</p>
+              <p className="mt-2">Rules: Keep your finger on the zone. Random challenges may require tapping a target with your other hand. If you leave the app, you&apos;re out.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="mx-auto w-full max-w-md">
+          <p className="mb-2 text-xs text-body-gray">Live feed</p>
+          <div className="flex h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-white/10 bg-black/30 p-2">
+            {state.feed.slice(0, 12).map((f) => (
+              <div key={f.id} className="text-xs text-white/90">
+                {f.type === "join" && "🎮"} {f.message}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Countdown 5,4,3,2,1 -----
+  if (state.phase === "countdown" && countdownNum != null) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center">
+        {countdownNum > 0 ? (
+          <span className="animate-pulse font-mono text-9xl font-black text-white">
+            {countdownNum}
+          </span>
+        ) : (
+          <span className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-5xl font-black text-transparent md:text-7xl">
+            HOLD NOW!
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // ----- Winner -----
+  if (state.phase === "winner") {
+    const winner = remaining[0];
+    const isRealWinner = winner?.isReal ?? false;
+    const net = netPrizePool(state.prizePool);
+    const holdTime = state.gameStartMs != null && winner
+      ? (winner.eliminatedAtMs ?? Date.now()) - state.gameStartMs
+      : 0;
+    return (
+      <div className="flex flex-col items-center gap-6 py-8">
+        <h2 className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-5xl font-black text-transparent">
+          WINNER!
+        </h2>
+        <p className="text-2xl font-bold text-white">{winner?.username}</p>
+        <p className="text-teal text-xl">Won ${net.toFixed(2)}!</p>
+        <p className="text-body-gray">Hold time: {formatHoldTime(holdTime)}</p>
+        {isRealWinner && (
+          <p className="text-lg text-teal">🎉 Congratulations! Funds added to your wallet.</p>
+        )}
+        {state.realPlayerEliminated && (
+          <p className="text-body-gray">
+            You placed #{state.realPlayerRank} out of {totalPlayers} players. Better luck next time!
+          </p>
+        )}
+        <div className="flex gap-4">
+          <a
+            href="/last-touch"
+            className="rounded-xl bg-teal px-6 py-3 font-semibold text-charcoal"
+          >
+            Play Again
+          </a>
+          <button
+            type="button"
+            className="rounded-xl border border-white/20 px-6 py-3 font-semibold text-white"
+          >
+            Share Result
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ----- Playing / Final 10 / 2 / 3 -----
+  const gameElapsedMs = state.gameStartMs != null ? Date.now() - state.gameStartMs : 0;
+  const myHoldMs = holdStartMs != null ? Date.now() - holdStartMs : 0;
+
+  return (
+    <div className="flex flex-col gap-4 pb-6">
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-white">LAST TOUCH</span>
+        <span className="font-mono text-white tabular-nums">{formatHoldTime(gameElapsedMs)}</span>
+        <span className="flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> LIVE
+        </span>
+      </div>
+
+      <div className="rounded-xl border border-teal/30 bg-card/80 p-4 text-center">
+        <p className="text-xs text-body-gray">PRIZE POOL</p>
+        <p className="text-3xl font-bold text-white tabular-nums">
+          $<AnimatedNumber value={state.prizePool} />
+        </p>
+        <p className="mt-1 text-xs text-body-gray">Late entry: ${(getEntryFeeAtMinute(gameElapsedMs / 60000) ?? 0).toFixed(2)}</p>
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2">
+        <span className="text-body-gray">Players Remaining</span>
+        <span className="font-mono font-bold text-white tabular-nums">
+          {remaining.length} / {totalPlayers}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-teal/80 transition-all duration-500"
+          style={{ width: `${(remaining.length / totalPlayers) * 100}%` }}
+        />
+      </div>
+
+      {challengeActive && (
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleChallengeTap}
+          onKeyDown={(e) => e.key === "Enter" && handleChallengeTap()}
+          className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border-4 border-amber-400 bg-amber-400/20 p-8 text-center"
+        >
+          <p className="font-bold text-amber-400">TAP TARGET</p>
+          <p className="font-mono text-2xl text-white">{challengeSecLeft}s</p>
+        </div>
+      )}
+
+      <div className="flex flex-1 flex-col items-center justify-center">
+        {!isEliminated ? (
+          <div
+            ref={touchZoneRef}
+            role="button"
+            tabIndex={0}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerLeave}
+            onContextMenu={(e) => e.preventDefault()}
+            className={`flex min-h-[200px] min-w-[200px] max-w-[min(90vw,320px)] cursor-pointer select-none flex-col items-center justify-center rounded-full border-4 transition-all ${
+              isHolding
+                ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(0,229,199,0.4)]"
+                : "border-white/20 bg-white/5 hover:border-teal/50"
+            }`}
+            style={{ touchAction: "none" }}
+          >
+            {isHolding ? (
+              <>
+                <p className="font-mono text-2xl font-bold text-white tabular-nums">
+                  {formatHoldTime(myHoldMs)}
+                </p>
+                <p className="mt-1 text-xs text-teal">HOLDING</p>
+              </>
+            ) : (
+              <p className="text-center text-sm text-body-gray">PLACE YOUR FINGER HERE</p>
+            )}
+          </div>
+        ) : (
+          <div className="flex min-h-[200px] min-w-[200px] flex-col items-center justify-center rounded-full border-4 border-red-500/80 bg-red-500/20">
+            <p className="text-xl font-bold text-red-400">ELIMINATED</p>
+            {state.realPlayerEliminatedAtMs != null && state.realPlayerHoldStartMs != null && (
+              <p className="mt-1 text-sm text-body-gray">
+                Hold time: {formatHoldTime(state.realPlayerEliminatedAtMs - state.realPlayerHoldStartMs)}
+              </p>
+            )}
+            <p className="mt-1 text-sm text-white">Rank #{state.realPlayerRank}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-lg bg-black/40 p-2">
+        <p className="mb-1 text-xs text-body-gray">Eliminations</p>
+        <div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto">
+          {state.feed.filter((f) => f.type === "eliminate" || f.type === "late_join").slice(0, 8).map((f) => (
+            <div
+              key={f.id}
+              className={`text-xs ${f.type === "late_join" ? "text-emerald-400" : "text-red-400/90"}`}
+            >
+              {f.type === "late_join" && "💰"} {f.type === "eliminate" && "❌"} {f.message}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {realPlayer && !isEliminated && (
+        <div className="rounded-lg border border-white/10 bg-card/60 p-3 text-sm">
+          <p>Your Hold Time: {formatHoldTime(myHoldMs)}</p>
+          <p>Your Rank: #{remaining.filter((p) => p.entryTimeMs <= realPlayer.entryTimeMs).length} / {totalPlayers}</p>
+          <p>Warnings: {realPlayer.warnings} / {MAX_WARNINGS}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase";
+import AppNavbar from "@/components/AppNavbar";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import { useOnlinePlayers } from "@/hooks/useOnlinePlayers";
+import { getCurrentUser } from "@/lib/api";
+
+interface DisplayUser {
+  user_metadata?: { username?: string };
+  email?: string;
+}
+
+const GAMES = [
+  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: true },
+  { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
+  { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
+  { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: false },
+  { name: "Reaction Duel", slug: "reaction-duel", gradient: "from-orange-500/30 to-red-500/30", active: true },
+  { name: "Spelling Bee", slug: "spelling-bee", gradient: "from-amber-500/30 to-yellow-600/30", active: true },
+  { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
+  { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
+];
+
+function useRandom(min: number, max: number, seed: string): number {
+  const [n, setN] = useState(min);
+  useEffect(() => {
+    setN(min + Math.floor(Math.random() * (max - min + 1)));
+  }, [min, max, seed]);
+  return n;
+}
+
+function GameCard({
+  name,
+  slug,
+  gradient,
+  active,
+  playersOnline,
+  waitSec,
+  isPractice,
+}: {
+  name: string;
+  slug: string;
+  gradient: string;
+  active: boolean;
+  playersOnline: number;
+  waitSec: number;
+  isPractice: boolean;
+}) {
+  const content = (
+    <div
+      className={`card-border relative flex min-h-[160px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
+        active
+          ? isPractice
+            ? "hover:-translate-y-0.5 hover:border-purple-500/30 hover:shadow-purple-500/10 cursor-pointer"
+            : "hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-teal-glow/10 cursor-pointer"
+          : "cursor-not-allowed opacity-60"
+      }`}
+    >
+      <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
+      <div className="relative">
+        <p className="font-semibold text-white">{name}</p>
+        {active ? (
+          <span className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>
+            {isPractice ? "1v1 • Free" : "1v1"}
+          </span>
+        ) : (
+          <span className="mt-2 inline-block w-fit rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-body-gray">
+            Coming Soon
+          </span>
+        )}
+      </div>
+      <div className="relative mt-2 space-y-1 text-xs text-body-gray">
+        <p>{playersOnline} players online</p>
+        <p>~{waitSec} sec avg wait</p>
+      </div>
+      {!active && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="h-10 w-10 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+
+  if (active) {
+    return <Link href={`/play/${slug}`}>{content}</Link>;
+  }
+  return <div>{content}</div>;
+}
+
+export default function PlayPage() {
+  const router = useRouter();
+  const { isPractice } = usePlayMode();
+  const [user, setUser] = useState<DisplayUser | null>(null);
+  const [userId, setUserId] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [playersWait, setPlayersWait] = useState<{ players: number; wait: number }[]>([]);
+  const onlineCount = useOnlinePlayers(userId);
+
+  useEffect(() => {
+    setPlayersWait(
+      GAMES.map(() => ({
+        players: 50 + Math.floor(Math.random() * 451),
+        wait: 10 + Math.floor(Math.random() * 36),
+      }))
+    );
+  }, []);
+
+  useEffect(() => {
+    async function getUser() {
+      const current = await getCurrentUser();
+      if (!current) {
+        router.push("/login");
+        setLoading(false);
+        return;
+      }
+      setUserId(current.id);
+      setUser({
+        user_metadata: { username: current.username },
+        email: current.email,
+      });
+      setIsDevMode(current.isDevMode ?? false);
+      setLoading(false);
+    }
+    getUser();
+  }, [router]);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("skillflow_dev_mode");
+        localStorage.removeItem("skillflow_dev_user");
+      }
+      const supabase = createClient();
+      if (supabase) await supabase.auth.signOut();
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-charcoal">
+        <svg
+          className={`h-10 w-10 animate-spin ${
+            isPractice ? "text-purple-400" : "text-teal"
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  const username = user?.user_metadata?.username || "Player";
+
+  return (
+    <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
+      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
+      <AppNavbar
+        username={username}
+        isDevMode={isDevMode}
+        onLogout={handleLogout}
+        loggingOut={loggingOut}
+        currentPage="play"
+      />
+      <ModeToggleBarContent />
+      <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
+        {!isPractice && (
+          <Link
+            href="/last-touch"
+            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
+                  LAST TOUCH
+                </h2>
+                <p className="mt-1 text-body-gray">Hold your ground. Win it all.</p>
+                <p className="mt-2 text-sm text-teal">Massive prize pool • Last finger standing wins</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-xs text-body-gray">Prize Pool</p>
+                  <p className="text-xl font-bold text-white">$1,247</p>
+                </div>
+                <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(0,229,199,0.4)]">
+                  Join Now
+                </span>
+              </div>
+            </div>
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-teal/20 blur-2xl" />
+          </Link>
+        )}
+
+        <h1 className="text-2xl font-bold text-white sm:text-3xl">Choose Your Game</h1>
+        <p className="mt-1 text-body-gray">
+          {isPractice ? "Select a game to play for free" : "Select a game and stake to find your opponent"}
+        </p>
+        <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3">
+          {(isPractice
+            ? GAMES.filter((g) => g.active && ["8-ball-pool", "chess", "connect-4", "reaction-duel", "spelling-bee"].includes(g.slug))
+            : GAMES
+          ).map((game, i) => (
+            <GameCard
+              key={game.slug}
+              name={game.name}
+              slug={game.slug}
+              gradient={game.gradient}
+              active={game.active}
+              playersOnline={onlineCount}
+              waitSec={playersWait[i]?.wait ?? 15}
+              isPractice={isPractice}
+            />
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}

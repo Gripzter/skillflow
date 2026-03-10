@@ -1,0 +1,2149 @@
+/**
+ * Real matchmaking: find or create matches in Supabase.
+ * Polling-only — no Supabase Realtime for matchmaking.
+ * Realtime is only used inside the match room for game events.
+ */
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
+
+export interface DbMatch {
+  id: string;
+  game_type: string;
+  player1_id: string;
+  player2_id: string | null;
+  player1_username: string | null;
+  player2_username: string | null;
+  player1_rating: number | null;
+  player2_rating: number | null;
+  stake_amount: number;
+  platform_fee: number | null;
+  total_pot: number | null;
+  winner_payout: number | null;
+  status: string;
+  result: string | null;
+  winner_id: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+const POLL_INTERVAL_MS = 2000;
+const MATCHMAKING_TIMEOUT_MS = 60000;
+
+export type MatchmakingStatus = "searching" | "waiting" | "matched" | "timeout";
+
+/**
+ * Start matchmaking: search for waiting match → join or create → poll until ready.
+ * Returns a cleanup function. Call it on cancel or unmount.
+ */
+export async function startMatchmaking(
+  supabase: SupabaseClient,
+  gameType: string,
+  stakeAmount: number,
+  userId: string,
+  username: string,
+  rating: number,
+  onStatusUpdate: (status: MatchmakingStatus, match?: DbMatch) => void,
+  onMatchReady: (match: DbMatch, role: "player1" | "player2") => void,
+  onError: (error: string) => void
+): Promise<() => void> {
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let matchId: string | null = null;
+  let cancelled = false;
+
+  const cleanup = () => {
+    cancelled = true;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+  };
+
+  try {
+    onStatusUpdate("searching");
+
+    const normalizedGameType = gameType.toLowerCase().trim();
+    const stake = Number(stakeAmount);
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      onError("Not authenticated");
+      return cleanup;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Starting matchmaking...", { gameType: normalizedGameType, stake });
+    }
+
+    const { data: waitingMatches, error: findError } = await supabase
+      .from("matches")
+      .select("*")
+      .eq("game_type", normalizedGameType)
+      .eq("stake_amount", stake)
+      .eq("status", "waiting")
+      .neq("player1_id", userId)
+      .order("created_at", { ascending: true })
+      .limit(1);
+
+    if (findError) {
+      onError(findError.message ?? "Failed to search for matches");
+      return cleanup;
+    }
+
+    if (waitingMatches && waitingMatches.length > 0) {
+      const match = waitingMatches[0] as DbMatch;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Found waiting match:", match.id);
+      }
+      const totalPot = match.stake_amount * 2;
+      const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
+      const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
+
+      const { data: updated, error: joinError } = await supabase
+        .from("matches")
+        .update({
+          player2_id: userId,
+          player2_username: username,
+          player2_rating: rating,
+          status: "matched",
+          total_pot: totalPot,
+          platform_fee: platformFee,
+          winner_payout: winnerPayout,
+        })
+        .eq("id", match.id)
+        .eq("status", "waiting")
+        .select()
+        .single();
+
+      if (joinError || !updated) {
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Join failed (match taken?), retrying…", joinError?.message);
+        }
+        return startMatchmaking(
+          supabase,
+          gameType,
+          stakeAmount,
+          userId,
+          username,
+          rating,
+          onStatusUpdate,
+          onMatchReady,
+          onError
+        );
+      }
+
+      matchId = (updated as DbMatch).id;
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Player 2 joined match:", matchId, "— calling onMatchReady NOW (no delay)");
+      }
+      onStatusUpdate("matched", updated as DbMatch);
+      if (!cancelled) {
+        onMatchReady(updated as DbMatch, "player2");
+      }
+      return cleanup;
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] No waiting match found, creating new...");
+    }
+
+    const { data: newMatch, error: createError } = await supabase
+      .from("matches")
+      .insert({
+        game_type: normalizedGameType,
+        stake_amount: stake,
+        player1_id: userId,
+        player1_username: username,
+        player1_rating: rating,
+        status: "waiting",
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      onError(createError.message ?? "Failed to create match");
+      return cleanup;
+    }
+    if (!newMatch) {
+      onError("Failed to create match");
+      return cleanup;
+    }
+
+    matchId = (newMatch as DbMatch).id;
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[matchmaking] Created match as Player 1:", matchId, "— starting polling every 2s");
+    }
+    onStatusUpdate("waiting", newMatch as DbMatch);
+
+    pollInterval = setInterval(async () => {
+      if (cancelled) {
+        // eslint-disable-next-line no-console
+        console.log("[matchmaking] Polling cancelled, stopping");
+        return;
+      }
+
+      try {
+        const { data: freshMatch, error: pollError } = await supabase
+          .from("matches")
+          .select("*")
+          .eq("id", matchId)
+          .single();
+
+        if (pollError) {
+          // eslint-disable-next-line no-console
+          console.error("[matchmaking] Poll query error:", pollError);
+          return;
+        }
+
+        if (process.env.NODE_ENV !== "production") {
+          // eslint-disable-next-line no-console
+          console.log("[matchmaking] Poll check:", (freshMatch as DbMatch)?.status, "player2_id:", (freshMatch as DbMatch)?.player2_id);
+        }
+
+        if (
+          freshMatch &&
+          (freshMatch as DbMatch).status === "matched" &&
+          (freshMatch as DbMatch).player2_id
+        ) {
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+          if (process.env.NODE_ENV !== "production") {
+            // eslint-disable-next-line no-console
+            console.log("[matchmaking] Player 1 matched! Calling onMatchReady NOW (no delay), NAVIGATING TO:", `/match/${(freshMatch as DbMatch).id}`);
+          }
+          onStatusUpdate("matched", freshMatch as DbMatch);
+          if (!cancelled) {
+            onMatchReady(freshMatch as DbMatch, "player1");
+          }
+        }
+      } catch (pollErr) {
+        // eslint-disable-next-line no-console
+        console.error("[matchmaking] Poll error:", pollErr);
+      }
+    }, POLL_INTERVAL_MS);
+
+    const timeoutId = setTimeout(() => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+      if (!cancelled) onStatusUpdate("timeout");
+    }, MATCHMAKING_TIMEOUT_MS);
+
+    return () => {
+      cleanup();
+      clearTimeout(timeoutId);
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Matchmaking failed";
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.error("[matchmaking] Error:", err);
+    }
+    onError(message);
+    return cleanup;
+  }
+}
+
+/**
+ * Cancel a waiting match (e.g. when Player 1 clicks Cancel).
+ */
+export async function cancelMatchmaking(
+  supabase: SupabaseClient,
+  matchId: string
+): Promise<void> {
+  await supabase
+    .from("matches")
+    .update({ status: "cancelled" })
+    .eq("id", matchId)
+    .eq("status", "waiting");
+}
+
+/**
+ * Mark match as completed with winner and result (used from match room / API).
+ */
+export async function completeMatch(
+  supabase: SupabaseClient,
+  matchId: string,
+  winnerId: string | null,
+  result: "player1_win" | "player2_win" | "draw"
+): Promise<DbMatch> {
+  const { data, error } = await supabase
+    .from("matches")
+    .update({
+      winner_id: winnerId,
+      result,
+      status: result === "draw" ? "draw" : "completed",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", matchId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error("Match not found");
+  return data as DbMatch;
+}
+/**
+ * Supabase Realtime connection manager for match channels.
+ * Each match uses channel `match:{matchId}` for game events and presence.
+ */
+
+import { createClient } from "@/lib/supabase";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+
+export type GameEventPayload = Record<string, unknown> & { type?: string };
+
+export class RealtimeManager {
+  private channel: RealtimeChannel | null = null;
+  private matchId = "";
+
+  private getSupabase() {
+    return createClient();
+  }
+
+  /**
+   * Join a match channel: subscribe to game_event broadcasts and presence.
+   */
+  async joinChannel(
+    matchId: string,
+    userId: string,
+    onEvent: (event: GameEventPayload & { type: string }) => void
+  ): Promise<RealtimeChannel | null> {
+    const supabase = this.getSupabase();
+    if (!supabase) return null;
+
+    this.leaveChannel();
+    this.matchId = matchId;
+
+    this.channel = supabase.channel(`match:${matchId}`, {
+      config: {
+        presence: { key: userId },
+        broadcast: { self: false },
+      },
+    });
+
+    this.channel.on("broadcast", { event: "game_event" }, (payload: { payload: GameEventPayload }) => {
+      const event = payload.payload as GameEventPayload & { type: string };
+      onEvent(event?.type ? event : { ...event, type: "game_event" });
+    });
+
+    this.channel.on("presence", { event: "sync" }, () => {
+      const state = this.channel?.presenceState() ?? {};
+      onEvent({ type: "presence_sync", players: Object.keys(state) } as GameEventPayload & { type: string });
+    });
+
+    this.channel.on("presence", { event: "join" }, ({ key }: { key: string }) => {
+      onEvent({ type: "player_joined", userId: key } as GameEventPayload & { type: string });
+    });
+
+    this.channel.on("presence", { event: "leave" }, ({ key }: { key: string }) => {
+      onEvent({ type: "player_left", userId: key } as GameEventPayload & { type: string });
+    });
+
+    await this.channel.subscribe(async (status: string) => {
+      if (status === "SUBSCRIBED") {
+        await this.channel?.track({ user_id: userId, online_at: new Date().toISOString() });
+      }
+    });
+
+    return this.channel;
+  }
+
+  /** Send a game event to the channel (opponent receives via broadcast). */
+  async sendEvent(event: GameEventPayload): Promise<void> {
+    if (!this.channel) return;
+    await this.channel.send({
+      type: "broadcast",
+      event: "game_event",
+      payload: event,
+    });
+  }
+
+  /** Leave the current channel and untrack presence. */
+  async leaveChannel(): Promise<void> {
+    if (this.channel) {
+      await this.channel.untrack();
+      await this.channel.unsubscribe();
+      this.channel = null;
+    }
+    this.matchId = "";
+  }
+
+  getCurrentMatchId(): string {
+    return this.matchId;
+  }
+}
+
+export const realtimeManager = new RealtimeManager();
+
+const ONLINE_CHANNEL_NAME = "online_players";
+const MIN_FAKE_COUNT = 50;
+const MAX_FAKE_COUNT = 150;
+
+/**
+ * Join the global "online_players" presence channel, track this user, and subscribe to count.
+ * When real count < 5, reports a fake count (50–150) to avoid "empty" feel.
+ * Returns cleanup function.
+ */
+export function subscribeOnlinePresence(
+  userId: string,
+  onCount: (count: number) => void
+): () => void {
+  const supabase = createClient();
+  if (!supabase) return () => {};
+
+  const channel = supabase.channel(ONLINE_CHANNEL_NAME, {
+    config: { presence: { key: userId } },
+  });
+
+  channel.on("presence", { event: "sync" }, () => {
+    const state = channel.presenceState();
+    const realCount = Object.keys(state).length;
+    const count =
+      realCount < 5
+        ? MIN_FAKE_COUNT + Math.floor(Math.random() * (MAX_FAKE_COUNT - MIN_FAKE_COUNT + 1))
+        : realCount;
+    onCount(count);
+  });
+
+  channel.subscribe(async (status) => {
+    if (status === "SUBSCRIBED") {
+      await channel.track({ user_id: userId, at: new Date().toISOString() });
+    }
+  });
+
+  return () => {
+    channel.untrack();
+    channel.unsubscribe();
+  };
+}
+/**
+ * Game-specific event broadcasting over the match realtime channel.
+ * Phase 2 will use these helpers to send typed move/action events.
+ */
+
+import { realtimeManager } from "./realtime";
+import type { GameEventPayload } from "./realtime";
+
+export type GameEventType =
+  | "move"
+  | "action"
+  | "ready"
+  | "rematch_request"
+  | "game_event"
+  | "opponent_disconnected";
+
+/**
+ * Send a game event to the opponent. Kept small (type + minimal data) for speed.
+ */
+export async function sendGameEvent(event: GameEventPayload): Promise<void> {
+  await realtimeManager.sendEvent(event);
+}
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import { createClient } from "@/lib/supabase";
+import {
+  startMatchmaking as startMatchmakingApi,
+  cancelMatchmaking,
+  type DbMatch,
+} from "@/lib/multiplayer/matchmaking";
+
+export type MatchmakingStatus =
+  | "idle"
+  | "searching"
+  | "waiting"
+  | "matched"
+  | "timeout"
+  | "error";
+
+export interface MatchmakingOptions {
+  gameType: string;
+  stakeAmount: number;
+  userId: string;
+  username: string;
+  rating: number;
+  onMatchReady?: (match: DbMatch, role: "player1" | "player2") => void;
+}
+
+export function useMatchmaking() {
+  const [status, setStatus] = useState<MatchmakingStatus>("idle");
+  const [match, setMatch] = useState<DbMatch | null>(null);
+  const [role, setRole] = useState<"player1" | "player2" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const matchRef = useRef<DbMatch | null>(null);
+  matchRef.current = match;
+
+  const startMatchmaking = useCallback(async (options: MatchmakingOptions) => {
+    setStatus("searching");
+    setError(null);
+    setMatch(null);
+    setRole(null);
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase not configured");
+      setStatus("error");
+      return;
+    }
+
+    try {
+      cleanupRef.current = await startMatchmakingApi(
+        supabase,
+        options.gameType,
+        options.stakeAmount,
+        options.userId,
+        options.username,
+        options.rating,
+        (updateStatus, matchData) => {
+          setStatus(updateStatus as MatchmakingStatus);
+          if (matchData) setMatch(matchData);
+        },
+        (matchData, matchRole) => {
+          setMatch(matchData);
+          setRole(matchRole);
+          setStatus("matched");
+          options.onMatchReady?.(matchData, matchRole);
+        },
+        (err) => {
+          setError(err);
+          setStatus("error");
+        }
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Matchmaking failed";
+      setError(message);
+      setStatus("error");
+    }
+  }, []);
+
+  const cancelSearching = useCallback(async () => {
+    if (cleanupRef.current) {
+      cleanupRef.current();
+      cleanupRef.current = null;
+    }
+    const currentMatch = matchRef.current;
+    if (currentMatch?.status === "waiting") {
+      const supabase = createClient();
+      if (supabase) {
+        try {
+          await cancelMatchmaking(supabase, currentMatch.id);
+        } catch {
+          // best effort
+        }
+      }
+    }
+    setStatus("idle");
+    setMatch(null);
+    setRole(null);
+    setError(null);
+  }, []);
+
+  // Cleanup only on unmount — do NOT depend on match/status or we kill the 2s delay before onMatchReady
+  useEffect(() => {
+    return () => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        cleanupRef.current = null;
+      }
+      const currentMatch = matchRef.current;
+      if (currentMatch?.status === "waiting") {
+        const supabase = createClient();
+        if (supabase) {
+          cancelMatchmaking(supabase, currentMatch.id).catch(() => {});
+        }
+      }
+    };
+  }, []);
+
+  return { status, match, role, error, startMatchmaking, cancelSearching };
+}
+"use client";
+
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { useToast } from "@/components/Toast";
+import { useGeo } from "@/contexts/GeoContext";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import { useMatchmaking } from "@/hooks/useMatchmaking";
+import {
+  getCurrentUser,
+  getWalletBalance,
+  debitWallet,
+  creditWallet,
+  createMatch,
+  computePayout,
+  type PlayerInfo,
+  type StoredMatch,
+} from "@/lib/api";
+import { checkCanPlay } from "@/lib/responsible-gaming";
+import { createClient } from "@/lib/supabase";
+
+const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
+const MATCHMAKING_TIMEOUT_SEC = 60;
+
+export type BotDifficulty = "rookie" | "gamer" | "professional";
+
+const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; emoji: string; description: string }[] = [
+  { value: "rookie", emoji: "🟢", label: "Rookie", description: "Learning the ropes. A great place to start." },
+  { value: "gamer", emoji: "🟡", label: "Gamer", description: "A solid opponent. Bring your A-game." },
+  { value: "professional", emoji: "🔴", label: "Professional", description: "Near-perfect play. Only the best can win." },
+];
+const MATCHMAKING_SLOW_SEC = 30;
+const GAME_SLUG_TO_NAME: Record<string, string> = {
+  "8-ball-pool": "8 Ball Pool",
+  chess: "Chess",
+  "connect-4": "Connect 4",
+  "reaction-duel": "Reaction Duel",
+  "memory-match": "Memory Match",
+  "spelling-bee": "Spelling Bee",
+};
+
+export default function PlayGamePage() {
+  const router = useRouter();
+  const params = useParams();
+  const gameSlug = (params?.game as string) || "";
+  const gameName = GAME_SLUG_TO_NAME[gameSlug] || gameSlug.replace(/-/g, " ");
+
+  const [username, setUsername] = useState<string>("Player");
+  const [userId, setUserId] = useState<string>("");
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [balance, setBalance] = useState(0);
+
+  const [stake, setStake] = useState(5);
+  const [customStake, setCustomStake] = useState("");
+  const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("gamer");
+  const [matchmaking, setMatchmaking] = useState(false);
+  const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
+  const [opponentFound, setOpponentFound] = useState<PlayerInfo | null>(null);
+  const [match, setMatch] = useState<StoredMatch | null>(null);
+  const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
+  const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [navigateToMatchId, setNavigateToMatchId] = useState<string | null>(null);
+
+  const { isPractice } = usePlayMode();
+  const { isRestricted } = useGeo();
+  const { showToast } = useToast();
+  const effectivePractice = isPractice || isRestricted;
+  const {
+    status: realMatchStatus,
+    match: realMatch,
+    role: realRole,
+    error: realMatchError,
+    startMatchmaking,
+    cancelSearching,
+  } = useMatchmaking();
+
+  const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
+  const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
+  const insufficientBalance = !effectivePractice && balance < stakeAmount;
+  const useRealMatchmaking = !isPractice && !isRestricted;
+  const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
+  const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
+  const realMatchmakingTimeout = realMatchStatus === "timeout";
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        setUsername(user.username);
+        setUserId(user.id);
+        setIsDevMode(user.isDevMode ?? false);
+        setEmailVerified(user.emailVerified ?? true);
+        const bal = await getWalletBalance();
+        setBalance(bal);
+      } catch {
+        router.push("/login");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+    const handleUpdate = () => void getWalletBalance().then(setBalance);
+    window.addEventListener("skillflow_wallet_updated", handleUpdate);
+    return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
+  }, [router]);
+
+  // Elapsed timer for real matchmaking (and bot fallback timeout)
+  useEffect(() => {
+    if (!matchmaking || !useRealMatchmaking) return;
+    const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
+    return () => clearInterval(timer);
+  }, [matchmaking, useRealMatchmaking]);
+
+  // Fallback: if navigateToMatchId was set (e.g. from a code path that didn't use handleMatchReady), navigate
+  useEffect(() => {
+    if (!navigateToMatchId) return;
+    const matchUrl = `/match/${navigateToMatchId}`;
+    window.location.href = matchUrl;
+  }, [navigateToMatchId]);
+
+  const player1 = useMemo<PlayerInfo>(
+    () => ({
+      username,
+      rating: 1000,
+      winRate: 50,
+      matchesPlayed: 0,
+    }),
+    [username]
+  );
+
+  const handleCancelMatchmaking = useCallback(async () => {
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    setElapsedTimer(null);
+    if (findMatchTimeoutRef.current) {
+      clearTimeout(findMatchTimeoutRef.current);
+      findMatchTimeoutRef.current = null;
+    }
+    setNavigateToMatchId(null);
+    if (useRealMatchmaking) {
+      await cancelSearching();
+    }
+    setMatchmaking(false);
+    setOpponentFound(null);
+    setMatch(null);
+    setMatchmakingElapsed(0);
+    if (!isPractice && !isRestricted) {
+      try {
+        await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+        setBalance(await getWalletBalance());
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
+      }
+    }
+  }, [elapsedTimer, stakeAmount, isPractice, isRestricted, useRealMatchmaking, cancelSearching]);
+
+  const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.log("[PlayGamePage] onMatchReady called", match?.id, _role, "— navigating with window.location.href");
+    }
+    if (match?.id) {
+      const matchUrl = `/match/${match.id}`;
+      window.location.href = matchUrl;
+    }
+  }, []);
+
+  const handleFindMatch = useCallback(async () => {
+    if (isPractice || isRestricted) {
+      setMatchmaking(true);
+      setMatchmakingElapsed(0);
+      const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
+      setElapsedTimer(timer);
+      const delay = 1000 + Math.floor(Math.random() * 2000);
+      findMatchTimeoutRef.current = setTimeout(async () => {
+        clearInterval(timer);
+        setElapsedTimer(null);
+        const opponent: PlayerInfo = {
+          username: "Bot",
+          rating: 1000,
+          winRate: 50,
+          matchesPlayed: 0,
+        };
+        setOpponentFound(opponent);
+        try {
+          const newMatch = await createMatch({
+            gameType: gameSlug,
+            gameDisplayName: gameName,
+            stakeAmount: 0,
+            player1,
+            player2: opponent,
+            isPractice: true,
+            botDifficulty,
+          });
+          setMatch(newMatch);
+          setTimeout(() => router.push(`/match/${newMatch.id}`), 1500);
+        } catch {
+          setMatchmaking(false);
+          setOpponentFound(null);
+        }
+      }, delay);
+      return;
+    }
+
+    if (!emailVerified) {
+      showToast("Please verify your email before playing for real money. Practice mode is available.", "error");
+      return;
+    }
+
+    const supabase = createClient();
+    if (supabase && userId) {
+      const canPlay = await checkCanPlay(supabase, userId);
+      if (!canPlay.allowed) {
+        showToast(canPlay.reason ?? "Real money play is not allowed.", "error");
+        return;
+      }
+    }
+
+    if (useRealMatchmaking) {
+      if (insufficientBalance || stakeAmount < 1) return;
+      try {
+        await debitWallet(stakeAmount, `Match entry – ${gameName}`);
+        setBalance(await getWalletBalance());
+        dispatchWalletUpdated();
+      } catch {
+        return;
+      }
+      setMatchmaking(true);
+      setMatchmakingElapsed(0);
+      try {
+        await startMatchmaking({
+          gameType: gameSlug,
+          stakeAmount,
+          userId,
+          username,
+          rating: 1000,
+          onMatchReady: handleMatchReady,
+        });
+      } catch {
+        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
+        dispatchWalletUpdated();
+        setMatchmaking(false);
+      }
+      return;
+    }
+  }, [
+    balance,
+    stakeAmount,
+    gameName,
+    gameSlug,
+    insufficientBalance,
+    isPractice,
+    isRestricted,
+    player1,
+    router,
+    useRealMatchmaking,
+    userId,
+    username,
+    startMatchmaking,
+    handleMatchReady,
+    botDifficulty,
+  ]);
+
+  const handleSwitchToPractice = useCallback(async () => {
+    await cancelSearching();
+    setMatchmaking(false);
+    setMatchmakingElapsed(0);
+    setOpponentFound(null);
+    setMatch(null);
+    try {
+      await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+      setBalance(await getWalletBalance());
+      dispatchWalletUpdated();
+    } catch {
+      dispatchWalletUpdated();
+    }
+    router.push(`/play/${gameSlug}`);
+    showToast("Switched to lobby. Toggle Practice mode to play vs bot for free.", "success");
+  }, [cancelSearching, stakeAmount, gameSlug, router, showToast]);
+
+  useEffect(() => {
+    return () => {
+      if (findMatchTimeoutRef.current) clearTimeout(findMatchTimeoutRef.current);
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-charcoal">
+        <svg
+          className={`h-10 w-10 animate-spin ${effectivePractice ? "text-purple-400" : "text-teal"}`}
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+
+  return (
+    <div className="min-h-screen bg-charcoal pb-32 md:pb-0">
+      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
+      <AppNavbar
+        username={username}
+        isDevMode={isDevMode}
+        onLogout={async () => {
+          setLoggingOut(true);
+          try {
+            const { logout } = await import("@/lib/api");
+            await logout();
+            router.push("/login");
+            router.refresh();
+          } catch {
+            setLoggingOut(false);
+          }
+        }}
+        loggingOut={loggingOut}
+        currentPage="play"
+      />
+      <ModeToggleBarContent />
+
+      <main className="relative mx-auto max-w-[800px] px-4 pt-4 pb-32 sm:px-6 md:pt-8 md:pb-12">
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            href="/play"
+            className="flex items-center gap-2 text-body-gray transition-colors hover:text-white"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {gameName}
+          </Link>
+          {!effectivePractice && (
+            <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <span className="text-sm font-medium text-white">${balance.toFixed(2)}</span>
+            </div>
+          )}
+        </div>
+
+        {effectivePractice && (
+          <>
+            <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
+              <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
+              <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
+            </div>
+            <section className="mt-8">
+              <h2 className="text-xl font-bold text-white">Select Difficulty</h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {DIFFICULTY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setBotDifficulty(opt.value)}
+                    className={`pressable rounded-full border px-4 py-2.5 text-sm font-medium transition-all ${
+                      botDifficulty === opt.value
+                        ? opt.value === "rookie"
+                          ? "border-emerald-500 bg-emerald-500/20 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                          : opt.value === "gamer"
+                            ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.3)]"
+                            : "border-red-500 bg-red-500/20 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+                        : "border-white/20 bg-[#1A1D27] text-body-gray hover:border-white/40 hover:text-white"
+                    }`}
+                  >
+                    {opt.emoji} {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-body-gray">
+                &quot;{DIFFICULTY_OPTIONS.find((o) => o.value === botDifficulty)?.description}&quot;
+              </p>
+            </section>
+          </>
+        )}
+
+        {!effectivePractice && (
+          <section className="mt-8">
+            <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
+            <p className="mt-1 text-body-gray">
+              Both players put up the same amount. Winner takes all minus 5% platform fee.
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+              {STAKE_PRESETS.map((amt) => (
+                <button
+                  key={amt}
+                  type="button"
+                  onClick={() => {
+                    setStake(amt);
+                    setCustomStake("");
+                  }}
+                  className={`pressable rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                    !customStake && stake === amt
+                      ? "border-teal bg-teal text-charcoal shadow-teal-glow/30"
+                      : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
+                  }`}
+                >
+                  ${amt}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-sm text-body-gray">Custom amount</p>
+            <input
+              type="number"
+              min={1}
+              max={balance}
+              step="0.01"
+              placeholder="0.00"
+              value={customStake}
+              onChange={(e) => setCustomStake(e.target.value)}
+              className="mt-1 w-full max-w-[200px] rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
+            />
+
+            <div className="card-border mt-6 rounded-card bg-card p-5">
+              <p className="text-body-gray">Your Stake: ${stakeAmount.toFixed(2)}</p>
+              <p className="mt-1 text-body-gray">Opponent&apos;s Stake: ${stakeAmount.toFixed(2)}</p>
+              <p className="mt-1 text-body-gray">Total Pot: ${totalPot.toFixed(2)}</p>
+              <p className="mt-1 text-body-gray">Platform fee (5%): ${platformFee.toFixed(2)}</p>
+              <p className="mt-2 text-lg font-bold text-teal">Winner gets: ${winnerPayout.toFixed(2)}</p>
+            </div>
+
+            {insufficientBalance && stakeAmount > 0 && (
+              <p className="mt-3 text-sm text-red-400">
+                Insufficient balance. <Link href="/wallet" className="text-teal underline">Deposit funds</Link> to play.
+              </p>
+            )}
+          </section>
+        )}
+
+        {!effectivePractice && (
+          <section className="mt-8">
+            <h2 className="text-xl font-bold text-white">Match Settings</h2>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <span className="rounded-lg border border-white/10 bg-card px-3 py-2 text-sm text-white">
+                Ranked 1v1
+              </span>
+              <span className="rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-sm text-teal">
+                Matched by skill rating ±200
+              </span>
+            </div>
+          </section>
+        )}
+
+        <div className="fixed bottom-[76px] left-0 right-0 z-30 px-4 pb-4 md:static md:mt-10 md:px-0 md:pb-0">
+          <button
+            type="button"
+            onClick={handleFindMatch}
+            disabled={!effectivePractice && (insufficientBalance || stakeAmount < 1)}
+            className={`pressable h-14 w-full rounded-lg text-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
+              effectivePractice
+                ? "bg-gradient-to-r from-[#7C5CFC] to-purple-600 text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                : "bg-teal text-charcoal hover:shadow-teal-glow"
+            }`}
+          >
+            {effectivePractice ? "Start Practice" : `Find Match — $${stakeAmount.toFixed(2)}`}
+          </button>
+        </div>
+      </main>
+
+      {/* Matchmaking overlay */}
+      {matchmaking && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/95 px-4">
+          {realMatchStatus === "error" && (
+            <>
+              <p className="text-xl font-semibold text-red-400">Matchmaking failed</p>
+              <p className="mt-2 text-body-gray">{realMatchError ?? "Please try again."}</p>
+              <button
+                type="button"
+                onClick={handleCancelMatchmaking}
+                className="mt-6 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+              >
+                Refund &amp; go back
+              </button>
+            </>
+          )}
+          {realMatchStatus === "matched" && realMatch && !opponentFound && !match && (
+            <>
+              <p className="text-2xl font-bold text-teal">Opponent Found!</p>
+              <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
+                <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-lg font-bold text-white">
+                    {username.charAt(0)}
+                  </div>
+                  <p className="mt-2 font-medium text-white">{username}</p>
+                  <p className="text-xs text-body-gray">Rating 1000</p>
+                </div>
+                <span className="text-2xl font-bold text-teal drop-shadow-lg">VS</span>
+                <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-lg font-bold text-white">
+                    {(realRole === "player1" ? realMatch.player2_username : realMatch.player1_username)?.charAt(0) ?? "?"}
+                  </div>
+                  <p className="mt-2 font-medium text-white">
+                    {realRole === "player1" ? realMatch.player2_username : realMatch.player1_username}
+                  </p>
+                  <p className="text-xs text-body-gray">
+                    Rating {realRole === "player1" ? realMatch.player2_rating : realMatch.player1_rating}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-6 text-body-gray">Starting match...</p>
+            </>
+          )}
+          {realMatchmakingTimeout && useRealMatchmaking && (
+            <>
+              <p className="text-xl font-semibold text-white">No opponent found</p>
+              <p className="mt-2 text-body-gray">Keep waiting, play a bot, or cancel and get a refund.</p>
+              <div className="mt-6 flex flex-col gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    startMatchmaking({
+                      gameType: gameSlug,
+                      stakeAmount,
+                      userId,
+                      username,
+                      rating: 1000,
+                      onMatchReady: handleMatchReady,
+                    });
+                  }}
+                  className="rounded-lg bg-teal px-6 py-2.5 font-semibold text-charcoal hover:shadow-teal-glow"
+                >
+                  Keep Waiting
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSwitchToPractice}
+                  className="rounded-lg border border-teal/50 bg-teal/10 px-6 py-2.5 font-semibold text-teal hover:bg-teal/20"
+                >
+                  Switch to Practice Mode
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelMatchmaking}
+                  className="rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+                >
+                  Cancel (refund)
+                </button>
+              </div>
+            </>
+          )}
+          {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && !realMatchmakingTimeout && (
+            <>
+              <div className="relative flex h-24 w-24 items-center justify-center">
+                <div className={`absolute h-20 w-20 animate-ping rounded-full border-2 ${effectivePractice ? "border-purple-500/40" : "border-teal/40"}`} />
+                <div className={`absolute h-16 w-16 animate-pulse rounded-full border-2 ${effectivePractice ? "border-purple-500" : "border-teal"}`} />
+                <div className={`h-3 w-3 rounded-full ${effectivePractice ? "bg-purple-500" : "bg-teal"}`} />
+              </div>
+              <p className="mt-6 text-xl font-semibold text-white">
+                {realMatchStatus === "waiting"
+                  ? "Waiting for opponent..."
+                  : effectivePractice
+                    ? "Finding practice opponent..."
+                    : "Searching for opponent..."}
+              </p>
+              <p className="mt-2 text-body-gray">
+                {effectivePractice ? `${gameName} • Free play` : `Stake: $${stakeAmount.toFixed(2)} • ${gameName} • Ranked 1v1`}
+              </p>
+              <p className="mt-2 text-sm text-body-gray">
+                {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}
+              </p>
+              {slowMessage && !timeoutReached && realMatchStatus === "searching" && (
+                <p className="mt-2 text-sm text-amber-400">Taking longer than usual...</p>
+              )}
+              <button
+                type="button"
+                onClick={handleCancelMatchmaking}
+                className="mt-8 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+          {opponentFound && match && (
+            <>
+              <p className={`text-2xl font-bold ${effectivePractice ? "text-purple-400" : "text-teal"}`}>Opponent Found!</p>
+              <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
+                <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br text-lg font-bold text-white ${
+                      effectivePractice ? "from-purple-500/40 to-fuchsia-500/40" : "from-teal/40 to-purple/40"
+                    }`}
+                  >
+                    {player1.username.charAt(0)}
+                  </div>
+                  <p className="mt-2 font-medium text-white">{player1.username}</p>
+                  <p className="text-xs text-body-gray">Rating {player1.rating}</p>
+                </div>
+                <span className={`text-2xl font-bold drop-shadow-lg ${effectivePractice ? "text-purple-400" : "text-teal"}`}>VS</span>
+                <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-lg font-bold text-white">
+                    {opponentFound.username.charAt(0)}
+                  </div>
+                  <p className="mt-2 font-medium text-white">{opponentFound.username}</p>
+                  <p className="text-xs text-body-gray">Rating {opponentFound.rating}</p>
+                </div>
+              </div>
+              <p className="mt-6 text-body-gray">{effectivePractice ? "Starting practice match..." : "Starting match..."}</p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import ModeToggleBarContent from "@/components/ModeToggleBar";
+import {
+  getCurrentUser,
+  getMatch,
+  completeMatchAndSettle,
+  updateMatch as apiUpdateMatch,
+  type StoredMatch,
+} from "@/lib/api";
+import { updateMatch } from "@/lib/matchmaking";
+import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
+import type { ConnectionSnapshot } from "@/lib/connection-logger";
+import { useMultiplayer } from "@/hooks/useMultiplayer";
+import EightBallPool from "@/components/games/EightBallPool";
+import Chess from "@/components/games/Chess";
+import ConnectFour from "@/components/games/ConnectFour";
+import ReactionDuel from "@/components/games/ReactionDuel";
+import MemoryMatch from "@/components/games/MemoryMatch";
+import SpellingBee from "@/components/games/SpellingBee";
+import GameChat, { type ChatMessage } from "@/components/GameChat";
+import { usePlayMode } from "@/contexts/PlayModeContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
+
+const OPPONENT_RECONNECT_SEC = 30;
+
+type Outcome = null | "victory" | "defeat" | "draw";
+
+function MatchPageContent() {
+  const router = useRouter();
+  const params = useParams();
+  const matchId = (params?.id as string) || "";
+  const { isPractice } = usePlayMode();
+
+  const [username, setUsername] = useState<string>("Player");
+  const [userId, setUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [isDevMode, setIsDevMode] = useState(false);
+  const [match, setMatch] = useState<StoredMatch | null>(null);
+  const [timerSec, setTimerSec] = useState(0);
+  const [outcome, setOutcome] = useState<Outcome>(null);
+  const [forfeitConfirm, setForfeitConfirm] = useState(false);
+  const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
+  const [connectionCheckState, setConnectionCheckState] = useState<"checking" | "ok" | "warning" | "unrecommended">("checking");
+  const [connectionStatus, setConnectionStatus] = useState<"connecting" | "connected" | "poor" | "disconnected">("connecting");
+  const [opponentDisconnectedAt, setOpponentDisconnectedAt] = useState<number | null>(null);
+  const [reconnectCountdown, setReconnectCountdown] = useState<number | null>(null);
+  const [wonByForfeit, setWonByForfeit] = useState(false);
+  const [incomingEvent, setIncomingEvent] = useState<Record<string, unknown> | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const forfeitHandledRef = useRef(false);
+  const inProgressSetRef = useRef(false);
+  const matchRef = useRef<StoredMatch | null>(null);
+  matchRef.current = match;
+
+  const {
+    connected: realtimeConnected,
+    opponentConnected,
+    sendGameEvent,
+  } = useMultiplayer({
+    matchId: match?.isRealMultiplayer ? matchId : "",
+    userId,
+    onGameEvent: (event) => {
+      const e = event as { type?: string };
+      if (e.type === "opponent_disconnected") {
+        setOpponentDisconnectedAt((t) => (t === null ? Date.now() : t));
+        return;
+      }
+      if (e.type === "chat_message") {
+        const ev = event as {
+          message?: string;
+          isPreset?: boolean;
+          senderId?: string;
+          senderName?: string;
+          timestamp?: number;
+        };
+        if (ev.message && ev.senderId && ev.timestamp) {
+          setChatMessages((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              senderId: ev.senderId,
+              senderName: ev.senderName || "Opponent",
+              message: ev.message,
+              isPreset: !!ev.isPreset,
+              timestamp: ev.timestamp,
+              reported: false,
+            },
+          ]);
+          if (!chatOpen) {
+            setUnreadCount((c) => c + 1);
+          }
+        }
+        return;
+      }
+      setIncomingEvent(event as Record<string, unknown>);
+    },
+  });
+
+  useEffect(() => {
+    async function load() {
+      setLoadError(null);
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        setUsername(user.username);
+        setUserId(user.id);
+        setIsDevMode(user.isDevMode ?? false);
+        const m = await getMatch(matchId);
+        if (!m) {
+          setLoadError("Match not found. It may have been cancelled or the link is invalid.");
+          setLoading(false);
+          return;
+        }
+        if (!m.player1 || !m.player2) {
+          setLoadError("Invalid match data. Please try again.");
+          setLoading(false);
+          return;
+        }
+        if (
+          (m.stakeAmount ?? 0) > 0 &&
+          !m.isPractice &&
+          m.status === "in_progress" &&
+          !m.player2Id
+        ) {
+          setLoadError("Invalid match — real money matches require a real opponent. Please start a new match.");
+          setLoading(false);
+          return;
+        }
+        setMatch(m);
+      } catch (err) {
+        console.error("Failed to load match:", err);
+        setLoadError("Failed to load match. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [matchId, router]);
+
+  const isRealMultiplayerMatch = match?.isRealMultiplayer ?? false;
+  const realtimeConnectedRef = useRef(realtimeConnected);
+  realtimeConnectedRef.current = realtimeConnected;
+
+  useEffect(() => {
+    if (!match || match.status !== "in_progress" || loading) return;
+    if (!isRealMultiplayerMatch) {
+      setConnectionCheckPassed(true);
+      setConnectionCheckState("ok");
+      setConnectionStatus("connected");
+      return;
+    }
+    const graceMs = 5000;
+    const graceTimeout = setTimeout(() => {
+      setConnectionCheckPassed(true);
+      setConnectionCheckState("ok");
+      setConnectionStatus(realtimeConnectedRef.current ? "connected" : "poor");
+    }, graceMs);
+    return () => clearTimeout(graceTimeout);
+  }, [match, loading, isRealMultiplayerMatch]);
+
+  useEffect(() => {
+    if (!connectionCheckPassed || !isRealMultiplayerMatch) return;
+    setConnectionStatus(realtimeConnected ? "connected" : "poor");
+  }, [connectionCheckPassed, isRealMultiplayerMatch, realtimeConnected]);
+
+  useEffect(() => {
+    if (!match || match.status !== "in_progress" || !isRealMultiplayerMatch) return;
+    const interval = setInterval(() => {
+      setConnectionStatus((prev) => (realtimeConnectedRef.current ? "connected" : prev === "disconnected" ? "disconnected" : "poor"));
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [match, isRealMultiplayerMatch]);
+
+  useEffect(() => {
+    if (!match || match.status !== "in_progress" || !connectionCheckPassed) return;
+    const log: ConnectionSnapshot[] = [];
+    startConnectionLogging((snapshot) => {
+      log.push(snapshot);
+      updateMatch(matchId, {
+        connectionLog: [...log],
+        connectionWarningAcknowledged: match.connectionWarningAcknowledged,
+      });
+    });
+    return () => stopConnectionLogging();
+  }, [match, matchId, connectionCheckPassed]);
+
+  useEffect(() => {
+    if (!match || match.status !== "in_progress") return;
+    const t = setInterval(() => setTimerSec((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [match]);
+
+  // Clear disconnect state when opponent reconnects
+  useEffect(() => {
+    if (opponentConnected) {
+      setOpponentDisconnectedAt(null);
+      setReconnectCountdown(null);
+    }
+  }, [opponentConnected]);
+
+  const isRealMultiplayer = match?.isRealMultiplayer ?? false;
+
+  const sendLocalChatMessage = useCallback(
+    (text: string, isPreset: boolean, senderId: string, senderName: string) => {
+      const msg: ChatMessage = {
+        id: crypto.randomUUID(),
+        senderId,
+        senderName,
+        message: text,
+        isPreset,
+        timestamp: Date.now(),
+        reported: false,
+      };
+      setChatMessages((prev) => [...prev, msg]);
+      if (!chatOpen && senderId !== userId && senderId !== "system") {
+        setUnreadCount((c) => c + 1);
+      }
+    },
+    [chatOpen, userId]
+  );
+
+  const handleSendChatMessage = useCallback(
+    (message: string, isPreset: boolean) => {
+      if (!message.trim()) return;
+      const senderName = username || "Player";
+      sendLocalChatMessage(message, isPreset, userId, senderName);
+      const payload = {
+        type: "chat_message",
+        message,
+        isPreset,
+        senderId: userId,
+        senderName,
+        timestamp: Date.now(),
+      };
+      if (isRealMultiplayer && sendGameEvent) {
+        sendGameEvent(payload).catch(() => {});
+      }
+    },
+    [isRealMultiplayer, sendGameEvent, sendLocalChatMessage, userId, username]
+  );
+
+  const handleReportMessage = useCallback(
+    (id: string) => {
+      setChatMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, reported: true } : m))
+      );
+      try {
+        if (typeof window !== "undefined") {
+          const key = "skillflow_chat_reports";
+          const existing = JSON.parse(
+            window.localStorage.getItem(key) ?? "[]"
+          ) as unknown[];
+          const reported = chatMessages.find((m) => m.id === id);
+          const entry = reported
+            ? {
+                id: reported.id,
+                senderId: reported.senderId,
+                senderName: reported.senderName,
+                message: reported.message,
+                timestamp: reported.timestamp,
+              }
+            : { id, timestamp: Date.now() };
+          window.localStorage.setItem(
+            key,
+            JSON.stringify([...existing, entry])
+          );
+        }
+      } catch {
+        // ignore
+      }
+      // lightweight confirmation
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          senderId: "system",
+          senderName: "System",
+          message: "Message reported. We'll review it.",
+          isPreset: false,
+          timestamp: Date.now(),
+          reported: false,
+        },
+      ]);
+    },
+    [chatMessages]
+  );
+
+  // Real multiplayer: when both connected, set match status to in_progress in DB (once)
+  useEffect(() => {
+    if (!match?.isRealMultiplayer || !realtimeConnected || !opponentConnected) return;
+    if (inProgressSetRef.current) return;
+    inProgressSetRef.current = true;
+    apiUpdateMatch(matchId, { status: "in_progress" });
+  }, [match?.isRealMultiplayer, matchId, realtimeConnected, opponentConnected]);
+
+  // Opponent disconnect: 30s countdown then forfeit win
+  useEffect(() => {
+    if (!match?.isRealMultiplayer || forfeitHandledRef.current) return;
+    if (opponentDisconnectedAt === null) {
+      setReconnectCountdown(null);
+      return;
+    }
+    setReconnectCountdown(OPPONENT_RECONNECT_SEC);
+    const interval = setInterval(() => {
+      setReconnectCountdown((c) => {
+        if (c === null || c <= 1) {
+          clearInterval(interval);
+          const m = matchRef.current;
+          if (!forfeitHandledRef.current && m) {
+            forfeitHandledRef.current = true;
+            setWonByForfeit(true);
+            completeMatchAndSettle(m, "player1").catch(() => {});
+            dispatchWalletUpdated();
+            setOutcome("victory");
+          }
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [match?.isRealMultiplayer, opponentDisconnectedAt]);
+
+  /**
+   * Unified game end: winner is 'player1' or 'player2'.
+   * Compare winner ID with current user to show the correct result to each player.
+   * Only Player 1 persists the result (completeMatchAndSettle) to avoid double-writes.
+   */
+  const handleGameEnd = useCallback(
+    async (winner: "player1" | "player2") => {
+      if (!match) return;
+      const isReal = match.isRealMultiplayer ?? false;
+      const myRole: "player1" | "player2" =
+        isReal && match.player1Id && match.player2Id
+          ? match.player1Id === userId
+            ? "player1"
+            : "player2"
+          : "player1";
+      const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
+      const iWon = winnerId === userId;
+
+      if (myRole === "player1") {
+        try {
+          await completeMatchAndSettle(match, winner);
+          dispatchWalletUpdated();
+        } catch {
+          dispatchWalletUpdated();
+        }
+      }
+      setOutcome(iWon ? "victory" : "defeat");
+    },
+    [match, userId]
+  );
+
+  const handleWin = useCallback(() => handleGameEnd("player1"), [handleGameEnd]);
+  const handleLoss = useCallback(() => handleGameEnd("player2"), [handleGameEnd]);
+
+  const handleDraw = useCallback(async () => {
+    if (!match) return;
+    const isReal = match.isRealMultiplayer ?? false;
+    const myRole: "player1" | "player2" =
+      isReal && match.player1Id && match.player2Id
+        ? match.player1Id === userId
+          ? "player1"
+          : "player2"
+        : "player1";
+    if (myRole === "player1") {
+      try {
+        await completeMatchAndSettle(match, "draw");
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
+      }
+    }
+    setOutcome("draw");
+  }, [match, userId]);
+
+  const handleForfeitConfirm = useCallback(async () => {
+    if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
+      await sendGameEvent({ type: "resign" }).catch(() => {});
+    }
+    handleLoss();
+    setForfeitConfirm(false);
+  }, [handleLoss, match?.isRealMultiplayer, match?.gameType, sendGameEvent]);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      const { logout } = await import("@/lib/api");
+      await logout();
+      router.push("/login");
+      router.refresh();
+    } catch {
+      setLoggingOut(false);
+    }
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-charcoal px-4">
+        <div className="text-center">
+          <p className="text-lg font-medium text-white">{loadError}</p>
+          <div className="mt-6 flex flex-wrap justify-center gap-4">
+            <Link
+              href="/play"
+              className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+            >
+              Back to Play
+            </Link>
+            <Link
+              href="/dashboard"
+              className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+            >
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !match) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-charcoal">
+        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+      </div>
+    );
+  }
+
+  const safePlayer1 = match.player1 ?? { username: "Player 1", rating: 1000 };
+  const safePlayer2 = match.player2 ?? { username: "Opponent", rating: 1000 };
+
+  const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  const shortId = match.id.slice(0, 8);
+  const myRole: "player1" | "player2" =
+    isRealMultiplayer && match.player1Id && match.player2Id
+      ? match.player1Id === userId
+        ? "player1"
+        : "player2"
+      : "player1";
+  const opponentUsername =
+    myRole === "player1" ? safePlayer2.username : safePlayer1.username;
+  const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
+
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.log("[MatchPage] Loaded match room", {
+      matchId: match.id,
+      gameType: match.gameType,
+      player1Id: match.player1Id,
+      player2Id: match.player2Id,
+      myUserId: userId,
+      myRole,
+      isRealMultiplayer,
+    });
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-charcoal">
+      <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
+      <AppNavbar
+        username={username}
+        isDevMode={isDevMode}
+        onLogout={handleLogout}
+        loggingOut={loggingOut}
+        currentPage="play"
+      />
+      <ModeToggleBarContent />
+
+      {/* Top bar */}
+      <div className="border-b border-white/5 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-white">
+              {match.gameType === "chess"
+                ? "Chess ♟"
+                : match.gameType === "connect-4"
+                  ? "Connect 4 🔴🟡"
+                  : match.gameType === "reaction-duel"
+                    ? "Reaction Duel ⚡"
+                    : match.gameType === "memory-match"
+                      ? "Memory Match 🧠"
+                      : match.gameType === "spelling-bee"
+                        ? "Spelling Bee 🐝"
+                        : match.gameDisplayName}
+            </span>
+            {match.isPractice && (
+              <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
+                PRACTICE
+              </span>
+            )}
+            <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
+              ✓ Connection OK
+            </span>
+          </div>
+          <span className="text-body-gray tabular-nums">{formatTime(timerSec)}</span>
+          <span className="text-xs text-body-gray">Match ID: {shortId}</span>
+        </div>
+      </div>
+
+      {/* Waiting for opponent (real multiplayer) */}
+      {waitingForOpponent && (
+        <main className="mx-auto flex min-h-[40vh] flex-1 flex-col items-center justify-center px-4 py-8">
+          <div className="h-12 w-12 animate-pulse rounded-full border-2 border-teal/50" />
+          <p className="mt-4 text-lg font-semibold text-white">Waiting for opponent to connect...</p>
+          <p className="mt-1 text-body-gray">They have joined the match and are loading the game.</p>
+        </main>
+      )}
+
+      {/* Opponent disconnected countdown */}
+      {isRealMultiplayer && opponentDisconnectedAt !== null && reconnectCountdown !== null && !outcome && (
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-charcoal/90 px-4">
+          <p className="text-lg font-semibold text-amber-400">Opponent disconnected...</p>
+          <p className="mt-2 text-body-gray">
+            Waiting {reconnectCountdown}s for reconnection. If they don&apos;t return, you win by forfeit.
+          </p>
+        </div>
+      )}
+
+      {/* Connection quality: small indicator only when actually poor (no modal at start) */}
+      {isRealMultiplayerMatch && match.status === "in_progress" && !outcome && connectionStatus === "poor" && (
+        <div
+          className="fixed right-2 top-[118px] z-30 rounded-md border px-2.5 py-1.5 text-[11px] font-medium text-amber-400"
+          style={{
+            background: "rgba(245, 158, 11, 0.15)",
+            borderColor: "rgba(245, 158, 11, 0.3)",
+          }}
+        >
+          ⚠️ Unstable connection
+        </div>
+      )}
+      {isRealMultiplayerMatch && match.status === "in_progress" && !outcome && connectionStatus === "disconnected" && (
+        <div
+          className="fixed left-0 right-0 top-[72px] z-30 border-b px-4 py-2 text-center text-[13px] font-medium text-red-400"
+          style={{
+            background: "rgba(239, 68, 68, 0.15)",
+            borderColor: "rgba(239, 68, 68, 0.3)",
+          }}
+        >
+          Connection lost — trying to reconnect...
+        </div>
+      )}
+
+      {/* In-game chat bar — only for real human vs human matches */}
+      {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && (
+        <div className="mx-auto w-full px-4 sm:px-6 lg:max-w-[1200px]">
+          <GameChat
+            messages={chatMessages}
+            onSendMessage={handleSendChatMessage}
+            onReportMessage={handleReportMessage}
+            playerName={username}
+            opponentName={safePlayer2.username}
+            playerId={userId}
+            unreadCount={unreadCount}
+            isOpen={chatOpen}
+            onToggle={() => {
+              setChatOpen((open) => !open);
+              if (!chatOpen) setUnreadCount(0);
+            }}
+            isPractice={false}
+          />
+        </div>
+      )}
+
+      {/* Main: Chess and Connect 4 use full-width layout; Pool uses 3 columns */}
+      {!waitingForOpponent && match.gameType === "chess" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div className="card-border flex min-h-[500px] flex-1 flex-col rounded-card bg-card p-4">
+              <Chess
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "connect-4" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ height: "calc(100vh - 160px)" }}
+            >
+              <ConnectFour
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "reaction-duel" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div className="card-border flex min-h-[400px] flex-1 flex-col rounded-card bg-card p-4">
+              <ReactionDuel
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "memory-match" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ height: "calc(100vh - 160px)" }}
+            >
+              <MemoryMatch
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "spelling-bee" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ minHeight: "calc(100vh - 160px)" }}
+            >
+              <SpellingBee
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "8-ball-pool" && match.status === "in_progress" && !outcome ? (
+        <main className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col px-4 py-6">
+          <div className="flex w-full flex-col bg-transparent">
+            <EightBallPool
+              player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+              player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+              onGameEnd={handleGameEnd}
+              isPlayer2Bot={!isRealMultiplayer}
+            />
+          </div>
+        </main>
+      ) : !waitingForOpponent ? (
+        <main className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-6 md:grid-cols-[1fr_2fr_1fr]">
+          <div className="card-border rounded-card bg-card p-4 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-2xl font-bold text-white">
+              {safePlayer1.username.charAt(0)}
+            </div>
+            <p className="mt-2 font-medium text-white">{safePlayer1.username}</p>
+            <p className="text-xs text-body-gray">Rating {safePlayer1.rating}</p>
+            <p className="mt-4 text-3xl font-bold text-teal">0</p>
+            <p className="text-xs text-body-gray">Score</p>
+          </div>
+          <div className="card-border flex flex-col items-center justify-center rounded-card bg-card p-4">
+            {match.status === "in_progress" && !outcome ? (
+              <>
+                <p className="text-body-gray">Game in progress...</p>
+                <div className="mt-6 flex flex-wrap justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handleWin}
+                    className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+                  >
+                    🏆 I Won
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLoss}
+                    className="rounded-lg border border-red-500/50 bg-red-500/10 px-6 py-3 font-semibold text-red-400 hover:bg-red-500/20"
+                  >
+                    😞 I Lost
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+          <div className="card-border rounded-card bg-card p-4 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-2xl font-bold text-white">
+              {safePlayer2.username.charAt(0)}
+            </div>
+            <p className="mt-2 font-medium text-white">
+              {safePlayer2.username}
+              {!isRealMultiplayer && (
+                <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
+                  🤖 BOT
+                </span>
+              )}
+            </p>
+            <p className="text-xs text-body-gray">Rating {safePlayer2.rating}</p>
+            <p className="mt-4 text-3xl font-bold text-white">0</p>
+            <p className="text-xs text-body-gray">Score</p>
+          </div>
+        </main>
+      ) : null}
+
+      {/* Bottom bar */}
+      <div className="border-t border-white/5 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4">
+          <p className="text-sm text-body-gray">
+            {match.isPractice
+              ? "Practice Match — No stakes"
+              : `Stake: $${match.stakeAmount.toFixed(2)} each • Winner gets: $${match.winnerPayout.toFixed(2)}`}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm text-body-gray hover:text-white"
+            >
+              Report Issue
+            </button>
+            {match.status === "in_progress" && !outcome && (
+              <button
+                type="button"
+                onClick={() => setForfeitConfirm(true)}
+                className={match.isPractice
+                  ? "rounded-lg border border-white/20 px-4 py-2 text-sm text-body-gray hover:bg-white/10"
+                  : "rounded-lg border border-red-500/50 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                }
+              >
+                {match.isPractice ? "Leave Match" : "Forfeit Match"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Victory overlay — only shown when THIS player won */}
+      {outcome === "victory" && match.gameType !== "spelling-bee" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+          <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
+          <div className="animate-fade-in relative text-center">
+            <p className="text-5xl font-bold text-white sm:text-6xl">
+              {match.isPractice ? "You won! 🎯" : "🏆 VICTORY!"}
+            </p>
+            {wonByForfeit && (
+              <p className="mt-4 text-xl font-semibold text-amber-400">Opponent left the match. You win by forfeit!</p>
+            )}
+            {!wonByForfeit && (
+              <p className="mt-4 text-lg text-white/90">
+                {match.isPractice ? "Nice work!" : "Congratulations! You outplayed your opponent!"}
+              </p>
+            )}
+            {!match.isPractice && (
+              <p className="mt-3 text-2xl font-bold text-teal">+${match.winnerPayout.toFixed(2)}</p>
+            )}
+            <p className="mt-2 text-body-gray">Defeated {opponentUsername}</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link
+                href={`/play/${match.gameType}`}
+                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+              >
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
+              </Link>
+              {match.isPractice && (
+                <Link
+                  href="/play"
+                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                >
+                  Play for Real Money
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Draw overlay */}
+      {outcome === "draw" && match.gameType !== "spelling-bee" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/5 via-transparent to-amber-500/5" aria-hidden />
+          <div className="animate-fade-in relative text-center">
+            <p className="text-4xl font-bold text-white sm:text-5xl">🤝 It&apos;s a Draw!</p>
+            {match.isPractice ? (
+              <p className="mt-4 text-lg text-purple-400">Practice match — no stakes.</p>
+            ) : (
+              <>
+                <p className="mt-4 text-lg text-white/90">Evenly matched! Your stake has been returned.</p>
+                <p className="mt-2 text-xl font-semibold text-amber-400">${match.stakeAmount.toFixed(2)} returned</p>
+              </>
+            )}
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link
+                href={`/play/${match.gameType}`}
+                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+              >
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Defeat overlay — only shown when THIS player lost (respectful, encouraging) */}
+      {outcome === "defeat" && match.gameType !== "spelling-bee" && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+          <div className="absolute inset-0 bg-gradient-to-t from-red-500/5 via-transparent to-red-500/5" aria-hidden />
+          <div className="animate-fade-in relative text-center">
+            <p className="text-4xl font-bold text-white sm:text-5xl">Defeated</p>
+            <p className="mt-4 text-lg text-white/90">Good effort! Every match makes you better.</p>
+            {!match.isPractice && (
+              <p className="mt-2 text-base text-red-400/90">-${match.stakeAmount.toFixed(2)}</p>
+            )}
+            <p className="mt-1 text-body-gray">{opponentUsername} won</p>
+            {!match.isPractice && (
+              <p className="mt-4 max-w-sm text-sm text-body-gray">
+                Tip: Practice mode is great for sharpening your skills!
+              </p>
+            )}
+            {match.isPractice && <p className="mt-2 text-body-gray">Try again?</p>}
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
+              <Link
+                href={`/play/${match.gameType}`}
+                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+              >
+                🔄 Rematch
+              </Link>
+              <Link
+                href="/play"
+                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+              >
+                🎮 New Match
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+              >
+                🏠 Dashboard
+              </Link>
+              {match.isPractice && (
+                <Link
+                  href="/play"
+                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                >
+                  Play for Real Money
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forfeit / Leave confirmation modal */}
+      {forfeitConfirm && !outcome && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="card-border w-full max-w-sm rounded-card bg-card p-6">
+            <p className="text-center font-medium text-white">
+              {match.isPractice
+                ? "Leave this practice match? Your progress will not be saved."
+                : `Are you sure you want to forfeit? You will lose your $${match.stakeAmount.toFixed(2)} stake.`}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setForfeitConfirm(false)}
+                className="flex-1 rounded-lg border border-white/20 py-2.5 text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleForfeitConfirm}
+                className={`flex-1 rounded-lg py-2.5 font-medium ${match.isPractice ? "bg-white/10 text-white hover:bg-white/20" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}
+              >
+                {match.isPractice ? "Leave" : "Forfeit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function MatchPage() {
+  return (
+    <ErrorBoundary>
+      <MatchPageContent />
+    </ErrorBoundary>
+  );
+}

@@ -219,11 +219,16 @@ export async function startMatchmaking(
           }
           if (process.env.NODE_ENV !== "production") {
             // eslint-disable-next-line no-console
-            console.log("[matchmaking] Player 1 matched! Calling onMatchReady NOW (no delay), NAVIGATING TO:", `/match/${(freshMatch as DbMatch).id}`);
+            console.log(
+              "[matchmaking] Player 1 matched! Calling onMatchReady with 500ms delay, NAVIGATING TO:",
+              `/match/${(freshMatch as DbMatch).id}`
+            );
           }
           onStatusUpdate("matched", freshMatch as DbMatch);
           if (!cancelled) {
-            onMatchReady(freshMatch as DbMatch, "player1");
+            setTimeout(() => {
+              onMatchReady(freshMatch as DbMatch, "player1");
+            }, 500);
           }
         }
       } catch (pollErr) {

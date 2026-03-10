@@ -128,12 +128,7 @@ function MatchPageContent() {
           setLoading(false);
           return;
         }
-        if (
-          (m.stakeAmount ?? 0) > 0 &&
-          !m.isPractice &&
-          m.status === "in_progress" &&
-          !m.player2Id
-        ) {
+        if (!m.isRealMultiplayer && !m.isPractice && (m.stakeAmount ?? 0) > 0) {
           setLoadError("Invalid match — real money matches require a real opponent. Please start a new match.");
           setLoading(false);
           return;
@@ -341,23 +336,14 @@ function MatchPageContent() {
   const handleGameEnd = useCallback(
     async (winner: "player1" | "player2") => {
       if (!match) return;
-      const isReal = match.isRealMultiplayer ?? false;
-      const myRole: "player1" | "player2" =
-        isReal && match.player1Id && match.player2Id
-          ? match.player1Id === userId
-            ? "player1"
-            : "player2"
-          : "player1";
       const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
       const iWon = winnerId === userId;
 
-      if (myRole === "player1") {
-        try {
-          await completeMatchAndSettle(match, winner);
-          dispatchWalletUpdated();
-        } catch {
-          dispatchWalletUpdated();
-        }
+      try {
+        await completeMatchAndSettle(match, winner);
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
       }
       setOutcome(iWon ? "victory" : "defeat");
     },
@@ -369,23 +355,14 @@ function MatchPageContent() {
 
   const handleDraw = useCallback(async () => {
     if (!match) return;
-    const isReal = match.isRealMultiplayer ?? false;
-    const myRole: "player1" | "player2" =
-      isReal && match.player1Id && match.player2Id
-        ? match.player1Id === userId
-          ? "player1"
-          : "player2"
-        : "player1";
-    if (myRole === "player1") {
-      try {
-        await completeMatchAndSettle(match, "draw");
-        dispatchWalletUpdated();
-      } catch {
-        dispatchWalletUpdated();
-      }
+    try {
+      await completeMatchAndSettle(match, "draw");
+      dispatchWalletUpdated();
+    } catch {
+      dispatchWalletUpdated();
     }
     setOutcome("draw");
-  }, [match, userId]);
+  }, [match]);
 
   const handleForfeitConfirm = useCallback(async () => {
     if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
