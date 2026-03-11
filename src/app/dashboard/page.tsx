@@ -7,6 +7,7 @@ import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
   getWalletBalance,
@@ -44,9 +45,40 @@ function formatTimeAgo(createdAt: string) {
   return `${days}d ago`;
 }
 
+const QUICK_GAMES = [
+  {
+    slug: "chess",
+    name: "Chess",
+    emoji: "♟️",
+    gradient: "from-amber-500/20 to-rose-500/20",
+  },
+  {
+    slug: "connect-4",
+    name: "Connect 4",
+    emoji: "🔴",
+    gradient: "from-red-500/30 to-amber-400/30",
+  },
+  {
+    slug: "reaction-duel",
+    name: "Reaction Duel",
+    emoji: "⚡",
+    gradient: "from-orange-500/30 to-red-500/30",
+  },
+] as const;
+
+const GAME_EMOJI: Record<string, string> = {
+  "8-ball-pool": "🎱",
+  chess: "♟️",
+  "connect-4": "🔴",
+  "reaction-duel": "⚡",
+  "memory-match": "🧠",
+  "spelling-bee": "🐝",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const { showToast } = useToast();
+  const { isPractice } = usePlayMode();
 
   const [username, setUsername] = useState("Player");
   const [isDevMode, setIsDevMode] = useState(false);
@@ -56,6 +88,9 @@ export default function DashboardPage() {
   const [matches, setMatches] = useState<StoredMatch[]>([]);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
+  const [quickGameStats, setQuickGameStats] = useState<
+    { playersOnline: number }[]
+  >([]);
 
   useEffect(() => {
     async function load() {
@@ -96,6 +131,15 @@ export default function DashboardPage() {
     }
     load();
   }, [router]);
+
+  useEffect(() => {
+    // Lightweight, non-authoritative "players online" numbers for quick play row
+    setQuickGameStats(
+      QUICK_GAMES.map(() => ({
+        playersOnline: 50 + Math.floor(Math.random() * 451),
+      }))
+    );
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -176,7 +220,7 @@ export default function DashboardPage() {
 
       <main className="relative mx-auto flex max-w-[1000px] flex-col gap-8 px-4 py-8 pb-24 md:px-6">
         {/* 1. Greeting + inline balance chip */}
-        <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
               {greeting}
@@ -195,8 +239,107 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        {/* 2. Hero stats card */}
-        <section className="card-border rounded-card bg-card/80 px-4 py-4 sm:px-5 sm:py-4">
+        {/* 2. Featured game banner – Last Touch */}
+        <section className="animate-fade-in" style={{ animationDelay: "80ms" }}>
+          <Link
+            href="/last-touch"
+            className="group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.12)] transition-all duration-300 hover:border-teal/70 hover:shadow-[0_0_70px_rgba(0,229,199,0.25)]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-200/80">
+                  Featured Event
+                </p>
+                <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-extrabold text-transparent">
+                  LAST TOUCH
+                </h2>
+                <p className="mt-1 text-sm text-body-gray">
+                  Hold your ground. Win the pot.
+                </p>
+                <p className="mt-2 text-xs text-teal">
+                  Massive prize pool • Last finger standing wins
+                </p>
+              </div>
+              <div className="flex items-center gap-5">
+                <div className="text-right">
+                  <p className="text-[11px] uppercase tracking-[0.16em] text-body-gray">
+                    Current Prize Pool
+                  </p>
+                  <p className="mt-1 text-xl font-semibold text-white">$1,247</p>
+                </div>
+                <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(0,229,199,0.5)] transition-transform duration-150 group-hover:-translate-y-0.5">
+                  Join Now
+                </span>
+              </div>
+            </div>
+            <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-teal/25 blur-3xl" />
+          </Link>
+        </section>
+
+        {/* 3. Quick Play – Jump back in */}
+        <section
+          className="flex flex-col gap-3 animate-fade-in"
+          style={{ animationDelay: "140ms" }}
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-100">
+              Jump Back In
+            </h2>
+            <span className="text-[11px] text-body-gray">
+              One tap to play
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {QUICK_GAMES.map((game, index) => {
+              const stats = quickGameStats[index];
+              const playersOnline = stats?.playersOnline ?? 0;
+              const accentClasses = isPractice
+                ? "hover:border-purple-500/40 hover:shadow-[0_0_28px_rgba(168,85,247,0.35)]"
+                : "hover:border-teal/60 hover:shadow-[0_0_28px_rgba(0,229,199,0.35)]";
+
+              return (
+                <button
+                  key={game.slug}
+                  type="button"
+                  onClick={() => router.push(`/play/${game.slug}`)}
+                  className={`group relative flex flex-col justify-between overflow-hidden rounded-card border border-white/10 bg-card px-4 py-3 text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
+                  style={{ animationDelay: `${160 + index * 60}ms` }}
+                >
+                  <div
+                    className={`pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br ${game.gradient} opacity-40`}
+                    aria-hidden
+                  />
+                  <div className="relative flex items-center gap-2">
+                    <span className="text-lg" aria-hidden>
+                      {game.emoji}
+                    </span>
+                    <span className="font-semibold">{game.name}</span>
+                  </div>
+                  <div className="relative mt-2 flex items-center justify-between text-[11px] text-body-gray">
+                    <span>{playersOnline.toLocaleString()} online</span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        isPractice
+                          ? "bg-purple-500/25 text-purple-100"
+                          : "bg-teal/25 text-teal"
+                      }`}
+                    >
+                      Play
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* 4. Stats row */}
+        <section
+          className="animate-fade-in"
+          style={{ animationDelay: "220ms" }}
+        >
+          <div className="card-border rounded-card border-teal/25 bg-card/80 px-4 py-4 shadow-[0_0_30px_rgba(0,229,199,0.08)] sm:px-5 sm:py-4">
           <div className="grid gap-4 sm:grid-cols-4">
             <div className="flex flex-col gap-1">
               <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
@@ -239,34 +382,14 @@ export default function DashboardPage() {
               <span className="text-[11px] text-body-gray">Global position</span>
             </div>
           </div>
+          </div>
         </section>
 
-        {/* 3. Quick actions */}
-        <section className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={() => router.push("/play")}
-            className="group inline-flex items-center gap-2 rounded-card border border-white/10 bg-gradient-to-r from-teal/15 via-teal/5 to-transparent px-4 py-2.5 text-sm font-medium text-gray-50 transition-colors hover:border-teal hover:bg-teal/15"
-          >
-            <span className="text-base" aria-hidden>
-              🎮
-            </span>
-            <span>Play Now</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/last-touch")}
-            className="group inline-flex items-center gap-2 rounded-card border border-white/10 bg-gradient-to-r from-white/5 via-white/0 to-transparent px-4 py-2.5 text-sm font-medium text-gray-100 transition-colors hover:border-white/40 hover:bg-white/5"
-          >
-            <span className="text-base" aria-hidden>
-              📈
-            </span>
-            <span>Last Touch</span>
-          </button>
-        </section>
-
-        {/* 4. Recent activity */}
-        <section className="flex flex-col gap-3">
+        {/* 5. Recent matches */}
+        <section
+          className="flex flex-col gap-3 animate-fade-in"
+          style={{ animationDelay: "260ms" }}
+        >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-100">Recent Matches</h2>
             <Link
@@ -293,19 +416,25 @@ export default function DashboardPage() {
                     ? "text-emerald-300"
                     : "text-red-400";
                 const opponentName = match.player2?.username ?? "Opponent";
+                const emoji = GAME_EMOJI[match.gameType] ?? "🎮";
 
                 return (
                   <div
                     key={match.id}
                     className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
                   >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-gray-100">
-                        {match.gameDisplayName} vs {opponentName}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="shrink-0 text-lg" aria-hidden>
+                        {emoji}
                       </span>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-gray-100">
+                          {match.gameDisplayName} vs {opponentName}
+                        </span>
                       <span className="text-[11px] text-body-gray">
                         {resultLabel} · {formatTimeAgo(match.createdAt)}
                       </span>
+                      </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <span className={`text-xs font-semibold ${resultColor}`}>{resultLabel}</span>
