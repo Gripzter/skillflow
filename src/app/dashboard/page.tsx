@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
@@ -243,9 +244,16 @@ export default function DashboardPage() {
         <section className="animate-fade-in" style={{ animationDelay: "80ms" }}>
           <Link
             href="/last-touch"
-            className="group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.12)] transition-all duration-300 hover:border-teal/70 hover:shadow-[0_0_70px_rgba(0,229,199,0.25)]"
+            className="group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-black/40 p-6 shadow-[0_0_40px_rgba(0,229,199,0.12)] transition-all duration-300 hover:border-teal/70 hover:shadow-[0_0_70px_rgba(0,229,199,0.25)]"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <Image
+              src="/games/lasttouch.jpg"
+              alt="Last Touch arena background"
+              fill
+              className="object-cover"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-200/80">
@@ -303,30 +311,42 @@ export default function DashboardPage() {
                   key={game.slug}
                   type="button"
                   onClick={() => router.push(`/play/${game.slug}`)}
-                  className={`group relative flex flex-col justify-between overflow-hidden rounded-card border border-white/10 bg-card px-4 py-3 text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
+                  className={`group relative flex h-[120px] flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-card text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
                   style={{ animationDelay: `${160 + index * 60}ms` }}
                 >
-                  <div
-                    className={`pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br ${game.gradient} opacity-40`}
-                    aria-hidden
+                  <Image
+                    src={
+                      game.slug === "chess"
+                        ? "/games/chess.jpg"
+                        : game.slug === "connect-4"
+                        ? "/games/connect4.jpg"
+                        : "/games/reaction.jpg"
+                    }
+                    alt={`${game.name} background`}
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    loading="lazy"
                   />
-                  <div className="relative flex items-center gap-2">
-                    <span className="text-lg" aria-hidden>
-                      {game.emoji}
-                    </span>
-                    <span className="font-semibold">{game.name}</span>
-                  </div>
-                  <div className="relative mt-2 flex items-center justify-between text-[11px] text-body-gray">
-                    <span>{playersOnline.toLocaleString()} online</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        isPractice
-                          ? "bg-purple-500/25 text-purple-100"
-                          : "bg-teal/25 text-teal"
-                      }`}
-                    >
-                      Play
-                    </span>
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
+                  <div className="relative z-10 flex h-full flex-col justify-between px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg" aria-hidden>
+                        {game.emoji}
+                      </span>
+                      <span className="font-semibold">{game.name}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-[11px] text-body-gray">
+                      <span>{playersOnline.toLocaleString()} online</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          isPractice
+                            ? "bg-purple-500/25 text-purple-100"
+                            : "bg-teal/25 text-teal"
+                        }`}
+                      >
+                        Play
+                      </span>
+                    </div>
                   </div>
                 </button>
               );

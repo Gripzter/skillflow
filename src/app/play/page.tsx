@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -53,30 +54,60 @@ function GameCard({
 }) {
   const content = (
     <div
-      className={`card-border relative flex min-h-[160px] flex-col justify-between rounded-card bg-card p-5 transition-all duration-200 ${
+      className={`card-border relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-card bg-card transition-all duration-200 ${
         active
           ? isPractice
-            ? "hover:-translate-y-0.5 hover:border-purple-500/30 hover:shadow-purple-500/10 cursor-pointer"
-            : "hover:-translate-y-0.5 hover:border-teal/30 hover:shadow-teal-glow/10 cursor-pointer"
+            ? "hover:-translate-y-0.5 hover:border-purple-500/40 hover:shadow-[0_0_26px_rgba(168,85,247,0.35)] cursor-pointer"
+            : "hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-[0_0_26px_rgba(0,229,199,0.35)] cursor-pointer"
           : "cursor-not-allowed opacity-60"
       }`}
     >
-      <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
-      <div className="relative">
-        <p className="font-semibold text-white">{name}</p>
-        {active ? (
-          <span className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>
-            {isPractice ? "1v1 • Free" : "1v1"}
-          </span>
-        ) : (
-          <span className="mt-2 inline-block w-fit rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-body-gray">
-            Coming Soon
-          </span>
-        )}
-      </div>
-      <div className="relative mt-2 space-y-1 text-xs text-body-gray">
-        <p>{playersOnline} players online</p>
-        <p>~{waitSec} sec avg wait</p>
+      {active && (slug === "chess" || slug === "connect-4" || slug === "reaction-duel" || slug === "spelling-bee" || slug === "8-ball-pool") && (
+        <>
+          <Image
+            src={
+              slug === "chess"
+                ? "/games/chess.jpg"
+                : slug === "connect-4"
+                ? "/games/connect4.jpg"
+                : slug === "reaction-duel"
+                ? "/games/reaction.jpg"
+                : slug === "spelling-bee"
+                ? "/games/spelling.jpg"
+                : "/games/pool.jpg"
+            }
+            alt={`${name} background`}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
+        </>
+      )}
+      {!active && (
+        <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
+      )}
+      <div className="relative z-10 p-5">
+        <div>
+          <p className="font-semibold text-white">{name}</p>
+          {active ? (
+            <span
+              className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+              }`}
+            >
+              {isPractice ? "1v1 • Free" : "1v1"}
+            </span>
+          ) : (
+            <span className="mt-2 inline-block w-fit rounded-full bg-white/10 px-2.5 py-0.5 text-xs text-body-gray">
+              Coming Soon
+            </span>
+          )}
+        </div>
+        <div className="mt-3 space-y-1 text-xs text-body-gray">
+          <p>{playersOnline} players online</p>
+          <p>~{waitSec} sec avg wait</p>
+        </div>
       </div>
       {!active && (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -183,9 +214,16 @@ export default function PlayPage() {
         {!isPractice && (
           <Link
             href="/last-touch"
-            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-teal/40 bg-gradient-to-br from-teal/10 via-purple-500/10 to-teal/10 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
+            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-teal/40 bg-black/40 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-teal/5 to-purple-500/5 opacity-0 transition-opacity group-hover:opacity-100" />
+            <Image
+              src="/games/lasttouch.jpg"
+              alt="Last Touch arena background"
+              fill
+              className="object-cover"
+              loading="lazy"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
