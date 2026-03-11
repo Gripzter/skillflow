@@ -359,49 +359,108 @@ export default function DashboardPage() {
           className="animate-fade-in"
           style={{ animationDelay: "220ms" }}
         >
-          <div className="card-border rounded-card border-teal/25 bg-card/80 px-4 py-4 shadow-[0_0_30px_rgba(0,229,199,0.08)] sm:px-5 sm:py-4">
-          <div className="grid gap-4 sm:grid-cols-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                Win Rate
-              </span>
-              <span className="text-lg font-medium text-gray-50">
-                {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
-              </span>
-              <span className="text-[11px] text-body-gray">Real-money matches</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                Matches Played
-              </span>
-              <span className="text-lg font-medium text-gray-50">
-                {totalMatches.toLocaleString()}
-              </span>
-              <span className="text-[11px] text-body-gray">Completed</span>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                Net Earnings
-              </span>
-              <span
-                className={`text-lg font-medium ${
-                  netEarnings >= 0 ? "text-emerald-300" : "text-red-400"
+          <div className="grid gap-3 sm:grid-cols-4">
+            {/* Win Rate */}
+            <div
+              className={`card-border relative overflow-hidden rounded-card bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(0,229,199,0.25)] ${
+                totalMatches > 0 && winRate >= 50
+                  ? "border-emerald-400/40"
+                  : totalMatches > 0
+                  ? "border-red-500/40"
+                  : "border-white/10"
+              }`}
+            >
+              <div
+                className={`pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br opacity-30 ${
+                  totalMatches > 0 && winRate >= 50
+                    ? "from-emerald-500/40 via-teal/20 to-transparent"
+                  : totalMatches > 0
+                    ? "from-red-500/40 via-amber-500/20 to-transparent"
+                    : "from-white/10 to-transparent"
                 }`}
-              >
-                {formatCurrency(netEarnings)}
-              </span>
-              <span className="text-[11px] text-body-gray">Wins minus entries</span>
+                aria-hidden
+              />
+              <div className="pointer-events-none absolute -right-4 -top-4 h-10 w-10 rounded-full bg-emerald-400/15 blur-xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
+                    Win Rate
+                  </span>
+                  <span className="text-xs text-emerald-300/80">🏆</span>
+                </div>
+                <p className="mt-1 text-lg font-semibold text-gray-50">
+                  {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
+                </p>
+                <p className="mt-0.5 text-[11px] text-body-gray">Real-money matches</p>
+              </div>
             </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                Rank
-              </span>
-              <span className="text-lg font-medium text-gray-50">
-                {playerRank ? `#${playerRank.toLocaleString()}` : "—"}
-              </span>
-              <span className="text-[11px] text-body-gray">Global position</span>
+
+            {/* Matches Played */}
+            <div className="card-border relative overflow-hidden rounded-card border-white/10 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(148,163,184,0.35)]">
+              <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-white/10 via-slate-700/10 to-transparent opacity-30" />
+              <div className="pointer-events-none absolute -right-5 -top-5 h-10 w-10 rounded-full bg-slate-400/20 blur-xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
+                    Matches
+                  </span>
+                  <span className="text-xs text-gray-300/80">🎮</span>
+                </div>
+                <p className="mt-1 text-lg font-semibold text-gray-50">
+                  {totalMatches.toLocaleString()}
+                </p>
+                <p className="mt-0.5 text-[11px] text-body-gray">Completed games</p>
+              </div>
             </div>
-          </div>
+
+            {/* Net Earnings */}
+            <div className="card-border relative overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(0,229,199,0.35)]">
+              <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-teal/30 via-emerald-500/10 to-transparent opacity-40" />
+              <div className="pointer-events-none absolute -right-6 -top-6 h-12 w-12 rounded-full bg-emerald-400/25 blur-xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
+                    Net Earnings
+                  </span>
+                  <span className="text-xs text-emerald-300/80">📈</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span
+                    className={`text-lg font-semibold ${
+                      netEarnings >= 0 ? "text-emerald-300" : "text-red-400"
+                    }`}
+                  >
+                    {formatCurrency(netEarnings)}
+                  </span>
+                  {netEarnings > 0 && (
+                    <span className="text-[10px] text-emerald-300">
+                      ↑
+                    </span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-[11px] text-body-gray">Wins minus entries</p>
+              </div>
+            </div>
+
+            {/* Rank */}
+            <div className="card-border relative overflow-hidden rounded-card border-amber-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(251,191,36,0.35)]">
+              <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-amber-500/25 via-purple-500/15 to-transparent opacity-40" />
+              <div className="pointer-events-none absolute -right-5 -top-5 h-11 w-11 rounded-full bg-amber-300/25 blur-xl" />
+              <div className="relative">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
+                    Rank
+                  </span>
+                  <span className="text-xs text-amber-300/80">🎖️</span>
+                </div>
+                <p className="mt-1 text-lg font-semibold text-gray-50">
+                  {playerRank ? `#${playerRank.toLocaleString()}` : "Unranked"}
+                </p>
+                <p className="mt-0.5 text-[11px] text-body-gray">
+                  {playerRank ? "Global position" : "Play 10 matches to rank"}
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -437,12 +496,46 @@ export default function DashboardPage() {
                     : "text-red-400";
                 const opponentName = match.player2?.username ?? "Opponent";
                 const emoji = GAME_EMOJI[match.gameType] ?? "🎮";
+                const gameImageSrc =
+                  match.gameType === "chess"
+                    ? "/games/chess.jpg"
+                    : match.gameType === "connect-4"
+                    ? "/games/connect4.jpg"
+                    : match.gameType === "reaction-duel"
+                    ? "/games/reaction.jpg"
+                    : match.gameType === "spelling-bee"
+                    ? "/games/spelling.jpg"
+                    : match.gameType === "8-ball-pool"
+                    ? "/games/pool.jpg"
+                    : undefined;
+                const borderColorClass = isDraw
+                  ? "border-l-amber-400/60"
+                  : isWin
+                    ? "border-l-emerald-400/70"
+                    : "border-l-red-400/70";
+                const stake = match.stakeAmount ?? 0;
+                const delta =
+                  isDraw ? 0 : isWin ? (match.winnerPayout ?? 0) : -stake;
+                const deltaPrefix = delta > 0 ? "+" : delta < 0 ? "-" : "";
+                const deltaAbs = Math.abs(delta);
 
                 return (
                   <div
                     key={match.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3 text-sm"
+                    className={`relative flex items-center justify-between gap-3 border-l-2 px-4 py-3 text-sm transition-colors duration-150 hover:bg-white/5 ${borderColorClass}`}
                   >
+                    {gameImageSrc && (
+                      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-10">
+                        <Image
+                          src={gameImageSrc}
+                          alt={`${match.gameDisplayName} background`}
+                          fill
+                          className="object-cover"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-l from-black via-transparent to-transparent" />
+                      </div>
+                    )}
                     <div className="flex min-w-0 items-center gap-3">
                       <span className="shrink-0 text-lg" aria-hidden>
                         {emoji}
@@ -452,7 +545,12 @@ export default function DashboardPage() {
                           {match.gameDisplayName} vs {opponentName}
                         </span>
                       <span className="text-[11px] text-body-gray">
-                        {resultLabel} · {formatTimeAgo(match.createdAt)}
+                        {resultLabel}
+                        {delta !== 0 && (
+                          <> · {deltaPrefix}${deltaAbs.toFixed(2)}</>
+                        )}
+                        {" · "}
+                        {formatTimeAgo(match.createdAt)}
                       </span>
                       </div>
                     </div>
@@ -466,7 +564,11 @@ export default function DashboardPage() {
           )}
         </section>
       </main>
-      <Footer />
+      <div className="border-t border-transparent bg-gradient-to-r from-teal/30 via-teal/10 to-transparent">
+        <div className="opacity-80">
+          <Footer />
+        </div>
+      </div>
     </div>
   );
 }
