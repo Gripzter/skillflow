@@ -231,12 +231,12 @@ export default function DepositPage() {
           <p>You&apos;ll be redirected to Stripe&apos;s secure payment page.</p>
           <p className="mt-2">We never see or store your card details.</p>
           <p className="mt-3 font-medium text-white">Visa, Mastercard, Amex</p>
-          <p className="mt-1">🔒 Secured by Stripe</p>
+          <p className="mt-1">Secured by Stripe</p>
         </div>
 
         {!emailVerified && (
           <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-            📧 Please verify your email before making a deposit.{" "}
+            Please verify your email before making a deposit.{" "}
             <ResendVerificationLink email={userEmail} />
           </div>
         )}

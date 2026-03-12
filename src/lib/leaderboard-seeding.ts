@@ -62,19 +62,7 @@ export function buildLeaderboard(realPlayers: LeaderboardPlayer[], gradients: st
 }
 
 export function getTopGameEmoji(topGame: string | undefined): string {
-  switch (topGame) {
-    case "Chess":
-      return "♟️";
-    case "Reaction Duel":
-      return "⚡";
-    case "Spelling Bee":
-      return "🐝";
-    case "8 Ball Pool":
-      return "🎱";
-    case "Connect 4":
-      return "🔴";
-    default:
-      return "🎮";
-  }
+  void topGame;
+  return "";
 }
 

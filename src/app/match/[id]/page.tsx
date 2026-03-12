@@ -465,15 +465,15 @@ function MatchPageContent() {
           <div className="flex items-center gap-3">
             <span className="font-semibold text-white">
               {match.gameType === "chess"
-                ? "Chess ♟"
+                ? "Chess"
                 : match.gameType === "connect-4"
-                  ? "Connect 4 🔴🟡"
+                  ? "Connect 4"
                   : match.gameType === "reaction-duel"
-                    ? "Reaction Duel ⚡"
+                    ? "Reaction Duel"
                     : match.gameType === "memory-match"
-                      ? "Memory Match 🧠"
+                      ? "Memory Match"
                       : match.gameType === "spelling-bee"
-                        ? "Spelling Bee 🐝"
+                        ? "Spelling Bee"
                         : match.gameDisplayName}
             </span>
             {match.isPractice && (
@@ -518,7 +518,7 @@ function MatchPageContent() {
             borderColor: "rgba(245, 158, 11, 0.3)",
           }}
         >
-          ⚠️ Unstable connection
+          Unstable connection
         </div>
       )}
       {isRealMultiplayerMatch && match.status === "in_progress" && !outcome && connectionStatus === "disconnected" && (
@@ -690,14 +690,14 @@ function MatchPageContent() {
                     onClick={handleWin}
                     className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
                   >
-                    🏆 I Won
+                    I Won
                   </button>
                   <button
                     type="button"
                     onClick={handleLoss}
                     className="rounded-lg border border-red-500/50 bg-red-500/10 px-6 py-3 font-semibold text-red-400 hover:bg-red-500/20"
                   >
-                    😞 I Lost
+                    I Lost
                   </button>
                 </div>
               </>
@@ -711,7 +711,7 @@ function MatchPageContent() {
               {safePlayer2.username}
               {!isRealMultiplayer && (
                 <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                  🤖 BOT
+                  BOT
                 </span>
               )}
             </p>
@@ -759,7 +759,7 @@ function MatchPageContent() {
           <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
           <div className="animate-fade-in relative text-center">
             <p className="text-5xl font-bold text-white sm:text-6xl">
-              {match.isPractice ? "You won! 🎯" : "🏆 VICTORY!"}
+              {match.isPractice ? "You won!" : "VICTORY!"}
             </p>
             {wonByForfeit && (
               <p className="mt-4 text-xl font-semibold text-amber-400">Opponent left the match. You win by forfeit!</p>
@@ -778,19 +778,19 @@ function MatchPageContent() {
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                🔄 Rematch
+                Rematch
               </Link>
               <Link
                 href="/play"
                 className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
               >
-                🎮 New Match
+                New Match
               </Link>
               <Link
                 href="/dashboard"
                 className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
               >
-                🏠 Dashboard
+                Dashboard
               </Link>
               {match.isPractice && (
                 <Link
@@ -810,7 +810,7 @@ function MatchPageContent() {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
           <div className="absolute inset-0 bg-gradient-to-t from-amber-500/5 via-transparent to-amber-500/5" aria-hidden />
           <div className="animate-fade-in relative text-center">
-            <p className="text-4xl font-bold text-white sm:text-5xl">🤝 It&apos;s a Draw!</p>
+            <p className="text-4xl font-bold text-white sm:text-5xl">It&apos;s a Draw!</p>
             {match.isPractice ? (
               <p className="mt-4 text-lg text-purple-400">Practice match — no stakes.</p>
             ) : (
@@ -824,19 +824,19 @@ function MatchPageContent() {
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                🔄 Rematch
+                Rematch
               </Link>
               <Link
                 href="/play"
                 className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
               >
-                🎮 New Match
+                New Match
               </Link>
               <Link
                 href="/dashboard"
                 className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
               >
-                🏠 Dashboard
+                Dashboard
               </Link>
             </div>
           </div>
@@ -865,19 +865,19 @@ function MatchPageContent() {
                 href={`/play/${match.gameType}`}
                 className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
               >
-                🔄 Rematch
+                Rematch
               </Link>
               <Link
                 href="/play"
                 className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
               >
-                🎮 New Match
+                New Match
               </Link>
               <Link
                 href="/dashboard"
                 className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
               >
-                🏠 Dashboard
+                Dashboard
               </Link>
               {match.isPractice && (
                 <Link

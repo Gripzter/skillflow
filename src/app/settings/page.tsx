@@ -88,7 +88,6 @@ export default function SettingsPage() {
               isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
             }`}
           >
-            <span aria-hidden>🎁</span>
             Referrals
           </Link>
         </section>
@@ -103,7 +102,6 @@ export default function SettingsPage() {
               isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
             }`}
           >
-            <span aria-hidden>🛡️</span>
             Gaming Limits
           </Link>
         </section>
@@ -156,7 +154,7 @@ export default function SettingsPage() {
               }`}
             >
               <span className="absolute right-3 top-3 rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
-                NEW ✨
+                NEW
               </span>
               {theme === "sci-fi" && (
                 <span className="absolute right-3 top-10 text-[#00F0FF]" aria-hidden>

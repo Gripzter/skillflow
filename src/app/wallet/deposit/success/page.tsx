@@ -54,7 +54,6 @@ function DepositSuccessContent() {
           )}
           {status === "success" && (
             <>
-              <div className="mb-4 text-5xl">✅</div>
               <h1 className="text-2xl font-bold text-white">Deposit Successful!</h1>
               <p className="mt-3 text-3xl font-bold text-teal">+${amount.toFixed(2)}</p>
               <p className="mt-2 text-body-gray">Funds have been added to your wallet.</p>
@@ -69,7 +68,6 @@ function DepositSuccessContent() {
           )}
           {status === "error" && (
             <>
-              <div className="mb-4 text-5xl">❌</div>
               <h1 className="text-2xl font-bold text-white">Something went wrong</h1>
               <p className="mt-4 text-body-gray">
                 Your deposit could not be confirmed. If money was charged, it will be refunded automatically.

@@ -16,8 +16,8 @@ const RATING_STYLES: Record<
 > = {
   good: { bg: "#22C55E", text: "white", label: "● GOOD", icon: "●" },
   medium: { bg: "#EAB308", text: "#171717", label: "● MEDIUM", icon: "●" },
-  warning: { bg: "#F97316", text: "white", label: "⚠ WARNING", icon: "⚠" },
-  unrecommended: { bg: "#EF4444", text: "white", label: "⛔ BAD", icon: "⛔" },
+  warning: { bg: "#F97316", text: "white", label: "! WARNING", icon: "!" },
+  unrecommended: { bg: "#EF4444", text: "white", label: "× BAD", icon: "×" },
 };
 
 function getPingColor(ping: number): string {
@@ -50,10 +50,10 @@ function getSpeedColor(speed: number): string {
 
 function getConnectionIcon(type: string): string {
   const t = type.toLowerCase();
-  if (t.includes("ethernet")) return "🔌";
-  if (t.includes("wifi") || t.includes("wlan")) return "📶";
-  if (t.includes("4g") || t.includes("3g") || t.includes("cellular")) return "📱";
-  return "📶";
+  if (t.includes("ethernet")) return "";
+  if (t.includes("wifi") || t.includes("wlan")) return "";
+  if (t.includes("4g") || t.includes("3g") || t.includes("cellular")) return "";
+  return "";
 }
 
 function formatTimeAgo(ts: number): string {
@@ -184,7 +184,7 @@ export default function ConnectionBadge() {
             <div className="flex items-center justify-between gap-4">
               <span className="text-body-gray">Type</span>
               <span className="flex items-center gap-1.5 text-white">
-                {getConnectionIcon(metrics.connectionType)} {metrics.connectionType}
+                {metrics.connectionType}
               </span>
             </div>
           </div>

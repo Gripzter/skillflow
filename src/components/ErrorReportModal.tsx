@@ -97,7 +97,7 @@ export default function ErrorReportModal({
             marginBottom: "4px",
           }}
         >
-          🐛 Report Error
+          Report Error
         </h2>
         <p
           style={{

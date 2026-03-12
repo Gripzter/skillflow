@@ -50,31 +50,19 @@ const QUICK_GAMES = [
   {
     slug: "chess",
     name: "Chess",
-    emoji: "♟️",
     gradient: "from-amber-500/20 to-rose-500/20",
   },
   {
     slug: "connect-4",
     name: "Connect 4",
-    emoji: "🔴",
     gradient: "from-red-500/30 to-amber-400/30",
   },
   {
     slug: "reaction-duel",
     name: "Reaction Duel",
-    emoji: "⚡",
     gradient: "from-orange-500/30 to-red-500/30",
   },
 ] as const;
-
-const GAME_EMOJI: Record<string, string> = {
-  "8-ball-pool": "🎱",
-  chess: "♟️",
-  "connect-4": "🔴",
-  "reaction-duel": "⚡",
-  "memory-match": "🧠",
-  "spelling-bee": "🐝",
-};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -330,9 +318,6 @@ export default function DashboardPage() {
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
                   <div className="relative z-10 flex h-full flex-col justify-between px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg" aria-hidden>
-                        {game.emoji}
-                      </span>
                       <span className="font-semibold">{game.name}</span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[11px] text-body-gray">
@@ -386,7 +371,6 @@ export default function DashboardPage() {
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
                     Win Rate
                   </span>
-                  <span className="text-xs text-emerald-300/80">🏆</span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
                   {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
@@ -404,7 +388,6 @@ export default function DashboardPage() {
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
                     Matches
                   </span>
-                  <span className="text-xs text-gray-300/80">🎮</span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
                   {totalMatches.toLocaleString()}
@@ -422,7 +405,6 @@ export default function DashboardPage() {
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
                     Net Earnings
                   </span>
-                  <span className="text-xs text-emerald-300/80">📈</span>
                 </div>
                 <div className="mt-1 flex items-baseline gap-1">
                   <span
@@ -451,7 +433,6 @@ export default function DashboardPage() {
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
                     Rank
                   </span>
-                  <span className="text-xs text-amber-300/80">🎖️</span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
                   {playerRank ? `#${playerRank.toLocaleString()}` : "Unranked"}
@@ -495,7 +476,6 @@ export default function DashboardPage() {
                     ? "text-emerald-300"
                     : "text-red-400";
                 const opponentName = match.player2?.username ?? "Opponent";
-                const emoji = GAME_EMOJI[match.gameType] ?? "🎮";
                 const gameImageSrc =
                   match.gameType === "chess"
                     ? "/games/chess.jpg"
@@ -537,9 +517,6 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="shrink-0 text-lg" aria-hidden>
-                        {emoji}
-                      </span>
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-gray-100">
                           {match.gameDisplayName} vs {opponentName}

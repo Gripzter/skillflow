@@ -133,7 +133,7 @@ export default function AppNavbar({
                 : "text-body-gray hover:text-white"
             }`}
           >
-            🎁 Referrals
+            Referrals
           </Link>
           </nav>
         </div>

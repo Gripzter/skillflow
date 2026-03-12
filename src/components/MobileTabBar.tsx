@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 
 const TABS = [
-  { href: "/dashboard", icon: "🏠", label: "Home" },
-  { href: "/play", icon: "🎮", label: "Play" },
-  { href: "/wallet", icon: "💰", label: "Wallet" },
-  { href: "/leaderboard", icon: "🏆", label: "Rank" },
-  { href: "/profile", icon: "👤", label: "Profile" },
+  { href: "/dashboard", label: "Home" },
+  { href: "/play", label: "Play" },
+  { href: "/wallet", label: "Wallet" },
+  { href: "/leaderboard", label: "Rank" },
+  { href: "/profile", label: "Profile" },
 ] as const;
 
 export default function MobileTabBar() {
@@ -45,13 +45,12 @@ export default function MobileTabBar() {
               isActive ? (isPractice ? "text-purple-400" : "text-teal") : "text-body-gray"
             }`}
           >
-            <span className="relative inline-block text-lg" aria-hidden>
-              {tab.icon}
+            <span className="relative text-[11px] font-medium">
+              {tab.label}
               {tab.href === "/play" && isPractice && (
-                <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-purple-500" aria-hidden />
+                <span className="absolute -right-3 top-0.5 h-2 w-2 rounded-full bg-purple-500" aria-hidden />
               )}
             </span>
-            <span className="text-[11px] font-medium">{tab.label}</span>
           </Link>
         );
       })}

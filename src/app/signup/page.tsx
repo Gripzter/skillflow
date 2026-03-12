@@ -275,7 +275,7 @@ function SignupContent() {
     return (
       <AuthLayout heading="Check Your Email" subtitle="Verify your account to get started">
         <div className="rounded-xl border border-white/10 bg-card p-8 text-center">
-          <span className="text-5xl" aria-hidden>📧</span>
+          <span className="text-5xl" aria-hidden />
           <h2 className="mt-4 text-xl font-bold text-white">Check Your Email</h2>
           <p className="mt-2 text-body-gray">
             We&apos;ve sent a verification link to <strong className="text-white">{verificationEmail}</strong>
@@ -317,7 +317,7 @@ function SignupContent() {
     <AuthLayout heading="Create your account" subtitle="Join the arena. Bet on yourself.">
       {referralCode && (
         <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          🎁 You&apos;ll get a $5 bonus after your first deposit ($5+)!
+          You&apos;ll get a $5 bonus after your first deposit ($5+)!
         </div>
       )}
       <form onSubmit={handleSubmit} noValidate className="space-y-5">

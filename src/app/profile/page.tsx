@@ -30,15 +30,15 @@ const GAME_TABS = [
 ] as const;
 
 const ACHIEVEMENTS = [
-  { id: "first_blood", icon: "🏆", title: "First Blood", desc: "Win your first match", check: (ctx: ProfileStats) => ctx.totalWins >= 1 },
-  { id: "on_fire", icon: "🔥", title: "On Fire", desc: "Win 3 matches in a row", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
-  { id: "high_roller", icon: "💰", title: "High Roller", desc: "Play a $50+ stake match", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
-  { id: "sharpshooter", icon: "🎯", title: "Sharpshooter", desc: "Win 10 matches total", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
-  { id: "champion", icon: "👑", title: "Champion", desc: "Reach Gold rating", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
-  { id: "speed_demon", icon: "⚡", title: "Speed Demon", desc: "Win a match in under 2 minutes", check: () => false },
-  { id: "pool_shark", icon: "🎱", title: "Pool Shark", desc: "Win 10 8-ball pool matches", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
-  { id: "grandmaster", icon: "♟️", title: "Grandmaster", desc: "Win 10 chess matches", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
-  { id: "diamond", icon: "💎", title: "Diamond Player", desc: "Reach Diamond rating", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
+  { id: "first_blood", title: "First Blood", desc: "Win your first match", check: (ctx: ProfileStats) => ctx.totalWins >= 1 },
+  { id: "on_fire", title: "On Fire", desc: "Win 3 matches in a row", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
+  { id: "high_roller", title: "High Roller", desc: "Play a $50+ stake match", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
+  { id: "sharpshooter", title: "Sharpshooter", desc: "Win 10 matches total", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
+  { id: "champion", title: "Champion", desc: "Reach Gold rating", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
+  { id: "speed_demon", title: "Speed Demon", desc: "Win a match in under 2 minutes", check: () => false },
+  { id: "pool_shark", title: "Pool Shark", desc: "Win 10 8-ball pool matches", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
+  { id: "grandmaster", title: "Grandmaster", desc: "Win 10 chess matches", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
+  { id: "diamond", title: "Diamond Player", desc: "Reach Diamond rating", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
 ] as const;
 
 interface ProfileStats {
@@ -310,7 +310,7 @@ export default function ProfilePage() {
                 </div>
                 <p className="mt-1 text-sm text-body-gray">Joined {memberSince}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold text-white">
-                  <span className="text-amber-400">⭐</span> {stats.rating} Rating
+                  {stats.rating} Rating
                   <span className="rounded bg-white/10 px-2 py-0.5 text-sm font-medium text-body-gray">{rank}</span>
                 </p>
               </div>
@@ -327,17 +327,16 @@ export default function ProfilePage() {
         {/* Section 2: Stats overview */}
         <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {[
-            { label: "Total Matches", value: stats.matches.length, icon: "🎮" },
-            { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%`, icon: "📊" },
-            { label: "Total Earnings", value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`, icon: "💰" },
-            { label: "Win Streak", value: stats.bestStreak, icon: "🔥" },
+            { label: "Total Matches", value: stats.matches.length },
+            { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
+            { label: "Total Earnings", value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}` },
+            { label: "Win Streak", value: stats.bestStreak },
           ].map((card, i) => (
             <div
               key={card.label}
               className="card-border animate-fade-in rounded-card bg-card p-5"
               style={{ animationDelay: `${i * 0.05}s` }}
             >
-              <span className="text-2xl" aria-hidden>{card.icon}</span>
               <p className="mt-2 text-xs text-body-gray">{card.label}</p>
               <p className="mt-1 text-2xl font-bold text-white">{card.value}</p>
             </div>

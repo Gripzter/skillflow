@@ -117,7 +117,7 @@ export default function WithdrawPage() {
         />
         <main className="relative mx-auto max-w-[500px] px-4 pt-8 pb-12">
           <div className="rounded-xl border border-white/10 bg-card p-8 text-center">
-            <p className="text-2xl font-bold text-white">Withdrawal request submitted! ✅</p>
+            <p className="text-2xl font-bold text-white">Withdrawal request submitted!</p>
             <p className={`mt-4 text-xl font-semibold ${isPractice ? "text-purple-300" : "text-teal"}`}>
               You&apos;ll receive: ${playerReceives.toFixed(2)}
             </p>

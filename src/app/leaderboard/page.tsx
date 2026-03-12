@@ -161,7 +161,7 @@ export default function LeaderboardPage() {
 
       <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
-          {isPractice ? "Practice Leaderboard 🎯" : "Leaderboard 🏆"}
+          {isPractice ? "Practice Leaderboard" : "Leaderboard"}
         </h1>
         <p className="mt-1 text-body-gray">
           {isPractice ? "Ranked by practice matches played" : "See how you stack up against the competition"}
@@ -215,7 +215,7 @@ export default function LeaderboardPage() {
               className="order-1 sm:order-2 flex flex-col items-center rounded-card border-2 border-[#FFD700] bg-card p-6 shadow-[0_0_30px_rgba(255,215,0,0.2)] animate-fade-in"
               style={{ animationDelay: "0s" }}
             >
-              <span className="text-2xl">👑</span>
+              <span className="text-2xl" aria-hidden />
               <p className="text-2xl font-bold text-[#FFD700]">#1</p>
               <div
                 className={`mt-3 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${podium[0].avatarGradient} text-3xl font-bold text-white`}

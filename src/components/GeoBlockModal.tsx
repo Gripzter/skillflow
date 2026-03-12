@@ -16,7 +16,7 @@ export default function GeoBlockModal({ onClose, stateName }: GeoBlockModalProps
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="geo-block-title">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-card p-8 shadow-xl">
         <h2 id="geo-block-title" className="text-xl font-bold text-white">
-          🌍 Not Available in Your Region
+          Not Available in Your Region
         </h2>
         <p className="mt-4 text-body-gray">
           Skill-based wagering is not currently available in {displayState} due to local regulations.
@@ -35,13 +35,13 @@ export default function GeoBlockModal({ onClose, stateName }: GeoBlockModalProps
             href="/play?practice=1"
             className="rounded-lg bg-teal py-3 text-center font-semibold text-charcoal hover:shadow-teal-glow"
           >
-            🎯 Play Practice Mode
+            Play Practice Mode
           </Link>
           <Link
             href="/dashboard"
             className="rounded-lg border border-white/20 py-3 text-center font-medium text-white hover:bg-white/5"
           >
-            🏠 Back to Dashboard
+            Back to Dashboard
           </Link>
           <button
             type="button"

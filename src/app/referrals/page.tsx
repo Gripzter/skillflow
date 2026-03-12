@@ -157,7 +157,7 @@ export default function ReferralsPage() {
         currentPage="referrals"
       />
       <main className="relative mx-auto max-w-[600px] px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-bold text-white">🎁 Invite Friends, Earn $5 Each</h1>
+        <h1 className="text-2xl font-bold text-white">Invite Friends, Earn $5 Each</h1>
         <p className="mt-1 text-body-gray">Share your link. When they sign up and make their first deposit ($5+), you both get $5.</p>
 
         <section className="mt-6 rounded-xl border border-white/10 bg-card p-6">
@@ -178,7 +178,7 @@ export default function ReferralsPage() {
                   : "bg-teal hover:shadow-teal-glow"
               }`}
             >
-              {copied ? "✓ Copied" : "📋 Copy"}
+              {copied ? "Copied" : "Copy"}
             </button>
           </div>
           <p className="mt-3 text-sm text-body-gray">
@@ -227,7 +227,7 @@ export default function ReferralsPage() {
         </div>
 
         <section className="mt-8 rounded-xl border border-white/10 bg-card p-6">
-          <h2 className="text-lg font-semibold text-white">📊 Your Referral Stats</h2>
+          <h2 className="text-lg font-semibold text-white">Your Referral Stats</h2>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-xs text-body-gray">Friends Invited</p>
@@ -254,7 +254,7 @@ export default function ReferralsPage() {
         </section>
 
         <section className="mt-8 rounded-xl border border-white/10 bg-card p-6">
-          <h2 className="text-lg font-semibold text-white">📋 Referral History</h2>
+          <h2 className="text-lg font-semibold text-white">Referral History</h2>
           {history.length === 0 ? (
             <p className="mt-4 text-body-gray">No referrals yet. Share your link to get started!</p>
           ) : (
@@ -267,7 +267,7 @@ export default function ReferralsPage() {
                   <div>
                     <span className="font-medium text-white">{row.referred_username}</span>
                     <span className="ml-2 text-sm text-body-gray">
-                      {row.status === "completed" ? "✅ Completed" : "⏳ Pending deposit"}
+                      {row.status === "completed" ? "Completed" : "Pending deposit"}
                     </span>
                   </div>
                   {row.status === "completed" && (

@@ -238,7 +238,7 @@ export default function WalletPage() {
                       : "bg-teal hover:shadow-teal-glow"
                   }`}
                 >
-                  💰 Deposit
+                  Deposit
                 </button>
               ) : (
                 <Link
@@ -249,7 +249,7 @@ export default function WalletPage() {
                       : "bg-teal hover:shadow-teal-glow"
                   }`}
                 >
-                  💰 Deposit
+                  Deposit
                 </Link>
               )}
               {!isRestricted &&
@@ -258,14 +258,14 @@ export default function WalletPage() {
                     title="Minimum withdrawal: $10"
                     className="flex w-full cursor-not-allowed justify-center rounded-lg border border-white/30 bg-white/5 px-6 py-3 font-semibold text-white/60 sm:w-auto"
                   >
-                    💸 Withdraw
+                    Withdraw
                   </span>
                 ) : (
                   <Link
                     href="/wallet/withdraw"
                     className="pressable w-full rounded-lg border border-white/30 bg-transparent px-6 py-3 text-center font-semibold text-white transition-colors hover:bg-white/5 sm:w-auto"
                   >
-                    💸 Withdraw
+                    Withdraw
                   </Link>
                 ))}
             </div>
@@ -279,7 +279,7 @@ export default function WalletPage() {
                 isPractice ? "text-purple-400" : "text-teal"
               }`}
             >
-              🛡️ Set deposit limits
+              Set deposit limits
             </Link>
           </div>
         </section>
@@ -296,7 +296,7 @@ export default function WalletPage() {
                 onClick={handleAddTestBalance}
                 className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_16px_rgba(245,158,11,0.45)] transition hover:bg-amber-400 sm:w-auto"
               >
-                🧪 Add $50 Test Balance
+                Add $50 Test Balance
               </button>
               <p className="mt-2 text-xs text-amber-100/80">
                 Development only — will be removed in production.

@@ -29,7 +29,6 @@ export default function ModeToggleBarContent({ className = "" }: ModeToggleBarCo
           }`}
         >
           <span className="relative z-10 inline-flex items-center gap-1.5">
-            <span aria-hidden>💰</span>
             Real Money
           </span>
         </button>
@@ -45,7 +44,6 @@ export default function ModeToggleBarContent({ className = "" }: ModeToggleBarCo
           }`}
         >
           <span className="relative z-10 inline-flex items-center gap-1.5">
-            <span aria-hidden>🎯</span>
             Practice
           </span>
         </button>

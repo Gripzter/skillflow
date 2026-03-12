@@ -27,10 +27,10 @@ const MATCHMAKING_TIMEOUT_SEC = 60;
 
 export type BotDifficulty = "rookie" | "gamer" | "professional";
 
-const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; emoji: string; description: string }[] = [
-  { value: "rookie", emoji: "🟢", label: "Rookie", description: "Learning the ropes. A great place to start." },
-  { value: "gamer", emoji: "🟡", label: "Gamer", description: "A solid opponent. Bring your A-game." },
-  { value: "professional", emoji: "🔴", label: "Professional", description: "Near-perfect play. Only the best can win." },
+const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; description: string }[] = [
+  { value: "rookie", label: "Rookie", description: "Learning the ropes. A great place to start." },
+  { value: "gamer", label: "Gamer", description: "A solid opponent. Bring your A-game." },
+  { value: "professional", label: "Professional", description: "Near-perfect play. Only the best can win." },
 ];
 const MATCHMAKING_SLOW_SEC = 30;
 const GAME_SLUG_TO_NAME: Record<string, string> = {
@@ -355,7 +355,7 @@ export default function PlayGamePage() {
         {effectivePractice && (
           <>
             <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
-              <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
+              <p className="font-semibold text-purple-300">Practice Match — Free Play</p>
               <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
             </div>
             <section className="mt-8">
@@ -376,7 +376,7 @@ export default function PlayGamePage() {
                         : "border-white/20 bg-[#1A1D27] text-body-gray hover:border-white/40 hover:text-white"
                     }`}
                   >
-                    {opt.emoji} {opt.label}
+                    {opt.label}
                   </button>
                 ))}
               </div>

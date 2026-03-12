@@ -28,10 +28,10 @@ const GAME_NAME = "Spelling Bee";
 
 type BotDifficulty = "rookie" | "gamer" | "professional";
 
-const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; emoji: string; description: string }[] = [
-  { value: "rookie", emoji: "🟢", label: "Rookie", description: "Learning the ropes. A great place to start." },
-  { value: "gamer", emoji: "🟡", label: "Gamer", description: "A solid opponent. Bring your A-game." },
-  { value: "professional", emoji: "🔴", label: "Professional", description: "Near-perfect play. Only the best can win." },
+const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; description: string }[] = [
+  { value: "rookie", label: "Rookie", description: "Learning the ropes. A great place to start." },
+  { value: "gamer", label: "Gamer", description: "A solid opponent. Bring your A-game." },
+  { value: "professional", label: "Professional", description: "Near-perfect play. Only the best can win." },
 ];
 
 export default function PlaySpellingBeePage() {
@@ -313,7 +313,7 @@ export default function PlaySpellingBeePage() {
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Spelling Bee 🐝
+            Spelling Bee
           </Link>
           {!isPractice && (
             <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
@@ -324,7 +324,7 @@ export default function PlaySpellingBeePage() {
         </div>
 
         <div className="mt-6 rounded-xl border-l-4 border-amber-500 bg-amber-500/5 p-4">
-          <p className="font-medium text-white">Spelling Bee 🐝</p>
+          <p className="font-medium text-white">Spelling Bee</p>
           <p className="mt-1 text-sm text-body-gray">
             Test your spelling skills! Words get harder each round. Can you spell them all?
           </p>
@@ -333,7 +333,7 @@ export default function PlaySpellingBeePage() {
         {isPractice && (
           <>
             <div className="mt-6 rounded-xl border-2 border-purple-500/40 bg-purple-500/10 px-4 py-3 text-center">
-              <p className="font-semibold text-purple-300">🎯 Practice Match — Free Play</p>
+              <p className="font-semibold text-purple-300">Practice Match — Free Play</p>
               <p className="mt-1 text-sm text-body-gray">No money required. Play against a bot to sharpen your skills.</p>
             </div>
             <section className="mt-8">
@@ -354,7 +354,7 @@ export default function PlaySpellingBeePage() {
                         : "border-white/20 bg-[#1A1D27] text-body-gray hover:border-white/40 hover:text-white"
                     }`}
                   >
-                    {opt.emoji} {opt.label}
+                    {opt.label}
                   </button>
                 ))}
               </div>

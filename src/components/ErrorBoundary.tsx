@@ -81,7 +81,7 @@ function ErrorScreen({
           border: "1px solid rgba(255,255,255,0.08)",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }} aria-hidden />
         <h1
           style={{
             color: "#F3F4F6",
@@ -154,7 +154,7 @@ function ErrorScreen({
                 cursor: "pointer",
               }}
             >
-              🐛 Report This Error
+              Report This Error
             </button>
           ) : (
             <div
@@ -167,7 +167,7 @@ function ErrorScreen({
                 fontSize: "14px",
               }}
             >
-              ✅ Report sent — thank you for helping us improve!
+              Report sent — thank you for helping us improve!
             </div>
           )}
 
