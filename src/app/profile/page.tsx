@@ -531,7 +531,7 @@ export default function ProfilePage() {
                     unlocked
                       ? isPractice
                         ? "border-purple-500/40 bg-card shadow-[0_0_20px_rgba(139,92,246,0.16)]"
-                        : "border-teal/40 bg-card shadow-[0_0_20px_rgba(0,229,199,0.1)]"
+                        : "border-steel-blue bg-card shadow-[0_0_20px_rgba(42,58,92,0.4)]"
                       : "border-white/10 bg-card/80 opacity-50"
                   }`}
                 >

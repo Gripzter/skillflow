@@ -58,7 +58,7 @@ function GameCard({
         active
           ? isPractice
             ? "hover:-translate-y-0.5 hover:border-purple-500/40 hover:shadow-[0_0_26px_rgba(168,85,247,0.35)] cursor-pointer"
-            : "hover:-translate-y-0.5 hover:border-teal/40 hover:shadow-[0_0_26px_rgba(0,229,199,0.35)] cursor-pointer"
+            : "hover:-translate-y-0.5 hover:border-steel-blue-bright hover:shadow-[0_0_26px_rgba(42,58,92,0.6)] cursor-pointer"
           : "cursor-not-allowed opacity-60"
       }`}
     >
@@ -214,7 +214,7 @@ export default function PlayPage() {
         {!isPractice && (
           <Link
             href="/last-touch"
-            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-teal/40 bg-black/40 p-6 shadow-[0_0_40px_rgba(0,229,199,0.1)] transition-all duration-300 hover:border-teal/60 hover:shadow-[0_0_60px_rgba(0,229,199,0.2)]"
+            className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-steel-blue bg-black/40 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)] transition-all duration-300 hover:border-steel-blue-bright hover:shadow-[0_0_60px_rgba(42,58,92,0.6)]"
           >
             <Image
               src="/games/lasttouch.jpg"
@@ -237,7 +237,7 @@ export default function PlayPage() {
                   <p className="text-xs text-body-gray">Prize Pool</p>
                   <p className="text-xl font-bold text-white">$1,247</p>
                 </div>
-                <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(0,229,199,0.4)]">
+                <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(255,94,0,0.5)]">
                   Join Now
                 </span>
               </div>

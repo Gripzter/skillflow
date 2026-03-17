@@ -23,6 +23,10 @@ const config: Config = {
         "teal-hover": "#FF7A2E",
         "purple-hover": "#C084FC",
 
+        // Atmospheric steel blue
+        "steel-blue": "#2A3A5C",
+        "steel-blue-bright": "#3A4F7A",
+
         // Admin dashboard (distinct from player site)
         "admin-bg": "#0A0B0F",
         "admin-card": "#12131A",
@@ -40,17 +44,17 @@ const config: Config = {
         card: "12px",
       },
       boxShadow: {
-        // Real-money orange glow
-        "teal-glow": "0 0 20px rgba(255, 94, 0, 0.3)",
-        "teal-glow-lg": "0 0 30px rgba(255, 94, 0, 0.4)",
-        // Practice purple glow
+        // Atmospheric steel blue glows (non-interactive ambience)
+        "teal-glow": "0 0 20px rgba(42, 58, 92, 0.4)",
+        "teal-glow-lg": "0 0 30px rgba(42, 58, 92, 0.6)",
+        // Practice purple glow (kept for practice elements)
         "purple-glow": "0 0 20px rgba(168, 85, 247, 0.3)",
       },
       backgroundImage: {
         "gradient-teal-purple":
           "linear-gradient(135deg, #FF5E00 0%, #FF7A2E 100%)",
         "mesh-gradient":
-          "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 94, 0, 0.06), transparent), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(168, 85, 247, 0.05), transparent)",
+          "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(42, 58, 92, 0.15), transparent), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(42, 58, 92, 0.12), transparent)",
       },
       animation: {
         "fade-in": "fadeIn 0.6s ease-out forwards",

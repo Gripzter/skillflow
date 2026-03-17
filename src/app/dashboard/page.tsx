@@ -232,7 +232,7 @@ export default function DashboardPage() {
         <section className="animate-fade-in" style={{ animationDelay: "80ms" }}>
           <Link
             href="/last-touch"
-            className="group relative block overflow-hidden rounded-2xl border-2 border-teal/40 bg-black/40 p-6 shadow-[0_0_40px_rgba(0,229,199,0.12)] transition-all duration-300 hover:border-teal/70 hover:shadow-[0_0_70px_rgba(0,229,199,0.25)]"
+            className="group relative block overflow-hidden rounded-2xl border-2 border-steel-blue bg-black/40 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)] transition-all duration-300 hover:border-steel-blue-bright hover:shadow-[0_0_70px_rgba(42,58,92,0.6)]"
           >
             <Image
               src="/games/lasttouch.jpg"
@@ -264,7 +264,7 @@ export default function DashboardPage() {
                   </p>
                   <p className="mt-1 text-xl font-semibold text-white">$1,247</p>
                 </div>
-                <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(0,229,199,0.5)] transition-transform duration-150 group-hover:-translate-y-0.5">
+                <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
                   Join Now
                 </span>
               </div>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
               const playersOnline = stats?.playersOnline ?? 0;
               const accentClasses = isPractice
                 ? "hover:border-purple-500/40 hover:shadow-[0_0_28px_rgba(168,85,247,0.35)]"
-                : "hover:border-teal/60 hover:shadow-[0_0_28px_rgba(0,229,199,0.35)]";
+                : "hover:border-steel-blue-bright hover:shadow-[0_0_28px_rgba(42,58,92,0.6)]";
 
               return (
                 <button
@@ -347,7 +347,7 @@ export default function DashboardPage() {
           <div className="grid gap-3 sm:grid-cols-4">
             {/* Win Rate */}
             <div
-              className={`card-border relative overflow-hidden rounded-card bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(0,229,199,0.25)] ${
+              className={`card-border relative overflow-hidden rounded-card bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)] ${
                 totalMatches > 0 && winRate >= 50
                   ? "border-emerald-400/40"
                   : totalMatches > 0
@@ -397,7 +397,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Net Earnings */}
-            <div className="card-border relative overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(0,229,199,0.35)]">
+            <div className="card-border relative overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)]">
               <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-teal/30 via-emerald-500/10 to-transparent opacity-40" />
               <div className="pointer-events-none absolute -right-6 -top-6 h-12 w-12 rounded-full bg-emerald-400/25 blur-xl" />
               <div className="relative">

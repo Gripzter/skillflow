@@ -5,7 +5,7 @@
 :root {
   --accent: #ff5e00;
   --accent-light: rgba(255, 94, 0, 0.15);
-  --accent-glow: rgba(255, 94, 0, 0.3);
+  --accent-glow: rgba(42, 58, 92, 0.5); /* ambient glow now steel blue */
   --accent-dark: #ff7a2e;
 }
 

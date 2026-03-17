@@ -353,7 +353,7 @@ export default function LastTouch({
           <div className="mt-4 inline-block animate-pulse text-4xl">👆</div>
         </div>
 
-        <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-teal/50 bg-card/90 p-6 shadow-[0_0_40px_rgba(255,94,0,0.15)]">
+        <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-steel-blue bg-card/90 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)]">
           <p className="text-center text-sm text-body-gray">Current Prize Pool</p>
           <p className="mt-2 text-center text-4xl font-bold text-white tabular-nums">
             $<AnimatedNumber value={state.prizePool} />
@@ -556,7 +556,7 @@ export default function LastTouch({
             onContextMenu={(e) => e.preventDefault()}
             className={`flex min-h-[200px] min-w-[200px] max-w-[min(90vw,320px)] cursor-pointer select-none flex-col items-center justify-center rounded-full border-4 transition-all ${
               isHolding
-                ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(0,229,199,0.4)]"
+                ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(255,94,0,0.6)]"
                 : "border-white/20 bg-white/5 hover:border-teal/50"
             }`}
             style={{ touchAction: "none" }}

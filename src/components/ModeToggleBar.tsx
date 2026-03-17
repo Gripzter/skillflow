@@ -24,7 +24,7 @@ export default function ModeToggleBarContent({ className = "" }: ModeToggleBarCo
           onClick={() => setMode("real")}
           className={`relative rounded-[18px] px-4 py-2 text-sm font-bold transition-all duration-300 md:px-5 md:py-2 ${
             mode === "real"
-              ? "active-real bg-gradient-to-r from-[#FF5E00] to-[#FF7A2E] text-white shadow-[0_0_20px_rgba(255,94,0,0.3)]"
+              ? "active-real bg-gradient-to-r from-[#FF5E00] to-[#FF7A2E] text-white shadow-[0_0_20px_rgba(42,58,92,0.5)]"
               : "bg-transparent text-body-gray hover:text-primary-text/80"
           }`}
         >

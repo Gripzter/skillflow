@@ -118,7 +118,7 @@ export default function SettingsPage() {
                 theme === "default"
                   ? isPractice
                     ? "border-purple-500 bg-purple-500/5 shadow-[0_0_20px_rgba(139,92,246,0.18)]"
-                    : "border-teal bg-teal/5 shadow-[0_0_20px_rgba(0,229,199,0.15)]"
+                    : "border-steel-blue bg-steel-blue/10 shadow-[0_0_20px_rgba(42,58,92,0.5)]"
                   : "border-white/10 bg-card hover:border-white/20"
               }`}
             >

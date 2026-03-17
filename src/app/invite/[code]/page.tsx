@@ -79,7 +79,7 @@ export default function InviteCodePage() {
         </div>
       </header>
       <main className="relative mx-auto max-w-lg px-4 py-16 sm:px-6">
-        <div className="rounded-2xl border border-teal/30 bg-card p-8 text-center shadow-[0_0_40px_rgba(0,229,199,0.08)]">
+        <div className="rounded-2xl border border-steel-blue bg-card p-8 text-center shadow-[0_0_40px_rgba(42,58,92,0.4)]">
           <span className="text-5xl" aria-hidden />
           <h1 className="mt-4 text-2xl font-bold text-white">
             You&apos;ve been invited by {referrerName}!
