@@ -17,12 +17,12 @@ interface DisplayUser {
 }
 
 const GAMES = [
-  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: true },
   { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
   { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
-  { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: false },
   { name: "Reaction Duel", slug: "reaction-duel", gradient: "from-orange-500/30 to-red-500/30", active: true },
   { name: "Spelling Bee", slug: "spelling-bee", gradient: "from-amber-500/30 to-yellow-600/30", active: true },
+  { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: true },
+  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: false },
   { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
   { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
 ];
@@ -59,10 +59,12 @@ function GameCard({
           ? isPractice
             ? "hover:-translate-y-0.5 hover:border-purple-500/40 hover:shadow-[0_0_26px_rgba(168,85,247,0.35)] cursor-pointer"
             : "hover:-translate-y-0.5 hover:border-steel-blue-bright hover:shadow-[0_0_26px_rgba(42,58,92,0.6)] cursor-pointer"
-          : "cursor-not-allowed opacity-60"
+          : slug === "8-ball-pool"
+            ? "pointer-events-none opacity-50"
+            : "cursor-not-allowed opacity-60"
       }`}
     >
-      {active && (slug === "chess" || slug === "connect-4" || slug === "reaction-duel" || slug === "spelling-bee" || slug === "8-ball-pool") && (
+      {(slug === "chess" || slug === "connect-4" || slug === "reaction-duel" || slug === "spelling-bee" || slug === "8-ball-pool") && (
         <>
           <Image
             src={
@@ -109,11 +111,18 @@ function GameCard({
           <p>~{waitSec} sec avg wait</p>
         </div>
       </div>
-      {!active && (
+      {!active && slug !== "8-ball-pool" && (
         <div className="absolute inset-0 flex items-center justify-center">
           <svg className="h-10 w-10 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
+        </div>
+      )}
+      {!active && slug === "8-ball-pool" && (
+        <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-3">
+          <span className="rounded-full bg-[#2A3A5C] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+            Coming Soon
+          </span>
         </div>
       )}
     </div>
@@ -251,10 +260,7 @@ export default function PlayPage() {
           {isPractice ? "Select a game to play for free" : "Select a game and stake to find your opponent"}
         </p>
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3">
-          {(isPractice
-            ? GAMES.filter((g) => g.active && ["8-ball-pool", "chess", "connect-4", "reaction-duel", "spelling-bee"].includes(g.slug))
-            : GAMES
-          ).map((game, i) => (
+          {(isPractice ? GAMES.filter((g) => g.active || g.slug === "8-ball-pool") : GAMES).map((game, i) => (
             <GameCard
               key={game.slug}
               name={game.name}
