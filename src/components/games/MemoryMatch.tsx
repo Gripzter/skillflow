@@ -57,8 +57,6 @@ export default function MemoryMatch({
   const [thinking, setThinking] = useState(false);
   const [cardSize, setCardSize] = useState(60);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [desktopLogExpanded, setDesktopLogExpanded] = useState(false);
-  const [mobileLogExpanded, setMobileLogExpanded] = useState(false);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const resolvingRef = useRef(false);
@@ -67,6 +65,8 @@ export default function MemoryMatch({
   const botMemoryRef = useRef<Record<string, number[]>>({});
   const desktopLogRef = useRef<HTMLDivElement | null>(null);
   const mobileLogRef = useRef<HTMLDivElement | null>(null);
+  const desktopAtBottomRef = useRef(true);
+  const mobileAtBottomRef = useRef(true);
 
   const totalPairs = useMemo(() => cards.length / 2, [cards.length]);
   const remaining = useMemo(() => remainingPairs(cards), [cards]);
@@ -295,16 +295,17 @@ export default function MemoryMatch({
   }, [scores]);
 
   // Auto-scroll logs to latest entry within their own containers (no page scroll)
+  // Auto-scroll logs to latest entry when user is already at bottom
   useEffect(() => {
-    if (desktopLogRef.current) {
+    if (desktopLogRef.current && desktopAtBottomRef.current) {
       const el = desktopLogRef.current;
       el.scrollTop = el.scrollHeight;
     }
-    if (mobileLogRef.current) {
+    if (mobileLogRef.current && mobileAtBottomRef.current) {
       const el = mobileLogRef.current;
       el.scrollTop = el.scrollHeight;
     }
-  }, [moves.length, desktopLogExpanded, mobileLogExpanded]);
+  }, [moves.length]);
 
   useEffect(() => {
     if (selected.length === 2) {
@@ -381,7 +382,7 @@ export default function MemoryMatch({
     currentPlayer === 1 ? "rgba(0,229,199,0.8)" : "rgba(168, 85, 247, 0.8)";
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-4">
+      <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-4">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4 lg:min-w-0">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
           <div className="flex items-center gap-2">
@@ -559,32 +560,26 @@ export default function MemoryMatch({
         </div>
       </div>
 
-      {/* Desktop game log (collapsible, fixed height) */}
+      {/* Desktop game log: fixed-height live feed beside board */}
       <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 lg:flex lg:w-[320px] lg:flex-shrink-0 min-h-0 h-full">
-        <button
-          type="button"
-          className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-sm font-semibold text-white"
-          onClick={() => setDesktopLogExpanded((v) => !v)}
-        >
-          <span>Game Log</span>
-          <span className="text-xs text-body-gray">
-            {desktopLogExpanded ? "Show less" : "Show more"}
-          </span>
-        </button>
+        <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
+          <h3 className="text-sm font-semibold text-white">Game Log</h3>
+        </div>
         <div
           ref={desktopLogRef}
-          className={`flex-1 p-3 ${
-            desktopLogExpanded
-              ? "h-64 max-h-64 overflow-y-auto"
-              : "h-40 max-h-40 overflow-hidden"
-          }`}
+          className="flex-1 min-h-0 overflow-y-auto p-3"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+            desktopAtBottomRef.current = atBottom;
+          }}
         >
           {moves.length === 0 ? (
             <p className="py-4 text-center text-sm text-body-gray">
               Flip two cards to start!
             </p>
           ) : (
-            (desktopLogExpanded ? moves.slice(-12) : moves.slice(-6)).map((entry) => {
+            moves.map((entry) => {
               const isP1 = entry.player === 1;
               const isP2 = entry.player === 2;
               return (
@@ -629,32 +624,26 @@ export default function MemoryMatch({
         </div>
       </div>
 
-      {/* Mobile game log (collapsible, fixed height) */}
+      {/* Mobile game log: fixed-height live feed below board */}
       <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 lg:hidden">
-        <button
-          type="button"
-          className="flex w-full items-center justify-between text-sm font-semibold text-white"
-          onClick={() => setMobileLogExpanded((v) => !v)}
-        >
-          <span>Game Log</span>
-          <span className="text-xs text-body-gray">
-            {mobileLogExpanded ? "Close" : `${moves.length || 0} entries`}
-          </span>
-        </button>
+        <div className="border-b border-white/10 pb-2">
+          <h3 className="text-sm font-semibold text-white">Game Log</h3>
+        </div>
         <div
           ref={mobileLogRef}
-          className={`mt-2 ${
-            mobileLogExpanded
-              ? "max-h-40 overflow-y-auto"
-              : "max-h-20 overflow-hidden"
-          }`}
+          className="mt-2 max-h-[150px] overflow-y-auto"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+            mobileAtBottomRef.current = atBottom;
+          }}
         >
           {moves.length === 0 ? (
             <p className="py-2 text-center text-xs text-body-gray">
               Flip two cards to start!
             </p>
           ) : (
-            (mobileLogExpanded ? moves.slice(-6) : moves.slice(-2)).map((entry) => {
+            moves.map((entry) => {
               const isP1 = entry.player === 1;
               const isP2 = entry.player === 2;
               return (
