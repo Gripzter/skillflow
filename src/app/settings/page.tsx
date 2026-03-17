@@ -129,7 +129,7 @@ export default function SettingsPage() {
                   </svg>
                 </span>
               )}
-              <div className="mb-4 h-16 w-full overflow-hidden rounded-lg bg-[#0D0F14] p-2">
+              <div className="mb-4 h-16 w-full overflow-hidden rounded-lg bg-charcoal p-2">
                 <div className="flex gap-1">
                   <div className="h-2 flex-1 rounded bg-white/10" />
                   <div className={`h-2 w-8 rounded ${isPractice ? "bg-purple-500/60" : "bg-teal/60"}`} />

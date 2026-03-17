@@ -16,9 +16,9 @@ import {
 } from "@/lib/games/connect4-logic";
 import { getConnect4BotMove, getConnect4BotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 
-const BOARD_BG = "#1565C0";
-const CELL_BORDER = "#0D47A1";
-const HOLE_BG = "#0D0F14";
+const BOARD_BG = "#1A1A22";
+const CELL_BORDER = "#2A2A38";
+const HOLE_BG = "#0E0E12";
 const RED_CENTER = "#FF4444";
 const RED_EDGE = "#CC0000";
 const YELLOW_CENTER = "#FFDD44";
@@ -390,9 +390,9 @@ export default function ConnectFour({
                                 ? `radial-gradient(circle at 32% 28%, ${RED_CENTER}, 70%, ${RED_EDGE})`
                                 : `radial-gradient(circle at 32% 28%, ${YELLOW_CENTER}, 70%, ${YELLOW_EDGE})`,
                             boxShadow: isWinCell
-                              ? "0 0 16px rgba(0, 229, 199, 0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
+                              ? "0 0 16px rgba(255, 94, 0, 0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
                               : "inset -3px -3px 6px rgba(0,0,0,0.35), inset 3px 3px 6px rgba(255,255,255,0.25)",
-                            border: isWinCell ? "3px solid rgba(0, 229, 199, 0.9)" : undefined,
+                            border: isWinCell ? "3px solid rgba(255, 94, 0, 0.9)" : undefined,
                             ["--drop-from" as string]: `${dropFromY}px`,
                             animation: isDroppingHere ? "connect4Drop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
                           }}
@@ -415,7 +415,7 @@ export default function ConnectFour({
                   y1={3 + winResult.cells[0][0] * (cellSize + 3) + cellSize / 2}
                   x2={3 + winResult.cells[3][1] * (cellSize + 3) + cellSize / 2}
                   y2={3 + winResult.cells[3][0] * (cellSize + 3) + cellSize / 2}
-                  stroke="rgba(0, 229, 199, 0.95)"
+                  stroke="rgba(255, 94, 0, 0.95)"
                   strokeWidth="4"
                   strokeLinecap="round"
                 />

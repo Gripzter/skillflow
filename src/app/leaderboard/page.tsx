@@ -289,7 +289,7 @@ export default function LeaderboardPage() {
                 {visiblePlayers.map((player, i) => {
                   const rank = i + 4;
                   const rowBaseClasses = `border-b border-white/5 transition-colors ${
-                    rank % 2 === 0 ? "bg-[#151821]" : "bg-[#1A1D27]"
+                    rank % 2 === 0 ? "bg-card" : "bg-[#1A1A22]"
                   } ${player.isCurrentUser ? (isPractice ? "bg-purple-500/10" : "bg-teal/10") : ""}`;
 
                   if (isPractice) {

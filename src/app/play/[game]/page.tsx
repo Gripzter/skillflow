@@ -461,7 +461,7 @@ export default function PlayGamePage() {
             disabled={!effectivePractice && (insufficientBalance || stakeAmount < 1)}
             className={`pressable h-14 w-full rounded-lg text-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
               effectivePractice
-                ? "bg-gradient-to-r from-[#7C5CFC] to-purple-600 text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                ? "bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
                 : "bg-teal text-charcoal hover:shadow-teal-glow"
             }`}
           >

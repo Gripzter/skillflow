@@ -22,10 +22,10 @@ const ROUND_START_DELAY_MIN = 2000;
 const ROUND_START_DELAY_MAX = 5000;
 
 function reactionLabel(ms: number): { text: string; color: string } {
-  if (ms < 200) return { text: "INSANE! 🔥", color: "#EAB308" };
-  if (ms < 300) return { text: "Great!", color: "#00E5C7" };
+  if (ms < 200) return { text: "INSANE! 🔥", color: "#FACC15" };
+  if (ms < 300) return { text: "Great!", color: "#FF5E00" };
   if (ms < 400) return { text: "Good", color: "#22C55E" };
-  if (ms < 500) return { text: "OK", color: "#EAB308" };
+  if (ms < 500) return { text: "OK", color: "#FACC15" };
   return { text: "Slow", color: "#9ca3af" };
 }
 
@@ -66,7 +66,7 @@ export default function ReactionDuel({
   const [roundHistory, setRoundHistory] = useState<{ p1: Reaction; p2: Reaction; winner: "player1" | "player2" | "draw" }[]>([]);
   const [targetPos, setTargetPos] = useState<{ x: number; y: number } | null>(null);
   const [targetDiameter, setTargetDiameter] = useState(TARGET_BASE);
-  const [targetColor, setTargetColor] = useState("#00E5C7");
+  const [targetColor, setTargetColor] = useState("#FF5E00");
   const [p1Reaction, setP1Reaction] = useState<Reaction | null>(null);
   const [p2Reaction, setP2Reaction] = useState<Reaction | null>(null);
   const [opponentReactionForRound, setOpponentReactionForRound] = useState<{ round: number; reactionTime: number } | null>(null);
@@ -456,7 +456,7 @@ export default function ReactionDuel({
           ref={gameAreaRef}
           className="flex-1 min-h-[300px] mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
           style={{
-            backgroundColor: phase === "target" ? "#151821" : "#0D0F14",
+            backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
             minWidth: 0,
             minHeight: 400,
             touchAction: "manipulation",
@@ -476,7 +476,7 @@ export default function ReactionDuel({
                 <span
                   className="text-6xl font-black animate-fade-in"
                   style={{
-                    color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#EAB308" : "#00E5C7",
+                    color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
                   }}
                 >
                   {countdownN}

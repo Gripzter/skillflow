@@ -439,7 +439,7 @@ export default function PlaySpellingBeePage() {
             disabled={!isPractice && (insufficientBalance || stakeAmount < 1)}
             className={`pressable h-14 w-full rounded-lg text-lg font-bold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
               isPractice
-                ? "bg-gradient-to-r from-[#7C5CFC] to-purple-600 text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                ? "bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
                 : "bg-amber-500 text-charcoal hover:shadow-[0_0_24px_rgba(245,158,11,0.4)]"
             }`}
           >

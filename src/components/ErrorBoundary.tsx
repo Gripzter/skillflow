@@ -178,7 +178,7 @@ function ErrorScreen({
               padding: "12px 24px",
               borderRadius: "10px",
               border: "none",
-              background: "linear-gradient(135deg, #00E5C7, #00B4A0)",
+              background: "linear-gradient(135deg, #FF5E00, #FF7A2E)",
               color: "#0A0E17",
               fontSize: "14px",
               fontWeight: "700",

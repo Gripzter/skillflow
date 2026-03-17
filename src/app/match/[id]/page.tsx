@@ -795,7 +795,7 @@ function MatchPageContent() {
               {match.isPractice && (
                 <Link
                   href="/play"
-                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                  className="rounded-lg bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
                 >
                   Play for Real Money
                 </Link>
@@ -882,7 +882,7 @@ function MatchPageContent() {
               {match.isPractice && (
                 <Link
                   href="/play"
-                  className="rounded-lg bg-gradient-to-r from-[#7C5CFC] to-purple-600 px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(124,92,252,0.4)]"
+                  className="rounded-lg bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
                 >
                   Play for Real Money
                 </Link>

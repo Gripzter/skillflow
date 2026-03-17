@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --accent: #00E5C7;
-  --accent-light: rgba(0, 229, 199, 0.15);
-  --accent-glow: rgba(0, 229, 199, 0.3);
-  --accent-dark: #00B4A0;
+  --accent: #ff5e00;
+  --accent-light: rgba(255, 94, 0, 0.15);
+  --accent-glow: rgba(255, 94, 0, 0.3);
+  --accent-dark: #ff7a2e;
 }
 
 .practice-mode {
-  --accent: #8B5CF6;
-  --accent-light: rgba(139, 92, 246, 0.15);
-  --accent-glow: rgba(139, 92, 246, 0.3);
-  --accent-dark: #7C3AED;
+  --accent: #a855f7;
+  --accent-light: rgba(168, 85, 247, 0.15);
+  --accent-glow: rgba(168, 85, 247, 0.3);
+  --accent-dark: #c084fc;
 }
 
 html {

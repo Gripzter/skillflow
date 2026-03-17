@@ -346,14 +346,14 @@ export default function LastTouch({
     return (
       <div className="flex flex-col gap-6 pb-8">
         <div className="text-center">
-          <h1 className="bg-gradient-to-r from-teal via-[#00E5C7] to-purple-500 bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
+          <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
             LAST TOUCH
           </h1>
           <p className="mt-2 text-body-gray">Hold your ground. Win it all.</p>
           <div className="mt-4 inline-block animate-pulse text-4xl">👆</div>
         </div>
 
-        <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-teal/50 bg-card/90 p-6 shadow-[0_0_40px_rgba(0,229,199,0.15)]">
+        <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-teal/50 bg-card/90 p-6 shadow-[0_0_40px_rgba(255,94,0,0.15)]">
           <p className="text-center text-sm text-body-gray">Current Prize Pool</p>
           <p className="mt-2 text-center text-4xl font-bold text-white tabular-nums">
             $<AnimatedNumber value={state.prizePool} />
@@ -394,7 +394,7 @@ export default function LastTouch({
             <button
               type="button"
               onClick={handleJoin}
-              className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(0,229,199,0.4)] transition hover:opacity-95"
+              className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(255,94,0,0.4)] transition hover:opacity-95"
             >
               JOIN NOW — ${entryFee.toFixed(2)}
             </button>

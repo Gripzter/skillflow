@@ -279,18 +279,18 @@ export default function ProfilePage() {
       <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Section 1: Profile header */}
         <section
-          className="animate-fade-in overflow-hidden rounded-card border border-white/10 bg-gradient-to-br from-[#0D0F14] via-[#151821] to-[#0D0F14]"
+          className="animate-fade-in overflow-hidden rounded-card border border-white/10 bg-gradient-to-br from-[#0E0E12] via-[#1A1A22] to-[#0E0E12]"
           style={{
             backgroundImage: isPractice
-              ? "linear-gradient(135deg, rgba(139,92,246,0.05) 0%, transparent 50%, rgba(124,92,252,0.05) 100%)"
-              : "linear-gradient(135deg, rgba(0,229,199,0.04) 0%, transparent 50%, rgba(124,92,252,0.04) 100%)",
+              ? "linear-gradient(135deg, rgba(168,85,247,0.07) 0%, transparent 50%, rgba(192,132,252,0.06) 100%)"
+              : "linear-gradient(135deg, rgba(255,94,0,0.06) 0%, transparent 50%, rgba(255,122,46,0.05) 100%)",
           }}
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
               <div
                 className={`h-20 w-20 shrink-0 rounded-full bg-gradient-to-br p-0.5 ring-2 ring-white/10 ${
-                  isPractice ? "from-purple-500/50 to-fuchsia-500/40" : "from-teal/50 to-purple/50"
+                  isPractice ? "from-purple-500/50 to-fuchsia-500/40" : "from-teal/60 to-[rgba(255,122,46,0.8)]"
                 }`}
               >
                 <div className="flex h-full w-full items-center justify-center rounded-full bg-charcoal">
@@ -563,8 +563,8 @@ export default function ProfilePage() {
             <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full max-w-full" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient id="ratingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#00E5C7" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#00E5C7" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#FF5E00" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#FF5E00" stopOpacity="0" />
                 </linearGradient>
               </defs>
               {/* Grid */}
@@ -606,7 +606,7 @@ export default function ProfilePage() {
                     }
                     fill="url(#ratingGradient)"
                   />
-                  <polyline
+                    <polyline
                     points={ratingHistoryPoints
                       .map((p, i) => {
                         const x = pad.left + (p.x / Math.max(1, ratingHistoryPoints.length - 1)) * innerW;
@@ -615,7 +615,7 @@ export default function ProfilePage() {
                       })
                       .join(" ")}
                     fill="none"
-                    stroke="#00E5C7"
+                    stroke="#FF5E00"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -628,7 +628,7 @@ export default function ProfilePage() {
                   y1={pad.top + innerH / 2}
                   x2={chartW - pad.right}
                   y2={pad.top + innerH / 2}
-                  stroke="#00E5C7"
+                  stroke="#FF5E00"
                   strokeWidth="2"
                   strokeDasharray="4 4"
                 />

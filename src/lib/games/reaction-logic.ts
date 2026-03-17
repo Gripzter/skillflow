@@ -35,7 +35,7 @@ export function getTargetDiameter(base: number): number {
 
 /** Target colors per round (teal, green, blue, orange, pink) */
 export const TARGET_COLORS = [
-  "#00E5C7", // teal
+  "#FF5E00", // primary accent
   "#22C55E", // green
   "#3B82F6", // blue
   "#F97316", // orange
