@@ -296,9 +296,11 @@ export default function MemoryMatch({
   }, [selected, currentPlayer, resolveSelection]);
 
   useEffect(() => {
-    if (!isPlayer2Bot || currentPlayer !== 2 || gameOver || resolvingRef.current) {
+    if (!isPlayer2Bot || currentPlayer !== 2 || gameOver || isProcessing) {
       return;
     }
+    // eslint-disable-next-line no-console
+    console.log("BOT TURN STEP: start thinking", { currentPlayer, gameOver, isProcessing });
     setThinking(true);
 
     const snapshot = cards.map((c, index) => ({
@@ -319,10 +321,14 @@ export default function MemoryMatch({
     const secondDelay = getMemoryMatchBotDelayMs(botDecision.knowsPair, true);
 
     const t1 = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.log("BOT TURN STEP: flip first card", botDecision.firstIndex);
       flipCardAt(botDecision.firstIndex, 2);
     }, firstDelay);
 
     const t2 = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.log("BOT TURN STEP: flip second card", botDecision.secondIndex);
       flipCardAt(botDecision.secondIndex, 2);
       setThinking(false);
     }, firstDelay + secondDelay);
@@ -331,7 +337,7 @@ export default function MemoryMatch({
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [cards, currentPlayer, gameOver, isPlayer2Bot, flipCardAt]);
+  }, [cards, currentPlayer, gameOver, isPlayer2Bot, flipCardAt, isProcessing]);
 
   const handleCardClick = useCallback(
     (index: number) => {
