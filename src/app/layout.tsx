@@ -3,13 +3,11 @@ import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
 import { GeoProvider } from "@/contexts/GeoContext";
 import { PlayModeProvider } from "@/contexts/PlayModeContext";
-import { ThemeProvider } from "@/contexts/ThemeContext";
 import ConnectionMonitor from "@/components/ConnectionMonitor";
 import MobileTabBar from "@/components/MobileTabBar";
 import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import "./globals.css";
-import "@/styles/themes/sci-fi.css";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -63,20 +61,18 @@ if (typeof window !== 'undefined') {
         />
       </head>
       <body className="font-sans">
-        <ThemeProvider>
-          <GeoProvider>
-            <ConnectionMonitor />
-            <ToastProvider>
-              <PlayModeProvider>
-                <ErrorBoundary>
-                  <PracticeModeClassToggle />
-                  {children}
-                  <MobileTabBar />
-                </ErrorBoundary>
-              </PlayModeProvider>
-            </ToastProvider>
-          </GeoProvider>
-        </ThemeProvider>
+        <GeoProvider>
+          <ConnectionMonitor />
+          <ToastProvider>
+            <PlayModeProvider>
+              <ErrorBoundary>
+                <PracticeModeClassToggle />
+                {children}
+                <MobileTabBar />
+              </ErrorBoundary>
+            </PlayModeProvider>
+          </ToastProvider>
+        </GeoProvider>
       </body>
     </html>
   );

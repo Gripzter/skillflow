@@ -5,15 +5,29 @@ import AppNavbar from "@/components/AppNavbar";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { useTheme } from "@/contexts/ThemeContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
   const { isPractice } = usePlayMode();
-  const [user, setUser] = useState<{ user_metadata?: { username?: string } } | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernamePassword, setUsernamePassword] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [passwordCurrent, setPasswordCurrent] = useState("");
+  const [passwordNew, setPasswordNew] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -63,7 +77,166 @@ export default function SettingsPage() {
   }
 
   const username = user?.user_metadata?.username ?? "Player";
+  const email = user?.email ?? "Not set";
+  const dateOfBirth = user?.user_metadata?.date_of_birth ?? "Not set";
+  const avatarId = user?.user_metadata?.avatar_id ?? "avatar-1";
+  const lastUsernameChangeAt = user?.user_metadata?.last_username_change_at as string | undefined;
+  const lastChangeDate = lastUsernameChangeAt ? new Date(lastUsernameChangeAt) : null;
+  const now = new Date();
+  const canChangeUsername =
+    !lastChangeDate || (now.getTime() - lastChangeDate.getTime()) / (1000 * 60 * 60 * 24) >= 30;
+  const nextChangeDate = lastChangeDate
+    ? new Date(lastChangeDate.getTime() + 30 * 24 * 60 * 60 * 1000)
+    : null;
+  const nextChangeLabel = nextChangeDate?.toLocaleDateString();
   const isDevMode = typeof window !== "undefined" && localStorage.getItem("skillflow_dev_mode") === "true";
+
+  const AVATARS = [
+    "avatar-1",
+    "avatar-2",
+    "avatar-3",
+    "avatar-4",
+    "avatar-5",
+    "avatar-6",
+    "avatar-7",
+    "avatar-8",
+  ];
+
+  async function handleAvatarSelect(id: string) {
+    if (!user) return;
+    setAvatarSaving(true);
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const userId = user.id as string;
+      await supabase.from("profiles").update({ avatar_id: id }).eq("id", userId);
+      await supabase.auth.updateUser({
+        data: {
+          ...(user.user_metadata ?? {}),
+          avatar_id: id,
+        },
+      });
+      setUser((prev: any) =>
+        prev ? { ...prev, user_metadata: { ...(prev.user_metadata ?? {}), avatar_id: id } } : prev,
+      );
+    } finally {
+      setAvatarSaving(false);
+    }
+  }
+
+  async function handleSaveUsername() {
+    if (!user || !canChangeUsername || !usernameInput.trim() || !usernamePassword) return;
+    setUsernameSaving(true);
+    setUsernameError(null);
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const emailAddr = user.email as string | undefined;
+      if (!emailAddr) {
+        setUsernameError("Missing email on account.");
+        return;
+      }
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: emailAddr,
+        password: usernamePassword,
+      });
+      if (signInRes.error) {
+        setUsernameError("Incorrect password.");
+        return;
+      }
+      const userId = user.id as string;
+      const nowIso = new Date().toISOString();
+      await supabase.from("profiles").update({ username: usernameInput.trim() }).eq("id", userId);
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          ...(user.user_metadata ?? {}),
+          username: usernameInput.trim(),
+          last_username_change_at: nowIso,
+        },
+      });
+      if (error) {
+        setUsernameError(error.message ?? "Failed to update username.");
+        return;
+      }
+      if (data?.user) {
+        setUser(data.user);
+      }
+      setShowUsernameModal(false);
+      setUsernamePassword("");
+    } catch (err: any) {
+      setUsernameError(err?.message ?? "Failed to update username.");
+    } finally {
+      setUsernameSaving(false);
+    }
+  }
+
+  async function handleSavePassword() {
+    if (!user || !passwordCurrent || !passwordNew || passwordNew !== passwordConfirm) return;
+    setPasswordSaving(true);
+    setPasswordError(null);
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const emailAddr = user.email as string | undefined;
+      if (!emailAddr) {
+        setPasswordError("Missing email on account.");
+        return;
+      }
+      const signInRes = await supabase.auth.signInWithPassword({
+        email: emailAddr,
+        password: passwordCurrent,
+      });
+      if (signInRes.error) {
+        setPasswordError("Current password is incorrect.");
+        return;
+      }
+      const { error } = await supabase.auth.updateUser({
+        password: passwordNew,
+      });
+      if (error) {
+        setPasswordError(error.message ?? "Failed to update password.");
+        return;
+      }
+      setShowPasswordModal(false);
+      setPasswordCurrent("");
+      setPasswordNew("");
+      setPasswordConfirm("");
+    } catch (err: any) {
+      setPasswordError(err?.message ?? "Failed to update password.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
+  async function handleLogout() {
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!user) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const userId = user.id as string;
+      await supabase.from("profiles").delete().eq("id", userId);
+      await supabase.auth.signOut();
+      if (typeof window !== "undefined") {
+        window.location.href = "/";
+      }
+    } catch (err: any) {
+      setDeleteError(err?.message ?? "Failed to delete account.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-charcoal">
@@ -78,158 +251,157 @@ export default function SettingsPage() {
       <main className="settings-page-default mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-bold text-white">Settings</h1>
 
-        {/* Referrals */}
+        {/* 1. Profile */}
         <section className="mt-8">
-          <h2 className="text-lg font-semibold text-white">Referrals</h2>
-          <p className="mt-1 text-sm text-body-gray">Invite friends and earn $5 for each one who deposits.</p>
-          <Link
-            href="/referrals"
-            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors ${
-              isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
-            }`}
-          >
-            Referrals
-          </Link>
+          <h2 className="text-lg font-semibold text-white">Profile</h2>
+          <p className="mt-1 text-sm text-body-gray">Basic account information and avatar.</p>
+          <div className="mt-4 grid gap-6 md:grid-cols-[2fr,1.5fr]">
+            <div className="rounded-xl border border-steel-blue bg-card p-5">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-body-gray">Username</p>
+                <p className="mt-1 text-sm text-white">{username}</p>
+              </div>
+              <div className="mt-4">
+                <p className="text-xs uppercase tracking-wide text-body-gray">Email</p>
+                <p className="mt-1 text-sm text-white break-all">{email}</p>
+              </div>
+              <div className="mt-4">
+                <p className="text-xs uppercase tracking-wide text-body-gray">Date of birth</p>
+                <p className="mt-1 text-sm text-white">{dateOfBirth}</p>
+              </div>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUsernameModal(true);
+                    setUsernameInput(username);
+                  }}
+                  disabled={!canChangeUsername}
+                  className="rounded-lg border border-steel-blue px-4 py-2 text-sm font-medium text-white hover:bg-steel-blue/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Change username
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(true)}
+                  className="rounded-lg border border-steel-blue px-4 py-2 text-sm font-medium text-white hover:bg-steel-blue/20"
+                >
+                  Change password
+                </button>
+              </div>
+              {!canChangeUsername && nextChangeLabel && (
+                <p className="mt-3 text-xs text-body-gray">
+                  You can change your username again on{" "}
+                  <span className="text-primary-text">{nextChangeLabel}</span>.
+                </p>
+              )}
+            </div>
+            <div className="rounded-xl border border-steel-blue bg-card p-5">
+              <p className="text-sm font-semibold text-white">Avatar</p>
+              <p className="mt-1 text-xs text-body-gray">
+                Choose a preset avatar. This will show in the nav bar and in-game.
+              </p>
+              <div className="mt-4 grid grid-cols-4 gap-3">
+                {AVATARS.map((id) => {
+                  const selected = id === avatarId;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => handleAvatarSelect(id)}
+                      className={`flex h-14 w-14 items-center justify-center rounded-full border text-sm font-semibold transition-all ${
+                        selected
+                          ? "border-teal bg-teal text-charcoal"
+                          : "border-steel-blue bg-charcoal text-primary-text hover:border-steel-blue-bright"
+                      }`}
+                      disabled={avatarSaving && !selected}
+                      aria-pressed={selected}
+                    >
+                      {id.replace("avatar-", "").toUpperCase()}
+                    </button>
+                  );
+                })}
+              </div>
+              {avatarSaving && (
+                <p className="mt-3 text-xs text-body-gray">Saving avatar…</p>
+              )}
+            </div>
+          </div>
         </section>
 
-        {/* Responsible Gaming */}
-        <section className="mt-8">
+        {/* 2. Responsible Gaming (unchanged) */}
+        <section className="mt-10">
           <h2 className="text-lg font-semibold text-white">Responsible Gaming</h2>
           <p className="mt-1 text-sm text-body-gray">Set deposit limits, cool-off periods, and self-exclusion.</p>
           <Link
             href="/settings/responsible-gaming"
-            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-card px-5 py-3 text-white transition-colors ${
-              isPractice ? "hover:border-purple-500/40 hover:bg-purple-500/5" : "hover:border-teal/40 hover:bg-teal/5"
+            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-steel-blue bg-card px-5 py-3 text-white transition-colors ${
+              isPractice
+                ? "hover:border-purple-500/40 hover:bg-purple-500/5"
+                : "hover:border-steel-blue-bright hover:bg-steel-blue/10"
             }`}
           >
             Gaming Limits
           </Link>
         </section>
 
-        {/* Theme */}
+        {/* 3. Referrals (unchanged) */}
         <section className="mt-8">
-          <h2 className="text-lg font-semibold text-white">App Theme</h2>
-          <p className="mt-1 text-sm text-body-gray">Customize the look and feel of SkillFlow</p>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => setTheme("default")}
-              className={`group relative flex flex-col rounded-xl border-2 p-5 text-left transition-all ${
-                theme === "default"
-                  ? isPractice
-                    ? "border-purple-500 bg-purple-500/5 shadow-[0_0_20px_rgba(139,92,246,0.18)]"
-                    : "border-steel-blue bg-steel-blue/10 shadow-[0_0_20px_rgba(42,58,92,0.5)]"
-                  : "border-white/10 bg-card hover:border-white/20"
-              }`}
-            >
-              {theme === "default" && (
-                <span className={`absolute right-3 top-3 ${isPractice ? "text-purple-400" : "text-teal"}`} aria-hidden>
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              )}
-              <div className="mb-4 h-16 w-full overflow-hidden rounded-lg bg-charcoal p-2">
-                <div className="flex gap-1">
-                  <div className="h-2 flex-1 rounded bg-white/10" />
-                  <div className={`h-2 w-8 rounded ${isPractice ? "bg-purple-500/60" : "bg-teal/60"}`} />
-                  <div className="h-2 w-6 rounded bg-purple/50" />
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <div className="h-6 flex-1 rounded bg-white/5" />
-                  <div className={`h-6 w-12 rounded border ${isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10"}`} />
-                </div>
-              </div>
-              <span className="font-semibold text-white">Default</span>
-              <span className="mt-0.5 text-sm text-body-gray">Clean and modern</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setTheme("sci-fi")}
-              className={`group relative flex flex-col rounded-xl border-2 p-5 text-left transition-all ${
-                theme === "sci-fi"
-                  ? "border-[#00F0FF] bg-[#00F0FF]/5 shadow-[0_0_20px_rgba(0,240,255,0.2)]"
-                  : "border-white/10 bg-card hover:border-white/20"
-              }`}
-            >
-              <span className="absolute right-3 top-3 rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
-                NEW
-              </span>
-              {theme === "sci-fi" && (
-                <span className="absolute right-3 top-10 text-[#00F0FF]" aria-hidden>
-                  <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </span>
-              )}
-              <div className="mb-4 h-16 w-full overflow-hidden rounded-lg bg-[#050510] p-2">
-                <div className="flex gap-1">
-                  <div className="h-2 flex-1 rounded bg-white/10" />
-                  <div className="h-2 w-8 rounded bg-[#00F0FF]/60 shadow-[0_0_6px_rgba(0,240,255,0.5)]" />
-                  <div className="h-2 w-6 rounded bg-[#FF00E5]/50" />
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <div className="h-6 flex-1 rounded bg-white/5" />
-                  <div className="h-6 w-12 rounded border border-[#00F0FF]/30 bg-[#00F0FF]/10" />
-                </div>
-              </div>
-              <span className="font-semibold text-white">Sci-Fi</span>
-              <span className="mt-0.5 text-sm text-body-gray">Futuristic holographic HUD</span>
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold text-white">Referrals</h2>
+          <p className="mt-1 text-sm text-body-gray">Invite friends and earn $5 for each one who deposits.</p>
+          <Link
+            href="/referrals"
+            className={`mt-4 inline-flex items-center gap-2 rounded-xl border border-steel-blue bg-card px-5 py-3 text-white transition-colors ${
+              isPractice
+                ? "hover:border-purple-500/40 hover:bg-purple-500/5"
+                : "hover:border-steel-blue-bright hover:bg-steel-blue/10"
+            }`}
+          >
+            Referrals
+          </Link>
         </section>
 
-        {/* Notifications (placeholder) */}
+        {/* 4. Notifications (coming soon) */}
         <section className="mt-10">
-          <h2 className="text-lg font-semibold text-white">Notifications</h2>
-          <p className="mt-1 text-sm text-body-gray">Manage how we notify you (coming soon)</p>
-          <div className="mt-4 space-y-4 rounded-xl border border-white/10 bg-card p-4">
-            {[
-              { label: "Match updates", on: true },
-              { label: "Friend activity", on: true },
-              { label: "Promotions", on: false },
-              { label: "Reminders", on: false },
-            ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between">
-                <span className="text-white">{item.label}</span>
-                <span className="inline-flex h-6 w-11 shrink-0 rounded-full bg-white/10 transition-colors">
-                  <span
-                    className={`inline-block h-5 w-5 translate-y-0.5 translate-x-0.5 rounded-full bg-white shadow ${
-                      item.on ? `translate-x-5 ${isPractice ? "bg-purple-500" : "bg-teal"}` : ""
-                    }`}
-                  />
+          <h2 className="text-lg font-semibold text-white">
+            Notifications <span className="ml-2 text-xs font-normal text-body-gray">(coming soon)</span>
+          </h2>
+          <p className="mt-1 text-sm text-body-gray">
+            Manage how we notify you about matches and account activity.
+          </p>
+          <div className="mt-4 space-y-4 rounded-xl border border-steel-blue bg-card p-4 opacity-60 pointer-events-none">
+            {["Match updates", "Friend activity", "Promotions", "Reminders"].map((label) => (
+              <div key={label} className="flex items-center justify-between">
+                <span className="text-white">{label}</span>
+                <span className="inline-flex h-6 w-11 shrink-0 rounded-full bg-white/10">
+                  <span className="inline-block h-5 w-5 translate-y-0.5 translate-x-0.5 rounded-full bg-white/40" />
                 </span>
               </div>
             ))}
           </div>
         </section>
 
-        {/* Account (placeholder) */}
+        {/* 5. Danger Zone */}
         <section className="mt-10">
-          <h2 className="text-lg font-semibold text-white">Account</h2>
-          <p className="mt-1 text-sm text-body-gray">Security and account options (coming soon)</p>
-          <div className="mt-4 space-y-3">
+          <h2 className="text-lg font-semibold text-white">Danger Zone</h2>
+          <p className="mt-1 text-sm text-body-gray">Manage account termination and sign-out.</p>
+          <div className="mt-4 space-y-3 rounded-xl border border-red-500/40 bg-card/60 p-4">
             <button
               type="button"
-              disabled
-              className="w-full rounded-lg border border-white/10 bg-card px-4 py-3 text-left text-body-gray opacity-70"
-            >
-              Change username
-            </button>
-            <button
-              type="button"
-              disabled
-              className="w-full rounded-lg border border-white/10 bg-card px-4 py-3 text-left text-body-gray opacity-70"
-            >
-              Change password
-            </button>
-            <button
-              type="button"
-              disabled
-              className="w-full rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-left text-red-400 opacity-70"
+              onClick={() => {
+                setShowDeleteModal(true);
+                setDeleteConfirmText("");
+              }}
+              className="w-full rounded-lg border border-red-500/60 px-4 py-3 text-left text-sm font-medium text-red-400 hover:bg-red-500/10"
             >
               Delete account
+            </button>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full rounded-lg border border-steel-blue px-4 py-3 text-left text-sm font-medium text-white hover:bg-steel-blue/10"
+            >
+              Log out
             </button>
           </div>
         </section>
@@ -243,6 +415,182 @@ export default function SettingsPage() {
           </Link>
         </div>
       </main>
+      {/* Change username modal */}
+      {showUsernameModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-xl border border-steel-blue bg-[#242430] p-6">
+            <h2 className="text-lg font-semibold text-white">Change username</h2>
+            <p className="mt-1 text-sm text-body-gray">
+              You can change your username once every 30 days.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-body-gray">New username</label>
+                <input
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-body-gray">Current password</label>
+                <input
+                  type="password"
+                  value={usernamePassword}
+                  onChange={(e) => setUsernamePassword(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-teal"
+                />
+              </div>
+              {usernameError && (
+                <p className="text-xs text-red-400">{usernameError}</p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUsernameModal(false);
+                  setUsernameError(null);
+                  setUsernamePassword("");
+                }}
+                className="rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  usernameSaving ||
+                  !canChangeUsername ||
+                  !usernameInput.trim() ||
+                  !usernamePassword
+                }
+                onClick={handleSaveUsername}
+                className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {usernameSaving ? "Saving..." : "Save username"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change password modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-xl border border-steel-blue bg-[#242430] p-6">
+            <h2 className="text-lg font-semibold text-white">Change password</h2>
+            <p className="mt-1 text-sm text-body-gray">
+              Enter your current password and a new password.
+            </p>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="text-xs font-medium text-body-gray">Current password</label>
+                <input
+                  type="password"
+                  value={passwordCurrent}
+                  onChange={(e) => setPasswordCurrent(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-body-gray">New password</label>
+                <input
+                  type="password"
+                  value={passwordNew}
+                  onChange={(e) => setPasswordNew(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-teal"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-body-gray">Confirm new password</label>
+                <input
+                  type="password"
+                  value={passwordConfirm}
+                  onChange={(e) => setPasswordConfirm(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-teal"
+                />
+              </div>
+              {passwordError && (
+                <p className="text-xs text-red-400">{passwordError}</p>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordModal(false);
+                  setPasswordError(null);
+                  setPasswordCurrent("");
+                  setPasswordNew("");
+                  setPasswordConfirm("");
+                }}
+                className="rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  passwordSaving ||
+                  !passwordCurrent ||
+                  !passwordNew ||
+                  passwordNew !== passwordConfirm
+                }
+                onClick={handleSavePassword}
+                className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {passwordSaving ? "Saving..." : "Save password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete account modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-md rounded-xl border border-steel-blue bg-[#242430] p-6">
+            <h2 className="text-lg font-semibold text-white">Delete account</h2>
+            <p className="mt-1 text-sm text-body-gray">
+              This will permanently delete your account, game history, and any remaining balance. This action
+              cannot be undone.
+            </p>
+            <p className="mt-3 text-xs text-body-gray">
+              Type <span className="font-mono text-red-400">DELETE</span> to confirm.
+            </p>
+            <input
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-steel-blue bg-card px-3 py-2 text-sm text-white outline-none focus:border-red-500"
+            />
+            {deleteError && (
+              <p className="mt-2 text-xs text-red-400">{deleteError}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteError(null);
+                  setDeleteConfirmText("");
+                }}
+                className="rounded-lg border border-white/20 px-4 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteLoading || deleteConfirmText !== "DELETE"}
+                onClick={handleConfirmDelete}
+                className="rounded-lg border border-red-500 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleteLoading ? "Deleting..." : "Delete account"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
