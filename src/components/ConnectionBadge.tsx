@@ -172,7 +172,7 @@ export default function ConnectionBadge() {
           title={tooltipText}
         >
           <svg
-            className="h-5 w-5"
+            className="h-8 w-8"
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden
@@ -181,28 +181,28 @@ export default function ConnectionBadge() {
             <path
               d="M4.5 9.5C8.2 6.3 15.8 6.3 19.5 9.5"
               stroke={arc3On ? wifiColor : "#2A2A38"}
-              strokeWidth={1.7}
+              strokeWidth={3}
               strokeLinecap="round"
             />
             {/* middle arc */}
             <path
               d="M7 12c3-2.5 7-2.5 10 0"
               stroke={arc2On ? wifiColor : "#2A2A38"}
-              strokeWidth={1.7}
+              strokeWidth={3}
               strokeLinecap="round"
             />
             {/* inner arc */}
             <path
               d="M9.5 14.5c1.5-1.3 3.5-1.3 5 0"
               stroke={arc1On ? wifiColor : "#2A2A38"}
-              strokeWidth={1.7}
+              strokeWidth={3}
               strokeLinecap="round"
             />
             {/* dot */}
             <circle
               cx="12"
               cy="18"
-              r="1.4"
+              r="2.1"
               fill={dotOn ? wifiColor : "#2A2A38"}
             />
           </svg>
