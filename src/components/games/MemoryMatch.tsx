@@ -262,7 +262,7 @@ export default function MemoryMatch({
           setSelected([]);
           setStreak((prev) => ({ ...prev, [player]: 0 }));
           const nextPlayer: MemoryMatchPlayer = player === 1 ? 2 : 1;
-          setCurrentPlayer(nextPlayer);
+          setCurrentPlayer(() => nextPlayer);
           // eslint-disable-next-line no-console
           console.log("Turn passing to:", nextPlayer);
           setTurnMessage(
@@ -273,6 +273,8 @@ export default function MemoryMatch({
           resolvingRef.current = false;
           processingRef.current = false;
           setIsProcessing(false);
+          // eslint-disable-next-line no-console
+          console.log("ALL FLAGS RESET - player should be able to click now");
         }, 1200);
       }
     },
@@ -341,14 +343,21 @@ export default function MemoryMatch({
 
   const handleCardClick = useCallback(
     (index: number) => {
-      if (gameOver || currentPlayer !== 1 || resolvingRef.current || thinking || isProcessing) {
+      // Single source of truth for interactivity on human side:
+      // - must be player's turn
+      // - game not over
+      // - cannot pick more than 2 cards
+      if (gameOver || currentPlayer !== 1) {
+        return;
+      }
+      if (selected.length >= 2) {
         return;
       }
       const card = cards[index];
       if (!card || card.state !== "hidden") return;
       flipCardAt(index, 1);
     },
-    [cards, currentPlayer, gameOver, flipCardAt, isProcessing, thinking]
+    [cards, currentPlayer, gameOver, flipCardAt, selected.length]
   );
 
   const formatScoreLabel = (name: string, score: number) => `${name}: ${score}`;
