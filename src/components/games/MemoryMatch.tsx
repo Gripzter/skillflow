@@ -57,6 +57,7 @@ export default function MemoryMatch({
   const [thinking, setThinking] = useState(false);
   const [cardSize, setCardSize] = useState(60);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
 
   const boardRef = useRef<HTMLDivElement | null>(null);
   const resolvingRef = useRef(false);
@@ -235,6 +236,8 @@ export default function MemoryMatch({
               else onGameEnd("player2");
             } else {
               setCurrentPlayer(player);
+              // eslint-disable-next-line no-console
+              console.log("Turn staying with:", player);
             }
           }, 400);
         }, 260);
@@ -260,6 +263,8 @@ export default function MemoryMatch({
           setStreak((prev) => ({ ...prev, [player]: 0 }));
           const nextPlayer: MemoryMatchPlayer = player === 1 ? 2 : 1;
           setCurrentPlayer(nextPlayer);
+          // eslint-disable-next-line no-console
+          console.log("Turn passing to:", nextPlayer);
           setTurnMessage(
             nextPlayer === 1
               ? "YOUR TURN — Find a pair!"
@@ -524,13 +529,14 @@ export default function MemoryMatch({
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 lg:w-[320px] lg:flex-shrink-0 min-h-0 h-full">
+      {/* Desktop game log */}
+      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 lg:flex lg:w-[320px] lg:flex-shrink-0 min-h-0 h-full">
         <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">
           Game Log
         </h3>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col-reverse">
           {moves.length === 0 ? (
-            <p className="text-center text-sm text-body-gray py-4">
+            <p className="py-4 text-center text-sm text-body-gray">
               Flip two cards to start!
             </p>
           ) : (
@@ -578,6 +584,138 @@ export default function MemoryMatch({
           )}
         </div>
       </div>
+
+      {/* Mobile game log (collapsed/expandable) */}
+      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 lg:hidden">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between text-sm font-semibold text-white"
+          onClick={() => setLogOpen((v) => !v)}
+        >
+          <span>Game Log</span>
+          <span className="text-xs text-body-gray">
+            {logOpen ? "Close" : `${moves.length || 0} entries`}
+          </span>
+        </button>
+        {!logOpen && (
+          <div className="mt-2 max-h-[72px] overflow-hidden">
+            {moves.length === 0 ? (
+              <p className="py-2 text-center text-xs text-body-gray">
+                Flip two cards to start!
+              </p>
+            ) : (
+              moves.slice(0, 2).map((entry) => {
+                const isP1 = entry.player === 1;
+                const isP2 = entry.player === 2;
+                return (
+                  <div
+                    key={entry.id}
+                    className="mb-2 flex max-w-full shrink-0"
+                    style={{
+                      marginLeft: isP1 ? "auto" : 0,
+                      marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
+                    }}
+                  >
+                    <div
+                      className="rounded-xl px-3.5 py-2.5"
+                      style={{
+                        backgroundColor: isP1
+                          ? "rgba(0,229,199,0.25)"
+                          : isP2
+                            ? "rgba(168,85,247,0.25)"
+                            : "rgba(148,163,184,0.16)",
+                        borderLeft: isP1
+                          ? "3px solid rgba(0,229,199,0.6)"
+                          : isP2
+                            ? "3px solid rgba(168,85,247,0.7)"
+                            : "3px solid rgba(148,163,184,0.6)",
+                      }}
+                    >
+                      <p className="text-[11px] font-bold text-white">
+                        {isP1
+                          ? player1.username
+                          : isP2
+                            ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
+                            : "Game"}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-white/90">
+                        {entry.message}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {logOpen && (
+        <div className="fixed inset-x-0 bottom-0 z-40 max-h-[60vh] rounded-t-2xl border border-white/10 bg-card/95 pb-4 lg:hidden">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+            <h3 className="text-sm font-semibold text-white">Game Log</h3>
+            <button
+              type="button"
+              onClick={() => setLogOpen(false)}
+              className="rounded p-1 text-body-gray hover:bg-white/10 hover:text-white"
+              aria-label="Close game log"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="max-h-[50vh] overflow-y-auto px-4 pt-3 pb-1 flex flex-col-reverse">
+            {moves.length === 0 ? (
+              <p className="py-2 text-center text-sm text-body-gray">
+                Flip two cards to start!
+              </p>
+            ) : (
+              moves.map((entry) => {
+                const isP1 = entry.player === 1;
+                const isP2 = entry.player === 2;
+                return (
+                  <div
+                    key={entry.id}
+                    className="mb-2 flex max-w-[80%] shrink-0"
+                    style={{
+                      marginLeft: isP1 ? "auto" : 0,
+                      marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
+                    }}
+                  >
+                    <div
+                      className="rounded-xl px-3.5 py-2.5"
+                      style={{
+                        backgroundColor: isP1
+                          ? "rgba(0,229,199,0.25)"
+                          : isP2
+                            ? "rgba(168,85,247,0.25)"
+                            : "rgba(148,163,184,0.16)",
+                        borderLeft: isP1
+                          ? "3px solid rgba(0,229,199,0.6)"
+                          : isP2
+                            ? "3px solid rgba(168,85,247,0.7)"
+                            : "3px solid rgba(148,163,184,0.6)",
+                      }}
+                    >
+                      <p className="text-xs font-bold text-white">
+                        {isP1
+                          ? player1.username
+                          : isP2
+                            ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
+                            : "Game"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-white/90">
+                        {entry.message}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
 
       <style
         dangerouslySetInnerHTML={{
