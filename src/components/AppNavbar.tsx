@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getWalletBalance } from "@/lib/api";
+import { getWalletBalance, getMyProfile } from "@/lib/api";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 
@@ -31,6 +31,7 @@ export default function AppNavbar({
 }: AppNavbarProps) {
   const { isPractice } = usePlayMode();
   const [balance, setBalance] = useState(0);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +45,21 @@ export default function AppNavbar({
     return () => {
       cancelled = true;
       window.removeEventListener(WALLET_UPDATED_EVENT, handleUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAvatar() {
+      const profile = await getMyProfile();
+      if (!cancelled && profile && "avatar_url" in profile) {
+        const url = (profile as any).avatar_url as string | null;
+        if (url) setAvatarUrl(url);
+      }
+    }
+    loadAvatar();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -153,6 +169,14 @@ export default function AppNavbar({
             href="/profile"
             className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-body-gray transition-colors hover:bg-white/5 hover:text-white sm:flex"
           >
+            {avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                className="h-6 w-6 rounded-full object-cover"
+              />
+            )}
             <span className="text-sm font-medium">{username}</span>
             {isDevMode && (
               <span className="rounded bg-purple/20 px-1.5 py-0.5 text-xs font-medium text-purple">
@@ -179,9 +203,18 @@ export default function AppNavbar({
             }`}
             aria-label="Profile"
           >
-            <span className="text-sm font-bold text-white">
-              {username.charAt(0).toUpperCase()}
-            </span>
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                className="h-full w-full rounded-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-bold text-white">
+                {username.charAt(0).toUpperCase()}
+              </span>
+            )}
           </Link>
 
           <button

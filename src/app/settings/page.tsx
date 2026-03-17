@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { usePlayMode } from "@/contexts/PlayModeContext";
+import { useToast } from "@/components/Toast";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { isPractice } = usePlayMode();
+  const { showToast } = useToast();
   const [user, setUser] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
@@ -25,6 +27,7 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -79,7 +82,7 @@ export default function SettingsPage() {
   const username = user?.user_metadata?.username ?? "Player";
   const email = user?.email ?? "Not set";
   const dateOfBirth = user?.user_metadata?.date_of_birth ?? "Not set";
-  const avatarId = user?.user_metadata?.avatar_id ?? "avatar-1";
+  const avatarUrl: string | undefined = user?.user_metadata?.avatar_url;
   const lastUsernameChangeAt = user?.user_metadata?.last_username_change_at as string | undefined;
   const lastChangeDate = lastUsernameChangeAt ? new Date(lastUsernameChangeAt) : null;
   const now = new Date();
@@ -91,36 +94,69 @@ export default function SettingsPage() {
   const nextChangeLabel = nextChangeDate?.toLocaleDateString();
   const isDevMode = typeof window !== "undefined" && localStorage.getItem("skillflow_dev_mode") === "true";
 
-  const AVATARS = [
-    "avatar-1",
-    "avatar-2",
-    "avatar-3",
-    "avatar-4",
-    "avatar-5",
-    "avatar-6",
-    "avatar-7",
-    "avatar-8",
-  ];
+  const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
 
-  async function handleAvatarSelect(id: string) {
-    if (!user) return;
+  async function handleAvatarFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      showToast("Image must be under 2MB", "error");
+      e.target.value = "";
+      return;
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const allowedExt = ["png", "jpg", "jpeg", "webp"];
+    if (!allowedExt.includes(ext)) {
+      showToast("Unsupported image format. Use PNG, JPG, JPEG, or WEBP.", "error");
+      e.target.value = "";
+      return;
+    }
+
     setAvatarSaving(true);
     try {
       const supabase = createClient();
       if (!supabase) return;
+
       const userId = user.id as string;
-      await supabase.from("profiles").update({ avatar_id: id }).eq("id", userId);
-      await supabase.auth.updateUser({
+      const path = `${userId}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        showToast("Failed to upload avatar. Please try again.", "error");
+        return;
+      }
+
+      const { data: publicData } = supabase.storage.from("avatars").getPublicUrl(path);
+      const publicUrl = publicData?.publicUrl;
+      if (!publicUrl) {
+        showToast("Failed to get avatar URL.", "error");
+        return;
+      }
+
+      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId);
+      const { data, error } = await supabase.auth.updateUser({
         data: {
           ...(user.user_metadata ?? {}),
-          avatar_id: id,
+          avatar_url: publicUrl,
         },
       });
-      setUser((prev: any) =>
-        prev ? { ...prev, user_metadata: { ...(prev.user_metadata ?? {}), avatar_id: id } } : prev,
-      );
+      if (error) {
+        showToast("Avatar saved, but profile update failed.", "error");
+      }
+      if (data?.user) {
+        setUser(data.user);
+      }
+      showToast("Avatar updated.", "success");
+    } catch {
+      showToast("Failed to upload avatar. Please try again.", "error");
     } finally {
       setAvatarSaving(false);
+      if (e.target) e.target.value = "";
     }
   }
 
@@ -299,32 +335,59 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-steel-blue bg-card p-5">
               <p className="text-sm font-semibold text-white">Avatar</p>
               <p className="mt-1 text-xs text-body-gray">
-                Choose a preset avatar. This will show in the nav bar and in-game.
+                Upload an image to use as your avatar. This will show in the nav bar and in-game.
               </p>
-              <div className="mt-4 grid grid-cols-4 gap-3">
-                {AVATARS.map((id) => {
-                  const selected = id === avatarId;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => handleAvatarSelect(id)}
-                      className={`flex h-14 w-14 items-center justify-center rounded-full border text-sm font-semibold transition-all ${
-                        selected
-                          ? "border-teal bg-teal text-charcoal"
-                          : "border-steel-blue bg-charcoal text-primary-text hover:border-steel-blue-bright"
-                      }`}
-                      disabled={avatarSaving && !selected}
-                      aria-pressed={selected}
+              <div className="mt-4 flex items-center gap-4">
+                <div className="h-16 w-16 shrink-0 rounded-full bg-charcoal ring-2 ring-white/10 overflow-hidden flex items-center justify-center">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarUrl}
+                      alt="Avatar"
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    <svg
+                      className="h-10 w-10 text-body-gray"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
                     >
-                      {id.replace("avatar-", "").toUpperCase()}
-                    </button>
-                  );
-                })}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6.5 20a5.5 5.5 0 0 1 11 0"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center justify-center rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal hover:opacity-90 disabled:opacity-60"
+                    disabled={avatarSaving}
+                  >
+                    {avatarSaving ? "Uploading..." : "Upload Avatar"}
+                  </button>
+                  <p className="text-[11px] text-body-gray">
+                    Max size 2MB. PNG, JPG, JPEG, or WEBP.
+                  </p>
+                </div>
               </div>
-              {avatarSaving && (
-                <p className="mt-3 text-xs text-body-gray">Saving avatar…</p>
-              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/*"
+                className="hidden"
+                onChange={handleAvatarFileChange}
+              />
             </div>
           </div>
         </section>

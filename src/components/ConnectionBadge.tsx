@@ -14,10 +14,10 @@ const RATING_STYLES: Record<
   ConnectionRating,
   { bg: string; text: string; label: string; icon: string }
 > = {
-  good: { bg: "#22C55E", text: "white", label: "● GOOD", icon: "●" },
-  medium: { bg: "#EAB308", text: "#171717", label: "● MEDIUM", icon: "●" },
-  warning: { bg: "#F97316", text: "white", label: "! WARNING", icon: "!" },
-  unrecommended: { bg: "#EF4444", text: "white", label: "× BAD", icon: "×" },
+  good: { bg: "#22C55E", text: "white", label: "GOOD", icon: "" },
+  medium: { bg: "#EAB308", text: "#171717", label: "MEDIUM", icon: "" },
+  warning: { bg: "#F97316", text: "white", label: "WARNING", icon: "" },
+  unrecommended: { bg: "#EF4444", text: "white", label: "BAD", icon: "" },
 };
 
 function getPingColor(ping: number): string {
@@ -80,9 +80,15 @@ export default function ConnectionBadge() {
   const [showModal, setShowModal] = useState(false);
   const [fullTestRunning, setFullTestRunning] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [grace, setGrace] = useState(true);
 
   useEffect(() => {
     return subscribeConnectionMetrics(setMetrics);
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setGrace(false), 5000);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -118,6 +124,37 @@ export default function ConnectionBadge() {
         ? "Your connection may cause issues during competitive matches. We strongly recommend improving your connection before wagering."
         : "";
 
+  const effectiveRating: ConnectionRating = grace ? "good" : metrics.overallRating;
+  const effectivePing = Math.round(metrics.pingAvg || metrics.ping);
+
+  let level = 4;
+  if (!grace) {
+    if (effectiveRating === "good") level = 4;
+    else if (effectiveRating === "medium") level = 3;
+    else if (effectiveRating === "warning") level = 2;
+    else level = 1;
+  }
+
+  const dotOn = level >= 1;
+  const arc1On = level >= 2;
+  const arc2On = level >= 3;
+  const arc3On = level >= 4;
+
+  let wifiColor = "#22C55E";
+  let levelLabel = "Strong connection";
+  if (level === 3) {
+    wifiColor = "#FACC15";
+    levelLabel = "Fair connection";
+  } else if (level === 2) {
+    wifiColor = "#EF4444";
+    levelLabel = "Weak connection";
+  } else if (level === 1) {
+    wifiColor = "#EF4444";
+    levelLabel = "Poor connection";
+  }
+
+  const tooltipText = `${levelLabel} · ${effectivePing}ms`;
+
   return (
     <>
       <div
@@ -129,15 +166,46 @@ export default function ConnectionBadge() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold transition-opacity hover:opacity-90"
-          style={{ backgroundColor: ratingStyle.bg, color: ratingStyle.text }}
+          className="flex items-center justify-center rounded-full p-1.5 text-[11px] font-bold transition-colors hover:bg-white/5"
           aria-label="Connection quality"
           aria-expanded={open}
+          title={tooltipText}
         >
-          <span className="animate-pulse" aria-hidden>
-            {ratingStyle.icon}
-          </span>
-          <span>{ratingStyle.label}</span>
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            {/* outer arc */}
+            <path
+              d="M4.5 9.5C8.2 6.3 15.8 6.3 19.5 9.5"
+              stroke={arc3On ? wifiColor : "#2A2A38"}
+              strokeWidth={1.7}
+              strokeLinecap="round"
+            />
+            {/* middle arc */}
+            <path
+              d="M7 12c3-2.5 7-2.5 10 0"
+              stroke={arc2On ? wifiColor : "#2A2A38"}
+              strokeWidth={1.7}
+              strokeLinecap="round"
+            />
+            {/* inner arc */}
+            <path
+              d="M9.5 14.5c1.5-1.3 3.5-1.3 5 0"
+              stroke={arc1On ? wifiColor : "#2A2A38"}
+              strokeWidth={1.7}
+              strokeLinecap="round"
+            />
+            {/* dot */}
+            <circle
+              cx="12"
+              cy="18"
+              r="1.4"
+              fill={dotOn ? wifiColor : "#2A2A38"}
+            />
+          </svg>
         </button>
 
         {/* Dropdown */}
