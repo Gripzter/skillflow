@@ -83,6 +83,8 @@ export default function ReactionDuel({
   const areaSizeRef = useRef({ w: GAME_AREA_MIN.w, h: GAME_AREA_MIN.h });
   const roundStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const gameLogRef = useRef<HTMLDivElement | null>(null);
+  const atBottomRef = useRef(true);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
   const baseTargetSize = isMobile ? TARGET_BASE_MOBILE : TARGET_BASE;
@@ -124,6 +126,13 @@ export default function ReactionDuel({
     }, 1000);
     return () => clearTimeout(t);
   }, [phase, countdownN]);
+
+  // Auto-scroll game log to the latest round result when user hasn't scrolled up.
+  useEffect(() => {
+    if (!gameLogRef.current) return;
+    if (!atBottomRef.current) return;
+    gameLogRef.current.scrollTop = gameLogRef.current.scrollHeight;
+  }, [roundHistory.length]);
 
   // Incoming multiplayer: round_start (show target after delay), reaction_result (opponent's time)
   useEffect(() => {
@@ -401,8 +410,8 @@ export default function ReactionDuel({
   const progressP2 = p2Wins / TOTAL_ROUNDS;
 
   return (
-    <div className="flex h-full flex-col touch-manipulation" style={{ touchAction: "manipulation" }}>
-      <div className="flex flex-1 flex-col min-h-0">
+    <div className="flex h-full flex-col md:flex-row touch-manipulation" style={{ touchAction: "manipulation" }}>
+      <div className="flex flex-1 flex-col min-h-0 md:flex-1">
         <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
           <span className="font-semibold text-white">Reaction Duel ⚡</span>
           <span className="text-body-gray tabular-nums">
@@ -605,6 +614,46 @@ export default function ReactionDuel({
             })()}
           </div>
         )}
+      </div>
+
+      {/* Desktop game log panel */}
+      <div className="hidden md:flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[320px] min-h-0 h-full">
+        <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
+          <h3 className="text-sm font-semibold text-white">Game Log</h3>
+        </div>
+        <div
+          ref={gameLogRef}
+          className="flex-1 min-h-0 overflow-y-auto p-3"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+          }}
+        >
+          {roundHistory.length === 0 ? (
+            <p className="py-4 text-center text-xs text-body-gray">Rounds will appear here.</p>
+          ) : (
+            roundHistory.map((r, i) => {
+              const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
+              const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
+              const winnerText =
+                r.winner === "draw"
+                  ? "Round tied 🤝"
+                  : r.winner === "player1"
+                    ? `${player1.username} wins!`
+                    : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
+              return (
+                <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
+                  <div className="text-[11px] font-semibold text-white/90">
+                    Round {i + 1} · {winnerText}
+                  </div>
+                  <div className="mt-1 text-[13px] text-white/90">
+                    {player1.username}: {p1Label} · {player2.username}: {p2Label}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `

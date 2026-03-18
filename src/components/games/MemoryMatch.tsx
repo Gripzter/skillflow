@@ -382,8 +382,8 @@ export default function MemoryMatch({
     currentPlayer === 1 ? "rgba(0,229,199,0.8)" : "rgba(168, 85, 247, 0.8)";
 
   return (
-      <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-4">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4 lg:min-w-0">
+      <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4 md:min-w-0">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
@@ -561,7 +561,7 @@ export default function MemoryMatch({
       </div>
 
       {/* Desktop game log: fixed-height live feed beside board */}
-      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 lg:flex lg:w-[320px] lg:flex-shrink-0 min-h-0 h-full">
+      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:flex md:w-[320px] md:flex-shrink-0 min-h-0 h-full">
         <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>
@@ -625,7 +625,7 @@ export default function MemoryMatch({
       </div>
 
       {/* Mobile game log: fixed-height live feed below board */}
-      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 lg:hidden">
+      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 md:hidden">
         <div className="border-b border-white/10 pb-2">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>

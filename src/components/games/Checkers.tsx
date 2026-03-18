@@ -816,10 +816,10 @@ export default function Checkers({
   const gameLogEnabled = true;
 
   return (
-    <div className="flex h-full min-h-0 flex-col lg:flex-row lg:gap-4">
+    <div className="flex h-full min-h-0 flex-col md:flex-row md:gap-4">
       {/* Left: board + turn info */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:pr-0">
-        <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 lg:px-4">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
+        <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 md:px-4">
           <div
             className="flex-1 rounded-lg border px-3 py-2"
             style={{
@@ -841,7 +841,7 @@ export default function Checkers({
             </div>
           </div>
 
-          <div className="hidden lg:block" />
+          <div className="hidden md:block" />
 
           <div
             className="flex-1 rounded-lg border px-3 py-2"
@@ -868,7 +868,7 @@ export default function Checkers({
           </div>
         </div>
 
-        <div className="px-2 pb-3 lg:px-4">
+        <div className="px-2 pb-3 md:px-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-white">{showTurnText}</p>
             {isMyTurn && (isMultiplayer || !isPlayer2Bot || currentTurn !== 2) ? (
@@ -887,7 +887,7 @@ export default function Checkers({
         </div>
 
         {/* Board */}
-        <div className="relative mx-auto w-full max-w-[520px] flex-1 min-h-0 px-2 pb-2 lg:px-4">
+        <div className="relative mx-auto w-full max-w-[520px] flex-1 min-h-0 px-2 pb-2 md:px-4">
           <div
             className="relative grid w-full aspect-square rounded-lg"
             style={{
@@ -1029,11 +1029,11 @@ export default function Checkers({
 
       {/* Right: chat + game log (fixed height) */}
       <div
-        className="w-full lg:w-[320px] lg:flex-shrink-0 lg:border lg:border-[#2A3A5C] lg:bg-[#1A1A22] lg:p-0 lg:rounded-lg overflow-hidden"
+        className="w-full md:w-[320px] md:flex-shrink-0 md:border md:border-[#2A3A5C] md:bg-[#1A1A22] md:p-0 md:rounded-lg overflow-hidden"
         style={{ background: "#1A1A22" }}
       >
         {/* Desktop */}
-        <div className="hidden lg:flex h-full min-h-0 flex-col">
+        <div className="hidden md:flex h-full min-h-0 flex-col">
           {/* Real money: chat 40% + log 60% */}
           {chatEnabled ? (
             <>
@@ -1061,7 +1061,7 @@ export default function Checkers({
         </div>
 
         {/* Mobile stacking */}
-        <div className="flex lg:hidden h-full flex-col min-h-0">
+        <div className="flex md:hidden h-full flex-col min-h-0">
           {/* Mobile real-money: chat 120px + log 150px */}
           {chatEnabled ? (
             <>

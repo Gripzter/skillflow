@@ -99,7 +99,7 @@ export default function Chess({
   const moveListEndRef = useRef<HTMLDivElement | null>(null);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   useEffect(() => {
-    const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 1024);
+    const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -363,11 +363,11 @@ export default function Chess({
   }, [capturedWhite, capturedBlack]);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col lg:flex-row lg:gap-6">
+    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-6">
       {/* Left: Board area */}
       <div
         ref={boardContainerRef}
-        className="flex flex-1 flex-col items-center justify-center gap-3 py-4 lg:min-w-0"
+        className="flex flex-1 flex-col items-center justify-center gap-3 py-4 md:min-w-0"
       >
         {/* Black (Player 2) info */}
         <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
@@ -521,7 +521,7 @@ export default function Chess({
       )}
 
       {/* Right: Chat-style move log — persisted moveHistory, append-only */}
-      <div className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 lg:w-[32%] lg:min-w-[240px] min-h-0">
+      <div className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 md:w-[32%] md:min-w-[240px] min-h-0">
         <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
         <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col" style={{ maxHeight: 400 }}>
           <p key="start" className="text-center text-xs text-body-gray py-2 shrink-0">
