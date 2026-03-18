@@ -37,6 +37,7 @@ const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "connect-4": "Connect 4",
   "reaction-duel": "Reaction Duel",
   "memory-match": "Memory Match",
+  checkers: "Checkers",
   "spelling-bee": "Spelling Bee",
 };
 

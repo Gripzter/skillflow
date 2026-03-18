@@ -22,9 +22,10 @@ const GAMES = [
   { name: "Reaction Duel", slug: "reaction-duel", gradient: "from-orange-500/30 to-red-500/30", active: true },
   { name: "Spelling Bee", slug: "spelling-bee", gradient: "from-amber-500/30 to-yellow-600/30", active: true },
   { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: true },
-  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: false },
+  { name: "Checkers", slug: "checkers", gradient: "from-[#FF5E00]/25 to-[#2A3A5C]/25", active: true },
   { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
   { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
+  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: false },
 ];
 
 function useRandom(min: number, max: number, seed: string): number {
@@ -43,6 +44,7 @@ function GameCard({
   playersOnline,
   waitSec,
   isPractice,
+  emoji,
 }: {
   name: string;
   slug: string;
@@ -51,6 +53,7 @@ function GameCard({
   playersOnline: number;
   waitSec: number;
   isPractice: boolean;
+  emoji?: string;
 }) {
   const content = (
     <div
@@ -91,7 +94,12 @@ function GameCard({
       )}
       <div className="relative z-10 p-5">
         <div>
-          <p className="font-semibold text-white">{name}</p>
+          <p className="font-semibold text-white flex items-center gap-2">
+            <span>{name}</span>
+            {active && slug === "checkers" && emoji ? (
+              <span className="text-[18px] leading-none">{emoji}</span>
+            ) : null}
+          </p>
           {active ? (
             <span
               className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -122,6 +130,13 @@ function GameCard({
         <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-3">
           <span className="rounded-full bg-[#2A3A5C] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
             Coming Soon
+          </span>
+        </div>
+      )}
+      {active && slug === "checkers" && (
+        <div className="relative z-10 mt-4 flex items-center justify-center px-5">
+          <span className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22]/20 px-5 py-2 text-sm font-semibold text-white shadow-[0_0_22px_rgba(42,58,92,0.4)]">
+            Play
           </span>
         </div>
       )}
@@ -270,6 +285,7 @@ export default function PlayPage() {
               playersOnline={onlineCount}
               waitSec={playersWait[i]?.wait ?? 15}
               isPractice={isPractice}
+              emoji={game.slug === "checkers" ? "⬛" : undefined}
             />
           ))}
         </div>

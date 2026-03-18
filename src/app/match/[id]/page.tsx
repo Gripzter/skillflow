@@ -22,6 +22,7 @@ import ConnectFour from "@/components/games/ConnectFour";
 import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
+import Checkers from "@/components/games/Checkers";
 import GameChat, { type ChatMessage } from "@/components/GameChat";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -472,6 +473,8 @@ function MatchPageContent() {
                     ? "Reaction Duel"
                     : match.gameType === "memory-match"
                       ? "Memory Match"
+                    : match.gameType === "checkers"
+                      ? "Checkers"
                       : match.gameType === "spelling-bee"
                         ? "Spelling Bee"
                         : match.gameDisplayName}
@@ -534,7 +537,7 @@ function MatchPageContent() {
       )}
 
       {/* In-game chat bar — only for real human vs human matches */}
-      {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && (
+      {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && match?.gameType !== "checkers" && (
         <div className="mx-auto w-full px-4 sm:px-6 lg:max-w-[1200px]">
           <GameChat
             messages={chatMessages}
@@ -631,6 +634,35 @@ function MatchPageContent() {
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+              />
+            </div>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "checkers" ? (
+        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+          {match.status === "in_progress" && !outcome ? (
+            <div
+              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
+              style={{ height: "calc(100vh - 160px)" }}
+            >
+              <Checkers
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+                isPractice={match.isPractice}
+                chatEnabled={isRealMultiplayer}
+                chatMessages={chatMessages}
+                onSendChatMessage={handleSendChatMessage}
+                onReportChatMessage={handleReportMessage}
+                playerId={userId}
               />
             </div>
           ) : null}
