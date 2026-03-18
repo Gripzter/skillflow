@@ -89,6 +89,74 @@ function GameCard({
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
         </>
       )}
+      {slug === "checkers" && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: "linear-gradient(135deg, #1A1A22 0%, #0E0E12 100%)",
+              opacity: 0.95,
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 opacity-35">
+            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 p-2">
+              {Array.from({ length: 16 }).map((_, i) => {
+                const rr = Math.floor(i / 4);
+                const cc = i % 4;
+                const dark = (rr + cc) % 2 === 0;
+                return (
+                  <div
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={i}
+                    className="w-full h-full"
+                    style={{
+                      background: dark ? "rgba(42,58,92,0.35)" : "rgba(255,255,255,0.02)",
+                      border: "1px solid rgba(255,255,255,0.01)",
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
+        </>
+      )}
+      {slug === "memory-match" && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: "linear-gradient(135deg, #1A1A22 0%, #0E0E12 100%)",
+              opacity: 0.9,
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 opacity-20">
+            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 p-1">
+              {Array.from({ length: 16 }).map((_, i) => {
+                const rr = Math.floor(i / 4);
+                const cc = i % 4;
+                const icon = (rr + cc) % 2 === 0 ? "🧠" : "🧩";
+                return (
+                  <div
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={i}
+                    className="flex items-center justify-center"
+                    style={{
+                      fontSize: 14,
+                      color: "rgba(255,255,255,0.35)",
+                      textShadow: "0 0 14px rgba(168,85,247,0.12)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {icon}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
+        </>
+      )}
       {!active && (
         <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
       )}
@@ -96,7 +164,7 @@ function GameCard({
         <div>
           <p className="font-semibold text-white flex items-center gap-2">
             <span>{name}</span>
-            {active && slug === "checkers" && emoji ? (
+            {active && (slug === "checkers" || slug === "memory-match") && emoji ? (
               <span className="text-[18px] leading-none">{emoji}</span>
             ) : null}
           </p>
@@ -130,13 +198,6 @@ function GameCard({
         <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-3">
           <span className="rounded-full bg-[#2A3A5C] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
             Coming Soon
-          </span>
-        </div>
-      )}
-      {active && slug === "checkers" && (
-        <div className="relative z-10 mt-4 flex items-center justify-center px-5">
-          <span className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22]/20 px-5 py-2 text-sm font-semibold text-white shadow-[0_0_22px_rgba(42,58,92,0.4)]">
-            Play
           </span>
         </div>
       )}
@@ -285,7 +346,7 @@ export default function PlayPage() {
               playersOnline={onlineCount}
               waitSec={playersWait[i]?.wait ?? 15}
               isPractice={isPractice}
-              emoji={game.slug === "checkers" ? "⬛" : undefined}
+              emoji={game.slug === "checkers" ? "⬛" : game.slug === "memory-match" ? "🧠" : undefined}
             />
           ))}
         </div>

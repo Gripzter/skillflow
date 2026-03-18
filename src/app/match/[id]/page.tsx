@@ -26,6 +26,7 @@ import Checkers from "@/components/games/Checkers";
 import GameChat, { type ChatMessage } from "@/components/GameChat";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { useToast } from "@/components/Toast";
 
 const OPPONENT_RECONNECT_SEC = 30;
 
@@ -36,6 +37,7 @@ function MatchPageContent() {
   const params = useParams();
   const matchId = (params?.id as string) || "";
   const { isPractice } = usePlayMode();
+  const { showToast } = useToast();
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
@@ -338,17 +340,22 @@ function MatchPageContent() {
     async (winner: "player1" | "player2") => {
       if (!match) return;
       const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
-      const iWon = winnerId === userId;
+      // Practice/dev matches may not have stable user IDs on the match record,
+      // so fall back to role-based win detection.
+      const iWon = winnerId ? winnerId === userId : winner === "player1";
 
       try {
         await completeMatchAndSettle(match, winner);
         dispatchWalletUpdated();
       } catch {
+        // eslint-disable-next-line no-console
+        console.error("[MatchPage] Failed to persist match result", { matchId: match.id, winner });
+        showToast("Match result could not be saved — please contact support", "error");
         dispatchWalletUpdated();
       }
       setOutcome(iWon ? "victory" : "defeat");
     },
-    [match, userId]
+    [match, userId, showToast]
   );
 
   const handleWin = useCallback(() => handleGameEnd("player1"), [handleGameEnd]);

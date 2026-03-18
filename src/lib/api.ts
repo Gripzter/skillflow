@@ -475,7 +475,8 @@ export async function updateMatch(
   if (updates.winner === "draw") row.result = "draw";
   else if (updates.winner) row.result = updates.winner === "player1" ? "player1_win" : "player2_win";
   if (updates.status === "completed") row.completed_at = new Date().toISOString();
-  await supabase.from("matches").update(row).eq("id", id);
+  const { error } = await supabase.from("matches").update(row).eq("id", id);
+  if (error) throw error;
 }
 
 export async function completeMatch(matchId: string, winner: "player1" | "player2"): Promise<void> {

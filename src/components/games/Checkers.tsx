@@ -365,11 +365,11 @@ export default function Checkers({
       setSelected(null);
       setChainActive(false);
 
-      // Log the move (local).
-      setLog((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), side: moveMeta.didCapture ? (currentTurn as Player) : (currentTurn as Player), message: turnLogText },
-      ]);
+      // Log the move (local) unless the caller intentionally skipped it
+      // (e.g. capture chains where we log per-jump messages).
+      if (turnLogText) {
+        setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn as Player, message: turnLogText }]);
+      }
 
       if (end?.kind === "win") {
         const winnerRole = winnerRoleFromPlayer(end.winner);
@@ -533,35 +533,38 @@ export default function Checkers({
       let lastFrom = chosen.start;
       let lastTo = chosen.end;
 
+      const botName = getBotName(isPlayer2Bot, player2.username);
+
       for (const step of chosen.steps) {
         const applied = applyStep(b, step, 2);
         b = applied.board;
+
         if (step.type === "capture") {
           didCapture = true;
           capturedCount += 1;
+          setLog((prev) => [...prev, { id: crypto.randomUUID(), side: 2, message: `${botName} captured a piece!` }]);
         }
-        didKing = didKing || applied.didKing;
+
+        if (applied.didKing) {
+          didKing = true;
+          setLog((prev) => [...prev, { id: crypto.randomUUID(), side: 2, message: `${botName} got a King!` }]);
+        }
+
         lastFrom = step.from;
         lastTo = step.to;
       }
 
-      const playerName = getBotName(isPlayer2Bot, player2.username);
-      let logText = "";
-      if (didCapture) {
-        logText = capturedCount > 1 ? `${playerName} captured ${capturedCount} pieces` : `${playerName} captured opponent's piece`;
-        if (didKing) logText += ` and got a King!`;
-      } else {
-        logText = `${playerName} moved piece to ${posToAlgebraic(lastTo)}`;
-        if (didKing) logText += ` and got a King!`;
+      if (!didCapture) {
+        setLog((prev) => [...prev, { id: crypto.randomUUID(), side: 2, message: `${botName} moved piece to ${posToAlgebraic(lastTo)}` }]);
+      }
+      if (didCapture && capturedCount > 1) {
+        const label = capturedCount === 2 ? "double" : capturedCount === 3 ? "triple" : `${capturedCount}-jump`;
+        setLog((prev) => [...prev, { id: crypto.randomUUID(), side: 2, message: `${botName} completed a ${label} jump!` }]);
       }
 
       const nextTurn: Player = 1;
       const nextNoProgressCount = didCapture || didKing ? 0 : noProgressCount + 1;
       const end = getGameWinnerOrDraw(b, nextNoProgressCount);
-      setLog((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), side: 2, message: logText },
-      ]);
 
       if (end?.kind === "win") {
         gameOverRef.current = true;
@@ -619,6 +622,12 @@ export default function Checkers({
         setBoard(applied.board);
         setLastMove({ from: step.from, to: step.to });
 
+        const actorName = currentTurn === 1 ? player1.username : player2.username;
+        setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: `${actorName} captured a piece!` }]);
+        if (applied.didKing) {
+          setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: `${actorName} got a King!` }]);
+        }
+
         turnMetaRef.current.didCapture = true;
         turnMetaRef.current.capturedCount += 1;
         turnMetaRef.current.didKing = turnMetaRef.current.didKing || applied.didKing;
@@ -635,11 +644,14 @@ export default function Checkers({
         const didCapture = true;
         const didKing = turnMetaRef.current.didKing;
         const finalTo = turnMetaRef.current.finalTo ?? step.to;
-
-        const playerName = currentTurn === 1 ? player1.username : player2.username;
-        const captureText = turnMetaRef.current.capturedCount > 1 ? `${playerName} captured ${turnMetaRef.current.capturedCount} pieces` : `${playerName} captured opponent's piece`;
-        const kingText = didKing ? ` and got a King!` : "";
-        const turnLogText = captureText + kingText;
+        const chainCaptures = turnMetaRef.current.capturedCount;
+        if (chainCaptures > 1) {
+          const label = chainCaptures === 2 ? "double" : chainCaptures === 3 ? "triple" : `${chainCaptures}-jump`;
+          setLog((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), side: currentTurn, message: `${actorName} completed a ${label} jump!` },
+          ]);
+        }
 
         const nextTurn = opposite(currentTurn);
         const nextNoProgressCount = didCapture || didKing ? 0 : noProgressCount + 1;
@@ -649,7 +661,7 @@ export default function Checkers({
           step.from,
           finalTo,
           { didCapture, didKing, capturedCount: turnMetaRef.current.capturedCount },
-          turnLogText,
+          "",
           undefined,
           nextNoProgressCount
         );
@@ -688,7 +700,10 @@ export default function Checkers({
         const didCapture = false;
 
         const playerName = currentTurn === 1 ? player1.username : player2.username;
-        const turnLogText = `${playerName} moved piece to ${posToAlgebraic(step.to)}${didKing ? " and got a King!" : ""}`;
+        const turnLogText = `${playerName} moved piece to ${posToAlgebraic(step.to)}`;
+        if (didKing) {
+          setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: `${playerName} got a King!` }]);
+        }
 
         const nextTurn = opposite(currentTurn);
         const nextNoProgressCount = didCapture || didKing ? 0 : noProgressCount + 1;
@@ -710,6 +725,11 @@ export default function Checkers({
         const applied = applyStep(board, step, currentTurn);
         setBoard(applied.board);
         setLastMove({ from: step.from, to: step.to });
+        const playerName = currentTurn === 1 ? player1.username : player2.username;
+        setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: `${playerName} captured a piece!` }]);
+        if (applied.didKing) {
+          setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: `${playerName} got a King!` }]);
+        }
         turnMetaRef.current.didCapture = true;
         turnMetaRef.current.capturedCount += 1;
         turnMetaRef.current.didKing = turnMetaRef.current.didKing || applied.didKing;
@@ -725,14 +745,14 @@ export default function Checkers({
         const didCapture = true;
         const didKing = turnMetaRef.current.didKing;
         const finalTo = turnMetaRef.current.finalTo ?? step.to;
-
-        const playerName = currentTurn === 1 ? player1.username : player2.username;
-        const captureText =
-          turnMetaRef.current.capturedCount > 1
-            ? `${playerName} captured ${turnMetaRef.current.capturedCount} pieces`
-            : `${playerName} captured opponent's piece`;
-        const kingText = didKing ? ` and got a King!` : "";
-        const turnLogText = captureText + kingText;
+        const chainCaptures = turnMetaRef.current.capturedCount;
+        if (chainCaptures > 1) {
+          const label = chainCaptures === 2 ? "double" : chainCaptures === 3 ? "triple" : `${chainCaptures}-jump`;
+          setLog((prev) => [
+            ...prev,
+            { id: crypto.randomUUID(), side: currentTurn, message: `${playerName} completed a ${label} jump!` },
+          ]);
+        }
 
         const nextTurn = opposite(currentTurn);
         const nextNoProgressCount = didCapture || didKing ? 0 : noProgressCount + 1;
@@ -743,7 +763,7 @@ export default function Checkers({
           step.from,
           finalTo,
           { didCapture, didKing, capturedCount: turnMetaRef.current.capturedCount },
-          turnLogText,
+          "",
           undefined,
           nextNoProgressCount
         );

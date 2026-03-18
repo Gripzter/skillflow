@@ -75,6 +75,7 @@ export default function DashboardPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [balance, setBalance] = useState(0);
   const [matches, setMatches] = useState<StoredMatch[]>([]);
+  const [practiceMatches, setPracticeMatches] = useState<StoredMatch[]>([]);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [quickGameStats, setQuickGameStats] = useState<
@@ -110,7 +111,8 @@ export default function DashboardPage() {
         setLeaderboard(buildLeaderboard(basePlayers));
 
         // Practice mode data (local-only; no network)
-        getPracticeMatches();
+        const pm = getPracticeMatches();
+        setPracticeMatches(pm.map((m) => ({ ...(m as unknown as StoredMatch), isPractice: true })));
         getPracticeStats(user.username);
       } catch {
         router.push("/login");
@@ -143,13 +145,20 @@ export default function DashboardPage() {
     }
   }
 
-  const completedMatches = useMemo(
-    () => matches.filter((m) => m.status === "completed" && !m.isPractice),
-    [matches]
-  );
-  const totalMatches = completedMatches.length;
-  const wins = completedMatches.filter((m) => m.winner === "player1").length;
-  // Real-money win rate as raw percentage; UI will format to one decimal place
+  const completedMatchesAll = useMemo(() => {
+    const realCompleted = matches.filter((m) => m.status === "completed");
+    const practiceCompleted = practiceMatches.filter((m) => m.status === "completed");
+    return [...realCompleted, ...practiceCompleted];
+  }, [matches, practiceMatches]);
+
+  const totalMatches = completedMatchesAll.length;
+  const wins = completedMatchesAll.filter((m) => {
+    if (!m.winner) return false;
+    const userIsPlayer1 = m.player1.username === username;
+    return (m.winner === "player1" && userIsPlayer1) || (m.winner === "player2" && !userIsPlayer1);
+  }).length;
+
+  // Win rate across practice + real-money (net earnings remains real-money only)
   const winRate = totalMatches ? (wins / totalMatches) * 100 : 0;
 
   const netEarnings = useMemo(() => {
@@ -167,10 +176,11 @@ export default function DashboardPage() {
     return idx >= 0 ? idx + 1 : null;
   }, [leaderboard, username]);
 
-  const recentActivity = useMemo(
-    () => completedMatches.slice(0, 5),
-    [completedMatches]
-  );
+  const recentActivity = useMemo(() => {
+    return [...completedMatchesAll]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5);
+  }, [completedMatchesAll]);
   const greeting = getGreeting();
 
   if (loading) {
@@ -467,15 +477,17 @@ export default function DashboardPage() {
           ) : (
             <div className="divide-y divide-white/5 rounded-lg border border-white/5 bg-black/20">
               {recentActivity.map((match) => {
-                const isWin = match.winner === "player1";
+                const userIsPlayer1 = match.player1?.username === username;
                 const isDraw = !match.winner;
+                const isWin =
+                  !isDraw && ((match.winner === "player1" && userIsPlayer1) || (match.winner === "player2" && !userIsPlayer1));
                 const resultLabel = isDraw ? "Draw" : isWin ? "Won" : "Lost";
                 const resultColor = isDraw
                   ? "text-amber-300"
                   : isWin
                     ? "text-emerald-300"
                     : "text-red-400";
-                const opponentName = match.player2?.username ?? "Opponent";
+                const opponentName = userIsPlayer1 ? match.player2?.username ?? "Opponent" : match.player1?.username ?? "Opponent";
                 const gameImageSrc =
                   match.gameType === "chess"
                     ? "/games/chess.jpg"
