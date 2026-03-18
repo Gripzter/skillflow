@@ -816,7 +816,7 @@ export default function Checkers({
   const gameLogEnabled = true;
 
   return (
-    <div className="flex h-full min-h-0 flex-col md:flex-row md:gap-4">
+    <div className="flex h-full min-h-0 flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
       {/* Left: board + turn info */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
         <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 md:px-4">
@@ -1049,12 +1049,12 @@ export default function Checkers({
                   playerId={playerId}
                 />
               </div>
-              <div className="flex-[0_0_60%] min-h-0 overflow-hidden" style={{ borderTop: "1px solid #2A3A5C" }}>
+              <div className="flex-[0_0_60%] min-h-0 overflow-hidden overflow-x-hidden flex-shrink-0 flex-grow-0" style={{ borderTop: "1px solid #2A3A5C" }}>
                 <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
               </div>
             </>
           ) : (
-            <div className="flex-1 min-h-0">
+            <div className="flex-none min-h-0 h-full overflow-hidden" style={{ minHeight: 500, maxHeight: 500 }}>
               <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
             </div>
           )}
@@ -1077,12 +1077,12 @@ export default function Checkers({
                   playerId={playerId}
                 />
               </div>
-              <div className="h-[150px] min-h-[150px] overflow-hidden border-t border-[#2A3A5C]">
+              <div className="h-[150px] min-h-[150px] max-h-[150px] overflow-hidden overflow-x-hidden border-t border-[#2A3A5C] flex-shrink-0 flex-grow-0">
                 <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
               </div>
             </>
           ) : (
-            <div className="h-[200px] min-h-[200px] overflow-hidden">
+            <div className="h-[150px] min-h-[150px] max-h-[150px] overflow-hidden">
               <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} isPracticeOnly />
             </div>
           )}
@@ -1120,13 +1120,13 @@ function GameLogFeed({
   }, [log]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="sticky top-0 z-10 border-b border-[#2A3A5C] bg-[#1A1A22]/90 px-4 py-3">
         <h3 className="text-sm font-bold text-white">Game Log</h3>
       </div>
       <div
         ref={desktopLogRef}
-        className="flex-1 min-h-0 overflow-y-auto p-3"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
         onScroll={(e) => {
           const el = e.currentTarget;
           atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;

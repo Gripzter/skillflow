@@ -588,7 +588,7 @@ export default function SpellingBee({
     timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-orange-500" : "bg-red-500";
 
   return (
-    <div className="spelling-bee flex min-h-0 flex-1 flex-col gap-4 overflow-auto md:flex-row">
+    <div className="spelling-bee flex min-h-0 flex-1 flex-col gap-4 overflow-auto md:flex-row md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
       <style>{`
         .spelling-bee { --spelling-amber: #F59E0B; }
         @keyframes spelling-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
@@ -863,10 +863,10 @@ export default function SpellingBee({
       </div>
 
       {/* Game log panel */}
-      <div className="w-full shrink-0 md:w-72">
-        <div className="rounded-xl border border-white/10 bg-card/80 p-4">
+      <div className="w-full shrink-0 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden md:w-72 md:h-full md:min-h-[500px] md:max-h-[500px] md:flex-shrink-0 md:flex-grow-0" style={{ overflowX: "hidden" }}>
+        <div className="rounded-xl border border-white/10 bg-card/80 p-4 flex flex-col h-full overflow-hidden">
           <p className="mb-2 font-medium text-white">Round history</p>
-          <div className="max-h-48 space-y-1 overflow-y-auto text-xs">
+          <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-xs">
             {roundHistory.length === 0 && <p className="text-body-gray">No rounds yet.</p>}
             {roundHistory.map((h, i) => (
               <div key={i} className="rounded border border-white/5 bg-white/5 p-2">

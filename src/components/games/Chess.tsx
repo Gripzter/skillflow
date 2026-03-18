@@ -363,7 +363,7 @@ export default function Chess({
   }, [capturedWhite, capturedBlack]);
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-6">
+    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-6 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
       {/* Left: Board area */}
       <div
         ref={boardContainerRef}
@@ -521,9 +521,12 @@ export default function Chess({
       )}
 
       {/* Right: Chat-style move log — persisted moveHistory, append-only */}
-      <div className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 md:w-[32%] md:min-w-[240px] min-h-0">
+      <div
+        className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 md:w-[32%] md:min-w-[240px] min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 h-[150px] min-h-[150px] max-h-[150px] md:h-full md:min-h-[500px] md:max-h-[500px]"
+        style={{ overflowX: "hidden" }}
+      >
         <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col" style={{ maxHeight: 400 }}>
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
           <p key="start" className="text-center text-xs text-body-gray py-2 shrink-0">
             ♟ Game Started • White: {player1.username} vs Black: {player2.username}
             {isPlayer2Bot ? " 🤖" : ""}

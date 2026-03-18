@@ -410,7 +410,7 @@ export default function ReactionDuel({
   const progressP2 = p2Wins / TOTAL_ROUNDS;
 
   return (
-    <div className="flex h-full flex-col md:flex-row touch-manipulation" style={{ touchAction: "manipulation" }}>
+    <div className="flex h-full flex-col md:flex-row touch-manipulation md:overflow-hidden md:min-h-[500px] md:max-h-[500px]" style={{ touchAction: "manipulation" }}>
       <div className="flex flex-1 flex-col min-h-0 md:flex-1">
         <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
           <span className="font-semibold text-white">Reaction Duel ⚡</span>
@@ -617,13 +617,13 @@ export default function ReactionDuel({
       </div>
 
       {/* Desktop game log panel */}
-      <div className="hidden md:flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[320px] min-h-0 h-full">
+      <div className="hidden md:flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[320px] min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
         <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>
         <div
           ref={gameLogRef}
-          className="flex-1 min-h-0 overflow-y-auto p-3"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
           onScroll={(e) => {
             const el = e.currentTarget;
             atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;

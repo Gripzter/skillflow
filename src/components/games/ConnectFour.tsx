@@ -269,7 +269,7 @@ export default function ConnectFour({
   const boardHeight = cellSize * ROWS + (ROWS + 1) * 3;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4">
+    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
       <div
         ref={boardColumnRef}
         className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden py-4 md:min-w-0"
@@ -427,9 +427,12 @@ export default function ConnectFour({
       </div>
 
       {/* Move log */}
-      <div className="flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[280px] md:flex-shrink-0 min-h-0 h-full">
+      <div
+        className="flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[280px] md:flex-shrink-0 min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 h-[150px] min-h-[150px] max-h-[150px] md:h-full md:min-h-[500px] md:max-h-[500px]"
+        style={{ overflowX: "hidden" }}
+      >
         <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-        <div className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
           <p className="text-center text-xs text-body-gray py-2 shrink-0">
             🔴🟡 Game Started • {player1.username} vs {player2.username}
             {isPlayer2Bot ? " 🤖" : ""}

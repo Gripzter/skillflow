@@ -382,7 +382,7 @@ export default function MemoryMatch({
     currentPlayer === 1 ? "rgba(0,229,199,0.8)" : "rgba(168, 85, 247, 0.8)";
 
   return (
-      <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4">
+      <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4 md:min-w-0">
         <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
           <div className="flex items-center gap-2">
@@ -561,13 +561,13 @@ export default function MemoryMatch({
       </div>
 
       {/* Desktop game log: fixed-height live feed beside board */}
-      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:flex md:w-[320px] md:flex-shrink-0 min-h-0 h-full">
+      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:flex md:w-[320px] md:flex-shrink-0 min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
         <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>
         <div
           ref={desktopLogRef}
-          className="flex-1 min-h-0 overflow-y-auto p-3"
+          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
           onScroll={(e) => {
             const el = e.currentTarget;
             const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
@@ -625,13 +625,13 @@ export default function MemoryMatch({
       </div>
 
       {/* Mobile game log: fixed-height live feed below board */}
-      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 md:hidden">
+      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 md:hidden h-[150px] min-h-[150px] max-h-[150px] overflow-hidden flex flex-col" style={{ overflowX: "hidden" }}>
         <div className="border-b border-white/10 pb-2">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>
         <div
           ref={mobileLogRef}
-          className="mt-2 max-h-[150px] overflow-y-auto"
+          className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
           onScroll={(e) => {
             const el = e.currentTarget;
             const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
