@@ -441,6 +441,12 @@ function MatchPageContent() {
   const opponentUsername =
     myRole === "player1" ? safePlayer2.username : safePlayer1.username;
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
+  const connectionTone =
+    connectionStatus === "disconnected"
+      ? "#EF4444"
+      : connectionStatus === "poor"
+        ? "#FACC15"
+        : "#22C55E";
 
   if (process.env.NODE_ENV !== "production") {
     // eslint-disable-next-line no-console
@@ -469,7 +475,7 @@ function MatchPageContent() {
 
       {/* Top bar */}
       <div className="border-b border-white/5 px-4 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between">
+        <div className="mx-auto hidden max-w-[1200px] items-center justify-between md:flex">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-white">
               {match.gameType === "chess"
@@ -497,6 +503,49 @@ function MatchPageContent() {
           </div>
           <span className="text-body-gray tabular-nums">{formatTime(timerSec)}</span>
           <span className="text-xs text-body-gray">Match ID: {shortId}</span>
+        </div>
+        <div className="mx-auto flex max-w-[1200px] flex-col gap-2 md:hidden">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-semibold text-white">
+                {match.gameType === "chess"
+                  ? "Chess"
+                  : match.gameType === "connect-4"
+                    ? "Connect 4"
+                    : match.gameType === "reaction-duel"
+                      ? "Reaction Duel"
+                      : match.gameType === "memory-match"
+                        ? "Memory Match"
+                        : match.gameType === "checkers"
+                          ? "Checkers"
+                          : match.gameType === "spelling-bee"
+                            ? "Spelling Bee"
+                            : match.gameDisplayName}
+              </span>
+              {match.isPractice && (
+                <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-400">
+                  PRACTICE
+                </span>
+              )}
+            </div>
+            <span className="text-[22px] font-bold leading-none tabular-nums text-white">
+              {formatTime(timerSec)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border"
+              style={{ borderColor: "rgba(255,255,255,0.12)", color: connectionTone }}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.8">
+                <path d="M2 8.5a16 16 0 0 1 20 0" strokeOpacity="0.95" />
+                <path d="M5.5 12a11 11 0 0 1 13 0" strokeOpacity="0.9" />
+                <path d="M9 15.5a6 6 0 0 1 6 0" strokeOpacity="0.85" />
+                <circle cx="12" cy="19" r="1.8" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span className="text-[11px] text-[#7A7A8E]">Match ID: {shortId}</span>
+          </div>
         </div>
       </div>
 
@@ -812,33 +861,33 @@ function MatchPageContent() {
               <p className="mt-3 text-2xl font-bold text-teal">+${match.winnerPayout.toFixed(2)}</p>
             )}
             <p className="mt-2 text-body-gray">Defeated {opponentUsername}</p>
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
               <Link
                 href={`/play/${match.gameType}`}
-                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
               </Link>
               <Link
                 href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
-              </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
-              >
-                Dashboard
               </Link>
               {match.isPractice && (
                 <Link
                   href="/play"
-                  className="rounded-lg bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
+                  className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
                 >
                   Play for Real Money
                 </Link>
               )}
+              <Link
+                href="/dashboard"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
+              >
+                Dashboard
+              </Link>
             </div>
           </div>
         </div>
@@ -858,22 +907,22 @@ function MatchPageContent() {
                 <p className="mt-2 text-xl font-semibold text-amber-400">${match.stakeAmount.toFixed(2)} returned</p>
               </>
             )}
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
               <Link
                 href={`/play/${match.gameType}`}
-                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
               </Link>
               <Link
                 href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
               </Link>
               <Link
                 href="/dashboard"
-                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
               >
                 Dashboard
               </Link>
@@ -899,33 +948,33 @@ function MatchPageContent() {
               </p>
             )}
             {match.isPractice && <p className="mt-2 text-body-gray">Try again?</p>}
-            <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
               <Link
                 href={`/play/${match.gameType}`}
-                className="rounded-lg bg-teal px-6 py-3 font-semibold text-charcoal hover:shadow-teal-glow"
+                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
               </Link>
               <Link
                 href="/play"
-                className="rounded-lg border border-white/30 px-6 py-3 font-semibold text-white hover:bg-white/10"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
-              </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-lg border border-white/20 px-6 py-3 font-semibold text-white/90 hover:bg-white/10"
-              >
-                Dashboard
               </Link>
               {match.isPractice && (
                 <Link
                   href="/play"
-                  className="rounded-lg bg-gradient-to-r from-purple to-[rgba(192,132,252,1)] px-6 py-3 font-semibold text-white hover:shadow-[0_0_24px_rgba(168,85,247,0.4)]"
+                  className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
                 >
                   Play for Real Money
                 </Link>
               )}
+              <Link
+                href="/dashboard"
+                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
+              >
+                Dashboard
+              </Link>
             </div>
           </div>
         </div>
