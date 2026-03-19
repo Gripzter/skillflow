@@ -27,6 +27,7 @@ import {
   isLikelyIOS,
 } from "@/lib/games/spelling-speech";
 import type { GameMultiplayerProps } from "./Chess";
+import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
 
 type Phase =
   | "pre_round"
@@ -46,6 +47,7 @@ interface SpellingBeeProps extends GameMultiplayerProps {
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
   botDifficulty?: BotDifficulty;
+  isPractice?: boolean;
 }
 
 const DIFFICULTY_LABELS: Record<string, string> = {
@@ -74,6 +76,7 @@ export default function SpellingBee({
   sendGameEvent,
   incomingEvent,
   onEventProcessed,
+  isPractice: isPracticeProp,
 }: SpellingBeeProps) {
   const [phase, setPhase] = useState<Phase>("pre_round");
   const [round, setRound] = useState(1);
@@ -587,8 +590,18 @@ export default function SpellingBee({
   const timerColor =
     timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-orange-500" : "bg-red-500";
 
+  const isPractice = isPracticeProp ?? !isMultiplayer;
+  const p1RowActive =
+    (phase === "round_active" || phase === "tiebreaker_active") &&
+    p1Answer === null &&
+    (!isMultiplayer || myRole === "player1");
+  const p2RowActive =
+    (phase === "round_active" || phase === "tiebreaker_active") &&
+    p2Answer === null &&
+    (!isMultiplayer || myRole === "player2");
+
   return (
-    <div className="spelling-bee flex h-full min-h-0 w-full flex-col">
+    <div className="spelling-bee flex h-full min-h-0 w-full flex-col overflow-hidden">
       <style>{`
         .spelling-bee { --spelling-amber: #F59E0B; }
         @keyframes spelling-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
@@ -599,12 +612,11 @@ export default function SpellingBee({
         .spelling-wave { animation: spelling-wave 0.6s ease-in-out infinite; }
       `}</style>
 
-      {/* Mobile: keep stacked layout */}
-      <div className="md:hidden flex min-h-0 flex-1 flex-col gap-4 overflow-auto">
-        <div className="flex flex-1 flex-col gap-3 overflow-auto">
-          {/* Header */}
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold text-white">
+      {/* Mobile */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+          <div className="flex shrink-0 items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-white">
               Spelling Bee 🐝 · Round {displayRound}{isTiebreaker ? " (Tiebreaker)" : `/${TOTAL_ROUNDS}`}
             </span>
             {effectiveWord && (
@@ -616,28 +628,47 @@ export default function SpellingBee({
             )}
           </div>
 
-        {/* Timer bar */}
+          <div className="shrink-0">
+            <GamePlayerStack>
+              <GamePlayerRow
+                username={player1.username}
+                avatarLetter={player1.username.charAt(0)}
+                avatarClassName="bg-gradient-to-br from-amber-500/50 to-amber-700/50"
+                scoreRight={`Score: ${p1Score.toFixed(1)}`}
+                active={p1RowActive}
+                isPractice={isPractice}
+                rating={player1.rating}
+              />
+              <GamePlayerRow
+                username={player2.username}
+                avatarLetter={player2.username.charAt(0)}
+                avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+                scoreRight={`Score: ${p2Score.toFixed(1)}`}
+                active={p2RowActive}
+                isPractice={isPractice}
+                rating={player2.rating}
+                isBot={isPlayer2Bot}
+              />
+            </GamePlayerStack>
+          </div>
+
         {(phase === "round_active" || phase === "tiebreaker_active") && (
-          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-white/10">
             <div
               className={`h-full transition-all duration-100 ${timerColor}`}
               style={{ width: `${timerPercent}%` }}
             />
           </div>
         )}
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex shrink-0 items-center justify-between text-sm">
           {(phase === "round_active" || phase === "tiebreaker_active") && (
             <span className={`font-mono font-bold tabular-nums ${timerPercent <= 20 ? "text-red-400" : timerPercent <= 33 ? "text-orange-400" : "text-amber-400"}`}>
               {Math.ceil(timerRemainingMs / 1000)}s
             </span>
           )}
-          <span className="text-body-gray">
-            {player1.username}: <strong className="text-white">{p1Score.toFixed(1)}</strong>
-            {" · "}
-            {player2.username}: <strong className="text-white">{p2Score.toFixed(1)}</strong>
-          </span>
         </div>
 
+        <div className="game-play-area-mobile min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {/* Pre-round / Get ready */}
         {(phase === "pre_round" || phase === "get_ready" || phase === "tiebreaker_ready") && (
           <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-amber-500/30 bg-[#1A1D2E]/80 p-8">
@@ -863,6 +894,7 @@ export default function SpellingBee({
           </div>
         )}
         </div>
+        </div>
 
         {/* Game log panel */}
         <div className="w-full shrink-0 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden" style={{ overflowX: "hidden" }}>
@@ -886,36 +918,33 @@ export default function SpellingBee({
         </div>
       </div>
 
-      {/* Desktop: standardized 3-column layout */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
-        {/* Left: player cards */}
-        <div className="w-[200px] shrink-0 flex flex-col gap-3">
-          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
-                {player1.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">{player1.username}</p>
-                <p className="text-xs text-body-gray">Score {p1Score.toFixed(1)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
-                {player2.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">{player2.username}{isPlayer2Bot ? " 🤖" : ""}</p>
-                <p className="text-xs text-body-gray">Score {p2Score.toFixed(1)}</p>
-              </div>
-            </div>
-          </div>
+      {/* Desktop */}
+      <div className="hidden h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden md:flex">
+        <div className="flex w-[200px] shrink-0 flex-col justify-center">
+          <GamePlayerStack>
+            <GamePlayerRow
+              username={player1.username}
+              avatarLetter={player1.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-amber-500/50 to-amber-700/50"
+              scoreRight={`Score: ${p1Score.toFixed(1)}`}
+              active={p1RowActive}
+              isPractice={isPractice}
+              rating={player1.rating}
+            />
+            <GamePlayerRow
+              username={player2.username}
+              avatarLetter={player2.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+              scoreRight={`Score: ${p2Score.toFixed(1)}`}
+              active={p2RowActive}
+              isPractice={isPractice}
+              rating={player2.rating}
+              isBot={isPlayer2Bot}
+            />
+          </GamePlayerStack>
         </div>
 
-        {/* Center: main game */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden py-1">
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="font-semibold text-white">
               Spelling Bee 🐝 · Round {displayRound}{isTiebreaker ? " (Tiebreaker)" : `/${TOTAL_ROUNDS}`}
@@ -932,21 +961,15 @@ export default function SpellingBee({
               <div className={`h-full transition-all duration-100 ${timerColor}`} style={{ width: `${timerPercent}%` }} />
             </div>
           )}
-          <div className="flex items-center justify-between text-sm px-1">
+          <div className="flex shrink-0 items-center justify-between px-1 text-sm">
             {(phase === "round_active" || phase === "tiebreaker_active") && (
               <span className={`font-mono font-bold tabular-nums ${timerPercent <= 20 ? "text-red-400" : timerPercent <= 33 ? "text-orange-400" : "text-amber-400"}`}>
                 {Math.ceil(timerRemainingMs / 1000)}s
               </span>
             )}
-            <span className="text-body-gray">
-              {player1.username}: <strong className="text-white">{p1Score.toFixed(1)}</strong>
-              {" · "}
-              {player2.username}: <strong className="text-white">{p2Score.toFixed(1)}</strong>
-            </span>
           </div>
 
-          {/* Reuse existing main content block by wrapping it */}
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+          <div className="game-play-area-desktop min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
             {/* The existing content above already rendered in mobile; on desktop we rely on the same JSX via duplication */}
             {/* Pre-round / Get ready */}
             {(phase === "pre_round" || phase === "get_ready" || phase === "tiebreaker_ready") && (
@@ -1107,8 +1130,8 @@ export default function SpellingBee({
         </div>
 
         {/* Right: game log */}
-        <div className="w-[280px] shrink-0 overflow-hidden" style={{ overflowX: "hidden" }}>
-          <div className="rounded-xl border border-white/10 bg-card/80 p-4 flex flex-col h-full overflow-hidden md:min-h-[500px] md:max-h-[500px]">
+        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden" style={{ overflowX: "hidden" }}>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-card/80 p-4">
             <p className="mb-2 font-medium text-white">Round history</p>
             <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-xs">
               {roundHistory.length === 0 && <p className="text-body-gray">No rounds yet.</p>}

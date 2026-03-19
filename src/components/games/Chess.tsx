@@ -12,6 +12,7 @@ import {
   type PieceColor,
 } from "@/lib/games/chess-utils";
 import { getChessBotMove, getChessBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
+import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
 
 export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
@@ -336,21 +337,32 @@ export default function Chess({
     return () => clearTimeout(t);
   }, [fen, turn, isPlayer2Bot, botDifficulty, isMultiplayer, promotionPending, game, executeMove]);
 
-  const boardContainerRef = useRef<HTMLDivElement>(null);
+  const boardSlotMobileRef = useRef<HTMLDivElement>(null);
+  const boardSlotDesktopRef = useRef<HTMLDivElement>(null);
   const [boardSize, setBoardSize] = useState(400);
   useEffect(() => {
-    const el = boardContainerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const w = el.clientWidth;
-      const h = el.clientHeight - 200;
-      setBoardSize(Math.min(w, h, 520));
-    });
-    ro.observe(el);
-    const w = el.clientWidth;
-    const h = el.clientHeight - 200;
-    setBoardSize(Math.min(w, Math.max(320, h), 520));
-    return () => ro.disconnect();
+    const measure = () => {
+      const m = boardSlotMobileRef.current;
+      const d = boardSlotDesktopRef.current;
+      const el =
+        m && m.getBoundingClientRect().width > 0 && m.getBoundingClientRect().height > 0
+          ? m
+          : d && d.getBoundingClientRect().width > 0 && d.getBoundingClientRect().height > 0
+            ? d
+            : m || d;
+      if (!el) return;
+      const side = Math.min(el.clientWidth, el.clientHeight);
+      setBoardSize(Math.max(200, Math.min(Math.floor(side), 520)));
+    };
+    const ro = new ResizeObserver(measure);
+    if (boardSlotMobileRef.current) ro.observe(boardSlotMobileRef.current);
+    if (boardSlotDesktopRef.current) ro.observe(boardSlotDesktopRef.current);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
   const squareSize = Math.floor(boardSize / 8);
 
@@ -364,228 +376,61 @@ export default function Chess({
 
   const p1Active = turn === "w";
   const p2Active = turn === "b";
-  const accentBorder = isMultiplayer ? "#FF5E00" : "#A855F7";
+  const isPractice = !isMultiplayer;
 
-  const PlayerCard = ({
-    username,
-    rating,
-    avatarGradient,
-    active,
-    captured,
-    isBot,
-    advantage,
-  }: {
-    username: string;
-    rating: number;
-    avatarGradient: string;
-    active: boolean;
-    captured: PieceType[];
-    isBot?: boolean;
-    advantage?: number | null;
-  }) => (
-    <div
-      className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-      style={{
-        borderColor: active ? accentBorder : "#2A3A5C",
-        boxShadow: active ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
-      }}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`h-10 w-10 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-lg font-bold text-white`}>
-          {username.charAt(0)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-white">
-            {username}
-            {isBot && (
-              <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                🤖 BOT
-              </span>
-            )}
-            {active && (
-              <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: accentBorder }}>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                Turn
-              </span>
-            )}
-          </p>
-          <p className="text-xs text-body-gray">Rating {rating}</p>
-        </div>
-        {typeof advantage === "number" && advantage !== 0 && (
-          <span className="text-sm font-semibold text-teal">{advantage > 0 ? `+${advantage}` : `+${Math.abs(advantage)}`}</span>
-        )}
-      </div>
-      <div className="mt-1 flex flex-wrap items-center gap-0.5">
-        {CAPTURED_DISPLAY_ORDER.map((t) =>
-          captured.filter((p) => p === t).map((_, i) => (
-            <span
-              key={`${username}-${t}-${i}`}
-              className="inline-flex items-center justify-center leading-none text-white/90"
-              style={{ fontFamily: "system-ui", fontSize: 18, width: 18, height: 18 }}
-            >
-              {getPieceSymbol(active ? "w" : "b", t)}
-            </span>
-          ))
-        )}
-      </div>
+  const capturedFooter = (captured: PieceType[], pieceColor: PieceColor) => (
+    <div className="flex flex-wrap items-center gap-0.5">
+      {CAPTURED_DISPLAY_ORDER.map((t) =>
+        captured.filter((p) => p === t).map((_, i) => (
+          <span
+            key={`${t}-${i}`}
+            className="inline-flex items-center justify-center leading-none text-white/90"
+            style={{ fontFamily: "system-ui", fontSize: 14, width: 14, height: 14 }}
+          >
+            {getPieceSymbol(pieceColor, t)}
+          </span>
+        ))
+      )}
     </div>
   );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      {/* Mobile: keep existing stacked layout */}
-      <div className="md:hidden">
-        <div className="flex h-full min-h-0 w-full flex-col">
-          <div
-            ref={boardContainerRef}
-            className="flex flex-1 flex-col items-center justify-center gap-3 py-4"
-          >
-            {/* Black (Player 2) info */}
-            <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-lg font-bold text-white">
-                  {player2.username.charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-white">
-                    {player2.username}
-                    {isPlayer2Bot && (
-                      <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                        🤖 BOT
-                      </span>
-                    )}
-                    {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))) && (
-                      <span className="ml-1.5 inline-flex animate-pulse text-body-gray">
-                        {isMultiplayer ? "thinking..." : "..."}
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-body-gray">Rating {player2.rating}</p>
-                </div>
-                {materialAdvantage < 0 && (
-                  <span className="text-sm font-semibold text-teal">+{Math.abs(materialAdvantage)}</span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-0.5">
-                {CAPTURED_DISPLAY_ORDER.map((t) =>
-                  capturedBlack.filter((p) => p === t).map((_, i) => (
-                    <span
-                      key={`b-${t}-${i}`}
-                      className="inline-flex items-center justify-center leading-none text-white/90"
-                      style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
-                    >
-                      {getPieceSymbol("w", t)}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Board */}
-            <div className="flex items-center justify-center">
-              <ChessBoard
-                board={board}
-                selectedSquare={selectedSquare}
-                legalMoveTargets={legalMoveTargets}
-                lastMove={lastMove}
-                checkSquare={checkSquare}
-                squareSize={squareSize}
-                onSquareClick={handleSquareClick}
-                onPieceDragStart={handlePieceDragStart}
-                onPieceDragMove={handlePieceDragMove}
-                onPieceDragEnd={handlePieceDragEnd}
-                dragging={dragging}
-                turn={turn}
-                flipped={isMultiplayer && myRole === "player2"}
-              />
-            </div>
-
-            {/* White (Player 1) info */}
-            <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-lg font-bold text-white">
-                  {player1.username.charAt(0)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-white">{player1.username}</p>
-                  <p className="text-xs text-body-gray">Rating {player1.rating}</p>
-                </div>
-                {materialAdvantage > 0 && (
-                  <span className="text-sm font-semibold text-teal">+{materialAdvantage}</span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-0.5">
-                {CAPTURED_DISPLAY_ORDER.map((t) =>
-                  capturedWhite.filter((p) => p === t).map((_, i) => (
-                    <span
-                      key={`w-${t}-${i}`}
-                      className="inline-flex items-center justify-center leading-none text-body-gray"
-                      style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
-                    >
-                      {getPieceSymbol("b", t)}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Check / Checkmate / Stalemate indicator */}
-            {inCheck && !inCheckmate && (
-              <p className="text-sm font-semibold text-amber-400">Check!</p>
-            )}
-            {inCheckmate && (
-              <p className="text-sm font-semibold text-red-400">Checkmate!</p>
-            )}
-            {inStalemate && (
-              <p className="text-sm font-semibold text-body-gray">Stalemate — Draw!</p>
-            )}
-            {isMultiplayer && !gameOverRef.current && !inCheckmate && !inStalemate && !inDraw && (
-              <div className="mt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (sendGameEvent && !drawOfferSent) {
-                      setDrawOfferSent(true);
-                      sendGameEvent({ type: "draw_offer" }).catch(() => {});
-                    }
-                  }}
-                  disabled={drawOfferSent}
-                  className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-body-gray hover:bg-white/10 disabled:opacity-50"
-                >
-                  {drawOfferSent ? "Draw offered" : "Offer Draw"}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop: standardized 3-column layout */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
-        {/* Left: player cards */}
-        <div className="w-[200px] shrink-0 flex flex-col gap-3">
-          <PlayerCard
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+      {/* Mobile */}
+      <div className="md:hidden flex h-full min-h-0 w-full flex-col overflow-hidden">
+        <GamePlayerStack className="shrink-0 px-0">
+          <GamePlayerRow
             username={player1.username}
-            rating={player1.rating}
-            avatarGradient="from-teal/40 to-purple/40"
+            avatarLetter={player1.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40 text-charcoal"
+            scoreRight={materialAdvantage > 0 ? `+${materialAdvantage}` : "—"}
             active={p1Active}
-            captured={capturedWhite}
-            advantage={materialAdvantage > 0 ? materialAdvantage : null}
+            isPractice={isPractice}
+            rating={player1.rating}
+            footer={capturedFooter(capturedWhite, "b")}
+            thinking={false}
           />
-          <PlayerCard
+          <GamePlayerRow
             username={player2.username}
-            rating={player2.rating}
-            avatarGradient="from-purple/40 to-rose-500/40"
+            avatarLetter={player2.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+            scoreRight={materialAdvantage < 0 ? `+${Math.abs(materialAdvantage)}` : "—"}
             active={p2Active}
-            captured={capturedBlack}
+            isPractice={isPractice}
+            rating={player2.rating}
             isBot={isPlayer2Bot}
-            advantage={materialAdvantage < 0 ? materialAdvantage : null}
+            footer={capturedFooter(capturedBlack, "w")}
+            thinking={
+              botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))
+            }
           />
-        </div>
+        </GamePlayerStack>
 
-        {/* Center: board */}
-        <div className="flex flex-1 flex-col items-center justify-center min-w-0">
-          <div className="flex items-center justify-center">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 overflow-hidden py-2">
+          <div
+            ref={boardSlotMobileRef}
+            className="game-board-slot-mobile flex items-center justify-center overflow-hidden"
+          >
             <ChessBoard
               board={board}
               selectedSquare={selectedSquare}
@@ -602,22 +447,138 @@ export default function Chess({
               flipped={isMultiplayer && myRole === "player2"}
             />
           </div>
-          <div className="mt-3 flex w-full max-w-[550px] items-center justify-between text-sm">
-            <span className="text-body-gray">
+          <div className="shrink-0 text-center">
+            {inCheck && !inCheckmate && (
+              <p className="text-xs font-semibold text-amber-400">Check!</p>
+            )}
+            {inCheckmate && (
+              <p className="text-xs font-semibold text-red-400">Checkmate!</p>
+            )}
+            {inStalemate && (
+              <p className="text-xs font-semibold text-body-gray">Stalemate — Draw!</p>
+            )}
+            {isMultiplayer && !gameOverRef.current && !inCheckmate && !inStalemate && !inDraw && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (sendGameEvent && !drawOfferSent) {
+                    setDrawOfferSent(true);
+                    sendGameEvent({ type: "draw_offer" }).catch(() => {});
+                  }
+                }}
+                disabled={drawOfferSent}
+                className="mt-1 rounded-lg border border-white/20 px-3 py-1 text-xs text-body-gray hover:bg-white/10 disabled:opacity-50"
+              >
+                {drawOfferSent ? "Draw offered" : "Offer Draw"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile move log */}
+        <div
+          className="mt-2 flex h-[150px] min-h-[150px] max-h-[150px] shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
+          style={{ overflowX: "hidden" }}
+        >
+          <h3 className="shrink-0 border-b border-white/10 px-3 py-2 text-xs font-semibold text-white">Moves</h3>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2">
+            {moveHistory.length === 0 ? (
+              <p className="py-2 text-center text-xs text-body-gray">Make the first move!</p>
+            ) : (
+              moveHistory.map((bubble, i) => {
+                const isPlayer1 = bubble.player === 1;
+                const totalBubbles = moveHistory.length;
+                const bubbleOrdinal = i + 1;
+                const isInCollapsedRange =
+                  isMobile && !showAllMoves && totalBubbles > 3 && bubbleOrdinal <= totalBubbles - 3;
+                if (isInCollapsedRange) return null;
+                return (
+                  <div key={`move-${i}-${bubble.san}`} className="mb-1.5 text-[11px]">
+                    <span style={{ color: isPlayer1 ? "var(--color-teal, #0d9488)" : "#9ca3af" }} className="font-bold">
+                      {bubble.playerName}
+                    </span>
+                    <span className="text-white/90"> {bubble.san.replace(/[+#]$/, "")}</span>
+                  </div>
+                );
+              })
+            )}
+            {isMobile && !showAllMoves && moveHistory.length > 3 && (
+              <button
+                type="button"
+                className="mt-1 text-xs text-teal hover:underline"
+                onClick={() => setShowAllMoves(true)}
+              >
+                Show all
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: 3-column */}
+      <div className="hidden md:flex h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden">
+        <div className="w-[200px] shrink-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden">
+          <GamePlayerRow
+            username={player1.username}
+            avatarLetter={player1.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40 text-charcoal"
+            scoreRight={materialAdvantage > 0 ? `+${materialAdvantage}` : "—"}
+            active={p1Active}
+            isPractice={isPractice}
+            rating={player1.rating}
+            footer={capturedFooter(capturedWhite, "b")}
+          />
+          <GamePlayerRow
+            username={player2.username}
+            avatarLetter={player2.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+            scoreRight={materialAdvantage < 0 ? `+${Math.abs(materialAdvantage)}` : "—"}
+            active={p2Active}
+            isPractice={isPractice}
+            rating={player2.rating}
+            isBot={isPlayer2Bot}
+            footer={capturedFooter(capturedBlack, "w")}
+            thinking={
+              botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))
+            }
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
+          <div
+            ref={boardSlotDesktopRef}
+            className="game-board-slot-desktop flex items-center justify-center overflow-hidden"
+          >
+            <ChessBoard
+              board={board}
+              selectedSquare={selectedSquare}
+              legalMoveTargets={legalMoveTargets}
+              lastMove={lastMove}
+              checkSquare={checkSquare}
+              squareSize={squareSize}
+              onSquareClick={handleSquareClick}
+              onPieceDragStart={handlePieceDragStart}
+              onPieceDragMove={handlePieceDragMove}
+              onPieceDragEnd={handlePieceDragEnd}
+              dragging={dragging}
+              turn={turn}
+              flipped={isMultiplayer && myRole === "player2"}
+            />
+          </div>
+          <div className="mt-2 flex w-full max-w-[500px] items-center justify-between text-sm text-body-gray">
+            <span>
               {(() => {
                 const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
                 const myTurn = turn === myColor;
                 return myTurn ? "Your Turn" : "Opponent's Turn";
               })()}
             </span>
-            <span className="text-body-gray"> </span>
           </div>
         </div>
 
-        {/* Right: move log (already fixed-height/scrolling) */}
-        <div className="md:w-[280px] shrink-0">
+        <div className="w-[280px] shrink-0 min-h-0">
           <div
-            className="flex h-full flex-col rounded-lg border border-white/10 bg-card/80 min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]"
+            className="flex h-full max-h-full min-h-0 flex-col rounded-lg border border-white/10 bg-card/80 overflow-hidden"
             style={{ overflowX: "hidden" }}
           >
             <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>

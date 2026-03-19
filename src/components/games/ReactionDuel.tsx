@@ -30,6 +30,7 @@ function reactionLabel(ms: number): { text: string; color: string } {
 }
 
 import type { GameMultiplayerProps } from "./Chess";
+import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
 
 interface ReactionDuelProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -38,6 +39,7 @@ interface ReactionDuelProps extends GameMultiplayerProps {
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
   botDifficulty?: BotDifficulty;
+  isPractice?: boolean;
 }
 
 type Phase = "countdown" | "get_ready" | "target" | "tapped" | "round_result" | "match_over";
@@ -55,6 +57,7 @@ export default function ReactionDuel({
   sendGameEvent,
   incomingEvent,
   onEventProcessed,
+  isPractice: isPracticeProp,
 }: ReactionDuelProps) {
   const [phase, setPhase] = useState<Phase>("countdown");
   const [countdownN, setCountdownN] = useState(3);
@@ -74,7 +77,8 @@ export default function ReactionDuel({
   const [showTooEarly, setShowTooEarly] = useState(false);
   const [showMiss, setShowMiss] = useState(false);
   const [lastP1Time, setLastP1Time] = useState<number | null>(null);
-  const gameAreaRef = useRef<HTMLDivElement>(null);
+  const gameAreaMobileRef = useRef<HTMLDivElement>(null);
+  const gameAreaDesktopRef = useRef<HTMLDivElement>(null);
   const targetAppearTimeRef = useRef<number>(0);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,17 +106,33 @@ export default function ReactionDuel({
     roundResultTimeoutRef.current = null;
   }, []);
 
-  useEffect(() => {
-    const el = gameAreaRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const rect = el.getBoundingClientRect();
-      areaSizeRef.current = { w: rect.width, h: rect.height };
-    });
-    ro.observe(el);
-    areaSizeRef.current = { w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height };
-    return () => ro.disconnect();
+  const syncGameAreaSize = useCallback(() => {
+    const m = gameAreaMobileRef.current;
+    const d = gameAreaDesktopRef.current;
+    const rectM = m?.getBoundingClientRect();
+    const rectD = d?.getBoundingClientRect();
+    const pick =
+      rectM && rectM.width > 0 && rectM.height > 0
+        ? m!
+        : rectD && rectD.width > 0 && rectD.height > 0
+          ? d!
+          : m || d;
+    if (!pick) return;
+    const rect = pick.getBoundingClientRect();
+    areaSizeRef.current = { w: rect.width, h: rect.height };
   }, []);
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => syncGameAreaSize());
+    if (gameAreaMobileRef.current) ro.observe(gameAreaMobileRef.current);
+    if (gameAreaDesktopRef.current) ro.observe(gameAreaDesktopRef.current);
+    syncGameAreaSize();
+    window.addEventListener("resize", syncGameAreaSize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", syncGameAreaSize);
+    };
+  }, [syncGameAreaSize]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -257,66 +277,6 @@ export default function ReactionDuel({
     };
   }, [phase, round, isPlayer2Bot, botDifficulty, isMultiplayer, myRole, sendGameEvent, baseTargetSize]);
 
-  const handleGameAreaTap = useCallback(
-    (clientX: number, clientY: number) => {
-      if (phase === "countdown") return;
-      if (phase === "get_ready") {
-        setShowTooEarly(true);
-        const myReaction: Reaction = "false_start";
-        if (!isMultiplayer || myRole === "player1") setP1Reaction(myReaction);
-        else setP2Reaction(myReaction);
-        if (isMultiplayer && sendGameEvent) {
-          sendGameEvent({ type: "reaction_result", round, reactionTime: -1 }).catch(() => {});
-        }
-        if (botTimeoutRef.current) {
-          clearTimeout(botTimeoutRef.current);
-          botTimeoutRef.current = null;
-        }
-        if (!isMultiplayer && isPlayer2Bot) {
-          const botMs = getReactionBotResponseMs(botDifficulty);
-          setP2Reaction(botMs);
-          setTimeout(() => {
-            setPhase("round_result");
-            roundResultTimeoutRef.current = setTimeout(() => advanceRound("false_start", botMs), ROUND_RESULT_DURATION);
-          }, 800);
-        }
-        return;
-      }
-      const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
-      if (phase !== "target" || myReactionAlreadySet) return;
-      const el = gameAreaRef.current;
-      if (!el || !targetPos) return;
-      const rect = el.getBoundingClientRect();
-      const x = clientX - rect.left;
-      const y = clientY - rect.top;
-      const dist = Math.hypot(x - targetPos.x, y - targetPos.y);
-      const radius = targetDiameter / 2 + 15;
-      const hit = dist <= radius;
-      const reactionMs = Math.round(performance.now() - targetAppearTimeRef.current);
-      const value: Reaction = hit ? reactionMs : reactionMs + MISS_PENALTY_MS;
-      const sendValue = typeof value === "number" ? value : -1;
-      if (myRole === "player1") {
-        setP1Reaction(value);
-        setLastP1Time(typeof value === "number" ? value : null);
-        if (typeof value === "number") setP1TotalMs((t) => t + value);
-      } else {
-        setP2Reaction(value);
-        if (typeof value === "number") setP2TotalMs((t) => t + value);
-      }
-      if (tapTimeoutRef.current) {
-        clearTimeout(tapTimeoutRef.current);
-        tapTimeoutRef.current = null;
-      }
-      setTapPos({ x: hit ? targetPos.x : x, y: hit ? targetPos.y : y });
-      if (!hit) setShowMiss(true);
-      setPhase("tapped");
-      if (isMultiplayer && sendGameEvent) {
-        sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
-      }
-    },
-    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound]
-  );
-
   const advanceRound = useCallback(
     (p1: Reaction, p2: Reaction) => {
       if (roundResultTimeoutRef.current) {
@@ -348,6 +308,75 @@ export default function ReactionDuel({
       });
     },
     [p1Wins, p2Wins, p1TotalMs, p2TotalMs, onGameEnd, onGameDraw]
+  );
+
+  const handleGameAreaTap = useCallback(
+    (clientX: number, clientY: number) => {
+      if (phase === "countdown") return;
+      if (phase === "get_ready") {
+        setShowTooEarly(true);
+        const myReaction: Reaction = "false_start";
+        if (!isMultiplayer || myRole === "player1") setP1Reaction(myReaction);
+        else setP2Reaction(myReaction);
+        if (isMultiplayer && sendGameEvent) {
+          sendGameEvent({ type: "reaction_result", round, reactionTime: -1 }).catch(() => {});
+        }
+        if (botTimeoutRef.current) {
+          clearTimeout(botTimeoutRef.current);
+          botTimeoutRef.current = null;
+        }
+        if (!isMultiplayer && isPlayer2Bot) {
+          const botMs = getReactionBotResponseMs(botDifficulty);
+          setP2Reaction(botMs);
+          setTimeout(() => {
+            setPhase("round_result");
+            roundResultTimeoutRef.current = setTimeout(() => advanceRound("false_start", botMs), ROUND_RESULT_DURATION);
+          }, 800);
+        }
+        return;
+      }
+      const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
+      if (phase !== "target" || myReactionAlreadySet) return;
+      const m = gameAreaMobileRef.current;
+      const d = gameAreaDesktopRef.current;
+      const rm = m?.getBoundingClientRect();
+      const el =
+        rm && rm.width > 0 && rm.height > 0
+          ? m
+          : (() => {
+              const rd = d?.getBoundingClientRect();
+              return rd && rd.width > 0 && rd.height > 0 ? d : m || d;
+            })();
+      if (!el || !targetPos) return;
+      const rect = el.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const dist = Math.hypot(x - targetPos.x, y - targetPos.y);
+      const radius = targetDiameter / 2 + 15;
+      const hit = dist <= radius;
+      const reactionMs = Math.round(performance.now() - targetAppearTimeRef.current);
+      const value: Reaction = hit ? reactionMs : reactionMs + MISS_PENALTY_MS;
+      const sendValue = typeof value === "number" ? value : -1;
+      if (myRole === "player1") {
+        setP1Reaction(value);
+        setLastP1Time(typeof value === "number" ? value : null);
+        if (typeof value === "number") setP1TotalMs((t) => t + value);
+      } else {
+        setP2Reaction(value);
+        if (typeof value === "number") setP2TotalMs((t) => t + value);
+      }
+      if (tapTimeoutRef.current) {
+        clearTimeout(tapTimeoutRef.current);
+        tapTimeoutRef.current = null;
+      }
+      setTapPos({ x: hit ? targetPos.x : x, y: hit ? targetPos.y : y });
+      if (!hit) setShowMiss(true);
+      setPhase("tapped");
+      if (isMultiplayer && sendGameEvent) {
+        sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
+      }
+    },
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound]
   );
 
   function toReaction(t: number): Reaction {
@@ -409,39 +438,66 @@ export default function ReactionDuel({
   const progressP1 = p1Wins / TOTAL_ROUNDS;
   const progressP2 = p2Wins / TOTAL_ROUNDS;
 
+  const isPractice = isPracticeProp ?? !isMultiplayer;
+  const p1RowActive =
+    (phase === "target" || phase === "get_ready") &&
+    p1Reaction === null &&
+    (!isMultiplayer || myRole === "player1");
+  const p2RowActive =
+    (phase === "target" || phase === "get_ready") &&
+    p2Reaction === null &&
+    (!isMultiplayer || myRole === "player2");
+
   return (
-    <div className="flex h-full min-h-0 w-full flex-col touch-manipulation" style={{ touchAction: "manipulation" }}>
-      {/* Mobile: keep stacked layout */}
-      <div className="md:hidden">
-        <div className="flex h-full flex-col">
-          <div className="flex flex-1 flex-col min-h-0">
-            <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
-              <span className="font-semibold text-white">Reaction Duel ⚡</span>
-              <span className="text-body-gray tabular-nums">
+    <div
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden touch-manipulation"
+      style={{ touchAction: "manipulation" }}
+    >
+      {/* Mobile */}
+      <div className="flex h-full min-h-0 flex-col overflow-hidden md:hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+              <span className="text-sm font-semibold text-white">Reaction Duel ⚡</span>
+              <span className="text-body-gray tabular-nums text-xs">
                 Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
               </span>
             </div>
 
-            <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 bg-white/5">
-              <div className={`flex items-center gap-2 ${p1Wins >= p2Wins ? "text-teal" : "text-white"}`}>
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
-                  {player1.username.charAt(0)}
-                </div>
-                <span className="font-medium">{player1.username}: {p1Wins}</span>
-                {p1Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p1Streak} streak!</span>}
-              </div>
-              <span className="text-body-gray font-medium">VS</span>
-              <div className={`flex items-center gap-2 ${p2Wins >= p1Wins ? "text-purple-400" : "text-white"}`}>
-                <span className="font-medium">{player2.username}: {p2Wins}</span>
-                {isPlayer2Bot && <span className="text-xs text-body-gray">🤖</span>}
-                {p2Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p2Streak} streak!</span>}
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
-                  {player2.username.charAt(0)}
-                </div>
-              </div>
+            <div className="shrink-0 px-2 pt-2">
+              <GamePlayerStack>
+                <GamePlayerRow
+                  username={player1.username}
+                  avatarLetter={player1.username.charAt(0)}
+                  avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40"
+                  scoreRight={`Score: ${p1Wins}`}
+                  active={p1RowActive}
+                  isPractice={isPractice}
+                  rating={player1.rating}
+                  footer={
+                    p1Streak >= 3 ? (
+                      <span className="text-[10px] text-amber-400">🔥 {p1Streak} streak</span>
+                    ) : undefined
+                  }
+                />
+                <GamePlayerRow
+                  username={player2.username}
+                  avatarLetter={player2.username.charAt(0)}
+                  avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+                  scoreRight={`Score: ${p2Wins}`}
+                  active={p2RowActive}
+                  isPractice={isPractice}
+                  rating={player2.rating}
+                  isBot={isPlayer2Bot}
+                  footer={
+                    p2Streak >= 3 ? (
+                      <span className="text-[10px] text-amber-400">🔥 {p2Streak} streak</span>
+                    ) : undefined
+                  }
+                />
+              </GamePlayerStack>
             </div>
 
-            <div className="shrink-0 px-4 pb-2 flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1 px-3 pb-1 pt-1">
               {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
                 <div
                   key={i}
@@ -459,18 +515,17 @@ export default function ReactionDuel({
               ))}
             </div>
 
-            <div className="shrink-0 h-2 mx-4 mb-2 flex rounded-full overflow-hidden bg-white/10">
+            <div className="mx-3 mb-1 flex h-2 shrink-0 overflow-hidden rounded-full bg-white/10">
               <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
               <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
             </div>
 
             <div
-              ref={gameAreaRef}
-              className="flex-1 min-h-[300px] mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
+              ref={gameAreaMobileRef}
+              className="game-play-area-mobile mx-2 mb-2 flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
               style={{
                 backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
                 minWidth: 0,
-                minHeight: 400,
                 touchAction: "manipulation",
               }}
               onTouchStart={(e) => {
@@ -617,42 +672,46 @@ export default function ReactionDuel({
                 })()}
               </div>
             )}
-          </div>
         </div>
       </div>
 
-      {/* Desktop: standardized 3-column layout */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
-        {/* Left: player cards */}
-        <div className="w-[200px] shrink-0 flex flex-col gap-3">
-          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
-                {player1.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">{player1.username}</p>
-                <p className="text-xs text-body-gray">Wins {p1Wins}{p1Streak >= 3 ? ` · 🔥 ${p1Streak} streak` : ""}</p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
-                {player2.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">
-                  {player2.username}{isPlayer2Bot ? " 🤖" : ""}
-                </p>
-                <p className="text-xs text-body-gray">Wins {p2Wins}{p2Streak >= 3 ? ` · 🔥 ${p2Streak} streak` : ""}</p>
-              </div>
-            </div>
-          </div>
+      {/* Desktop */}
+      <div className="hidden h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden md:flex">
+        <div className="flex w-[200px] shrink-0 flex-col justify-center">
+          <GamePlayerStack>
+            <GamePlayerRow
+              username={player1.username}
+              avatarLetter={player1.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40"
+              scoreRight={`Score: ${p1Wins}`}
+              active={p1RowActive}
+              isPractice={isPractice}
+              rating={player1.rating}
+              footer={
+                p1Streak >= 3 ? (
+                  <span className="text-[10px] text-amber-400">🔥 {p1Streak} streak</span>
+                ) : undefined
+              }
+            />
+            <GamePlayerRow
+              username={player2.username}
+              avatarLetter={player2.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
+              scoreRight={`Score: ${p2Wins}`}
+              active={p2RowActive}
+              isPractice={isPractice}
+              rating={player2.rating}
+              isBot={isPlayer2Bot}
+              footer={
+                p2Streak >= 3 ? (
+                  <span className="text-[10px] text-amber-400">🔥 {p2Streak} streak</span>
+                ) : undefined
+              }
+            />
+          </GamePlayerStack>
         </div>
 
-        {/* Center: game area */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden py-2">
           <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
             <span className="font-semibold text-white">Reaction Duel ⚡</span>
             <span className="text-body-gray tabular-nums">
@@ -691,12 +750,11 @@ export default function ReactionDuel({
           </div>
 
           <div
-            ref={gameAreaRef}
-            className="flex-1 min-h-0 mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
+            ref={gameAreaDesktopRef}
+            className="game-play-area-desktop relative mx-3 mb-2 flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
             style={{
               backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
               minWidth: 0,
-              minHeight: 400,
               touchAction: "manipulation",
             }}
             onTouchStart={(e) => {
@@ -784,8 +842,11 @@ export default function ReactionDuel({
         </div>
 
         {/* Right: game log */}
-        <div className="w-[280px] shrink-0">
-          <div className="flex h-full w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
+        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
+            style={{ overflowX: "hidden" }}
+          >
             <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
               <h3 className="text-sm font-semibold text-white">Game Log</h3>
             </div>

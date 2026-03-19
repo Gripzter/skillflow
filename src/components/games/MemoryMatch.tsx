@@ -17,6 +17,7 @@ import {
   remainingPairs,
 } from "@/lib/games/memory-logic";
 import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs } from "@/lib/games/bot-engine";
+import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
 
 interface MemoryMatchProps {
   player1: { username: string; rating: number };
@@ -24,6 +25,8 @@ interface MemoryMatchProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  /** Real-money vs practice accent on active row (defaults true = practice). */
+  isPractice?: boolean;
 }
 
 type LogEntry = {
@@ -44,6 +47,7 @@ export default function MemoryMatch({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  isPractice = true,
 }: MemoryMatchProps) {
   const [cards, setCards] = useState<MemoryCard[]>(() => createShuffledDeck());
   const [currentPlayer, setCurrentPlayer] = useState<MemoryMatchPlayer>(1);
@@ -58,7 +62,8 @@ export default function MemoryMatch({
   const [cardSize, setCardSize] = useState(60);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const boardRef = useRef<HTMLDivElement | null>(null);
+  const boardSlotMobileRef = useRef<HTMLDivElement | null>(null);
+  const boardSlotDesktopRef = useRef<HTMLDivElement | null>(null);
   const resolvingRef = useRef(false);
   const processingRef = useRef(false);
   const gameEndCalledRef = useRef(false);
@@ -82,18 +87,23 @@ export default function MemoryMatch({
   }, []);
 
   const updateCardSize = useCallback(() => {
-    const el = boardRef.current;
-    if (!el) return;
-    const parent = el.parentElement;
+    const m = boardSlotMobileRef.current;
+    const d = boardSlotDesktopRef.current;
+    const parent =
+      m && m.getBoundingClientRect().width > 0 && m.getBoundingClientRect().height > 0
+        ? m
+        : d && d.getBoundingClientRect().width > 0 && d.getBoundingClientRect().height > 0
+          ? d
+          : m || d;
     if (!parent) return;
     const w = parent.clientWidth;
     const h = parent.clientHeight;
     if (!w || !h) return;
     const totalGapX = CARD_GAP * (GRID_COLS - 1);
     const totalGapY = CARD_GAP * (GRID_ROWS - 1);
-    const availableWidth = w - totalGapX - 32;
-    const reservedTopBottom = 160;
-    const availableHeight = h - totalGapY - reservedTopBottom;
+    const pad = 20;
+    const availableWidth = w - totalGapX - pad;
+    const availableHeight = h - totalGapY - pad;
     const maxByWidth = availableWidth / GRID_COLS;
     const maxByHeight = availableHeight / GRID_ROWS;
     const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
@@ -131,10 +141,10 @@ export default function MemoryMatch({
   }, [isProcessing]);
 
   useEffect(() => {
-    const el = boardRef.current?.parentElement;
-    if (!el) return;
     const ro = new ResizeObserver(() => updateCardSize());
-    ro.observe(el);
+    if (boardSlotMobileRef.current) ro.observe(boardSlotMobileRef.current);
+    if (boardSlotDesktopRef.current) ro.observe(boardSlotDesktopRef.current);
+    updateCardSize();
     window.addEventListener("resize", updateCardSize);
     return () => {
       ro.disconnect();
@@ -376,87 +386,56 @@ export default function MemoryMatch({
     [cards, currentPlayer, gameOver, flipCardAt, selected.length]
   );
 
-  const formatScoreLabel = (name: string, score: number) => `${name}: ${score}`;
-
   const activeColor =
     currentPlayer === 1 ? "rgba(0,229,199,0.8)" : "rgba(168, 85, 247, 0.8)";
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      {/* Mobile: keep existing stacked layout */}
-      <div className="md:hidden">
-        <div className="flex h-full min-h-0 w-full flex-col">
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4">
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
-              </div>
-              <div className="text-xs text-body-gray">
-                {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} remaining`}
-              </div>
-            </div>
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+      {/* Mobile */}
+      <div className="md:hidden flex h-full min-h-0 w-full flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden py-2">
+          <div className="flex shrink-0 items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1.5">
+            <span className="text-xs font-semibold text-white">Memory Match 🧠</span>
+            <span className="text-[11px] text-body-gray">
+              {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} left`}
+            </span>
+          </div>
 
-            <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
-              <div
-                className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
-                  currentPlayer === 1 ? "border-teal/60 bg-teal/10" : "border-white/10 bg-transparent"
-                }`}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-teal to-emerald-500 text-sm font-bold text-charcoal">
-                  {player1.username.charAt(0)}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-white truncate max-w-[120px]">
-                    {player1.username}
-                  </span>
-                  <span className="text-[11px] text-body-gray">Rating {player1.rating}</span>
-                </div>
-                <div className="ml-auto text-right">
-                  <p className="text-sm font-semibold text-teal">
-                    {formatScoreLabel("Pairs", scores[1])}
-                  </p>
-                </div>
-              </div>
-              <div
-                className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
-                  currentPlayer === 2 ? "border-purple/60 bg-purple/10" : "border-white/10 bg-transparent"
-                }`}
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
-                  {player2.username.charAt(0)}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-white truncate max-w-[120px]">
-                    {player2.username}
-                  </span>
-                  <span className="text-[11px] text-body-gray">Rating {player2.rating}</span>
-                </div>
-                <div className="ml-auto flex flex-col items-end gap-0.5">
-                  <p className="text-sm font-semibold text-purple-300">
-                    {formatScoreLabel("Pairs", scores[2])}
-                  </p>
-                  {isPlayer2Bot && (
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-body-gray">
-                      🤖 BOT
-                    </span>
-                  )}
-                  {thinking && (
-                    <span className="text-[10px] text-body-gray animate-pulse">Thinking...</span>
-                  )}
-                </div>
-              </div>
-            </div>
+          <GamePlayerStack className="shrink-0">
+            <GamePlayerRow
+              username={player1.username}
+              avatarLetter={player1.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-teal to-emerald-500 text-charcoal"
+              scoreRight={`Pairs: ${scores[1]}`}
+              active={currentPlayer === 1}
+              isPractice={isPractice}
+              rating={player1.rating}
+            />
+            <GamePlayerRow
+              username={player2.username}
+              avatarLetter={player2.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-purple-500 to-pink-500 text-white"
+              scoreRight={`Pairs: ${scores[2]}`}
+              active={currentPlayer === 2}
+              isPractice={isPractice}
+              rating={player2.rating}
+              isBot={isPlayer2Bot}
+              thinking={thinking}
+            />
+          </GamePlayerStack>
 
-            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60">
-              <div
-                ref={boardRef}
-                className="relative flex items-center justify-center p-3"
-                style={{
-                  perspective: "1000px",
-                  boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
-                  borderRadius: 18,
-                }}
-              >
+          <div
+            ref={boardSlotMobileRef}
+            className="game-board-slot-mobile flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60"
+          >
+            <div
+              className="relative flex max-h-full max-w-full items-center justify-center p-2"
+              style={{
+                perspective: "1000px",
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
+                borderRadius: 18,
+              }}
+            >
                 <div
                   className="absolute inset-0 rounded-[18px] border-[2px]"
                   style={{
@@ -556,12 +535,11 @@ export default function MemoryMatch({
                   })}
                 </div>
               </div>
-            </div>
+          </div>
 
-            <div className="mt-1 text-center text-sm text-body-gray">
+            <div className="mt-1 shrink-0 text-center text-xs text-body-gray">
               {turnMessage}
             </div>
-          </div>
 
           {/* Mobile game log: fixed-height live feed below board */}
           <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden flex flex-col" style={{ overflowX: "hidden" }}>
@@ -629,63 +607,47 @@ export default function MemoryMatch({
         </div>
       </div>
 
-      {/* Desktop: standardized 3-column layout */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
-        {/* Left: player cards */}
-        <div className="w-[200px] shrink-0 flex flex-col gap-3">
-          <div
-            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-            style={{
-              borderColor: currentPlayer === 1 ? "#FF5E00" : "#2A3A5C",
-              boxShadow: currentPlayer === 1 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-teal to-emerald-500 text-sm font-bold text-charcoal">
-                {player1.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">{player1.username}</p>
-                <p className="text-xs text-body-gray">Pairs {scores[1]}</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-            style={{
-              borderColor: currentPlayer === 2 ? "#A855F7" : "#2A3A5C",
-              boxShadow: currentPlayer === 2 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
-                {player2.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">
-                  {player2.username}{isPlayer2Bot ? " 🤖" : ""}
-                  {thinking && <span className="ml-2 text-xs text-body-gray animate-pulse">Thinking…</span>}
-                </p>
-                <p className="text-xs text-body-gray">Pairs {scores[2]}</p>
-              </div>
-            </div>
-          </div>
+      {/* Desktop: 3-column layout */}
+      <div className="hidden h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden md:flex">
+        <div className="flex w-[200px] shrink-0 flex-col justify-center">
+          <GamePlayerStack>
+            <GamePlayerRow
+              username={player1.username}
+              avatarLetter={player1.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-teal to-emerald-500 text-charcoal"
+              scoreRight={`Pairs: ${scores[1]}`}
+              active={currentPlayer === 1}
+              isPractice={isPractice}
+              rating={player1.rating}
+            />
+            <GamePlayerRow
+              username={player2.username}
+              avatarLetter={player2.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-purple-500 to-pink-500 text-white"
+              scoreRight={`Pairs: ${scores[2]}`}
+              active={currentPlayer === 2}
+              isPractice={isPractice}
+              rating={player2.rating}
+              isBot={isPlayer2Bot}
+              thinking={thinking}
+            />
+          </GamePlayerStack>
         </div>
 
-        {/* Center: board */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:min-w-0 py-4">
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden py-2">
+          <div className="flex shrink-0 items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
             <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
             <div className="text-xs text-body-gray">
               {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} remaining`}
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60">
+          <div
+            ref={boardSlotDesktopRef}
+            className="game-board-slot-desktop flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60"
+          >
             <div
-              ref={boardRef}
-              className="relative flex items-center justify-center p-3"
+              className="relative flex max-h-full max-w-full items-center justify-center p-2"
               style={{
                 perspective: "1000px",
                 boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
@@ -786,77 +748,74 @@ export default function MemoryMatch({
             </div>
           </div>
 
-          <div className="mt-1 flex w-full items-center justify-between text-sm text-body-gray">
-            <span>{currentPlayer === 1 ? "Your Turn" : "Opponent's Turn"}</span>
-            <span className="tabular-nums"> </span>
-          </div>
-
-          <div className="text-center text-sm text-body-gray">{turnMessage}</div>
+          <div className="shrink-0 text-center text-xs text-body-gray">{turnMessage}</div>
         </div>
 
-        {/* Right: game log */}
-        <div className="w-[280px] shrink-0">
-          <div className="w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 flex min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
-          <h3 className="text-sm font-semibold text-white">Game Log</h3>
-        </div>
-        <div
-          ref={desktopLogRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-            desktopAtBottomRef.current = atBottom;
-          }}
-        >
-          {moves.length === 0 ? (
-            <p className="py-4 text-center text-sm text-body-gray">
-              Flip two cards to start!
-            </p>
-          ) : (
-            moves.map((entry) => {
-              const isP1 = entry.player === 1;
-              const isP2 = entry.player === 2;
-              return (
-                <div
-                  key={entry.id}
-                  className="mb-2 flex max-w-[80%] shrink-0"
-                  style={{
-                    marginLeft: isP1 ? "auto" : 0,
-                    marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
-                  }}
-                >
-                  <div
-                    className="rounded-xl px-3.5 py-2.5"
-                    style={{
-                      backgroundColor: isP1
-                        ? "rgba(0,229,199,0.25)"
-                        : isP2
-                          ? "rgba(168,85,247,0.25)"
-                          : "rgba(148,163,184,0.16)",
-                      borderLeft: isP1
-                        ? "3px solid rgba(0,229,199,0.6)"
-                        : isP2
-                          ? "3px solid rgba(168,85,247,0.7)"
-                          : "3px solid rgba(148,163,184,0.6)",
-                    }}
-                  >
-                    <p className="text-xs font-bold text-white">
-                      {isP1
-                        ? player1.username
-                        : isP2
-                          ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
-                          : "Game"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-white/90">
-                      {entry.message}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden">
+          <div
+            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
+            style={{ overflowX: "hidden" }}
+          >
+            <div className="sticky top-0 z-10 shrink-0 border-b border-white/10 bg-card/90 px-4 py-3">
+              <h3 className="text-sm font-semibold text-white">Game Log</h3>
+            </div>
+            <div
+              ref={desktopLogRef}
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+                desktopAtBottomRef.current = atBottom;
+              }}
+            >
+              {moves.length === 0 ? (
+                <p className="py-4 text-center text-sm text-body-gray">
+                  Flip two cards to start!
+                </p>
+              ) : (
+                moves.map((entry) => {
+                  const isP1 = entry.player === 1;
+                  const isP2 = entry.player === 2;
+                  return (
+                    <div
+                      key={entry.id}
+                      className="mb-2 flex max-w-[80%] shrink-0"
+                      style={{
+                        marginLeft: isP1 ? "auto" : 0,
+                        marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
+                      }}
+                    >
+                      <div
+                        className="rounded-xl px-3.5 py-2.5"
+                        style={{
+                          backgroundColor: isP1
+                            ? "rgba(0,229,199,0.25)"
+                            : isP2
+                              ? "rgba(168,85,247,0.25)"
+                              : "rgba(148,163,184,0.16)",
+                          borderLeft: isP1
+                            ? "3px solid rgba(0,229,199,0.6)"
+                            : isP2
+                              ? "3px solid rgba(168,85,247,0.7)"
+                              : "3px solid rgba(148,163,184,0.6)",
+                        }}
+                      >
+                        <p className="text-xs font-bold text-white">
+                          {isP1
+                            ? player1.username
+                            : isP2
+                              ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
+                              : "Game"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-white/90">
+                          {entry.message}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>

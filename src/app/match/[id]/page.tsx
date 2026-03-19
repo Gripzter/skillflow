@@ -461,8 +461,28 @@ function MatchPageContent() {
     });
   }
 
+  const boardGameTypes = [
+    "chess",
+    "connect-4",
+    "reaction-duel",
+    "memory-match",
+    "checkers",
+    "spelling-bee",
+  ] as const;
+  const lockGameViewport =
+    match.status === "in_progress" &&
+    !outcome &&
+    !waitingForOpponent &&
+    (boardGameTypes as readonly string[]).includes(match.gameType);
+
   return (
-    <div className="flex min-h-screen flex-col bg-charcoal">
+    <div
+      className={`relative flex flex-col bg-charcoal ${
+        lockGameViewport
+          ? "h-[100dvh] max-h-[100dvh] overflow-hidden"
+          : "min-h-screen"
+      }`}
+    >
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
         username={username}
@@ -473,8 +493,15 @@ function MatchPageContent() {
       />
       <ModeToggleBarContent />
 
+      <div
+        className={
+          lockGameViewport
+            ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+            : "flex flex-1 flex-col"
+        }
+      >
       {/* Top bar */}
-      <div className="border-b border-white/5 px-4 py-3 sm:px-6">
+      <div className="shrink-0 border-b border-white/5 px-4 py-3 sm:px-6">
         <div className="mx-auto hidden max-w-[1200px] items-center justify-between md:flex">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-white">
@@ -594,7 +621,7 @@ function MatchPageContent() {
 
       {/* In-game chat bar — only for real human vs human matches */}
       {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && match?.gameType !== "checkers" && (
-        <div className="mx-auto w-full px-4 sm:px-6 lg:max-w-[1200px]">
+        <div className="mx-auto w-full shrink-0 px-4 sm:px-6 lg:max-w-[1200px]">
           <GameChat
             messages={chatMessages}
             onSendMessage={handleSendChatMessage}
@@ -615,9 +642,9 @@ function MatchPageContent() {
 
       {/* Main: Chess and Connect 4 use full-width layout; Pool uses 3 columns */}
       {!waitingForOpponent && match.gameType === "chess" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-[500px] flex-1 flex-col rounded-card bg-card p-4">
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <Chess
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -635,12 +662,9 @@ function MatchPageContent() {
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "connect-4" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div
-              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
-              style={{ height: "calc(100vh - 160px)" }}
-            >
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <ConnectFour
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -658,9 +682,9 @@ function MatchPageContent() {
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "reaction-duel" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-[400px] flex-1 flex-col rounded-card bg-card p-4">
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <ReactionDuel
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -673,34 +697,30 @@ function MatchPageContent() {
                 sendGameEvent={sendGameEvent}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
+                isPractice={match.isPractice}
               />
             </div>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "memory-match" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div
-              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
-              style={{ height: "calc(100vh - 160px)" }}
-            >
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <MemoryMatch
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                isPractice={match.isPractice}
               />
             </div>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "checkers" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div
-              className="card-border flex flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
-              style={{ height: "calc(100vh - 160px)" }}
-            >
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <Checkers
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -724,12 +744,9 @@ function MatchPageContent() {
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "spelling-bee" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-6 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-2 sm:px-6 lg:max-w-[1200px]">
           {match.status === "in_progress" && !outcome ? (
-            <div
-              className="card-border flex min-h-[500px] flex-1 flex-col overflow-hidden rounded-card bg-card p-4"
-              style={{ minHeight: "calc(100vh - 160px)" }}
-            >
+            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-3 sm:p-4">
               <SpellingBee
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -742,6 +759,7 @@ function MatchPageContent() {
                 sendGameEvent={sendGameEvent}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
+                isPractice={match.isPractice}
               />
             </div>
           ) : null}
@@ -811,7 +829,7 @@ function MatchPageContent() {
       ) : null}
 
       {/* Bottom bar */}
-      <div className="border-t border-white/5 px-4 py-4 sm:px-6">
+      <div className="shrink-0 border-t border-white/5 px-4 py-3 sm:px-6">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4">
           <p className="text-sm text-body-gray">
             {match.isPractice
@@ -839,6 +857,7 @@ function MatchPageContent() {
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Victory overlay — only shown when THIS player won */}

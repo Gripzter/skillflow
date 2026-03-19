@@ -25,6 +25,7 @@ const YELLOW_CENTER = "#FFDD44";
 const YELLOW_EDGE = "#CCAA00";
 
 import type { GameMultiplayerProps } from "./Chess";
+import { GamePlayerRow, GamePlayerStack, PlayerColorDot } from "@/components/games/GamePlayerStrip";
 
 interface ConnectFourProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -67,7 +68,8 @@ export default function ConnectFour({
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const moveListEndRef = useRef<HTMLDivElement | null>(null);
-  const boardColumnRef = useRef<HTMLDivElement>(null);
+  const boardSlotMobileRef = useRef<HTMLDivElement>(null);
+  const boardSlotDesktopRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(48);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
@@ -80,19 +82,26 @@ export default function ConnectFour({
   // Size board from the actual board column so it never overflows or gets cut off.
   // Board width = 7*cellSize + 24, board + preview height = 7*cellSize + 37.
   const updateCellSize = useCallback(() => {
-    const col = boardColumnRef.current;
-    if (!col) return;
-    const w = col.clientWidth;
-    const h = col.clientHeight;
+    const m = boardSlotMobileRef.current;
+    const d = boardSlotDesktopRef.current;
+    const el =
+      m && m.getBoundingClientRect().width > 0 && m.getBoundingClientRect().height > 0
+        ? m
+        : d && d.getBoundingClientRect().width > 0 && d.getBoundingClientRect().height > 0
+          ? d
+          : m || d;
+    if (!el) return;
+    const w = el.clientWidth;
+    const h = el.clientHeight;
     if (w <= 0 || h <= 0) return;
-    const reservedHeight = 80; // player bar + gap + padding
-    const availableWidth = Math.max(200, w - 32);
-    const availableHeight = Math.max(200, h - reservedHeight);
+    const pad = 8;
+    const availableWidth = Math.max(120, w - pad * 2);
+    const availableHeight = Math.max(120, h - pad * 2);
     const maxByWidth = (availableWidth - 24) / COLS;
     const maxByHeight = (availableHeight - 37) / (ROWS + 1);
     const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
     if (!Number.isFinite(raw) || raw <= 0) return;
-    setCellSize(Math.max(40, Math.min(raw, 75)));
+    setCellSize(Math.max(28, Math.min(raw, 75)));
   }, []);
 
   useLayoutEffect(() => {
@@ -100,11 +109,15 @@ export default function ConnectFour({
   }, [updateCellSize]);
 
   useEffect(() => {
-    const el = boardColumnRef.current;
-    if (!el) return;
     const ro = new ResizeObserver(updateCellSize);
-    ro.observe(el);
-    return () => ro.disconnect();
+    if (boardSlotMobileRef.current) ro.observe(boardSlotMobileRef.current);
+    if (boardSlotDesktopRef.current) ro.observe(boardSlotDesktopRef.current);
+    updateCellSize();
+    window.addEventListener("resize", updateCellSize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", updateCellSize);
+    };
   }, [updateCellSize]);
 
   useEffect(() => {
@@ -267,52 +280,40 @@ export default function ConnectFour({
 
   const boardWidth = cellSize * COLS + (COLS + 1) * 3;
   const boardHeight = cellSize * ROWS + (ROWS + 1) * 3;
+  const isPractice = !isMultiplayer;
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      {/* Mobile: keep existing stacked layout */}
-      <div className="md:hidden">
-        <div className="flex h-full min-h-0 w-full flex-col">
-          <div
-            ref={boardColumnRef}
-            className="flex min-h-0 flex-1 flex-col items-center gap-3 overflow-hidden py-4"
-          >
-            {/* Player bar */}
-            <div className="flex w-full max-w-[min(500px,90vw)] shrink-0 items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white font-bold text-sm">
-                  {player1.username.charAt(0)}
-                </div>
-                <span className="text-sm font-medium text-white truncate max-w-[100px]">{player1.username}</span>
-                <span className="text-lg" title="Red">🔴</span>
-              </div>
-              <div
-                className={`rounded-full px-4 py-1.5 text-sm font-semibold ${
-                  turn === 1 ? "bg-red-500/90 text-white" : "bg-amber-400/90 text-gray-900"
-                }`}
-              >
-                {turn === 1 ? "Player 1's Turn" : "Player 2's Turn"}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg" title="Yellow">🟡</span>
-                <span className="text-sm font-medium text-white truncate max-w-[100px]">{player2.username}</span>
-                {isPlayer2Bot && (
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-xs text-body-gray">🤖 BOT</span>
-                )}
-                {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))) && (
-                  <span className="animate-pulse text-body-gray text-sm">
-                    {isMultiplayer ? "Opponent's turn..." : "..."}
-                  </span>
-                )}
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-gray-900 font-bold text-sm">
-                  {player2.username.charAt(0)}
-                </div>
-              </div>
-            </div>
-
-            {/* Board container: centered, never overflows */}
-            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-              <div className="flex flex-col items-center relative shrink-0">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
+      <div className="flex h-full min-h-0 w-full flex-col overflow-hidden md:hidden">
+        <GamePlayerStack className="shrink-0">
+          <GamePlayerRow
+            username={player1.username}
+            avatarLetter={player1.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-red-600 to-red-800 text-white"
+            nameDot={<PlayerColorDot color={RED_EDGE} />}
+            scoreRight="—"
+            active={turn === 1}
+            isPractice={isPractice}
+            rating={player1.rating}
+          />
+          <GamePlayerRow
+            username={player2.username}
+            avatarLetter={player2.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-amber-400 to-amber-600 text-gray-900"
+            nameDot={<PlayerColorDot color={YELLOW_CENTER} />}
+            scoreRight="—"
+            active={turn === 2}
+            isPractice={isPractice}
+            rating={player2.rating}
+            isBot={isPlayer2Bot}
+            thinking={
+              botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))
+            }
+          />
+        </GamePlayerStack>
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden py-2">
+          <div ref={boardSlotMobileRef} className="game-connect4-slot-mobile">
+            <div className="relative flex max-h-full max-w-full shrink-0 flex-col items-center overflow-hidden">
               {/* Hover disc preview above board */}
               <div
                 className="relative flex justify-center"
@@ -425,13 +426,13 @@ export default function ConnectFour({
                   </svg>
                 )}
               </div>
-              </div>
             </div>
           </div>
+        </div>
 
-          {/* Move log */}
-          <div
-            className="flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 h-[150px] min-h-[150px] max-h-[150px]"
+        {/* Move log */}
+        <div
+            className="flex h-[150px] min-h-[150px] max-h-[150px] w-full shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
             style={{ overflowX: "hidden" }}
           >
             <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
@@ -486,79 +487,39 @@ export default function ConnectFour({
             </div>
           </div>
         </div>
-      </div>
 
       {/* Desktop: standardized 3-column layout */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
-        {/* Left: player cards */}
-        <div className="w-[200px] shrink-0 flex flex-col gap-3">
-          <div
-            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-            style={{
-              borderColor: turn === 1 ? (isMultiplayer ? "#FF5E00" : "#A855F7") : "#2A3A5C",
-              boxShadow: turn === 1 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white font-bold text-sm">
-                {player1.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">
-                  {player1.username} <span className="ml-1">🔴</span>
-                  {turn === 1 && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: isMultiplayer ? "#FF5E00" : "#A855F7" }}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Turn
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-body-gray">Rating {player1.rating}</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-            style={{
-              borderColor: turn === 2 ? (isMultiplayer ? "#FF5E00" : "#A855F7") : "#2A3A5C",
-              boxShadow: turn === 2 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-gray-900 font-bold text-sm">
-                {player2.username.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-white">
-                  {player2.username} <span className="ml-1">🟡</span>
-                  {isPlayer2Bot && (
-                    <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                      🤖 BOT
-                    </span>
-                  )}
-                  {turn === 2 && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: isMultiplayer ? "#FF5E00" : "#A855F7" }}>
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                      Turn
-                    </span>
-                  )}
-                  {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))) && (
-                    <span className="ml-2 inline-flex animate-pulse text-body-gray text-xs">
-                      {isMultiplayer ? "thinking..." : "..."}
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-body-gray">Rating {player2.rating}</p>
-              </div>
-            </div>
-          </div>
+      <div className="hidden md:flex h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden">
+        <div className="flex w-[200px] shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden">
+          <GamePlayerRow
+            username={player1.username}
+            avatarLetter={player1.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-red-600 to-red-800 text-white"
+            nameDot={<PlayerColorDot color={RED_EDGE} />}
+            scoreRight="—"
+            active={turn === 1}
+            isPractice={isPractice}
+            rating={player1.rating}
+          />
+          <GamePlayerRow
+            username={player2.username}
+            avatarLetter={player2.username.charAt(0)}
+            avatarClassName="bg-gradient-to-br from-amber-400 to-amber-600 text-gray-900"
+            nameDot={<PlayerColorDot color={YELLOW_CENTER} />}
+            scoreRight="—"
+            active={turn === 2}
+            isPractice={isPractice}
+            rating={player2.rating}
+            isBot={isPlayer2Bot}
+            thinking={
+              botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))
+            }
+          />
         </div>
 
-        {/* Center: board */}
-        <div ref={boardColumnRef} className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden md:min-w-0">
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-            <div className="flex flex-col items-center relative shrink-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
+          <div ref={boardSlotDesktopRef} className="game-connect4-slot-desktop">
+            <div className="relative flex max-h-full max-w-full shrink-0 flex-col items-center overflow-hidden">
               <div className="relative flex justify-center" style={{ width: boardWidth, height: cellSize + 16 }}>
                 {hoverCol !== null && !isColumnFull(hoverCol) && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2")) && !dropping && !gameOverRef.current && (
                   <div

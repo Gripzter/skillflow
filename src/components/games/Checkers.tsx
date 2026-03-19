@@ -6,6 +6,7 @@ import { createInitialBoard, getCaptureStepsFrom, getGameWinnerOrDraw, getLegalT
 import { getCheckersBotDelayMs, getCheckersBotTurnMove } from "@/lib/games/checkers-bot";
 import type { BotDifficulty } from "@/lib/games/bot-engine";
 import Link from "next/link";
+import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
 
 export interface CheckersChatMessage {
   id: string;
@@ -816,102 +817,54 @@ export default function Checkers({
   const gameLogEnabled = true;
 
   return (
-    <div className="flex h-full min-h-0 flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden md:flex-row md:gap-4 md:overflow-hidden">
       {/* Desktop left column: player cards */}
-      <div className="hidden md:flex w-[200px] shrink-0 flex-col gap-3 py-4">
-        <div
-          className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-          style={{
-            borderColor: currentTurn === 1 ? accent : "#2A3A5C",
-            boxShadow: currentTurn === 1 ? `0 0 22px ${sideCardAccent}` : undefined,
-          }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-white">{player1.username}</p>
-              <p className="text-xs text-body-gray">Captured: {p1Captured}</p>
-            </div>
-            {currentTurn === 1 && (
-              <span className="text-[11px] font-bold" style={{ color: accent }}>
-                ● Turn
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="rounded-lg border bg-[#1A1A22] px-3 py-2"
-          style={{
-            borderColor: currentTurn === 2 ? accent : "#2A3A5C",
-            boxShadow: currentTurn === 2 ? `0 0 22px ${sideCardAccent}` : undefined,
-          }}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-white">
-                {player2.username}
-                {isPlayer2Bot && !isMultiplayer ? <span className="ml-2 text-xs text-body-gray">(BOT)</span> : null}
-              </p>
-              <p className="text-xs text-body-gray">Captured: {p2Captured}</p>
-            </div>
-            {currentTurn === 2 && (
-              <span className="text-[11px] font-bold" style={{ color: accent }}>
-                ● Turn
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="hidden md:flex w-[200px] shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden py-2">
+        <GamePlayerRow
+          username={player1.username}
+          avatarLetter={player1.username.charAt(0)}
+          avatarClassName="bg-gradient-to-br from-orange-500/80 to-orange-700 text-white"
+          scoreRight={`Captured: ${p1Captured}`}
+          active={currentTurn === 1}
+          isPractice={isPractice}
+          rating={player1.rating}
+        />
+        <GamePlayerRow
+          username={player2.username}
+          avatarLetter={player2.username.charAt(0)}
+          avatarClassName="bg-gradient-to-br from-slate-400 to-slate-600 text-charcoal"
+          scoreRight={`Captured: ${p2Captured}`}
+          active={currentTurn === 2}
+          isPractice={isPractice}
+          rating={player2.rating}
+          isBot={isPlayer2Bot && !isMultiplayer}
+        />
       </div>
 
       {/* Left: board + turn info */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
-        <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 md:hidden">
-          <div
-            className="flex-1 rounded-lg border px-3 py-2"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              borderColor: currentTurn === 1 ? (isMyTurn ? accent : "rgba(255,255,255,0.08)") : "rgba(255,255,255,0.08)",
-              boxShadow: currentTurn === 1 && isMyTurn ? `0 0 22px ${isPractice ? "rgba(168,85,247,0.2)" : "rgba(255,94,0,0.2)"}` : undefined,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-bold text-white">{player1.username}</div>
-              <div className="text-xs text-body-gray">Captured: {p1Captured}</div>
-            </div>
-            <div className="mt-1 text-xs text-body-gray">
-              {currentTurn === 1 ? (
-                <span style={{ color: accent, fontWeight: 700 }}>● Turn</span>
-              ) : (
-                <span style={{ color: "rgba(255,255,255,0.45)" }}>Waiting</span>
-              )}
-            </div>
-          </div>
-
-          <div className="hidden md:block" />
-
-          <div
-            className="flex-1 rounded-lg border px-3 py-2"
-            style={{
-              background: "rgba(255,255,255,0.03)",
-              borderColor: currentTurn === 2 ? (!isMyTurn ? accent : "rgba(255,255,255,0.08)") : "rgba(255,255,255,0.08)",
-              boxShadow: currentTurn === 2 && !isMyTurn ? `0 0 22px ${isPractice ? "rgba(168,85,247,0.2)" : "rgba(255,94,0,0.2)"}` : undefined,
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div className="text-sm font-bold text-white">
-                {player2.username}
-                {isPlayer2Bot && !isMultiplayer ? <span className="ml-2 text-xs text-body-gray">(BOT)</span> : null}
-              </div>
-              <div className="text-xs text-body-gray">Captured: {p2Captured}</div>
-            </div>
-            <div className="mt-1 text-xs text-body-gray">
-              {currentTurn === 2 ? (
-                <span style={{ color: accent, fontWeight: 700 }}>● Turn</span>
-              ) : (
-                <span style={{ color: "rgba(255,255,255,0.45)" }}>Waiting</span>
-              )}
-            </div>
-          </div>
+        <div className="shrink-0 px-2 pb-2 pt-1 md:hidden">
+          <GamePlayerStack>
+            <GamePlayerRow
+              username={player1.username}
+              avatarLetter={player1.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-orange-500/80 to-orange-700 text-white"
+              scoreRight={`Captured: ${p1Captured}`}
+              active={currentTurn === 1}
+              isPractice={isPractice}
+              rating={player1.rating}
+            />
+            <GamePlayerRow
+              username={player2.username}
+              avatarLetter={player2.username.charAt(0)}
+              avatarClassName="bg-gradient-to-br from-slate-400 to-slate-600 text-charcoal"
+              scoreRight={`Captured: ${p2Captured}`}
+              active={currentTurn === 2}
+              isPractice={isPractice}
+              rating={player2.rating}
+              isBot={isPlayer2Bot && !isMultiplayer}
+            />
+          </GamePlayerStack>
         </div>
 
         <div className="px-2 pb-3 md:px-4">
@@ -933,9 +886,9 @@ export default function Checkers({
         </div>
 
         {/* Board */}
-        <div className="relative mx-auto w-full max-w-[520px] flex-1 min-h-0 px-2 pb-2 md:px-4">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-2 pb-2 md:px-4">
           <div
-            className="relative grid w-full aspect-square rounded-lg"
+            className="game-board-slot-mobile md:game-board-slot-desktop relative grid w-full rounded-lg"
             style={{
               gridTemplateColumns: "repeat(8, 1fr)",
               border: `2px solid ${BOARD_BORDER}`,
