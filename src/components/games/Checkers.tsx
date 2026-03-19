@@ -817,9 +817,55 @@ export default function Checkers({
 
   return (
     <div className="flex h-full min-h-0 flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
+      {/* Desktop left column: player cards */}
+      <div className="hidden md:flex w-[200px] shrink-0 flex-col gap-3 py-4">
+        <div
+          className="rounded-lg border bg-[#1A1A22] px-3 py-2"
+          style={{
+            borderColor: currentTurn === 1 ? accent : "#2A3A5C",
+            boxShadow: currentTurn === 1 ? `0 0 22px ${sideCardAccent}` : undefined,
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-white">{player1.username}</p>
+              <p className="text-xs text-body-gray">Captured: {p1Captured}</p>
+            </div>
+            {currentTurn === 1 && (
+              <span className="text-[11px] font-bold" style={{ color: accent }}>
+                ● Turn
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div
+          className="rounded-lg border bg-[#1A1A22] px-3 py-2"
+          style={{
+            borderColor: currentTurn === 2 ? accent : "#2A3A5C",
+            boxShadow: currentTurn === 2 ? `0 0 22px ${sideCardAccent}` : undefined,
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-white">
+                {player2.username}
+                {isPlayer2Bot && !isMultiplayer ? <span className="ml-2 text-xs text-body-gray">(BOT)</span> : null}
+              </p>
+              <p className="text-xs text-body-gray">Captured: {p2Captured}</p>
+            </div>
+            {currentTurn === 2 && (
+              <span className="text-[11px] font-bold" style={{ color: accent }}>
+                ● Turn
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Left: board + turn info */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
-        <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 md:px-4">
+        <div className="flex items-start justify-between gap-3 px-2 pb-2 pt-1 md:hidden">
           <div
             className="flex-1 rounded-lg border px-3 py-2"
             style={{

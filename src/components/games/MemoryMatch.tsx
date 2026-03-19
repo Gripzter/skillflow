@@ -382,115 +382,118 @@ export default function MemoryMatch({
     currentPlayer === 1 ? "rgba(0,229,199,0.8)" : "rgba(168, 85, 247, 0.8)";
 
   return (
-      <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-4 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4 md:min-w-0">
-        <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
-          </div>
-          <div className="text-xs text-body-gray">
-            {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} remaining`}
-          </div>
-        </div>
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {/* Mobile: keep existing stacked layout */}
+      <div className="md:hidden">
+        <div className="flex h-full min-h-0 w-full flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
+              </div>
+              <div className="text-xs text-body-gray">
+                {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} remaining`}
+              </div>
+            </div>
 
-        <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
-          <div
-            className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
-              currentPlayer === 1 ? "border-teal/60 bg-teal/10" : "border-white/10 bg-transparent"
-            }`}
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-teal to-emerald-500 text-sm font-bold text-charcoal">
-              {player1.username.charAt(0)}
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-white/5 px-3 py-2">
+              <div
+                className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
+                  currentPlayer === 1 ? "border-teal/60 bg-teal/10" : "border-white/10 bg-transparent"
+                }`}
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-teal to-emerald-500 text-sm font-bold text-charcoal">
+                  {player1.username.charAt(0)}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-white truncate max-w-[120px]">
+                    {player1.username}
+                  </span>
+                  <span className="text-[11px] text-body-gray">Rating {player1.rating}</span>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-sm font-semibold text-teal">
+                    {formatScoreLabel("Pairs", scores[1])}
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
+                  currentPlayer === 2 ? "border-purple/60 bg-purple/10" : "border-white/10 bg-transparent"
+                }`}
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
+                  {player2.username.charAt(0)}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-white truncate max-w-[120px]">
+                    {player2.username}
+                  </span>
+                  <span className="text-[11px] text-body-gray">Rating {player2.rating}</span>
+                </div>
+                <div className="ml-auto flex flex-col items-end gap-0.5">
+                  <p className="text-sm font-semibold text-purple-300">
+                    {formatScoreLabel("Pairs", scores[2])}
+                  </p>
+                  {isPlayer2Bot && (
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-body-gray">
+                      🤖 BOT
+                    </span>
+                  )}
+                  {thinking && (
+                    <span className="text-[10px] text-body-gray animate-pulse">Thinking...</span>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-white truncate max-w-[120px]">
-                {player1.username}
-              </span>
-              <span className="text-[11px] text-body-gray">Rating {player1.rating}</span>
-            </div>
-            <div className="ml-auto text-right">
-              <p className="text-sm font-semibold text-teal">
-                {formatScoreLabel("Pairs", scores[1])}
-              </p>
-            </div>
-          </div>
-          <div
-            className={`flex flex-1 items-center gap-2 rounded-lg border px-2 py-1 ${
-              currentPlayer === 2 ? "border-purple/60 bg-purple/10" : "border-white/10 bg-transparent"
-            }`}
-          >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
-              {player2.username.charAt(0)}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-medium text-white truncate max-w-[120px]">
-                {player2.username}
-              </span>
-              <span className="text-[11px] text-body-gray">Rating {player2.rating}</span>
-            </div>
-            <div className="ml-auto flex flex-col items-end gap-0.5">
-              <p className="text-sm font-semibold text-purple-300">
-                {formatScoreLabel("Pairs", scores[2])}
-              </p>
-              {isPlayer2Bot && (
-                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-body-gray">
-                  🤖 BOT
-                </span>
-              )}
-              {thinking && (
-                <span className="text-[10px] text-body-gray animate-pulse">Thinking...</span>
-              )}
-            </div>
-          </div>
-        </div>
 
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60">
-          <div
-            ref={boardRef}
-            className="relative flex items-center justify-center p-3"
-            style={{
-              perspective: "1000px",
-              boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
-              borderRadius: 18,
-            }}
-          >
-            <div
-              className="absolute inset-0 rounded-[18px] border-[2px]"
-              style={{
-                borderColor: activeColor,
-                opacity: 0.35,
-                boxShadow: `0 0 20px ${activeColor}`,
-              }}
-            />
-            <div
-              className="relative grid"
-              style={{
-                gridTemplateColumns: `repeat(${GRID_COLS}, ${cardSize}px)`,
-                gridTemplateRows: `repeat(${GRID_ROWS}, ${cardSize}px)`,
-                gap: CARD_GAP,
-              }}
-            >
-              {cards.map((card, index) => {
-                const isFlipped = card.state !== "hidden";
-                const isMatched = card.state === "matched";
-                const matchedBy = card.matchedBy;
-                const borderColor =
-                  isMatched && matchedBy === 1
-                    ? "#FF5E00"
-                    : isMatched && matchedBy === 2
-                      ? "#A855F7"
-                      : isFlipped
-                        ? "rgba(0, 229, 199, 0.5)"
-                        : "rgba(124, 92, 252, 0.3)";
+            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60">
+              <div
+                ref={boardRef}
+                className="relative flex items-center justify-center p-3"
+                style={{
+                  perspective: "1000px",
+                  boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
+                  borderRadius: 18,
+                }}
+              >
+                <div
+                  className="absolute inset-0 rounded-[18px] border-[2px]"
+                  style={{
+                    borderColor: activeColor,
+                    opacity: 0.35,
+                    boxShadow: `0 0 20px ${activeColor}`,
+                  }}
+                />
+                <div
+                  className="relative grid"
+                  style={{
+                    gridTemplateColumns: `repeat(${GRID_COLS}, ${cardSize}px)`,
+                    gridTemplateRows: `repeat(${GRID_ROWS}, ${cardSize}px)`,
+                    gap: CARD_GAP,
+                  }}
+                >
+                  {cards.map((card, index) => {
+                    const isFlipped = card.state !== "hidden";
+                    const isMatched = card.state === "matched";
+                    const matchedBy = card.matchedBy;
+                    const borderColor =
+                      isMatched && matchedBy === 1
+                        ? "#FF5E00"
+                        : isMatched && matchedBy === 2
+                          ? "#A855F7"
+                          : isFlipped
+                            ? "rgba(0, 229, 199, 0.5)"
+                            : "rgba(124, 92, 252, 0.3)";
 
-                const background =
-                  isMatched
-                    ? "rgba(0,229,199,0.15)"
-                    : isFlipped
-                      ? "#252840"
-                      : "radial-gradient(circle at 30% 30%, #1E2030, #050713)";
+                    const background =
+                      isMatched
+                        ? "rgba(0,229,199,0.15)"
+                        : isFlipped
+                          ? "#252840"
+                          : "radial-gradient(circle at 30% 30%, #1E2030, #050713)";
 
-                return (
+                    return (
                   <button
                     key={card.id}
                     type="button"
@@ -549,19 +552,251 @@ export default function MemoryMatch({
                       </div>
                     </div>
                   </button>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-1 text-center text-sm text-body-gray">
+              {turnMessage}
+            </div>
+          </div>
+
+          {/* Mobile game log: fixed-height live feed below board */}
+          <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden flex flex-col" style={{ overflowX: "hidden" }}>
+            <div className="border-b border-white/10 pb-2">
+              <h3 className="text-sm font-semibold text-white">Game Log</h3>
+            </div>
+            <div
+              ref={mobileLogRef}
+              className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+                mobileAtBottomRef.current = atBottom;
+              }}
+            >
+              {moves.length === 0 ? (
+                <p className="py-2 text-center text-xs text-body-gray">
+                  Flip two cards to start!
+                </p>
+              ) : (
+                moves.map((entry) => {
+                  const isP1 = entry.player === 1;
+                  const isP2 = entry.player === 2;
+                  return (
+                    <div
+                      key={entry.id}
+                      className="mb-2 flex max-w-full shrink-0"
+                      style={{
+                        marginLeft: isP1 ? "auto" : 0,
+                        marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
+                      }}
+                    >
+                      <div
+                        className="rounded-xl px-3.5 py-2.5"
+                        style={{
+                          backgroundColor: isP1
+                            ? "rgba(0,229,199,0.25)"
+                            : isP2
+                              ? "rgba(168,85,247,0.25)"
+                              : "rgba(148,163,184,0.16)",
+                          borderLeft: isP1
+                            ? "3px solid rgba(0,229,199,0.6)"
+                            : isP2
+                              ? "3px solid rgba(168,85,247,0.7)"
+                              : "3px solid rgba(148,163,184,0.6)",
+                        }}
+                      >
+                        <p className="text-[11px] font-bold text-white">
+                          {isP1
+                            ? player1.username
+                            : isP2
+                              ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
+                              : "Game"}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-white/90">
+                          {entry.message}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop: standardized 3-column layout */}
+      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
+        {/* Left: player cards */}
+        <div className="w-[200px] shrink-0 flex flex-col gap-3">
+          <div
+            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
+            style={{
+              borderColor: currentPlayer === 1 ? "#FF5E00" : "#2A3A5C",
+              boxShadow: currentPlayer === 1 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-teal to-emerald-500 text-sm font-bold text-charcoal">
+                {player1.username.charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-white">{player1.username}</p>
+                <p className="text-xs text-body-gray">Pairs {scores[1]}</p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="rounded-lg border bg-[#1A1A22] px-3 py-2"
+            style={{
+              borderColor: currentPlayer === 2 ? "#A855F7" : "#2A3A5C",
+              boxShadow: currentPlayer === 2 ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-sm font-bold text-white">
+                {player2.username.charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-white">
+                  {player2.username}{isPlayer2Bot ? " 🤖" : ""}
+                  {thinking && <span className="ml-2 text-xs text-body-gray animate-pulse">Thinking…</span>}
+                </p>
+                <p className="text-xs text-body-gray">Pairs {scores[2]}</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-1 text-center text-sm text-body-gray">
-          {turnMessage}
-        </div>
-      </div>
+        {/* Center: board */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden md:min-w-0 py-4">
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-white/5 px-3 py-2">
+            <span className="text-sm font-semibold text-white">Memory Match 🧠</span>
+            <div className="text-xs text-body-gray">
+              {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} remaining`}
+            </div>
+          </div>
 
-      {/* Desktop game log: fixed-height live feed beside board */}
-      <div className="hidden w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:flex md:w-[320px] md:flex-shrink-0 min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60">
+            <div
+              ref={boardRef}
+              className="relative flex items-center justify-center p-3"
+              style={{
+                perspective: "1000px",
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.02), 0 0 30px ${activeColor}`,
+                borderRadius: 18,
+              }}
+            >
+              <div
+                className="absolute inset-0 rounded-[18px] border-[2px]"
+                style={{
+                  borderColor: activeColor,
+                  opacity: 0.35,
+                  boxShadow: `0 0 20px ${activeColor}`,
+                }}
+              />
+              <div
+                className="relative grid"
+                style={{
+                  gridTemplateColumns: `repeat(${GRID_COLS}, ${cardSize}px)`,
+                  gridTemplateRows: `repeat(${GRID_ROWS}, ${cardSize}px)`,
+                  gap: CARD_GAP,
+                }}
+              >
+                {cards.map((card, index) => {
+                  const isFlipped = card.state !== "hidden";
+                  const isMatched = card.state === "matched";
+                  const matchedBy = card.matchedBy;
+                  const borderColor =
+                    isMatched && matchedBy === 1
+                      ? "#FF5E00"
+                      : isMatched && matchedBy === 2
+                        ? "#A855F7"
+                        : isFlipped
+                          ? "rgba(0, 229, 199, 0.5)"
+                          : "rgba(124, 92, 252, 0.3)";
+
+                  const background =
+                    isMatched
+                      ? "rgba(0,229,199,0.15)"
+                      : isFlipped
+                        ? "#252840"
+                        : "radial-gradient(circle at 30% 30%, #1E2030, #050713)";
+
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => handleCardClick(index)}
+                      disabled={
+                        gameOver ||
+                        resolvingRef.current ||
+                        isProcessing ||
+                        card.state !== "hidden" ||
+                        currentPlayer !== 1
+                      }
+                      className="memory-card group relative flex items-center justify-center rounded-[10px] outline-none"
+                      style={{
+                        width: cardSize,
+                        height: cardSize,
+                      }}
+                    >
+                      <div className={`memory-card-inner ${isFlipped ? "memory-card-flipped" : ""}`}>
+                        <div
+                          className="memory-card-face memory-card-back"
+                          style={{
+                            borderColor: "rgba(124, 92, 252, 0.3)",
+                            background,
+                          }}
+                        >
+                          <span className="text-2xl text-white/60 select-none">?</span>
+                        </div>
+                        <div
+                          className="memory-card-face memory-card-front"
+                          style={{
+                            borderColor,
+                            background,
+                            boxShadow: isMatched
+                              ? matchedBy === 1
+                                ? "0 0 16px rgba(0,229,199,0.6)"
+                                : "0 0 16px rgba(168,85,247,0.6)"
+                              : "0 4px 10px rgba(0,0,0,0.6)",
+                            transform: isMatched ? "scale(0.95)" : undefined,
+                          }}
+                        >
+                          <span className="select-none" style={{ fontSize: `${cardSize * 0.6}px` }}>
+                            {card.icon}
+                          </span>
+                          {isMatched && (
+                            <span className="absolute right-1 top-1 text-[14px] text-teal">
+                              ✓
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-1 flex w-full items-center justify-between text-sm text-body-gray">
+            <span>{currentPlayer === 1 ? "Your Turn" : "Opponent's Turn"}</span>
+            <span className="tabular-nums"> </span>
+          </div>
+
+          <div className="text-center text-sm text-body-gray">{turnMessage}</div>
+        </div>
+
+        {/* Right: game log */}
+        <div className="w-[280px] shrink-0">
+          <div className="w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 flex min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
         <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">Game Log</h3>
         </div>
@@ -622,69 +857,7 @@ export default function MemoryMatch({
             })
           )}
         </div>
-      </div>
-
-      {/* Mobile game log: fixed-height live feed below board */}
-      <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 md:hidden h-[150px] min-h-[150px] max-h-[150px] overflow-hidden flex flex-col" style={{ overflowX: "hidden" }}>
-        <div className="border-b border-white/10 pb-2">
-          <h3 className="text-sm font-semibold text-white">Game Log</h3>
-        </div>
-        <div
-          ref={mobileLogRef}
-          className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-            mobileAtBottomRef.current = atBottom;
-          }}
-        >
-          {moves.length === 0 ? (
-            <p className="py-2 text-center text-xs text-body-gray">
-              Flip two cards to start!
-            </p>
-          ) : (
-            moves.map((entry) => {
-              const isP1 = entry.player === 1;
-              const isP2 = entry.player === 2;
-              return (
-                <div
-                  key={entry.id}
-                  className="mb-2 flex max-w-full shrink-0"
-                  style={{
-                    marginLeft: isP1 ? "auto" : 0,
-                    marginRight: isP2 ? 0 : isP1 ? 0 : "auto",
-                  }}
-                >
-                  <div
-                    className="rounded-xl px-3.5 py-2.5"
-                    style={{
-                      backgroundColor: isP1
-                        ? "rgba(0,229,199,0.25)"
-                        : isP2
-                          ? "rgba(168,85,247,0.25)"
-                          : "rgba(148,163,184,0.16)",
-                      borderLeft: isP1
-                        ? "3px solid rgba(0,229,199,0.6)"
-                        : isP2
-                          ? "3px solid rgba(168,85,247,0.7)"
-                          : "3px solid rgba(148,163,184,0.6)",
-                    }}
-                  >
-                    <p className="text-[11px] font-bold text-white">
-                      {isP1
-                        ? player1.username
-                        : isP2
-                          ? `${player2.username}${isPlayer2Bot ? " 🤖" : ""}`
-                          : "Game"}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-white/90">
-                      {entry.message}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          )}
+          </div>
         </div>
       </div>
 

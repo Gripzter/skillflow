@@ -410,75 +410,78 @@ export default function ReactionDuel({
   const progressP2 = p2Wins / TOTAL_ROUNDS;
 
   return (
-    <div className="flex h-full flex-col md:flex-row touch-manipulation md:overflow-hidden md:min-h-[500px] md:max-h-[500px]" style={{ touchAction: "manipulation" }}>
-      <div className="flex flex-1 flex-col min-h-0 md:flex-1">
-        <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
-          <span className="font-semibold text-white">Reaction Duel ⚡</span>
-          <span className="text-body-gray tabular-nums">
-            Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
-          </span>
-        </div>
-
-        <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 bg-white/5">
-          <div className={`flex items-center gap-2 ${p1Wins >= p2Wins ? "text-teal" : "text-white"}`}>
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
-              {player1.username.charAt(0)}
+    <div className="flex h-full min-h-0 w-full flex-col touch-manipulation" style={{ touchAction: "manipulation" }}>
+      {/* Mobile: keep stacked layout */}
+      <div className="md:hidden">
+        <div className="flex h-full flex-col">
+          <div className="flex flex-1 flex-col min-h-0">
+            <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
+              <span className="font-semibold text-white">Reaction Duel ⚡</span>
+              <span className="text-body-gray tabular-nums">
+                Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
+              </span>
             </div>
-            <span className="font-medium">{player1.username}: {p1Wins}</span>
-            {p1Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p1Streak} streak!</span>}
-          </div>
-          <span className="text-body-gray font-medium">VS</span>
-          <div className={`flex items-center gap-2 ${p2Wins >= p1Wins ? "text-purple-400" : "text-white"}`}>
-            <span className="font-medium">{player2.username}: {p2Wins}</span>
-            {isPlayer2Bot && <span className="text-xs text-body-gray">🤖</span>}
-            {p2Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p2Streak} streak!</span>}
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
-              {player2.username.charAt(0)}
-            </div>
-          </div>
-        </div>
 
-        <div className="shrink-0 px-4 pb-2 flex items-center gap-1">
-          {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+            <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 bg-white/5">
+              <div className={`flex items-center gap-2 ${p1Wins >= p2Wins ? "text-teal" : "text-white"}`}>
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
+                  {player1.username.charAt(0)}
+                </div>
+                <span className="font-medium">{player1.username}: {p1Wins}</span>
+                {p1Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p1Streak} streak!</span>}
+              </div>
+              <span className="text-body-gray font-medium">VS</span>
+              <div className={`flex items-center gap-2 ${p2Wins >= p1Wins ? "text-purple-400" : "text-white"}`}>
+                <span className="font-medium">{player2.username}: {p2Wins}</span>
+                {isPlayer2Bot && <span className="text-xs text-body-gray">🤖</span>}
+                {p2Streak >= 3 && <span className="text-amber-400 text-xs">🔥 {p2Streak} streak!</span>}
+                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
+                  {player2.username.charAt(0)}
+                </div>
+              </div>
+            </div>
+
+            <div className="shrink-0 px-4 pb-2 flex items-center gap-1">
+              {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-2 w-2 rounded-full flex-1 max-w-[8px]"
+                  style={{
+                    backgroundColor: i < roundHistory.length
+                      ? roundHistory[i].winner === "player1"
+                        ? "var(--color-teal, #0d9488)"
+                        : roundHistory[i].winner === "player2"
+                          ? "#a855f7"
+                          : "#6b7280"
+                      : "rgba(255,255,255,0.15)",
+                  }}
+                />
+              ))}
+            </div>
+
+            <div className="shrink-0 h-2 mx-4 mb-2 flex rounded-full overflow-hidden bg-white/10">
+              <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
+              <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
+            </div>
+
             <div
-              key={i}
-              className="h-2 w-2 rounded-full flex-1 max-w-[8px]"
+              ref={gameAreaRef}
+              className="flex-1 min-h-[300px] mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
               style={{
-                backgroundColor: i < roundHistory.length
-                  ? roundHistory[i].winner === "player1"
-                    ? "var(--color-teal, #0d9488)"
-                    : roundHistory[i].winner === "player2"
-                      ? "#a855f7"
-                      : "#6b7280"
-                  : "rgba(255,255,255,0.15)",
+                backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
+                minWidth: 0,
+                minHeight: 400,
+                touchAction: "manipulation",
               }}
-            />
-          ))}
-        </div>
-
-        <div className="shrink-0 h-2 mx-4 mb-2 flex rounded-full overflow-hidden bg-white/10">
-          <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
-          <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
-        </div>
-
-        <div
-          ref={gameAreaRef}
-          className="flex-1 min-h-[300px] mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
-          style={{
-            backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
-            minWidth: 0,
-            minHeight: 400,
-            touchAction: "manipulation",
-          }}
-          onTouchStart={(e) => {
-            e.preventDefault();
-            const t = e.changedTouches[0];
-            if (t) handleGameAreaTap(t.clientX, t.clientY);
-          }}
-          onPointerDown={(e) => {
-            if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
-          }}
-        >
+              onTouchStart={(e) => {
+                e.preventDefault();
+                const t = e.changedTouches[0];
+                if (t) handleGameAreaTap(t.clientX, t.clientY);
+              }}
+              onPointerDown={(e) => {
+                if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
+              }}
+            >
           {phase === "countdown" && (
             <div className="text-center">
               {countdownN > 0 ? (
@@ -546,113 +549,280 @@ export default function ReactionDuel({
               MISS!
             </p>
           )}
-        </div>
+            </div>
 
-        {(phase === "round_result" || phase === "tapped") && p1Reaction !== null && p2Reaction !== null && (
-          <div className="shrink-0 mx-4 mb-4 p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-4">
-            <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player1" ? "text-teal font-semibold" : "text-body-gray opacity-70"}`}>
-              <p className="text-sm">{player1.username}</p>
-              <p className="text-lg tabular-nums">
-                {p1Reaction === "false_start" || p1Reaction === "timeout"
-                  ? (p1Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
-                  : `${p1Reaction}ms`}
-              </p>
-              {typeof p1Reaction === "number" && p1Reaction < 5000 && (
-                <p className="text-xs" style={{ color: reactionLabel(p1Reaction).color }}>{reactionLabel(p1Reaction).text}</p>
-              )}
-              {getRoundWinner(p1Reaction, p2Reaction) === "player1" && <span className="text-teal">✓</span>}
-            </div>
-            <span className="text-body-gray font-medium">VS</span>
-            <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player2" ? "text-purple-400 font-semibold" : "text-body-gray opacity-70"}`}>
-              <p className="text-sm">{player2.username}{isPlayer2Bot ? " 🤖" : ""}</p>
-              <p className="text-lg tabular-nums">
-                {p2Reaction === "false_start" || p2Reaction === "timeout"
-                  ? (p2Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
-                  : `${p2Reaction}ms`}
-              </p>
-              {typeof p2Reaction === "number" && <p className="text-xs" style={{ color: reactionLabel(p2Reaction).color }}>{reactionLabel(p2Reaction).text}</p>}
-              {getRoundWinner(p1Reaction, p2Reaction) === "player2" && <span className="text-purple-400">✓</span>}
-            </div>
-          </div>
-        )}
-
-        {phase === "match_over" && (
-          <div className="shrink-0 mx-4 mb-4 p-6 rounded-xl bg-white/5 border border-white/10 space-y-4">
-            <h3 className="text-xl font-bold text-white text-center">Match Over</h3>
-            <div className="flex justify-between gap-4">
-              <div className="text-center">
-                <p className="text-teal font-semibold">{player1.username}</p>
-                <p className="text-2xl font-bold text-white">{p1Wins} wins</p>
-                <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p1TotalMs / roundHistory.length) : 0}ms</p>
-              </div>
-              <div className="text-center">
-                <p className="text-purple-400 font-semibold">{player2.username}</p>
-                <p className="text-2xl font-bold text-white">{p2Wins} wins</p>
-                <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p2TotalMs / roundHistory.length) : 0}ms</p>
-              </div>
-            </div>
-            <div className="text-sm text-body-gray space-y-1 max-h-32 overflow-y-auto">
-              {roundHistory.map((r, i) => (
-                <div key={i} className="flex justify-between">
-                  <span>{typeof r.p1 === "number" ? `${r.p1}ms` : r.p1}</span>
-                  <span>Round {i + 1}</span>
-                  <span>{typeof r.p2 === "number" ? `${r.p2}ms` : r.p2}</span>
+            {(phase === "round_result" || phase === "tapped") && p1Reaction !== null && p2Reaction !== null && (
+              <div className="shrink-0 mx-4 mb-4 p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-4">
+                <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player1" ? "text-teal font-semibold" : "text-body-gray opacity-70"}`}>
+                  <p className="text-sm">{player1.username}</p>
+                  <p className="text-lg tabular-nums">
+                    {p1Reaction === "false_start" || p1Reaction === "timeout"
+                      ? (p1Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
+                      : `${p1Reaction}ms`}
+                  </p>
+                  {typeof p1Reaction === "number" && p1Reaction < 5000 && (
+                    <p className="text-xs" style={{ color: reactionLabel(p1Reaction).color }}>{reactionLabel(p1Reaction).text}</p>
+                  )}
+                  {getRoundWinner(p1Reaction, p2Reaction) === "player1" && <span className="text-teal">✓</span>}
                 </div>
-              ))}
-            </div>
-            {roundHistory.length > 0 && (() => {
-              const times = roundHistory.flatMap((r) => [
-                ...(typeof r.p1 === "number" ? [r.p1] : []),
-                ...(typeof r.p2 === "number" ? [r.p2] : []),
-              ]);
-              const best = times.length ? Math.min(...times) : 0;
-              return (
-                <p className="text-center text-teal text-sm">
-                  Best: {best}ms 🔥
-                </p>
-              );
-            })()}
+                <span className="text-body-gray font-medium">VS</span>
+                <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player2" ? "text-purple-400 font-semibold" : "text-body-gray opacity-70"}`}>
+                  <p className="text-sm">{player2.username}{isPlayer2Bot ? " 🤖" : ""}</p>
+                  <p className="text-lg tabular-nums">
+                    {p2Reaction === "false_start" || p2Reaction === "timeout"
+                      ? (p2Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
+                      : `${p2Reaction}ms`}
+                  </p>
+                  {typeof p2Reaction === "number" && <p className="text-xs" style={{ color: reactionLabel(p2Reaction).color }}>{reactionLabel(p2Reaction).text}</p>}
+                  {getRoundWinner(p1Reaction, p2Reaction) === "player2" && <span className="text-purple-400">✓</span>}
+                </div>
+              </div>
+            )}
+
+            {phase === "match_over" && (
+              <div className="shrink-0 mx-4 mb-4 p-6 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                <h3 className="text-xl font-bold text-white text-center">Match Over</h3>
+                <div className="flex justify-between gap-4">
+                  <div className="text-center">
+                    <p className="text-teal font-semibold">{player1.username}</p>
+                    <p className="text-2xl font-bold text-white">{p1Wins} wins</p>
+                    <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p1TotalMs / roundHistory.length) : 0}ms</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-purple-400 font-semibold">{player2.username}</p>
+                    <p className="text-2xl font-bold text-white">{p2Wins} wins</p>
+                    <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p2TotalMs / roundHistory.length) : 0}ms</p>
+                  </div>
+                </div>
+                <div className="text-sm text-body-gray space-y-1 max-h-32 overflow-y-auto">
+                  {roundHistory.map((r, i) => (
+                    <div key={i} className="flex justify-between">
+                      <span>{typeof r.p1 === "number" ? `${r.p1}ms` : r.p1}</span>
+                      <span>Round {i + 1}</span>
+                      <span>{typeof r.p2 === "number" ? `${r.p2}ms` : r.p2}</span>
+                    </div>
+                  ))}
+                </div>
+                {roundHistory.length > 0 && (() => {
+                  const times = roundHistory.flatMap((r) => [
+                    ...(typeof r.p1 === "number" ? [r.p1] : []),
+                    ...(typeof r.p2 === "number" ? [r.p2] : []),
+                  ]);
+                  const best = times.length ? Math.min(...times) : 0;
+                  return (
+                    <p className="text-center text-teal text-sm">
+                      Best: {best}ms 🔥
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Desktop game log panel */}
-      <div className="hidden md:flex w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 md:w-[320px] min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
-        <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
-          <h3 className="text-sm font-semibold text-white">Game Log</h3>
+      {/* Desktop: standardized 3-column layout */}
+      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
+        {/* Left: player cards */}
+        <div className="w-[200px] shrink-0 flex flex-col gap-3">
+          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-sm font-bold text-white">
+                {player1.username.charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-white">{player1.username}</p>
+                <p className="text-xs text-body-gray">Wins {p1Wins}{p1Streak >= 3 ? ` · 🔥 ${p1Streak} streak` : ""}</p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-lg border border-[#2A3A5C] bg-[#1A1A22] px-3 py-2">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-sm font-bold text-white">
+                {player2.username.charAt(0)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-white">
+                  {player2.username}{isPlayer2Bot ? " 🤖" : ""}
+                </p>
+                <p className="text-xs text-body-gray">Wins {p2Wins}{p2Streak >= 3 ? ` · 🔥 ${p2Streak} streak` : ""}</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <div
-          ref={gameLogRef}
-          className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
-          onScroll={(e) => {
-            const el = e.currentTarget;
-            atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-          }}
-        >
-          {roundHistory.length === 0 ? (
-            <p className="py-4 text-center text-xs text-body-gray">Rounds will appear here.</p>
-          ) : (
-            roundHistory.map((r, i) => {
-              const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
-              const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
-              const winnerText =
-                r.winner === "draw"
-                  ? "Round tied 🤝"
-                  : r.winner === "player1"
-                    ? `${player1.username} wins!`
-                    : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
-              return (
-                <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
-                  <div className="text-[11px] font-semibold text-white/90">
-                    Round {i + 1} · {winnerText}
-                  </div>
-                  <div className="mt-1 text-[13px] text-white/90">
-                    {player1.username}: {p1Label} · {player2.username}: {p2Label}
-                  </div>
-                </div>
-              );
-            })
-          )}
+
+        {/* Center: game area */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
+            <span className="font-semibold text-white">Reaction Duel ⚡</span>
+            <span className="text-body-gray tabular-nums">
+              Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
+            </span>
+          </div>
+
+          <div className="shrink-0 px-4 py-3 bg-white/5 flex items-center justify-between">
+            <span className="text-body-gray">First to {Math.ceil(TOTAL_ROUNDS / 2)} rounds</span>
+            <span className="text-body-gray tabular-nums">
+              {p1Wins}–{p2Wins}
+            </span>
+          </div>
+
+          <div className="shrink-0 px-4 pb-2 pt-3 flex items-center gap-1">
+            {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
+              <div
+                key={i}
+                className="h-2 w-2 rounded-full flex-1 max-w-[8px]"
+                style={{
+                  backgroundColor: i < roundHistory.length
+                    ? roundHistory[i].winner === "player1"
+                      ? "var(--color-teal, #0d9488)"
+                      : roundHistory[i].winner === "player2"
+                        ? "#a855f7"
+                        : "#6b7280"
+                    : "rgba(255,255,255,0.15)",
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="shrink-0 h-2 mx-4 mb-3 flex rounded-full overflow-hidden bg-white/10">
+            <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
+            <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
+          </div>
+
+          <div
+            ref={gameAreaRef}
+            className="flex-1 min-h-0 mx-4 mb-4 rounded-2xl border border-white/10 flex items-center justify-center relative overflow-hidden select-none"
+            style={{
+              backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
+              minWidth: 0,
+              minHeight: 400,
+              touchAction: "manipulation",
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              const t = e.changedTouches[0];
+              if (t) handleGameAreaTap(t.clientX, t.clientY);
+            }}
+            onPointerDown={(e) => {
+              if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
+            }}
+          >
+            {phase === "countdown" && (
+              <div className="text-center">
+                {countdownN > 0 ? (
+                  <span
+                    className="text-6xl font-black animate-fade-in"
+                    style={{
+                      color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
+                    }}
+                  >
+                    {countdownN}
+                  </span>
+                ) : (
+                  <span className="text-6xl font-black text-teal animate-pulse">GO!</span>
+                )}
+              </div>
+            )}
+
+            {phase === "get_ready" && (
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white animate-pulse">Get Ready...</p>
+                <p className="mt-2 text-body-gray">Round {round} of {TOTAL_ROUNDS}</p>
+              </div>
+            )}
+
+            {phase === "target" && targetPos && (
+              <div
+                className="absolute rounded-full border-[3px] border-white pointer-events-none animate-scale-in"
+                style={{
+                  left: targetPos.x - targetDiameter / 2,
+                  top: targetPos.y - targetDiameter / 2,
+                  width: targetDiameter,
+                  height: targetDiameter,
+                  backgroundColor: targetColor,
+                  boxShadow: `0 0 20px ${targetColor}, 0 0 40px ${targetColor}40`,
+                }}
+              >
+                <div className="absolute inset-[20%] rounded-full border-2 border-white/50" />
+                <div className="absolute inset-[35%] rounded-full border border-white/30" />
+              </div>
+            )}
+
+            {phase === "tapped" && tapPos && p1Reaction !== null && p1Reaction !== "false_start" && p1Reaction !== "timeout" && (
+              <div
+                className="absolute pointer-events-none text-2xl font-bold text-teal"
+                style={{ left: tapPos.x - 30, top: tapPos.y - 50 }}
+              >
+                {p1Reaction}ms
+                <span className="block text-sm font-normal" style={{ color: reactionLabel(p1Reaction).color }}>
+                  {reactionLabel(p1Reaction).text}
+                </span>
+              </div>
+            )}
+
+            {showTooEarly && (
+              <p className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-red-500 animate-pulse">
+                TOO EARLY!
+              </p>
+            )}
+
+            {showMiss && tapPos && (
+              <p
+                className="absolute text-xl font-bold text-red-500"
+                style={{ left: tapPos.x - 30, top: tapPos.y - 20 }}
+              >
+                MISS!
+              </p>
+            )}
+          </div>
+
+          <div className="mt-1 flex w-full px-4 items-center justify-between text-sm text-body-gray">
+            <span>{phase === "match_over" ? "Match Over" : "React fast when the target appears"}</span>
+            <span className="tabular-nums">{lastP1Time !== null ? `Last: ${lastP1Time}ms` : " "}</span>
+          </div>
+        </div>
+
+        {/* Right: game log */}
+        <div className="w-[280px] shrink-0">
+          <div className="flex h-full w-full shrink-0 flex-col rounded-lg border border-white/10 bg-card/80 min-h-0 h-full overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]" style={{ overflowX: "hidden" }}>
+            <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
+              <h3 className="text-sm font-semibold text-white">Game Log</h3>
+            </div>
+            <div
+              ref={gameLogRef}
+              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+              }}
+            >
+              {roundHistory.length === 0 ? (
+                <p className="py-4 text-center text-xs text-body-gray">Rounds will appear here.</p>
+              ) : (
+                roundHistory.map((r, i) => {
+                  const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
+                  const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
+                  const winnerText =
+                    r.winner === "draw"
+                      ? "Round tied 🤝"
+                      : r.winner === "player1"
+                        ? `${player1.username} wins!`
+                        : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
+                  return (
+                    <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
+                      <div className="text-[11px] font-semibold text-white/90">
+                        Round {i + 1} · {winnerText}
+                      </div>
+                      <div className="mt-1 text-[13px] text-white/90">
+                        {player1.username}: {p1Label} · {player2.username}: {p2Label}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

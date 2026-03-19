@@ -362,129 +362,307 @@ export default function Chess({
     return w - b;
   }, [capturedWhite, capturedBlack]);
 
-  return (
-    <div className="flex h-full min-h-0 w-full flex-col md:flex-row md:gap-6 md:overflow-hidden md:min-h-[500px] md:max-h-[500px]">
-      {/* Left: Board area */}
-      <div
-        ref={boardContainerRef}
-        className="flex flex-1 flex-col items-center justify-center gap-3 py-4 md:min-w-0"
-      >
-        {/* Black (Player 2) info */}
-        <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-lg font-bold text-white">
-              {player2.username.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-white">
-                {player2.username}
-                {isPlayer2Bot && (
-                  <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                    🤖 BOT
-                  </span>
-                )}
-                {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))) && (
-                  <span className="ml-1.5 inline-flex animate-pulse text-body-gray">
-                    {isMultiplayer ? "thinking..." : "..."}
-                  </span>
-                )}
-              </p>
-              <p className="text-xs text-body-gray">Rating {player2.rating}</p>
-            </div>
-            {materialAdvantage < 0 && (
-              <span className="text-sm font-semibold text-teal">+{Math.abs(materialAdvantage)}</span>
+  const p1Active = turn === "w";
+  const p2Active = turn === "b";
+  const accentBorder = isMultiplayer ? "#FF5E00" : "#A855F7";
+
+  const PlayerCard = ({
+    username,
+    rating,
+    avatarGradient,
+    active,
+    captured,
+    isBot,
+    advantage,
+  }: {
+    username: string;
+    rating: number;
+    avatarGradient: string;
+    active: boolean;
+    captured: PieceType[];
+    isBot?: boolean;
+    advantage?: number | null;
+  }) => (
+    <div
+      className="rounded-lg border bg-[#1A1A22] px-3 py-2"
+      style={{
+        borderColor: active ? accentBorder : "#2A3A5C",
+        boxShadow: active ? "0 0 22px rgba(42,58,92,0.45)" : undefined,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div className={`h-10 w-10 shrink-0 rounded-full bg-gradient-to-br ${avatarGradient} flex items-center justify-center text-lg font-bold text-white`}>
+          {username.charAt(0)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium text-white">
+            {username}
+            {isBot && (
+              <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
+                🤖 BOT
+              </span>
             )}
-          </div>
-          <div className="flex flex-wrap items-center gap-0.5">
-            {CAPTURED_DISPLAY_ORDER.map((t) =>
-              capturedBlack.filter((p) => p === t).map((_, i) => (
-                <span
-                  key={`b-${t}-${i}`}
-                  className="inline-flex items-center justify-center leading-none text-white/90"
-                  style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
+            {active && (
+              <span className="ml-2 inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color: accentBorder }}>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                Turn
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-body-gray">Rating {rating}</p>
+        </div>
+        {typeof advantage === "number" && advantage !== 0 && (
+          <span className="text-sm font-semibold text-teal">{advantage > 0 ? `+${advantage}` : `+${Math.abs(advantage)}`}</span>
+        )}
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-0.5">
+        {CAPTURED_DISPLAY_ORDER.map((t) =>
+          captured.filter((p) => p === t).map((_, i) => (
+            <span
+              key={`${username}-${t}-${i}`}
+              className="inline-flex items-center justify-center leading-none text-white/90"
+              style={{ fontFamily: "system-ui", fontSize: 18, width: 18, height: 18 }}
+            >
+              {getPieceSymbol(active ? "w" : "b", t)}
+            </span>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col">
+      {/* Mobile: keep existing stacked layout */}
+      <div className="md:hidden">
+        <div className="flex h-full min-h-0 w-full flex-col">
+          <div
+            ref={boardContainerRef}
+            className="flex flex-1 flex-col items-center justify-center gap-3 py-4"
+          >
+            {/* Black (Player 2) info */}
+            <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 flex items-center justify-center text-lg font-bold text-white">
+                  {player2.username.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-white">
+                    {player2.username}
+                    {isPlayer2Bot && (
+                      <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
+                        🤖 BOT
+                      </span>
+                    )}
+                    {(botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))) && (
+                      <span className="ml-1.5 inline-flex animate-pulse text-body-gray">
+                        {isMultiplayer ? "thinking..." : "..."}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-body-gray">Rating {player2.rating}</p>
+                </div>
+                {materialAdvantage < 0 && (
+                  <span className="text-sm font-semibold text-teal">+{Math.abs(materialAdvantage)}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-0.5">
+                {CAPTURED_DISPLAY_ORDER.map((t) =>
+                  capturedBlack.filter((p) => p === t).map((_, i) => (
+                    <span
+                      key={`b-${t}-${i}`}
+                      className="inline-flex items-center justify-center leading-none text-white/90"
+                      style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
+                    >
+                      {getPieceSymbol("w", t)}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Board */}
+            <div className="flex items-center justify-center">
+              <ChessBoard
+                board={board}
+                selectedSquare={selectedSquare}
+                legalMoveTargets={legalMoveTargets}
+                lastMove={lastMove}
+                checkSquare={checkSquare}
+                squareSize={squareSize}
+                onSquareClick={handleSquareClick}
+                onPieceDragStart={handlePieceDragStart}
+                onPieceDragMove={handlePieceDragMove}
+                onPieceDragEnd={handlePieceDragEnd}
+                dragging={dragging}
+                turn={turn}
+                flipped={isMultiplayer && myRole === "player2"}
+              />
+            </div>
+
+            {/* White (Player 1) info */}
+            <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-lg font-bold text-white">
+                  {player1.username.charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-white">{player1.username}</p>
+                  <p className="text-xs text-body-gray">Rating {player1.rating}</p>
+                </div>
+                {materialAdvantage > 0 && (
+                  <span className="text-sm font-semibold text-teal">+{materialAdvantage}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-0.5">
+                {CAPTURED_DISPLAY_ORDER.map((t) =>
+                  capturedWhite.filter((p) => p === t).map((_, i) => (
+                    <span
+                      key={`w-${t}-${i}`}
+                      className="inline-flex items-center justify-center leading-none text-body-gray"
+                      style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
+                    >
+                      {getPieceSymbol("b", t)}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Check / Checkmate / Stalemate indicator */}
+            {inCheck && !inCheckmate && (
+              <p className="text-sm font-semibold text-amber-400">Check!</p>
+            )}
+            {inCheckmate && (
+              <p className="text-sm font-semibold text-red-400">Checkmate!</p>
+            )}
+            {inStalemate && (
+              <p className="text-sm font-semibold text-body-gray">Stalemate — Draw!</p>
+            )}
+            {isMultiplayer && !gameOverRef.current && !inCheckmate && !inStalemate && !inDraw && (
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sendGameEvent && !drawOfferSent) {
+                      setDrawOfferSent(true);
+                      sendGameEvent({ type: "draw_offer" }).catch(() => {});
+                    }
+                  }}
+                  disabled={drawOfferSent}
+                  className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-body-gray hover:bg-white/10 disabled:opacity-50"
                 >
-                  {getPieceSymbol("w", t)}
-                </span>
-              ))
+                  {drawOfferSent ? "Draw offered" : "Offer Draw"}
+                </button>
+              </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Board */}
-        <div className="flex items-center justify-center">
-          <ChessBoard
-            board={board}
-            selectedSquare={selectedSquare}
-            legalMoveTargets={legalMoveTargets}
-            lastMove={lastMove}
-            checkSquare={checkSquare}
-            squareSize={squareSize}
-            onSquareClick={handleSquareClick}
-            onPieceDragStart={handlePieceDragStart}
-            onPieceDragMove={handlePieceDragMove}
-            onPieceDragEnd={handlePieceDragEnd}
-            dragging={dragging}
-            turn={turn}
-            flipped={isMultiplayer && myRole === "player2"}
+      {/* Desktop: standardized 3-column layout */}
+      <div className="hidden md:flex h-full min-h-0 w-full flex-row gap-4 overflow-hidden min-h-[500px] max-h-[500px]">
+        {/* Left: player cards */}
+        <div className="w-[200px] shrink-0 flex flex-col gap-3">
+          <PlayerCard
+            username={player1.username}
+            rating={player1.rating}
+            avatarGradient="from-teal/40 to-purple/40"
+            active={p1Active}
+            captured={capturedWhite}
+            advantage={materialAdvantage > 0 ? materialAdvantage : null}
+          />
+          <PlayerCard
+            username={player2.username}
+            rating={player2.rating}
+            avatarGradient="from-purple/40 to-rose-500/40"
+            active={p2Active}
+            captured={capturedBlack}
+            isBot={isPlayer2Bot}
+            advantage={materialAdvantage < 0 ? materialAdvantage : null}
           />
         </div>
 
-        {/* White (Player 1) info */}
-        <div className="flex w-full max-w-[min(100%,520px)] flex-col gap-1 rounded-lg bg-white/5 px-3 py-2">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-gradient-to-br from-teal/40 to-purple/40 flex items-center justify-center text-lg font-bold text-white">
-              {player1.username.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium text-white">{player1.username}</p>
-              <p className="text-xs text-body-gray">Rating {player1.rating}</p>
-            </div>
-            {materialAdvantage > 0 && (
-              <span className="text-sm font-semibold text-teal">+{materialAdvantage}</span>
-            )}
+        {/* Center: board */}
+        <div className="flex flex-1 flex-col items-center justify-center min-w-0">
+          <div className="flex items-center justify-center">
+            <ChessBoard
+              board={board}
+              selectedSquare={selectedSquare}
+              legalMoveTargets={legalMoveTargets}
+              lastMove={lastMove}
+              checkSquare={checkSquare}
+              squareSize={squareSize}
+              onSquareClick={handleSquareClick}
+              onPieceDragStart={handlePieceDragStart}
+              onPieceDragMove={handlePieceDragMove}
+              onPieceDragEnd={handlePieceDragEnd}
+              dragging={dragging}
+              turn={turn}
+              flipped={isMultiplayer && myRole === "player2"}
+            />
           </div>
-          <div className="flex flex-wrap items-center gap-0.5">
-            {CAPTURED_DISPLAY_ORDER.map((t) =>
-              capturedWhite.filter((p) => p === t).map((_, i) => (
-                <span
-                  key={`w-${t}-${i}`}
-                  className="inline-flex items-center justify-center leading-none text-body-gray"
-                  style={{ fontFamily: "system-ui", fontSize: 20, width: 20, height: 20 }}
-                >
-                  {getPieceSymbol("b", t)}
-                </span>
-              ))
-            )}
+          <div className="mt-3 flex w-full max-w-[550px] items-center justify-between text-sm">
+            <span className="text-body-gray">
+              {(() => {
+                const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
+                const myTurn = turn === myColor;
+                return myTurn ? "Your Turn" : "Opponent's Turn";
+              })()}
+            </span>
+            <span className="text-body-gray"> </span>
           </div>
         </div>
 
-        {/* Check / Checkmate / Stalemate indicator */}
-        {inCheck && !inCheckmate && (
-          <p className="text-sm font-semibold text-amber-400">Check!</p>
-        )}
-        {inCheckmate && (
-          <p className="text-sm font-semibold text-red-400">Checkmate!</p>
-        )}
-        {inStalemate && (
-          <p className="text-sm font-semibold text-body-gray">Stalemate — Draw!</p>
-        )}
-        {isMultiplayer && !gameOverRef.current && !inCheckmate && !inStalemate && !inDraw && (
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (sendGameEvent && !drawOfferSent) {
-                  setDrawOfferSent(true);
-                  sendGameEvent({ type: "draw_offer" }).catch(() => {});
-                }
-              }}
-              disabled={drawOfferSent}
-              className="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-body-gray hover:bg-white/10 disabled:opacity-50"
-            >
-              {drawOfferSent ? "Draw offered" : "Offer Draw"}
-            </button>
+        {/* Right: move log (already fixed-height/scrolling) */}
+        <div className="md:w-[280px] shrink-0">
+          <div
+            className="flex h-full flex-col rounded-lg border border-white/10 bg-card/80 min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 md:min-h-[500px] md:max-h-[500px]"
+            style={{ overflowX: "hidden" }}
+          >
+            <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
+              <p key="start" className="text-center text-xs text-body-gray py-2 shrink-0">
+                ♟ Game Started • White: {player1.username} vs Black: {player2.username}
+                {isPlayer2Bot ? " 🤖" : ""}
+              </p>
+              {moveHistory.length === 0 ? (
+                <p className="text-center text-sm text-body-gray py-4">Make the first move!</p>
+              ) : (
+                <>
+                  {moveHistory.map((bubble, i) => {
+                    const isPlayer1 = bubble.player === 1;
+                    return (
+                      <div key={`move-${i}-${bubble.san}`}>
+                        <div
+                          ref={i === moveHistory.length - 1 ? moveListEndRef : undefined}
+                          className="mb-2 flex max-w-[75%] shrink-0"
+                          style={{ marginLeft: isPlayer1 ? "auto" : 0, marginRight: isPlayer1 ? 0 : 40 }}
+                        >
+                          <div
+                            className="rounded-xl px-3.5 py-2.5"
+                            style={{
+                              backgroundColor: isPlayer1 ? "#1A3A2A" : "#1E1E2E",
+                              borderLeft: isPlayer1 ? "3px solid rgba(0, 229, 199, 0.5)" : "none",
+                            }}
+                          >
+                            <p className="text-xs font-bold" style={{ color: isPlayer1 ? "var(--color-teal, #0d9488)" : "#9ca3af" }}>
+                              {bubble.playerName}{bubble.player === 2 && isPlayer2Bot ? " 🤖" : ""}
+                            </p>
+                            <p className="text-sm text-white mt-0.5">{bubble.description}</p>
+                            <p className="text-[11px] text-body-gray mt-1 tabular-nums">
+                              {bubble.san.replace(/[+#]$/, "")} • {formatTs(bubble.ts)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Draw offer received modal */}
@@ -519,94 +697,6 @@ export default function Chess({
           </div>
         </div>
       )}
-
-      {/* Right: Chat-style move log — persisted moveHistory, append-only */}
-      <div
-        className="flex w-full flex-col rounded-lg border border-white/10 bg-card/80 md:w-[32%] md:min-w-[240px] min-h-0 overflow-hidden flex-shrink-0 flex-grow-0 h-[150px] min-h-[150px] max-h-[150px] md:h-full md:min-h-[500px] md:max-h-[500px]"
-        style={{ overflowX: "hidden" }}
-      >
-        <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
-          <p key="start" className="text-center text-xs text-body-gray py-2 shrink-0">
-            ♟ Game Started • White: {player1.username} vs Black: {player2.username}
-            {isPlayer2Bot ? " 🤖" : ""}
-          </p>
-          {moveHistory.length === 0 ? (
-            <p className="text-center text-sm text-body-gray py-4">Make the first move!</p>
-          ) : (
-            <>
-              {moveHistory.map((bubble, i) => {
-                const totalBubbles = moveHistory.length;
-                const bubbleOrdinal = i + 1;
-                const isInCollapsedRange = isMobile && !showAllMoves && totalBubbles > 3 && bubbleOrdinal <= totalBubbles - 3;
-                if (isInCollapsedRange) return null;
-                const isPlayer1 = bubble.player === 1;
-                return (
-                  <div key={`move-${i}-${bubble.san}`}>
-                    {i > 0 && (i + 1) % 10 === 0 && (
-                      <p className="text-center text-xs text-body-gray py-1">— Move {i + 1} —</p>
-                    )}
-                    <div
-                      ref={i === moveHistory.length - 1 ? moveListEndRef : undefined}
-                      className="mb-2 flex max-w-[75%] shrink-0"
-                      style={{ marginLeft: isPlayer1 ? "auto" : 0, marginRight: isPlayer1 ? 0 : 40 }}
-                    >
-                      <div
-                        className="rounded-xl px-3.5 py-2.5"
-                        style={{
-                          backgroundColor: isPlayer1 ? "#1A3A2A" : "#1E1E2E",
-                          borderLeft: isPlayer1 ? "3px solid rgba(0, 229, 199, 0.5)" : "none",
-                        }}
-                      >
-                        <p className="text-xs font-bold" style={{ color: isPlayer1 ? "var(--color-teal, #0d9488)" : "#9ca3af" }}>
-                          {bubble.playerName}{bubble.player === 2 && isPlayer2Bot ? " 🤖" : ""}
-                        </p>
-                        <p className="text-sm text-white mt-0.5">{bubble.description}</p>
-                        <p className="text-[11px] text-body-gray mt-1 tabular-nums">
-                          {bubble.san.replace(/[+#]$/, "")} • {formatTs(bubble.ts)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {isMobile && !showAllMoves && moveHistory.length > 3 && (
-                <button
-                  type="button"
-                  className="mt-2 text-center text-sm text-teal hover:underline"
-                  onClick={() => setShowAllMoves(true)}
-                >
-                  Show all
-                </button>
-              )}
-            </>
-          )}
-          {(inCheckmate || inStalemate || inDraw || inThreefold || insufficientMaterial) && (
-            <p key="end" className="text-center text-sm text-white/90 py-2 font-medium shrink-0">
-              {inCheckmate
-                ? `🏆 Checkmate! ${turn === "b" ? player1.username : player2.username} wins`
-                : inStalemate
-                  ? "🤝 Draw by stalemate"
-                  : "🤝 Draw"}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2 border-t border-white/10 p-3 shrink-0">
-          <button
-            type="button"
-            className="flex-1 rounded border border-white/20 py-2 text-xs font-medium text-body-gray hover:bg-white/5"
-          >
-            Offer Draw
-          </button>
-          <button
-            type="button"
-            onClick={() => onGameEnd("player2")}
-            className="flex-1 rounded border border-red-500/50 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10"
-          >
-            Resign
-          </button>
-        </div>
-      </div>
 
       {/* Promotion modal */}
       {promotionPending && (

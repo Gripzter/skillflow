@@ -843,7 +843,7 @@ function MatchPageContent() {
 
       {/* Victory overlay — only shown when THIS player won */}
       {outcome === "victory" && match.gameType !== "spelling-bee" && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
           <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
           <div className="animate-fade-in relative text-center">
             <p className="text-5xl font-bold text-white sm:text-6xl">
@@ -895,7 +895,7 @@ function MatchPageContent() {
 
       {/* Draw overlay */}
       {outcome === "draw" && match.gameType !== "spelling-bee" && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
           <div className="absolute inset-0 bg-gradient-to-t from-amber-500/5 via-transparent to-amber-500/5" aria-hidden />
           <div className="animate-fade-in relative text-center">
             <p className="text-4xl font-bold text-white sm:text-5xl">It&apos;s a Draw!</p>
@@ -933,7 +933,7 @@ function MatchPageContent() {
 
       {/* Defeat overlay — only shown when THIS player lost (respectful, encouraging) */}
       {outcome === "defeat" && match.gameType !== "spelling-bee" && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-charcoal/98 px-4">
+        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
           <div className="absolute inset-0 bg-gradient-to-t from-red-500/5 via-transparent to-red-500/5" aria-hidden />
           <div className="animate-fade-in relative text-center">
             <p className="text-4xl font-bold text-white sm:text-5xl">Defeated</p>
