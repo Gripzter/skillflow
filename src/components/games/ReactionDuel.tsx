@@ -30,8 +30,7 @@ function reactionLabel(ms: number): { text: string; color: string } {
 }
 
 import type { GameMultiplayerProps } from "./Chess";
-import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
-import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
+import type { MatchUiState } from "@/components/game/matchUi";
 
 interface ReactionDuelProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -59,6 +58,7 @@ export default function ReactionDuel({
   incomingEvent,
   onEventProcessed,
   isPractice: isPracticeProp,
+  onMatchUi,
 }: ReactionDuelProps) {
   const [phase, setPhase] = useState<Phase>("countdown");
   const [countdownN, setCountdownN] = useState(3);
@@ -78,8 +78,7 @@ export default function ReactionDuel({
   const [showTooEarly, setShowTooEarly] = useState(false);
   const [showMiss, setShowMiss] = useState(false);
   const [lastP1Time, setLastP1Time] = useState<number | null>(null);
-  const gameAreaMobileRef = useRef<HTMLDivElement>(null);
-  const gameAreaDesktopRef = useRef<HTMLDivElement>(null);
+  const gameAreaRef = useRef<HTMLDivElement>(null);
   const targetAppearTimeRef = useRef<number>(0);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,9 +87,6 @@ export default function ReactionDuel({
   const areaSizeRef = useRef({ w: GAME_AREA_MIN.w, h: GAME_AREA_MIN.h });
   const roundStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const gameLogMobileRef = useRef<HTMLDivElement | null>(null);
-  const gameLogDesktopRef = useRef<HTMLDivElement | null>(null);
-  const atBottomRef = useRef(true);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
   const baseTargetSize = isMobile ? TARGET_BASE_MOBILE : TARGET_BASE;
@@ -109,25 +105,16 @@ export default function ReactionDuel({
   }, []);
 
   const syncGameAreaSize = useCallback(() => {
-    const m = gameAreaMobileRef.current;
-    const d = gameAreaDesktopRef.current;
-    const rectM = m?.getBoundingClientRect();
-    const rectD = d?.getBoundingClientRect();
-    const pick =
-      rectM && rectM.width > 0 && rectM.height > 0
-        ? m!
-        : rectD && rectD.width > 0 && rectD.height > 0
-          ? d!
-          : m || d;
-    if (!pick) return;
-    const rect = pick.getBoundingClientRect();
+    const el = gameAreaRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
     areaSizeRef.current = { w: rect.width, h: rect.height };
   }, []);
 
   useEffect(() => {
     const ro = new ResizeObserver(() => syncGameAreaSize());
-    if (gameAreaMobileRef.current) ro.observe(gameAreaMobileRef.current);
-    if (gameAreaDesktopRef.current) ro.observe(gameAreaDesktopRef.current);
+    if (gameAreaRef.current) ro.observe(gameAreaRef.current);
     syncGameAreaSize();
     window.addEventListener("resize", syncGameAreaSize);
     return () => {
@@ -148,14 +135,6 @@ export default function ReactionDuel({
     }, 1000);
     return () => clearTimeout(t);
   }, [phase, countdownN]);
-
-  // Auto-scroll game log to the latest round result when user hasn't scrolled up.
-  useEffect(() => {
-    const activeLogRef = window.innerWidth < 768 ? gameLogMobileRef.current : gameLogDesktopRef.current;
-    if (!activeLogRef) return;
-    if (!atBottomRef.current) return;
-    activeLogRef.scrollTop = activeLogRef.scrollHeight;
-  }, [roundHistory.length]);
 
   // Incoming multiplayer: round_start (show target after delay), reaction_result (opponent's time)
   useEffect(() => {
@@ -340,17 +319,9 @@ export default function ReactionDuel({
       }
       const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
       if (phase !== "target" || myReactionAlreadySet) return;
-      const m = gameAreaMobileRef.current;
-      const d = gameAreaDesktopRef.current;
-      const rm = m?.getBoundingClientRect();
-      const el =
-        rm && rm.width > 0 && rm.height > 0
-          ? m
-          : (() => {
-              const rd = d?.getBoundingClientRect();
-              return rd && rd.width > 0 && rd.height > 0 ? d : m || d;
-            })();
-      if (!el || !targetPos) return;
+      const el = gameAreaRef.current;
+      const r = el?.getBoundingClientRect();
+      if (!el || !r || r.width <= 0 || !targetPos) return;
       const rect = el.getBoundingClientRect();
       const x = clientX - rect.left;
       const y = clientY - rect.top;
@@ -455,238 +426,79 @@ export default function ReactionDuel({
   const ACCENT_P2 = "#A855F7";
   const isMyTurn = isMultiplayer ? (myRole === "player1" ? p1RowActive : p2RowActive) : p1RowActive;
 
+  const gameStartRef = useRef(Date.now());
+  useEffect(() => {
+    if (!onMatchUi) return;
+    let turnText = "Get ready...";
+    if (phase === "match_over") turnText = "Match over";
+    else if (phase === "countdown") turnText = "Starting...";
+    else if (isMyTurn) turnText = "YOUR TURN — Tap the target when it appears!";
+    else turnText = "Waiting for opponent...";
+    const systemLogEntries: MatchUiState["systemLogEntries"] = [
+      {
+        id: "start",
+        text: `⚡ Reaction Duel — ${player1.username} vs ${player2.username}`,
+        timestamp: gameStartRef.current,
+      },
+      ...roundHistory.map((r, i) => {
+        const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : String(r.p1);
+        const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : String(r.p2);
+        const winnerText =
+          r.winner === "draw"
+            ? "Round tied"
+            : r.winner === "player1"
+              ? `${player1.username} wins`
+              : `${player2.username} wins`;
+        return {
+          id: `round-${i}`,
+          text: `Round ${i + 1}: ${winnerText} · ${player1.username}: ${p1Label}, ${player2.username}: ${p2Label}`,
+          timestamp: gameStartRef.current + (i + 1) * 1000,
+        };
+      }),
+    ];
+    onMatchUi({
+      scores: { player1: p1Wins, player2: p2Wins },
+      scoreLabel: "Rounds",
+      currentTurn: p1RowActive ? "player1" : "player2",
+      turnText,
+      systemLogEntries,
+    });
+  }, [
+    onMatchUi,
+    phase,
+    isMyTurn,
+    roundHistory,
+    p1Wins,
+    p2Wins,
+    p1RowActive,
+    player1.username,
+    player2.username,
+    isPlayer2Bot,
+  ]);
+
   return (
     <div
       className="flex h-full min-h-0 w-full flex-col overflow-hidden touch-manipulation"
       style={{ touchAction: "manipulation" }}
     >
-      {/* Mobile */}
-      <div className="flex h-full min-h-0 flex-col overflow-hidden md:hidden">
-        <MobilePlayerCards
-          player1Name={player1.username}
-          player1Right={`${p1Wins}`}
-          player2Name={player2.username}
-          player2Right={`${p2Wins}`}
-          player1Active={p1RowActive}
-          player2Active={p2RowActive}
-        />
-
-        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-          <div
-            ref={gameAreaMobileRef}
-            className="game-play-area-mobile flex min-w-0 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
-            style={{
-              backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
-              minWidth: 0,
-              touchAction: "manipulation",
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              const t = e.changedTouches[0];
-              if (t) handleGameAreaTap(t.clientX, t.clientY);
-            }}
-            onPointerDown={(e) => {
-              if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
-            }}
-          >
-            {phase === "countdown" && (
-              <div className="text-center">
-                {countdownN > 0 ? (
-                  <span
-                    className="text-6xl font-black animate-fade-in"
-                    style={{
-                      color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
-                    }}
-                  >
-                    {countdownN}
-                  </span>
-                ) : (
-                  <span className="text-6xl font-black text-teal animate-pulse">GO!</span>
-                )}
-              </div>
-            )}
-
-            {phase === "get_ready" && (
-              <div className="text-center">
-                <p className="text-3xl font-bold text-white animate-pulse">Get Ready...</p>
-                <p className="mt-2 text-body-gray">Round {round} of {TOTAL_ROUNDS}</p>
-              </div>
-            )}
-
-            {phase === "target" && targetPos && (
-              <div
-                className="absolute rounded-full border-[3px] border-white pointer-events-none animate-scale-in"
-                style={{
-                  left: targetPos.x - targetDiameter / 2,
-                  top: targetPos.y - targetDiameter / 2,
-                  width: targetDiameter,
-                  height: targetDiameter,
-                  backgroundColor: targetColor,
-                  boxShadow: `0 0 20px ${targetColor}, 0 0 40px ${targetColor}40`,
-                }}
-              >
-                <div className="absolute inset-[20%] rounded-full border-2 border-white/50" />
-                <div className="absolute inset-[35%] rounded-full border border-white/30" />
-              </div>
-            )}
-
-            {phase === "tapped" && tapPos && p1Reaction !== null && p1Reaction !== "false_start" && p1Reaction !== "timeout" && (
-              <div
-                className="absolute pointer-events-none text-2xl font-bold text-teal"
-                style={{ left: tapPos.x - 30, top: tapPos.y - 50 }}
-              >
-                {p1Reaction}ms
-                <span className="block text-sm font-normal" style={{ color: reactionLabel(p1Reaction).color }}>
-                  {reactionLabel(p1Reaction).text}
-                </span>
-              </div>
-            )}
-
-            {showTooEarly && (
-              <p className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-red-500 animate-pulse">
-                TOO EARLY!
-              </p>
-            )}
-
-            {showMiss && tapPos && (
-              <p
-                className="absolute text-xl font-bold text-red-500"
-                style={{ left: tapPos.x - 30, top: tapPos.y - 20 }}
-              >
-                MISS!
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Game status (~30px) */}
-        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            style={{ color: isMyTurn ? (myRole === "player1" ? ACCENT_P1 : ACCENT_P2) : "rgba(148, 163, 184, 1)" }}
-          >
-            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
+      <div className="mb-1.5 flex w-full max-w-[400px] shrink-0 flex-col gap-1 px-2">
+        <div className="flex items-center justify-between text-[11px] text-body-gray">
+          <span>
+            Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
           </span>
-          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">15s</span>
+          <span className="tabular-nums">
+            {p1Wins}–{p2Wins}
+          </span>
         </div>
-
-        {/* Game Log (~100px fixed) */}
-        <div className="h-[100px] min-h-[100px] max-h-[100px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-card/80">
-          <h3 className="shrink-0 border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">
-            Game Log
-          </h3>
-          <div
-            ref={gameLogMobileRef}
-            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-            }}
-          >
-            {roundHistory.length === 0 ? (
-              <p className="py-2 text-center text-[11px] text-body-gray">Rounds will appear here.</p>
-            ) : (
-              roundHistory.map((r, i) => {
-                const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
-                const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
-                const winnerText =
-                  r.winner === "draw"
-                    ? "Round tied 🤝"
-                    : r.winner === "player1"
-                      ? `${player1.username} wins!`
-                      : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
-
-                return (
-                  <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-2 py-2">
-                    <div className="text-[11px] font-semibold text-white/90">Round {i + 1} · {winnerText}</div>
-                    <div className="mt-1 text-[11px] text-white/80">
-                      {player1.username}: {p1Label} · {player2.username}: {p2Label}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
+          <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
         </div>
       </div>
-
-      {/* Desktop */}
-      <div className="hidden h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden md:flex">
-        <div className="flex w-[200px] shrink-0 flex-col justify-center">
-          <GamePlayerStack>
-            <GamePlayerRow
-              username={player1.username}
-              avatarLetter={player1.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40"
-              scoreRight={`Score: ${p1Wins}`}
-              active={p1RowActive}
-              isPractice={isPractice}
-              rating={player1.rating}
-              footer={
-                p1Streak >= 3 ? (
-                  <span className="text-[10px] text-amber-400">🔥 {p1Streak} streak</span>
-                ) : undefined
-              }
-            />
-            <GamePlayerRow
-              username={player2.username}
-              avatarLetter={player2.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
-              scoreRight={`Score: ${p2Wins}`}
-              active={p2RowActive}
-              isPractice={isPractice}
-              rating={player2.rating}
-              isBot={isPlayer2Bot}
-              footer={
-                p2Streak >= 3 ? (
-                  <span className="text-[10px] text-amber-400">🔥 {p2Streak} streak</span>
-                ) : undefined
-              }
-            />
-          </GamePlayerStack>
-        </div>
-
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden py-2">
-          <div className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 border-b border-white/10">
-            <span className="font-semibold text-white">Reaction Duel ⚡</span>
-            <span className="text-body-gray tabular-nums">
-              Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
-            </span>
-          </div>
-
-          <div className="shrink-0 px-4 py-3 bg-white/5 flex items-center justify-between">
-            <span className="text-body-gray">First to {Math.ceil(TOTAL_ROUNDS / 2)} rounds</span>
-            <span className="text-body-gray tabular-nums">
-              {p1Wins}–{p2Wins}
-            </span>
-          </div>
-
-          <div className="shrink-0 px-4 pb-2 pt-3 flex items-center gap-1">
-            {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-              <div
-                key={i}
-                className="h-2 w-2 rounded-full flex-1 max-w-[8px]"
-                style={{
-                  backgroundColor: i < roundHistory.length
-                    ? roundHistory[i].winner === "player1"
-                      ? "var(--color-teal, #0d9488)"
-                      : roundHistory[i].winner === "player2"
-                        ? "#a855f7"
-                        : "#6b7280"
-                    : "rgba(255,255,255,0.15)",
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="shrink-0 h-2 mx-4 mb-3 flex rounded-full overflow-hidden bg-white/10">
-            <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
-            <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
-          </div>
-
+      <div className="relative flex min-h-[min(55vh,400px)] min-h-0 w-full max-w-[400px] flex-1 items-center justify-center overflow-hidden">
           <div
-            ref={gameAreaDesktopRef}
-            className="game-play-area-desktop relative mx-3 mb-2 flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
+            ref={gameAreaRef}
+            className="flex aspect-[3/2] min-h-[220px] w-full min-w-0 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
             style={{
               backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
               minWidth: 0,
@@ -769,57 +581,6 @@ export default function ReactionDuel({
               </p>
             )}
           </div>
-
-          <div className="mt-1 flex w-full px-4 items-center justify-between text-sm text-body-gray">
-            <span>{phase === "match_over" ? "Match Over" : "React fast when the target appears"}</span>
-            <span className="tabular-nums">{lastP1Time !== null ? `Last: ${lastP1Time}ms` : " "}</span>
-          </div>
-        </div>
-
-        {/* Right: game log */}
-        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden">
-          <div
-            className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
-            style={{ overflowX: "hidden" }}
-          >
-            <div className="sticky top-0 z-10 border-b border-white/10 bg-card/90 px-4 py-3">
-              <h3 className="text-sm font-semibold text-white">Game Log</h3>
-            </div>
-            <div
-              ref={gameLogDesktopRef}
-              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-              }}
-            >
-              {roundHistory.length === 0 ? (
-                <p className="py-4 text-center text-xs text-body-gray">Rounds will appear here.</p>
-              ) : (
-                roundHistory.map((r, i) => {
-                  const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
-                  const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
-                  const winnerText =
-                    r.winner === "draw"
-                      ? "Round tied 🤝"
-                      : r.winner === "player1"
-                        ? `${player1.username} wins!`
-                        : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
-                  return (
-                    <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
-                      <div className="text-[11px] font-semibold text-white/90">
-                        Round {i + 1} · {winnerText}
-                      </div>
-                      <div className="mt-1 text-[13px] text-white/90">
-                        {player1.username}: {p1Label} · {player2.username}: {p2Label}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `

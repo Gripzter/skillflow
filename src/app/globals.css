@@ -120,6 +120,22 @@ main,
   animation: victory-glow 1.5s ease-in-out infinite;
 }
 
+/* GameLayout: active player card pulse */
+@keyframes gameLayoutActivePulse {
+  0%,
+  100% {
+    border-color: #ff5e00;
+    box-shadow: 0 0 0 0 rgba(255, 94, 0, 0);
+  }
+  50% {
+    border-color: #ff5e00;
+    box-shadow: 0 0 8px 0 rgba(255, 94, 0, 0.15);
+  }
+}
+.game-layout-card-active {
+  animation: gameLayoutActivePulse 2s ease-in-out infinite;
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);

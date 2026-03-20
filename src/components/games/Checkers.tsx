@@ -6,18 +6,8 @@ import { createInitialBoard, getCaptureStepsFrom, getGameWinnerOrDraw, getLegalT
 import { getCheckersBotDelayMs, getCheckersBotTurnMove } from "@/lib/games/checkers-bot";
 import type { BotDifficulty } from "@/lib/games/bot-engine";
 import Link from "next/link";
-import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
-import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
+import type { MatchUiState } from "@/components/game/matchUi";
 
-export interface CheckersChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  message: string;
-  isPreset: boolean;
-  timestamp: number;
-  reported: boolean;
-}
 
 const BOARD_LIGHT = "#1A1A22";
 const BOARD_DARK = "#242430";
@@ -29,12 +19,6 @@ const KING_GOLD = "#FFD700";
 
 const ACCENT_ORANGE = "#FF5E00";
 const ACCENT_PURPLE = "#A855F7";
-
-function filterProfanity(text: string): string {
-  // Same lightweight filter as `GameChat`, kept local to avoid UI coupling.
-  const bad = /\b(shit|damn|hell|ass|fuck|fck|fuk|crap|wtf)\b/gi;
-  return text.replace(bad, (match) => "*".repeat(match.length));
-}
 
 function formatPieceCodeToDisplay(piece: number): string {
   if (piece === 1) return "●";
@@ -56,152 +40,6 @@ function getBotName(isPlayer2Bot: boolean, player2Username: string): string {
   return isPlayer2Bot ? `${player2Username} 🤖` : player2Username;
 }
 
-type ChatPanelProps = {
-  enabled: boolean;
-  isPractice: boolean;
-  messages: CheckersChatMessage[];
-  onSend: (message: string, isPreset: boolean) => void;
-  onReport: (messageId: string) => void;
-  playerName: string;
-  opponentName: string;
-  playerId: string;
-};
-
-function ChatPanel({
-  enabled,
-  isPractice,
-  messages,
-  onSend,
-  playerName,
-  opponentName,
-}: ChatPanelProps) {
-  const accent = isPractice ? ACCENT_PURPLE : ACCENT_ORANGE;
-  const accentDim = isPractice ? "rgba(168,85,247,0.25)" : "rgba(255,94,0,0.25)";
-
-  const [input, setInput] = useState("");
-  const logRef = useRef<HTMLDivElement | null>(null);
-  const atBottomRef = useRef(true);
-
-  const presets = useMemo(
-    () => [
-      { label: "Good luck!", value: "Good luck!" },
-      { label: "Nice move!", value: "Nice move!" },
-      { label: "Your turn!", value: "Your turn!" },
-      { label: "Well played.", value: "Well played." },
-    ],
-    []
-  );
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (!logRef.current) return;
-    if (!atBottomRef.current) return;
-    logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [messages, enabled]);
-
-  const handleSend = useCallback(
-    (text: string, isPreset: boolean) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      if (trimmed.length > 200) return;
-      const filtered = filterProfanity(trimmed);
-      onSend(filtered, isPreset);
-      setInput("");
-    },
-    [onSend]
-  );
-
-  if (!enabled) return null;
-
-  return (
-    <div className="flex min-h-0 flex-col">
-      <div className="sticky top-0 z-10 border-b border-[#2A3A5C] bg-[#1A1A22]/90 px-4 py-3">
-        <h3 className="text-sm font-bold text-white">Chat</h3>
-      </div>
-
-      <div
-        ref={logRef}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-3"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-        }}
-      >
-        {messages.length === 0 ? (
-          <p className="py-2 text-xs text-[#7A7A8E]">No messages yet.</p>
-        ) : (
-          messages.map((m) => {
-            const isMine = m.senderName === playerName;
-            const bubbleBorder = isMine ? accent : "rgba(255,255,255,0.12)";
-            const bubbleBg = isMine ? accentDim : "rgba(255,255,255,0.03)";
-            return (
-              <div
-                key={m.id}
-                className="mb-2 flex"
-                style={{
-                  justifyContent: isMine ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  className="rounded-xl border px-3 py-2"
-                  style={{
-                    maxWidth: "85%",
-                    background: bubbleBg,
-                    borderColor: bubbleBorder,
-                  }}
-                >
-                  <div className="text-[11px] font-semibold text-white/90">
-                    {isMine ? playerName : opponentName}
-                    {m.isPreset ? <span className="ml-2 text-[10px] text-white/60">(preset)</span> : null}
-                  </div>
-                  <div className="mt-0.5 text-[13px] text-white/90">{m.message}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <div className="border-t border-[#2A3A5C] bg-[#1A1A22] px-4 py-3">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {presets.map((p) => (
-            <button
-              key={p.label}
-              type="button"
-              onClick={() => handleSend(p.value, true)}
-              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[12px] font-semibold text-white hover:bg-white/10"
-              style={{ borderColor: accentDim }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend(input, false);
-            }}
-            placeholder="Type a message..."
-            className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-[#E5E7EB] placeholder:text-[#4B5563] focus:outline-none"
-            style={{ borderColor: "rgba(255,255,255,0.08)" }}
-          />
-          <button
-            type="button"
-            onClick={() => handleSend(input, false)}
-            disabled={!input.trim()}
-            className="rounded-lg px-3 py-2 text-[13px] font-semibold disabled:opacity-40"
-            style={{ background: "transparent", border: `1px solid ${accentDim}`, color: "white" }}
-          >
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 type LogEntry = { id: string; side: Player; message: string };
 
 export interface CheckersProps extends GameMultiplayerProps {
@@ -212,13 +50,7 @@ export interface CheckersProps extends GameMultiplayerProps {
   isPlayer2Bot?: boolean;
   botDifficulty?: BotDifficulty;
 
-  // UI extras for the right panel
   isPractice?: boolean;
-  chatEnabled?: boolean;
-  chatMessages?: CheckersChatMessage[];
-  onSendChatMessage?: (message: string, isPreset: boolean) => void;
-  onReportChatMessage?: (messageId: string) => void;
-  playerId?: string;
 }
 
 export default function Checkers({
@@ -234,11 +66,7 @@ export default function Checkers({
   incomingEvent,
   onEventProcessed,
   isPractice = false,
-  chatEnabled = false,
-  chatMessages = [],
-  onSendChatMessage,
-  onReportChatMessage,
-  playerId = "",
+  onMatchUi,
 }: CheckersProps) {
   const [board, setBoard] = useState<Board>(() => createInitialBoard());
   const [currentTurn, setCurrentTurn] = useState<Player>(1);
@@ -815,68 +643,45 @@ export default function Checkers({
   const selectedPieceCode = selected ? board[selected.r][selected.c] : 0;
   const selectedIsKing = selected ? Math.abs(selectedPieceCode) === 2 : false;
 
-  const gameLogEnabled = true;
+  const gameStartRef = useRef(Date.now());
+  useEffect(() => {
+    if (!onMatchUi) return;
+    const turnText = isMyTurn
+      ? mustCapture && !chainActive
+        ? "YOUR TURN — Mandatory capture!"
+        : "YOUR TURN — Move a piece!"
+      : "Waiting for opponent...";
+    const systemLogEntries: MatchUiState["systemLogEntries"] = log.map((e, i) => ({
+      id: e.id,
+      text: e.message,
+      timestamp: gameStartRef.current + i * 100,
+    }));
+    onMatchUi({
+      scores: { player1: p1Captured, player2: p2Captured },
+      scoreLabel: "Captured",
+      currentTurn: currentTurn === 1 ? "player1" : "player2",
+      turnText,
+      turnTimerDisplay: isMyTurn ? `${timerSec}s` : undefined,
+      systemLogEntries,
+    });
+  }, [
+    onMatchUi,
+    p1Captured,
+    p2Captured,
+    currentTurn,
+    isMyTurn,
+    log,
+    timerSec,
+    mustCapture,
+    chainActive,
+  ]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden md:flex-row md:gap-4 md:overflow-hidden">
-      {/* Desktop left column: player cards */}
-      <div className="hidden md:flex w-[200px] shrink-0 flex-col gap-2 overflow-y-auto overflow-x-hidden py-2">
-        <GamePlayerRow
-          username={player1.username}
-          avatarLetter={player1.username.charAt(0)}
-          avatarClassName="bg-gradient-to-br from-orange-500/80 to-orange-700 text-white"
-          scoreRight={`Captured: ${p1Captured}`}
-          active={currentTurn === 1}
-          isPractice={isPractice}
-          rating={player1.rating}
-        />
-        <GamePlayerRow
-          username={player2.username}
-          avatarLetter={player2.username.charAt(0)}
-          avatarClassName="bg-gradient-to-br from-slate-400 to-slate-600 text-charcoal"
-          scoreRight={`Captured: ${p2Captured}`}
-          active={currentTurn === 2}
-          isPractice={isPractice}
-          rating={player2.rating}
-          isBot={isPlayer2Bot && !isMultiplayer}
-        />
-      </div>
-
-      {/* Left: board + turn info */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
-        <div className="shrink-0 md:hidden">
-          <MobilePlayerCards
-            player1Name={player1.username}
-            player1Right={String(p1Captured)}
-            player2Name={player2.username}
-            player2Right={String(p2Captured)}
-            player1Active={currentTurn === 1}
-            player2Active={currentTurn === 2}
-          />
-        </div>
-
-        <div className="hidden md:block px-2 pb-3 md:px-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-white">{showTurnText}</p>
-            {isMyTurn && (isMultiplayer || !isPlayer2Bot || currentTurn !== 2) ? (
-              <div className="rounded-full border px-3 py-1 text-xs font-bold" style={{ borderColor: "rgba(255,255,255,0.10)", color: accent }}>
-                {timerSec}s
-              </div>
-            ) : (
-              <div className="text-xs text-body-gray"> </div>
-            )}
-          </div>
-          {!isPractice && mustCapture && !chainActive && (
-            <p className="mt-1 text-xs text-body-gray">
-              Mandatory captures available. Jump to win.
-            </p>
-          )}
-        </div>
-
+    <div className="flex h-full min-h-0 w-full max-w-[400px] flex-col items-center justify-center overflow-hidden">
         {/* Board */}
-        <div className="flex min-h-0 flex-1 items-center justify-center px-0 pb-0 md:px-4 md:pb-2">
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center px-0 pb-0">
           <div
-            className="game-board-slot-mobile md:game-board-slot-desktop relative grid w-full rounded-lg"
+            className="relative grid w-full max-w-[400px] rounded-lg"
             style={{
               gridTemplateColumns: "repeat(8, 1fr)",
               border: `2px solid ${BOARD_BORDER}`,
@@ -996,81 +801,6 @@ export default function Checkers({
           </div>
         </div>
 
-        <div className="hidden md:block px-4 pb-4 pt-2">
-          <div className="flex items-center justify-between gap-3 text-xs text-body-gray">
-            <div>
-              {mustCapture && !chainActive ? (
-                <span style={{ color: accent, fontWeight: 700 }}>Mandatory captures</span>
-              ) : (
-                <span>Free moves available</span>
-              )}
-            </div>
-            <div>
-              {chainActive ? (
-                <span style={{ color: accent, fontWeight: 700 }}>Continue capturing</span>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile status row (~30px) */}
-        <div className="md:hidden flex h-[30px] shrink-0 items-center justify-between px-3">
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            style={{ color: isMyTurn ? (myRole === "player1" ? ACCENT_ORANGE : ACCENT_PURPLE) : "rgba(148, 163, 184, 1)" }}
-          >
-            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
-          </span>
-          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">{timerSec}s</span>
-        </div>
-      </div>
-
-      {/* Right: chat + game log (fixed height) */}
-      <div
-        className="w-full h-[100px] min-h-[100px] max-h-[100px] md:h-auto md:min-h-0 md:max-h-none md:w-[320px] md:flex-shrink-0 md:border md:border-[#2A3A5C] md:bg-[#1A1A22] md:p-0 md:rounded-lg overflow-hidden"
-        style={{ background: "#1A1A22" }}
-      >
-        {/* Desktop */}
-        <div className="hidden md:flex h-full min-h-0 flex-col">
-          {/* Real money: chat 40% + log 60% */}
-          {chatEnabled ? (
-            <>
-              <div className="flex-[0_0_40%] min-h-0 overflow-hidden">
-                <ChatPanel
-                  enabled={chatEnabled}
-                  isPractice={isPractice}
-                  messages={chatMessages}
-                  onSend={onSendChatMessage ?? (() => {})}
-                  onReport={onReportChatMessage ?? (() => {})}
-                  playerName={player1.username}
-                  opponentName={player2.username}
-                  playerId={playerId}
-                />
-              </div>
-              <div className="flex-[0_0_60%] min-h-0 overflow-hidden overflow-x-hidden flex-shrink-0 flex-grow-0" style={{ borderTop: "1px solid #2A3A5C" }}>
-                <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
-              </div>
-            </>
-          ) : (
-            <div className="flex-none min-h-0 h-full overflow-hidden" style={{ minHeight: 500, maxHeight: 500 }}>
-              <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
-            </div>
-          )}
-        </div>
-
-        {/* Mobile: strictly fixed game log (~100px). Chat is removed to keep the 100vh layout stable. */}
-        <div className="flex md:hidden h-full flex-col min-h-0">
-          <div className="h-full min-h-0 overflow-hidden">
-            <GameLogFeed
-              log={log}
-              player1Name={player1.username}
-              player2Name={player2.username}
-              isPlayer2Bot={isPlayer2Bot}
-              isPracticeOnly={!isPractice}
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1079,75 +809,4 @@ function isDark(r: number, c: number): boolean {
   return (r + c) % 2 === 1;
 }
 
-function GameLogFeed({
-  log,
-  player1Name,
-  player2Name,
-  isPlayer2Bot,
-  isPracticeOnly,
-}: {
-  log: LogEntry[];
-  player1Name: string;
-  player2Name: string;
-  isPlayer2Bot: boolean;
-  isPracticeOnly?: boolean;
-}) {
-  const desktopLogRef = useRef<HTMLDivElement>(null);
-  const atBottomRef = useRef(true);
-
-  useEffect(() => {
-    const el = desktopLogRef.current;
-    if (!el) return;
-    if (!atBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
-  }, [log]);
-
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div className="sticky top-0 z-10 border-b border-[#2A3A5C] bg-[#1A1A22]/90 px-4 py-3">
-        <h3 className="text-sm font-bold text-white">Game Log</h3>
-      </div>
-      <div
-        ref={desktopLogRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
-        onScroll={(e) => {
-          const el = e.currentTarget;
-          atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
-        }}
-      >
-        {log.length === 0 ? (
-          <p className="py-4 text-center text-xs text-[#7A7A8E]">Moves will appear here.</p>
-        ) : (
-          log.map((entry) => {
-            const isP1 = entry.side === 1;
-            const accentBg = isP1 ? "rgba(255,94,0,0.15)" : "rgba(168,85,247,0.15)";
-            const accentBorder = isP1 ? "rgba(255,94,0,0.45)" : "rgba(168,85,247,0.55)";
-            const name = isP1 ? player1Name : isPlayer2Bot ? `${player2Name} 🤖` : player2Name;
-            return (
-              <div
-                key={entry.id}
-                className="mb-2 flex"
-                style={{
-                  justifyContent: isP1 ? "flex-end" : "flex-start",
-                }}
-              >
-                <div
-                  className="rounded-xl border px-3 py-2"
-                  style={{
-                    maxWidth: "90%",
-                    background: accentBg,
-                    borderColor: accentBorder,
-                  }}
-                >
-                  <div className="text-[11px] font-semibold text-white/90">{name}</div>
-                  <div className="mt-0.5 text-[13px] text-white/90">{entry.message}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
 

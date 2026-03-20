@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
@@ -23,7 +23,9 @@ import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
 import Checkers from "@/components/games/Checkers";
-import GameChat, { type ChatMessage } from "@/components/GameChat";
+import { type ChatMessage } from "@/components/GameChat";
+import GameLayout, { type GameLayoutLogEntry } from "@/components/game/GameLayout";
+import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
@@ -59,6 +61,7 @@ function MatchPageContent() {
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [matchUi, setMatchUi] = useState<MatchUiState | null>(null);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
@@ -376,9 +379,12 @@ function MatchPageContent() {
     if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
       await sendGameEvent({ type: "resign" }).catch(() => {});
     }
-    handleLoss();
+    await handleGameEnd("player2");
     setForfeitConfirm(false);
-  }, [handleLoss, match?.isRealMultiplayer, match?.gameType, sendGameEvent]);
+    if (typeof window !== "undefined" && match) {
+      window.location.href = `/play/${match.gameType}`;
+    }
+  }, [handleGameEnd, match, sendGameEvent]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -391,6 +397,27 @@ function MatchPageContent() {
       setLoggingOut(false);
     }
   }
+
+  useEffect(() => {
+    setMatchUi(null);
+  }, [matchId]);
+
+  const mergedLogEntries = useMemo((): GameLayoutLogEntry[] => {
+    const chatEntries: GameLayoutLogEntry[] = chatMessages.map((m) => ({
+      id: `chat-${m.id}`,
+      type: "chat",
+      sender: m.senderName,
+      text: m.message,
+      timestamp: m.timestamp,
+    }));
+    const systemEntries: GameLayoutLogEntry[] = (matchUi?.systemLogEntries ?? []).map((e) => ({
+      id: `sys-${e.id}`,
+      type: "system",
+      text: e.text,
+      timestamp: e.timestamp,
+    }));
+    return [...chatEntries, ...systemEntries].sort((a, b) => a.timestamp - b.timestamp);
+  }, [chatMessages, matchUi]);
 
   if (loadError) {
     return (
@@ -475,6 +502,56 @@ function MatchPageContent() {
     !waitingForOpponent &&
     (boardGameTypes as readonly string[]).includes(match.gameType);
 
+  const GAME_LAYOUT_TITLE: Record<string, string> = {
+    chess: "Chess",
+    "connect-4": "Connect 4",
+    "reaction-duel": "Reaction Duel",
+    "memory-match": "Memory Match",
+    checkers: "Checkers",
+    "spelling-bee": "Spelling Bee",
+  };
+
+  function toLayoutConnection(
+    s: typeof connectionStatus
+  ): "connected" | "reconnecting" | "disconnected" {
+    if (s === "disconnected") return "disconnected";
+    if (s === "poor" || s === "connecting") return "reconnecting";
+    return "connected";
+  }
+
+  const gameLayoutProps = {
+    gameName: GAME_LAYOUT_TITLE[match.gameType] ?? match.gameDisplayName,
+    matchId: match.id,
+    mode: (match.isPractice ? "practice" : "real") as "practice" | "real",
+    player1: {
+      username: safePlayer1.username,
+      rating: safePlayer1.rating,
+      score: matchUi?.scores.player1 ?? 0,
+      scoreLabel: matchUi?.scoreLabel,
+      isBot: false,
+    },
+    player2: {
+      username: safePlayer2.username,
+      rating: safePlayer2.rating,
+      score: matchUi?.scores.player2 ?? 0,
+      scoreLabel: matchUi?.scoreLabel,
+      isBot: !isRealMultiplayer,
+    },
+    currentTurn: matchUi?.currentTurn ?? "player1",
+    timerDisplay: formatTime(timerSec),
+    turnTimerDisplay: matchUi?.turnTimerDisplay,
+    connectionStatus: toLayoutConnection(connectionStatus),
+    turnText: matchUi?.turnText ?? "Loading…",
+    logEntries: mergedLogEntries,
+    onSendChat: (msg: string) => {
+      handleSendChatMessage(msg, false);
+    },
+    chatPresets: ["gl hf!", "gg", "Nice move!", "Rematch?"],
+    onLeaveMatch: () => setForfeitConfirm(true),
+    onReportIssue: () => showToast("Thanks — we received your report.", "info"),
+    realStakeDisplay: match.isPractice ? undefined : `$${match.stakeAmount.toFixed(2)}`,
+  };
+
   return (
     <div
       className={`relative flex flex-col bg-charcoal ${
@@ -503,7 +580,8 @@ function MatchPageContent() {
             : "flex flex-1 flex-col"
         }
       >
-      {/* Top bar */}
+      {/* Top bar (hidden when unified GameLayout is active) */}
+      {!lockGameViewport && (
       <div className="shrink-0 border-b border-white/5 px-3 py-0 h-[40px] md:px-6 md:py-3 md:h-auto">
         <div className="mx-auto hidden max-w-[1200px] items-center justify-between md:flex">
           <div className="flex items-center gap-3">
@@ -560,6 +638,7 @@ function MatchPageContent() {
           <span className="text-[24px] font-bold leading-none tabular-nums text-white">{formatTime(timerSec)}</span>
         </div>
       </div>
+      )}
 
       {/* Waiting for opponent (real multiplayer) */}
       {waitingForOpponent && (
@@ -604,32 +683,11 @@ function MatchPageContent() {
         </div>
       )}
 
-      {/* In-game chat bar — only for real human vs human matches */}
-      {!waitingForOpponent && match?.status === "in_progress" && !outcome && isRealMultiplayer && match?.gameType !== "checkers" && (
-        <div className="hidden md:block mx-auto w-full shrink-0 px-4 sm:px-6 lg:max-w-[1200px]">
-          <GameChat
-            messages={chatMessages}
-            onSendMessage={handleSendChatMessage}
-            onReportMessage={handleReportMessage}
-            playerName={username}
-            opponentName={safePlayer2.username}
-            playerId={userId}
-            unreadCount={unreadCount}
-            isOpen={chatOpen}
-            onToggle={() => {
-              setChatOpen((open) => !open);
-              if (!chatOpen) setUnreadCount(0);
-            }}
-            isPractice={false}
-          />
-        </div>
-      )}
-
       {/* Main: Chess and Connect 4 use full-width layout; Pool uses 3 columns */}
       {!waitingForOpponent && match.gameType === "chess" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <Chess
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -642,14 +700,15 @@ function MatchPageContent() {
                 sendGameEvent={sendGameEvent}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "connect-4" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <ConnectFour
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -662,14 +721,15 @@ function MatchPageContent() {
                 sendGameEvent={sendGameEvent}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "reaction-duel" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <ReactionDuel
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -683,14 +743,15 @@ function MatchPageContent() {
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "memory-match" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <MemoryMatch
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -698,14 +759,15 @@ function MatchPageContent() {
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
                 isPractice={match.isPractice}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "checkers" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <Checkers
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -719,19 +781,15 @@ function MatchPageContent() {
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
-                chatEnabled={isRealMultiplayer}
-                chatMessages={chatMessages}
-                onSendChatMessage={handleSendChatMessage}
-                onReportChatMessage={handleReportMessage}
-                playerId={userId}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "spelling-bee" ? (
-        <main className="mx-auto flex min-h-0 flex-1 flex-col overflow-hidden px-0 py-0 md:px-4 md:py-2 lg:max-w-[1200px]">
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
           {match.status === "in_progress" && !outcome ? (
-            <div className="card-border flex min-h-0 flex-1 flex-col overflow-hidden rounded-card bg-card p-0 md:p-3 md:py-4 md:pr-4 md:pl-4">
+            <GameLayout {...gameLayoutProps}>
               <SpellingBee
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
@@ -745,8 +803,9 @@ function MatchPageContent() {
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
+                onMatchUi={setMatchUi}
               />
-            </div>
+            </GameLayout>
           ) : null}
         </main>
       ) : !waitingForOpponent && match.gameType === "8-ball-pool" && match.status === "in_progress" && !outcome ? (
@@ -813,7 +872,8 @@ function MatchPageContent() {
         </main>
       ) : null}
 
-      {/* Bottom bar */}
+      {/* Bottom bar (hidden when unified GameLayout is active) */}
+      {!lockGameViewport && (
       <div className="shrink-0 border-t border-white/5 px-3 py-0 h-[44px] md:px-6 md:py-3 md:h-auto">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 h-full">
           <p className="text-sm text-body-gray">
@@ -843,6 +903,7 @@ function MatchPageContent() {
           </div>
         </div>
       </div>
+      )}
       </div>
 
       {/* Victory overlay — only shown when THIS player won */}
@@ -866,32 +927,44 @@ function MatchPageContent() {
             )}
             <p className="mt-2 text-body-gray">Defeated {opponentUsername}</p>
             <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <Link
-                href={`/play/${match.gameType}`}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/play/${match.gameType}`;
+                }}
                 className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
-              </Link>
-              <Link
-                href="/play"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/play";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
-              </Link>
+              </button>
               {match.isPractice && (
-                <Link
-                  href="/play"
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/play";
+                  }}
                   className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
                 >
                   Play for Real Money
-                </Link>
+                </button>
               )}
-              <Link
-                href="/dashboard"
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/dashboard";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
               >
                 Dashboard
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -912,24 +985,33 @@ function MatchPageContent() {
               </>
             )}
             <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <Link
-                href={`/play/${match.gameType}`}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/play/${match.gameType}`;
+                }}
                 className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
-              </Link>
-              <Link
-                href="/play"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/play";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
-              </Link>
-              <Link
-                href="/dashboard"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/dashboard";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
               >
                 Dashboard
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -953,32 +1035,44 @@ function MatchPageContent() {
             )}
             {match.isPractice && <p className="mt-2 text-body-gray">Try again?</p>}
             <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <Link
-                href={`/play/${match.gameType}`}
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/play/${match.gameType}`;
+                }}
                 className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
               >
                 Rematch
-              </Link>
-              <Link
-                href="/play"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/play";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
               >
                 New Match
-              </Link>
+              </button>
               {match.isPractice && (
-                <Link
-                  href="/play"
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = "/play";
+                  }}
                   className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
                 >
                   Play for Real Money
-                </Link>
+                </button>
               )}
-              <Link
-                href="/dashboard"
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/dashboard";
+                }}
                 className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
               >
                 Dashboard
-              </Link>
+              </button>
             </div>
           </div>
         </div>

@@ -5,15 +5,13 @@ import { Chess as ChessEngine } from "chess.js";
 import ChessBoard from "./chess/ChessBoard";
 import {
   PIECE_VALUE,
-  CAPTURED_DISPLAY_ORDER,
   getPieceSymbol,
   getMoveDescriptionForChat,
   type PieceType,
   type PieceColor,
 } from "@/lib/games/chess-utils";
 import { getChessBotMove, getChessBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
-import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
-import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
+import type { MatchUiState } from "@/components/game/matchUi";
 
 export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
@@ -21,6 +19,7 @@ export interface GameMultiplayerProps {
   sendGameEvent?: (event: Record<string, unknown>) => Promise<void>;
   incomingEvent?: Record<string, unknown> | null;
   onEventProcessed?: () => void;
+  onMatchUi?: (state: MatchUiState) => void;
 }
 
 interface ChessProps extends GameMultiplayerProps {
@@ -33,9 +32,6 @@ interface ChessProps extends GameMultiplayerProps {
 }
 
 type PieceCode = string;
-
-const ACCENT_P1 = "#FF5E00"; // orange
-const ACCENT_P2 = "#A855F7"; // purple
 
 function boardFromGame(game: ChessEngine): (PieceCode | null)[][] {
   const b = game.board();
@@ -57,12 +53,6 @@ function getKingSquare(game: ChessEngine, color: "w" | "b"): string | null {
   return null;
 }
 
-function formatTs(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-}
-
 export default function Chess({
   player1,
   player2,
@@ -75,6 +65,7 @@ export default function Chess({
   sendGameEvent,
   incomingEvent,
   onEventProcessed,
+  onMatchUi,
 }: ChessProps) {
   const [game, setGame] = useState(() => new ChessEngine());
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -95,20 +86,11 @@ export default function Chess({
   type MoveHistoryEntry = { player: 1 | 2; playerName: string; description: string; san: string; ts: number };
   const [moveHistory, setMoveHistory] = useState<MoveHistoryEntry[]>([]);
   const [botThinking, setBotThinking] = useState(false);
-  const [showAllMoves, setShowAllMoves] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [drawOfferReceived, setDrawOfferReceived] = useState(false);
   const [drawOfferSent, setDrawOfferSent] = useState(false);
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
-  const moveListEndRef = useRef<HTMLDivElement | null>(null);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
-  useEffect(() => {
-    const check = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   const board = useMemo(() => boardFromGame(game), [game]);
   const turn = game.turn();
@@ -254,10 +236,6 @@ export default function Chess({
     }
   }, [inStalemate, inDraw, inThreefold, insufficientMaterial, onGameDraw]);
 
-  useEffect(() => {
-    moveListEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [moveHistory.length]);
-
   // Incoming multiplayer events: apply opponent move, handle resign, draw
   useEffect(() => {
     if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
@@ -341,26 +319,25 @@ export default function Chess({
     return () => clearTimeout(t);
   }, [fen, turn, isPlayer2Bot, botDifficulty, isMultiplayer, promotionPending, game, executeMove]);
 
-  const boardSlotMobileRef = useRef<HTMLDivElement>(null);
-  const boardSlotDesktopRef = useRef<HTMLDivElement>(null);
+  const boardSlotRef = useRef<HTMLDivElement>(null);
   const [boardSize, setBoardSize] = useState(400);
+  const [showCoords, setShowCoords] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const apply = () => setShowCoords(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
   useEffect(() => {
     const measure = () => {
-      const m = boardSlotMobileRef.current;
-      const d = boardSlotDesktopRef.current;
-      const el =
-        m && m.getBoundingClientRect().width > 0 && m.getBoundingClientRect().height > 0
-          ? m
-          : d && d.getBoundingClientRect().width > 0 && d.getBoundingClientRect().height > 0
-            ? d
-            : m || d;
+      const el = boardSlotRef.current;
       if (!el) return;
       const side = Math.min(el.clientWidth, el.clientHeight);
       setBoardSize(Math.max(200, Math.min(Math.floor(side), 520)));
     };
     const ro = new ResizeObserver(measure);
-    if (boardSlotMobileRef.current) ro.observe(boardSlotMobileRef.current);
-    if (boardSlotDesktopRef.current) ro.observe(boardSlotDesktopRef.current);
+    if (boardSlotRef.current) ro.observe(boardSlotRef.current);
     measure();
     window.addEventListener("resize", measure);
     return () => {
@@ -370,286 +347,120 @@ export default function Chess({
   }, []);
   const squareSize = Math.floor(boardSize / 8);
 
-  const materialAdvantage = useMemo(() => {
-    let w = 0,
-      b = 0;
-    capturedWhite.forEach((t) => (b += PIECE_VALUE[t]));
-    capturedBlack.forEach((t) => (w += PIECE_VALUE[t]));
-    return w - b;
-  }, [capturedWhite, capturedBlack]);
-
-  const p1Active = turn === "w";
-  const p2Active = turn === "b";
-  const isPractice = !isMultiplayer;
-
-  const capturedFooter = (captured: PieceType[], pieceColor: PieceColor) => (
-    <div className="flex flex-wrap items-center gap-0.5">
-      {CAPTURED_DISPLAY_ORDER.map((t) =>
-        captured.filter((p) => p === t).map((_, i) => (
-          <span
-            key={`${t}-${i}`}
-            className="inline-flex items-center justify-center leading-none text-white/90"
-            style={{ fontFamily: "system-ui", fontSize: 14, width: 14, height: 14 }}
-          >
-            {getPieceSymbol(pieceColor, t)}
-          </span>
-        ))
-      )}
-    </div>
+  const scoreP1 = useMemo(
+    () => capturedBlack.reduce((s, t) => s + PIECE_VALUE[t], 0),
+    [capturedBlack]
+  );
+  const scoreP2 = useMemo(
+    () => capturedWhite.reduce((s, t) => s + PIECE_VALUE[t], 0),
+    [capturedWhite]
   );
 
+  useEffect(() => {
+    if (!onMatchUi) return;
+    const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
+    const myTurn = turn === myColor;
+    let turnText = "Waiting for opponent...";
+    if (inCheckmate) turnText = "Checkmate!";
+    else if (inStalemate || inDraw) turnText = "Draw!";
+    else if (myTurn) turnText = "YOUR TURN — Move a piece!";
+    else turnText = "Waiting for opponent...";
+
+    const startTs = gameStartTimeRef.current;
+    const systemLogEntries: MatchUiState["systemLogEntries"] = [
+      {
+        id: "game-start",
+        text: `♟ Game started — ${player1.username} (White) vs ${player2.username} (Black)${isPlayer2Bot ? " 🤖" : ""}`,
+        timestamp: startTs,
+      },
+      ...moveHistory.map((m, i) => ({
+        id: `move-${i}-${m.san}`,
+        text: `${m.playerName}: ${m.san.replace(/[+#]$/, "")}`,
+        timestamp: startTs + Math.round(m.ts * 1000),
+      })),
+    ];
+
+    onMatchUi({
+      scores: { player1: scoreP1, player2: scoreP2 },
+      scoreLabel: "Pts",
+      currentTurn: turn === "w" ? "player1" : "player2",
+      turnText,
+      systemLogEntries,
+    });
+  }, [
+    onMatchUi,
+    turn,
+    inCheckmate,
+    inStalemate,
+    inDraw,
+    moveHistory,
+    player1.username,
+    player2.username,
+    isPlayer2Bot,
+    isMultiplayer,
+    myRole,
+    scoreP1,
+    scoreP2,
+  ]);
+
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
-      {/* Mobile */}
-      <div className="md:hidden flex h-full min-h-0 w-full flex-col overflow-hidden">
-        <MobilePlayerCards
-          player1Name={player1.username}
-          player1Right={materialAdvantage > 0 ? `+${materialAdvantage}` : "—"}
-          player2Name={player2.username}
-          player2Right={materialAdvantage < 0 ? `+${Math.abs(materialAdvantage)}` : "—"}
-          player1Active={p1Active}
-          player2Active={p2Active}
-        />
-
-        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-          <div
-            ref={boardSlotMobileRef}
-            className="game-board-slot-mobile relative flex items-center justify-center overflow-hidden"
-          >
-            <ChessBoard
-              board={board}
-              selectedSquare={selectedSquare}
-              legalMoveTargets={legalMoveTargets}
-              lastMove={lastMove}
-              checkSquare={checkSquare}
-              squareSize={squareSize}
-              onSquareClick={handleSquareClick}
-              onPieceDragStart={handlePieceDragStart}
-              onPieceDragMove={handlePieceDragMove}
-              onPieceDragEnd={handlePieceDragEnd}
-              dragging={dragging}
-              turn={turn}
-              flipped={isMultiplayer && myRole === "player2"}
-              showCoordinates={false}
-            />
-
-            {/* Overlays inside the board area (no extra vertical layout height). */}
-            {inCheck && !inCheckmate && !inStalemate && !inDraw && (
-              <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-amber-400">
-                Check!
-              </div>
-            )}
-            {inCheckmate && (
-              <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-red-400">
-                Checkmate!
-              </div>
-            )}
-            {inStalemate && (
-              <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-body-gray">
-                Stalemate — Draw!
-              </div>
-            )}
-            {isMultiplayer &&
-              !gameOverRef.current &&
-              !inCheckmate &&
-              !inStalemate &&
-              !inDraw && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (sendGameEvent && !drawOfferSent) {
-                      setDrawOfferSent(true);
-                      sendGameEvent({ type: "draw_offer" }).catch(() => {});
-                    }
-                  }}
-                  disabled={drawOfferSent}
-                  className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-lg border border-white/20 px-3 py-1 text-[11px] text-body-gray hover:bg-white/10 disabled:opacity-50"
-                >
-                  {drawOfferSent ? "Draw offered" : "Offer Draw"}
-                </button>
-              )}
-          </div>
-        </div>
-
-        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            style={{
-              color: (() => {
-                const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
-                const myTurn = turn === myColor;
-                if (inCheckmate) return "#F87171";
-                if (inStalemate || inDraw) return "#9ca3af";
-                if (!myTurn) return "rgba(148, 163, 184, 1)"; // text-body-gray-ish
-                return myColor === "w" ? ACCENT_P1 : ACCENT_P2;
-              })(),
-            }}
-          >
-            {(() => {
-              const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
-              const myTurn = turn === myColor;
-              if (inCheckmate) return "Checkmate!";
-              if (inStalemate || inDraw) return "Draw!";
-              return myTurn ? "Your Turn" : "Opponent's Turn";
-            })()}
-          </span>
-          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">15s</span>
-        </div>
-
-        {/* Mobile game log (~100px fixed) */}
+    <div className="flex h-full min-h-0 w-full max-w-[400px] flex-col items-center justify-center overflow-hidden">
+      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
         <div
-          className="h-[100px] min-h-[100px] max-h-[100px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-card/80"
-          style={{ overflowX: "hidden" }}
+          ref={boardSlotRef}
+          className="relative flex w-full max-w-[400px] items-center justify-center overflow-hidden"
         >
-          <h3 className="shrink-0 border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">
-            Game Log
-          </h3>
-          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2">
-            {moveHistory.length === 0 ? (
-              <p className="py-2 text-center text-[11px] text-body-gray">Make the first move!</p>
-            ) : (
-              moveHistory.map((bubble, i) => {
-                const isPlayer1 = bubble.player === 1;
-                const totalBubbles = moveHistory.length;
-                const bubbleOrdinal = i + 1;
-                const isInCollapsedRange =
-                  isMobile && !showAllMoves && totalBubbles > 3 && bubbleOrdinal <= totalBubbles - 3;
-                if (isInCollapsedRange) return null;
-                return (
-                  <div key={`move-${i}-${bubble.san}`} className="mb-1.5 text-[11px]">
-                    <span
-                      style={{ color: isPlayer1 ? "var(--color-teal, #0d9488)" : "#9ca3af" }}
-                      className="font-bold"
-                    >
-                      {bubble.playerName}
-                    </span>
-                    <span className="text-white/90"> {bubble.san.replace(/[+#]$/, "")}</span>
-                  </div>
-                );
-              })
-            )}
-            {isMobile && !showAllMoves && moveHistory.length > 3 && (
+          <ChessBoard
+            board={board}
+            selectedSquare={selectedSquare}
+            legalMoveTargets={legalMoveTargets}
+            lastMove={lastMove}
+            checkSquare={checkSquare}
+            squareSize={squareSize}
+            onSquareClick={handleSquareClick}
+            onPieceDragStart={handlePieceDragStart}
+            onPieceDragMove={handlePieceDragMove}
+            onPieceDragEnd={handlePieceDragEnd}
+            dragging={dragging}
+            turn={turn}
+            flipped={isMultiplayer && myRole === "player2"}
+            showCoordinates={showCoords}
+          />
+
+          {inCheck && !inCheckmate && !inStalemate && !inDraw && (
+            <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-amber-400">
+              Check!
+            </div>
+          )}
+          {inCheckmate && (
+            <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-red-400">
+              Checkmate!
+            </div>
+          )}
+          {inStalemate && (
+            <div className="pointer-events-none absolute left-2 top-2 rounded-lg bg-black/30 px-2 py-1 text-[11px] font-semibold text-body-gray">
+              Stalemate — Draw!
+            </div>
+          )}
+          {isMultiplayer &&
+            !gameOverRef.current &&
+            !inCheckmate &&
+            !inStalemate &&
+            !inDraw && (
               <button
                 type="button"
-                className="mt-1 text-[11px] text-teal hover:underline"
-                onClick={() => setShowAllMoves(true)}
+                onClick={() => {
+                  if (sendGameEvent && !drawOfferSent) {
+                    setDrawOfferSent(true);
+                    sendGameEvent({ type: "draw_offer" }).catch(() => {});
+                  }
+                }}
+                disabled={drawOfferSent}
+                className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-lg border border-white/20 px-3 py-1 text-[11px] text-body-gray hover:bg-white/10 disabled:opacity-50"
               >
-                Show all
+                {drawOfferSent ? "Draw offered" : "Offer Draw"}
               </button>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop: 3-column */}
-      <div className="hidden md:flex h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden">
-        <div className="w-[200px] shrink-0 flex flex-col gap-2 overflow-y-auto overflow-x-hidden">
-          <GamePlayerRow
-            username={player1.username}
-            avatarLetter={player1.username.charAt(0)}
-            avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40 text-charcoal"
-            scoreRight={materialAdvantage > 0 ? `+${materialAdvantage}` : "—"}
-            active={p1Active}
-            isPractice={isPractice}
-            rating={player1.rating}
-            footer={capturedFooter(capturedWhite, "b")}
-          />
-          <GamePlayerRow
-            username={player2.username}
-            avatarLetter={player2.username.charAt(0)}
-            avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
-            scoreRight={materialAdvantage < 0 ? `+${Math.abs(materialAdvantage)}` : "—"}
-            active={p2Active}
-            isPractice={isPractice}
-            rating={player2.rating}
-            isBot={isPlayer2Bot}
-            footer={capturedFooter(capturedBlack, "w")}
-            thinking={
-              botThinking || (isMultiplayer && turn === (myRole === "player1" ? "b" : "w"))
-            }
-          />
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col items-center justify-center overflow-hidden">
-          <div
-            ref={boardSlotDesktopRef}
-            className="game-board-slot-desktop flex items-center justify-center overflow-hidden"
-          >
-            <ChessBoard
-              board={board}
-              selectedSquare={selectedSquare}
-              legalMoveTargets={legalMoveTargets}
-              lastMove={lastMove}
-              checkSquare={checkSquare}
-              squareSize={squareSize}
-              onSquareClick={handleSquareClick}
-              onPieceDragStart={handlePieceDragStart}
-              onPieceDragMove={handlePieceDragMove}
-              onPieceDragEnd={handlePieceDragEnd}
-              dragging={dragging}
-              turn={turn}
-              flipped={isMultiplayer && myRole === "player2"}
-              showCoordinates={true}
-            />
-          </div>
-          <div className="mt-2 flex w-full max-w-[500px] items-center justify-between text-sm text-body-gray">
-            <span>
-              {(() => {
-                const myColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
-                const myTurn = turn === myColor;
-                return myTurn ? "Your Turn" : "Opponent's Turn";
-              })()}
-            </span>
-          </div>
-        </div>
-
-        <div className="w-[280px] shrink-0 min-h-0">
-          <div
-            className="flex h-full max-h-full min-h-0 flex-col rounded-lg border border-white/10 bg-card/80 overflow-hidden"
-            style={{ overflowX: "hidden" }}
-          >
-            <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
-              <p key="start" className="text-center text-xs text-body-gray py-2 shrink-0">
-                ♟ Game Started • White: {player1.username} vs Black: {player2.username}
-                {isPlayer2Bot ? " 🤖" : ""}
-              </p>
-              {moveHistory.length === 0 ? (
-                <p className="text-center text-sm text-body-gray py-4">Make the first move!</p>
-              ) : (
-                <>
-                  {moveHistory.map((bubble, i) => {
-                    const isPlayer1 = bubble.player === 1;
-                    return (
-                      <div key={`move-${i}-${bubble.san}`}>
-                        <div
-                          ref={i === moveHistory.length - 1 ? moveListEndRef : undefined}
-                          className="mb-2 flex max-w-[75%] shrink-0"
-                          style={{ marginLeft: isPlayer1 ? "auto" : 0, marginRight: isPlayer1 ? 0 : 40 }}
-                        >
-                          <div
-                            className="rounded-xl px-3.5 py-2.5"
-                            style={{
-                              backgroundColor: isPlayer1 ? "#1A3A2A" : "#1E1E2E",
-                              borderLeft: isPlayer1 ? "3px solid rgba(0, 229, 199, 0.5)" : "none",
-                            }}
-                          >
-                            <p className="text-xs font-bold" style={{ color: isPlayer1 ? "var(--color-teal, #0d9488)" : "#9ca3af" }}>
-                              {bubble.playerName}{bubble.player === 2 && isPlayer2Bot ? " 🤖" : ""}
-                            </p>
-                            <p className="text-sm text-white mt-0.5">{bubble.description}</p>
-                            <p className="text-[11px] text-body-gray mt-1 tabular-nums">
-                              {bubble.san.replace(/[+#]$/, "")} • {formatTs(bubble.ts)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </div>
         </div>
       </div>
 

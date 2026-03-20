@@ -27,8 +27,7 @@ import {
   isLikelyIOS,
 } from "@/lib/games/spelling-speech";
 import type { GameMultiplayerProps } from "./Chess";
-import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
-import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
+import type { MatchUiState } from "@/components/game/matchUi";
 
 type Phase =
   | "pre_round"
@@ -77,7 +76,7 @@ export default function SpellingBee({
   sendGameEvent,
   incomingEvent,
   onEventProcessed,
-  isPractice: isPracticeProp,
+  onMatchUi,
 }: SpellingBeeProps) {
   const [phase, setPhase] = useState<Phase>("pre_round");
   const [round, setRound] = useState(1);
@@ -122,6 +121,7 @@ export default function SpellingBee({
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pronunciationStartedRef = useRef<string | null>(null);
+  const gameStartRef = useRef(Date.now());
   inputValueRef.current = inputValue;
 
   const isRoundActive =
@@ -271,7 +271,20 @@ export default function SpellingBee({
     timerIntervalRef.current = setInterval(tick, 100);
     tick();
     return () => clearTimer();
-  }, [phase, isTiebreaker, tiebreakerRound, round, submitted, myRole, isMultiplayer, sendGameEvent, isPlayer2Bot, p2Answer, clearTimer]);
+  }, [
+    isRoundActive,
+    phase,
+    isTiebreaker,
+    tiebreakerRound,
+    round,
+    submitted,
+    myRole,
+    isMultiplayer,
+    sendGameEvent,
+    isPlayer2Bot,
+    p2Answer,
+    clearTimer,
+  ]);
 
   // Bot: schedule answer when round starts
   useEffect(() => {
@@ -288,7 +301,7 @@ export default function SpellingBee({
       setP2TimeMs(timeMs);
     }, Math.min(timeMs, ROUND_TIME_MS));
     return () => clearBotTimeout();
-  }, [phase, isTiebreaker, effectiveWord, isPlayer2Bot, botDifficulty, p2Answer, clearBotTimeout]);
+  }, [isRoundActive, phase, isTiebreaker, effectiveWord, isPlayer2Bot, botDifficulty, p2Answer, clearBotTimeout]);
 
   // Incoming multiplayer events
   useEffect(() => {
@@ -550,6 +563,68 @@ export default function SpellingBee({
     speakText(sentence, () => setAudioPlaying(false));
   }, [effectiveWord, audioPlaying]);
 
+  const roundResultScore = (() => {
+    if (phase !== "round_result" && phase !== "tiebreaker_result") return null;
+    const correct = effectiveWord?.word ?? "";
+    const p1Correct = isAnswerCorrect(correct, p1Answer ?? "");
+    const p2Correct = isAnswerCorrect(correct, p2Answer ?? "");
+    const p1T = p1TimeMs >= 0 ? p1TimeMs : ROUND_TIME_MS;
+    const p2T = p2TimeMs >= 0 ? p2TimeMs : ROUND_TIME_MS;
+    return scoreRound(p1Correct, p2Correct, p1T, p2T);
+  })();
+
+  const timerPercent = (timerRemainingMs / ROUND_TIME_MS) * 100;
+  const timerColor =
+    timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-orange-500" : "bg-red-500";
+
+  const p1RowActive =
+    (phase === "round_active" || phase === "tiebreaker_active") &&
+    p1Answer === null &&
+    (!isMultiplayer || myRole === "player1");
+  const p2RowActive =
+    (phase === "round_active" || phase === "tiebreaker_active") &&
+    p2Answer === null &&
+    (!isMultiplayer || myRole === "player2");
+
+  const isMyTurn = myRole === "player1" ? p1RowActive : p2RowActive;
+
+  useEffect(() => {
+    if (!onMatchUi) return;
+    const turnText =
+      phase === "match_over"
+        ? "Match complete"
+        : isMyTurn
+          ? "YOUR TURN — Spell the word!"
+          : "Waiting for opponent...";
+    const systemLogEntries: MatchUiState["systemLogEntries"] = roundHistory.map((r, i) => ({
+      id: `rh-${i}`,
+      text: `Round ${i + 1}: ${r.word} — +${r.p1Points.toFixed(1)} / +${r.p2Points.toFixed(1)}`,
+      timestamp: gameStartRef.current + i * 1000,
+    }));
+    onMatchUi({
+      scores: { player1: p1Score, player2: p2Score },
+      scoreLabel: "Pts",
+      currentTurn: p1RowActive ? "player1" : p2RowActive ? "player2" : myRole,
+      turnText,
+      turnTimerDisplay:
+        phase === "round_active" || phase === "tiebreaker_active"
+          ? `${Math.ceil(timerRemainingMs / 1000)}s`
+          : undefined,
+      systemLogEntries,
+    });
+  }, [
+    onMatchUi,
+    p1Score,
+    p2Score,
+    phase,
+    isMyTurn,
+    p1RowActive,
+    p2RowActive,
+    myRole,
+    roundHistory,
+    timerRemainingMs,
+  ]);
+
   if (phase === "match_over" && !isTiebreaker) {
     const winner = p1Score > p2Score ? "player1" : "player2";
     return (
@@ -577,32 +652,6 @@ export default function SpellingBee({
     return null;
   }
 
-  const roundResultScore = (() => {
-    if (phase !== "round_result" && phase !== "tiebreaker_result") return null;
-    const correct = effectiveWord?.word ?? "";
-    const p1Correct = isAnswerCorrect(correct, p1Answer ?? "");
-    const p2Correct = isAnswerCorrect(correct, p2Answer ?? "");
-    const p1T = p1TimeMs >= 0 ? p1TimeMs : ROUND_TIME_MS;
-    const p2T = p2TimeMs >= 0 ? p2TimeMs : ROUND_TIME_MS;
-    return scoreRound(p1Correct, p2Correct, p1T, p2T);
-  })();
-
-  const timerPercent = (timerRemainingMs / ROUND_TIME_MS) * 100;
-  const timerColor =
-    timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-orange-500" : "bg-red-500";
-
-  const isPractice = isPracticeProp ?? !isMultiplayer;
-  const p1RowActive =
-    (phase === "round_active" || phase === "tiebreaker_active") &&
-    p1Answer === null &&
-    (!isMultiplayer || myRole === "player1");
-  const p2RowActive =
-    (phase === "round_active" || phase === "tiebreaker_active") &&
-    p2Answer === null &&
-    (!isMultiplayer || myRole === "player2");
-
-  const isMyTurn = myRole === "player1" ? p1RowActive : p2RowActive;
-
   return (
     <div className="spelling-bee flex h-full min-h-0 w-full flex-col overflow-hidden">
       <style>{`
@@ -616,17 +665,8 @@ export default function SpellingBee({
       `}</style>
 
       {/* Mobile */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
+      <div className="mx-auto flex min-h-0 w-full max-w-[min(100%,420px)] flex-1 flex-col overflow-hidden md:hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <MobilePlayerCards
-            player1Name={player1.username}
-            player1Right={`${p1Score.toFixed(1)}`}
-            player2Name={player2.username}
-            player2Right={`${p2Score.toFixed(1)}`}
-            player1Active={p1RowActive}
-            player2Active={p2RowActive}
-          />
-
         <div className="game-play-area-mobile min-h-0 overflow-hidden overflow-x-hidden">
         {/* Pre-round / Get ready */}
         {(phase === "pre_round" || phase === "get_ready" || phase === "tiebreaker_ready") && (
@@ -854,79 +894,10 @@ export default function SpellingBee({
         )}
         </div>
         </div>
-
-        {/* Game status row (~30px) */}
-        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
-          <span
-            className="min-w-0 truncate text-[13px] font-medium"
-            style={{
-              color: (() => {
-                const active = phase === "round_active" || phase === "tiebreaker_active";
-                if (!active) return "rgba(148, 163, 184, 1)";
-                if (!isMyTurn) return "rgba(148, 163, 184, 1)";
-                return myRole === "player1" ? "#FF5E00" : "#A855F7";
-              })(),
-            }}
-          >
-            {(() => {
-              const active = phase === "round_active" || phase === "tiebreaker_active";
-              if (!active) return " ";
-              return isMyTurn ? "Your Turn" : "Opponent's Turn";
-            })()}
-          </span>
-          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">
-            {phase === "round_active" || phase === "tiebreaker_active" ? `${Math.ceil(timerRemainingMs / 1000)}s` : "15s"}
-          </span>
-        </div>
-
-        {/* Game log panel */}
-        <div className="w-full shrink-0 h-[100px] min-h-[100px] max-h-[100px] overflow-hidden" style={{ overflowX: "hidden" }}>
-          <div className="rounded-xl border border-white/10 bg-card/80 p-2 flex flex-col h-full overflow-hidden">
-            <h3 className="mb-2 font-semibold text-white text-[11px]">Game Log</h3>
-            <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-[11px]">
-              {roundHistory.length === 0 && <p className="text-body-gray">No rounds yet.</p>}
-              {roundHistory.map((h, i) => (
-                <div key={i} className="rounded border border-white/5 bg-white/5 p-2">
-                  <p className="font-medium text-white">Round {i + 1}: &quot;{h.word}&quot;</p>
-                  <p className="mt-0.5 text-body-gray">
-                    {player1.username} {h.p1Correct ? "✅" : "❌"}
-                    {h.p1Correct && ` (${(h.p1TimeMs / 1000).toFixed(1)}s)`} · {player2.username} {h.p2Correct ? "✅" : "❌"}
-                    {h.p2Correct && ` (${(h.p2TimeMs / 1000).toFixed(1)}s)`}
-                  </p>
-                  <p className="text-amber-400/80">+{h.p1Points} / +{h.p2Points}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Desktop */}
-      <div className="hidden h-full min-h-0 w-full flex-1 flex-row gap-4 overflow-hidden md:flex">
-        <div className="flex w-[200px] shrink-0 flex-col justify-center">
-          <GamePlayerStack>
-            <GamePlayerRow
-              username={player1.username}
-              avatarLetter={player1.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-amber-500/50 to-amber-700/50"
-              scoreRight={`Score: ${p1Score.toFixed(1)}`}
-              active={p1RowActive}
-              isPractice={isPractice}
-              rating={player1.rating}
-            />
-            <GamePlayerRow
-              username={player2.username}
-              avatarLetter={player2.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
-              scoreRight={`Score: ${p2Score.toFixed(1)}`}
-              active={p2RowActive}
-              isPractice={isPractice}
-              rating={player2.rating}
-              isBot={isPlayer2Bot}
-            />
-          </GamePlayerStack>
-        </div>
-
+      <div className="hidden h-full min-h-0 w-full max-w-[min(100%,420px)] flex-1 flex-col overflow-hidden md:flex md:mx-auto">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden py-1">
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="font-semibold text-white">
@@ -1109,27 +1080,6 @@ export default function SpellingBee({
                 )}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Right: game log */}
-        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden" style={{ overflowX: "hidden" }}>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-card/80 p-4">
-            <p className="mb-2 font-medium text-white">Round history</p>
-            <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-xs">
-              {roundHistory.length === 0 && <p className="text-body-gray">No rounds yet.</p>}
-              {roundHistory.map((h, i) => (
-                <div key={i} className="rounded border border-white/5 bg-white/5 p-2">
-                  <p className="font-medium text-white">Round {i + 1}: &quot;{h.word}&quot;</p>
-                  <p className="mt-0.5 text-body-gray">
-                    {player1.username} {h.p1Correct ? "✅" : "❌"}
-                    {h.p1Correct && ` (${(h.p1TimeMs / 1000).toFixed(1)}s)`} · {player2.username} {h.p2Correct ? "✅" : "❌"}
-                    {h.p2Correct && ` (${(h.p2TimeMs / 1000).toFixed(1)}s)`}
-                  </p>
-                  <p className="text-amber-400/80">+{h.p1Points} / +{h.p2Points}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>
