@@ -478,7 +478,7 @@ export default function ReactionDuel({
 
   return (
     <div
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden touch-manipulation"
+      className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden touch-manipulation"
       style={{ touchAction: "manipulation" }}
     >
       <div className="mb-1.5 flex w-full max-w-[400px] shrink-0 flex-col gap-1 px-2">
@@ -495,7 +495,7 @@ export default function ReactionDuel({
           <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
         </div>
       </div>
-      <div className="relative flex min-h-[min(55vh,400px)] min-h-0 w-full max-w-[400px] flex-1 items-center justify-center overflow-hidden">
+      <div className="relative flex min-h-0 w-full max-w-[400px] flex-1 items-center justify-center overflow-hidden">
           <div
             ref={gameAreaRef}
             className="flex aspect-[3/2] min-h-[220px] w-full min-w-0 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"

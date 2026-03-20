@@ -313,9 +313,9 @@ export default function ConnectFour({
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[420px] flex-col items-center justify-center overflow-hidden">
+    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
         <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
-          <div ref={boardSlotRef} className="relative flex w-full items-center justify-center overflow-hidden">
+          <div ref={boardSlotRef} className="relative flex h-full max-h-full w-full items-center justify-center overflow-hidden">
             <div className="relative flex max-h-full max-w-full shrink-0 flex-col items-center overflow-hidden">
               {/* Hover disc preview above board */}
               <div

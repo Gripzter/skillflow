@@ -379,7 +379,7 @@ export default function MemoryMatch({
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[400px] flex-col items-center justify-center overflow-hidden">
+    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
       <div className="mb-1.5 w-full shrink-0 px-1 text-center text-[10px] text-body-gray">
         {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} left`}
       </div>

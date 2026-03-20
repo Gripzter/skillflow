@@ -677,12 +677,13 @@ export default function Checkers({
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[400px] flex-col items-center justify-center overflow-hidden">
+    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
         {/* Board */}
         <div className="flex min-h-0 w-full flex-1 items-center justify-center px-0 pb-0">
           <div
             className="relative grid w-full max-w-[400px] rounded-lg"
             style={{
+              aspectRatio: "1",
               gridTemplateColumns: "repeat(8, 1fr)",
               border: `2px solid ${BOARD_BORDER}`,
               background: BOARD_LIGHT,

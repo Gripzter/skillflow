@@ -404,11 +404,11 @@ export default function Chess({
   ]);
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-[400px] flex-col items-center justify-center overflow-hidden">
+    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
       <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
         <div
           ref={boardSlotRef}
-          className="relative flex w-full max-w-[400px] items-center justify-center overflow-hidden"
+          className="relative flex h-full max-h-full w-full max-w-[400px] items-center justify-center overflow-hidden"
         >
           <ChessBoard
             board={board}

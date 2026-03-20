@@ -653,7 +653,7 @@ export default function SpellingBee({
   }
 
   return (
-    <div className="spelling-bee flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div className="spelling-bee flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden">
       <style>{`
         .spelling-bee { --spelling-amber: #F59E0B; }
         @keyframes spelling-shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
@@ -667,7 +667,7 @@ export default function SpellingBee({
       {/* Mobile */}
       <div className="mx-auto flex min-h-0 w-full max-w-[min(100%,420px)] flex-1 flex-col overflow-hidden md:hidden">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="game-play-area-mobile min-h-0 overflow-hidden overflow-x-hidden">
+        <div className="game-play-area-mobile min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         {/* Pre-round / Get ready */}
         {(phase === "pre_round" || phase === "get_ready" || phase === "tiebreaker_ready") && (
           <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-amber-500/30 bg-[#1A1D2E]/80 p-8">
