@@ -28,6 +28,7 @@ import {
 } from "@/lib/games/spelling-speech";
 import type { GameMultiplayerProps } from "./Chess";
 import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
+import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
 
 type Phase =
   | "pre_round"
@@ -600,6 +601,8 @@ export default function SpellingBee({
     p2Answer === null &&
     (!isMultiplayer || myRole === "player2");
 
+  const isMyTurn = myRole === "player1" ? p1RowActive : p2RowActive;
+
   return (
     <div className="spelling-bee flex h-full min-h-0 w-full flex-col overflow-hidden">
       <style>{`
@@ -613,62 +616,18 @@ export default function SpellingBee({
       `}</style>
 
       {/* Mobile */}
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:hidden">
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-          <div className="flex shrink-0 items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-white">
-              Spelling Bee 🐝 · Round {displayRound}{isTiebreaker ? " (Tiebreaker)" : `/${TOTAL_ROUNDS}`}
-            </span>
-            {effectiveWord && (
-              <span
-                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${DIFFICULTY_COLORS[effectiveWord.difficulty]}`}
-              >
-                {DIFFICULTY_LABELS[effectiveWord.difficulty]}
-              </span>
-            )}
-          </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <MobilePlayerCards
+            player1Name={player1.username}
+            player1Right={`${p1Score.toFixed(1)}`}
+            player2Name={player2.username}
+            player2Right={`${p2Score.toFixed(1)}`}
+            player1Active={p1RowActive}
+            player2Active={p2RowActive}
+          />
 
-          <div className="shrink-0">
-            <GamePlayerStack>
-              <GamePlayerRow
-                username={player1.username}
-                avatarLetter={player1.username.charAt(0)}
-                avatarClassName="bg-gradient-to-br from-amber-500/50 to-amber-700/50"
-                scoreRight={`Score: ${p1Score.toFixed(1)}`}
-                active={p1RowActive}
-                isPractice={isPractice}
-                rating={player1.rating}
-              />
-              <GamePlayerRow
-                username={player2.username}
-                avatarLetter={player2.username.charAt(0)}
-                avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
-                scoreRight={`Score: ${p2Score.toFixed(1)}`}
-                active={p2RowActive}
-                isPractice={isPractice}
-                rating={player2.rating}
-                isBot={isPlayer2Bot}
-              />
-            </GamePlayerStack>
-          </div>
-
-        {(phase === "round_active" || phase === "tiebreaker_active") && (
-          <div className="h-2 w-full shrink-0 overflow-hidden rounded-full bg-white/10">
-            <div
-              className={`h-full transition-all duration-100 ${timerColor}`}
-              style={{ width: `${timerPercent}%` }}
-            />
-          </div>
-        )}
-        <div className="flex shrink-0 items-center justify-between text-sm">
-          {(phase === "round_active" || phase === "tiebreaker_active") && (
-            <span className={`font-mono font-bold tabular-nums ${timerPercent <= 20 ? "text-red-400" : timerPercent <= 33 ? "text-orange-400" : "text-amber-400"}`}>
-              {Math.ceil(timerRemainingMs / 1000)}s
-            </span>
-          )}
-        </div>
-
-        <div className="game-play-area-mobile min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="game-play-area-mobile min-h-0 overflow-hidden overflow-x-hidden">
         {/* Pre-round / Get ready */}
         {(phase === "pre_round" || phase === "get_ready" || phase === "tiebreaker_ready") && (
           <div className="flex flex-1 flex-col items-center justify-center rounded-xl border border-amber-500/30 bg-[#1A1D2E]/80 p-8">
@@ -896,11 +855,35 @@ export default function SpellingBee({
         </div>
         </div>
 
+        {/* Game status row (~30px) */}
+        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
+          <span
+            className="min-w-0 truncate text-[13px] font-medium"
+            style={{
+              color: (() => {
+                const active = phase === "round_active" || phase === "tiebreaker_active";
+                if (!active) return "rgba(148, 163, 184, 1)";
+                if (!isMyTurn) return "rgba(148, 163, 184, 1)";
+                return myRole === "player1" ? "#FF5E00" : "#A855F7";
+              })(),
+            }}
+          >
+            {(() => {
+              const active = phase === "round_active" || phase === "tiebreaker_active";
+              if (!active) return " ";
+              return isMyTurn ? "Your Turn" : "Opponent's Turn";
+            })()}
+          </span>
+          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">
+            {phase === "round_active" || phase === "tiebreaker_active" ? `${Math.ceil(timerRemainingMs / 1000)}s` : "15s"}
+          </span>
+        </div>
+
         {/* Game log panel */}
-        <div className="w-full shrink-0 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden" style={{ overflowX: "hidden" }}>
-          <div className="rounded-xl border border-white/10 bg-card/80 p-4 flex flex-col h-full overflow-hidden">
-            <p className="mb-2 font-medium text-white">Round history</p>
-            <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-xs">
+        <div className="w-full shrink-0 h-[100px] min-h-[100px] max-h-[100px] overflow-hidden" style={{ overflowX: "hidden" }}>
+          <div className="rounded-xl border border-white/10 bg-card/80 p-2 flex flex-col h-full overflow-hidden">
+            <h3 className="mb-2 font-semibold text-white text-[11px]">Game Log</h3>
+            <div className="flex-1 min-h-0 space-y-1 overflow-y-auto overflow-x-hidden text-[11px]">
               {roundHistory.length === 0 && <p className="text-body-gray">No rounds yet.</p>}
               {roundHistory.map((h, i) => (
                 <div key={i} className="rounded border border-white/5 bg-white/5 p-2">

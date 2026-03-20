@@ -18,6 +18,7 @@ import {
 } from "@/lib/games/memory-logic";
 import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs } from "@/lib/games/bot-engine";
 import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
+import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
 
 interface MemoryMatchProps {
   player1: { username: string; rating: number };
@@ -393,40 +394,19 @@ export default function MemoryMatch({
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {/* Mobile */}
       <div className="md:hidden flex h-full min-h-0 w-full flex-col overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden py-2">
-          <div className="flex shrink-0 items-center justify-between gap-2 rounded-lg bg-white/5 px-2 py-1.5">
-            <span className="text-xs font-semibold text-white">Memory Match 🧠</span>
-            <span className="text-[11px] text-body-gray">
-              {suddenDeath ? "Sudden Death" : `${totalPairs} pairs • ${remaining} left`}
-            </span>
-          </div>
-
-          <GamePlayerStack className="shrink-0">
-            <GamePlayerRow
-              username={player1.username}
-              avatarLetter={player1.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-teal to-emerald-500 text-charcoal"
-              scoreRight={`Pairs: ${scores[1]}`}
-              active={currentPlayer === 1}
-              isPractice={isPractice}
-              rating={player1.rating}
-            />
-            <GamePlayerRow
-              username={player2.username}
-              avatarLetter={player2.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-purple-500 to-pink-500 text-white"
-              scoreRight={`Pairs: ${scores[2]}`}
-              active={currentPlayer === 2}
-              isPractice={isPractice}
-              rating={player2.rating}
-              isBot={isPlayer2Bot}
-              thinking={thinking}
-            />
-          </GamePlayerStack>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <MobilePlayerCards
+            player1Name={player1.username}
+            player1Right={`${scores[1]}`}
+            player2Name={player2.username}
+            player2Right={`${scores[2]}`}
+            player1Active={currentPlayer === 1}
+            player2Active={currentPlayer === 2}
+          />
 
           <div
             ref={boardSlotMobileRef}
-            className="game-board-slot-mobile flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60"
+            className="game-board-slot-mobile flex items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-[#050713]/60"
           >
             <div
               className="relative flex max-h-full max-w-full items-center justify-center p-2"
@@ -537,18 +517,28 @@ export default function MemoryMatch({
               </div>
           </div>
 
-            <div className="mt-1 shrink-0 text-center text-xs text-body-gray">
-              {turnMessage}
+            {/* Game status (~30px) */}
+            <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
+              <span
+                className="min-w-0 truncate text-[13px] font-medium"
+                style={{ color: currentPlayer === 1 ? "#FF5E00" : "rgba(148, 163, 184, 1)" }}
+              >
+                {currentPlayer === 1 ? "Your Turn — Find a pair!" : "Opponent's Turn"}
+              </span>
+              <span className="shrink-0 text-[13px] text-body-gray tabular-nums">15s</span>
             </div>
 
-          {/* Mobile game log: fixed-height live feed below board */}
-          <div className="mt-3 w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-3 h-[150px] min-h-[150px] max-h-[150px] overflow-hidden flex flex-col" style={{ overflowX: "hidden" }}>
-            <div className="border-b border-white/10 pb-2">
-              <h3 className="text-sm font-semibold text-white">Game Log</h3>
-            </div>
+            {/* Game Log (~100px fixed) */}
+            <div
+              className="h-[100px] min-h-[100px] max-h-[100px] w-full shrink-0 rounded-lg border border-white/10 bg-card/80 p-2 overflow-hidden flex flex-col"
+              style={{ overflowX: "hidden" }}
+            >
+              <div className="shrink-0 border-b border-white/10 pb-2">
+                <h3 className="text-[11px] font-semibold text-white">Game Log</h3>
+              </div>
             <div
               ref={mobileLogRef}
-              className="mt-2 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+              className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden mt-2"
               onScroll={(e) => {
                 const el = e.currentTarget;
                 const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
@@ -602,8 +592,8 @@ export default function MemoryMatch({
                   );
                 })
               )}
+              </div>
             </div>
-          </div>
         </div>
       </div>
 

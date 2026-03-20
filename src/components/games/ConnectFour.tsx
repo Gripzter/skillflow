@@ -26,6 +26,7 @@ const YELLOW_EDGE = "#CCAA00";
 
 import type { GameMultiplayerProps } from "./Chess";
 import { GamePlayerRow, GamePlayerStack, PlayerColorDot } from "@/components/games/GamePlayerStrip";
+import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
 
 interface ConnectFourProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -281,38 +282,24 @@ export default function ConnectFour({
   const boardWidth = cellSize * COLS + (COLS + 1) * 3;
   const boardHeight = cellSize * ROWS + (ROWS + 1) * 3;
   const isPractice = !isMultiplayer;
+  const ACCENT_P1 = "#FF5E00";
+  const ACCENT_P2 = "#A855F7";
+  const isMyTurn = (turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2");
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden md:hidden">
-        <GamePlayerStack className="shrink-0">
-          <GamePlayerRow
-            username={player1.username}
-            avatarLetter={player1.username.charAt(0)}
-            avatarClassName="bg-gradient-to-br from-red-600 to-red-800 text-white"
-            nameDot={<PlayerColorDot color={RED_EDGE} />}
-            scoreRight="—"
-            active={turn === 1}
-            isPractice={isPractice}
-            rating={player1.rating}
-          />
-          <GamePlayerRow
-            username={player2.username}
-            avatarLetter={player2.username.charAt(0)}
-            avatarClassName="bg-gradient-to-br from-amber-400 to-amber-600 text-gray-900"
-            nameDot={<PlayerColorDot color={YELLOW_CENTER} />}
-            scoreRight="—"
-            active={turn === 2}
-            isPractice={isPractice}
-            rating={player2.rating}
-            isBot={isPlayer2Bot}
-            thinking={
-              botThinking || (isMultiplayer && turn === (myRole === "player1" ? 2 : 1))
-            }
-          />
-        </GamePlayerStack>
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden py-2">
-          <div ref={boardSlotMobileRef} className="game-connect4-slot-mobile">
+        <MobilePlayerCards
+          player1Name={player1.username}
+          player1Right="—"
+          player2Name={player2.username}
+          player2Right="—"
+          player1Active={turn === 1}
+          player2Active={turn === 2}
+        />
+
+        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+          <div ref={boardSlotMobileRef} className="game-connect4-slot-mobile relative flex items-center justify-center overflow-hidden">
             <div className="relative flex max-h-full max-w-full shrink-0 flex-col items-center overflow-hidden">
               {/* Hover disc preview above board */}
               <div
@@ -430,19 +417,32 @@ export default function ConnectFour({
           </div>
         </div>
 
-        {/* Move log */}
+        {/* Game status (~30px) */}
+        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
+          <span
+            className="min-w-0 truncate text-[13px] font-medium"
+            style={{ color: isMyTurn ? (myRole === "player1" ? ACCENT_P1 : ACCENT_P2) : "rgba(148, 163, 184, 1)" }}
+          >
+            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
+          </span>
+          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">15s</span>
+        </div>
+
+        {/* Game Log (~100px fixed) */}
         <div
-            className="flex h-[150px] min-h-[150px] max-h-[150px] w-full shrink-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
+          className="h-[100px] min-h-[100px] max-h-[100px] w-full shrink-0 flex flex-col overflow-hidden rounded-lg border border-white/10 bg-card/80"
             style={{ overflowX: "hidden" }}
           >
-            <h3 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Moves</h3>
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 flex flex-col">
-              <p className="text-center text-xs text-body-gray py-2 shrink-0">
+          <h3 className="shrink-0 border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">
+            Game Log
+          </h3>
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2 flex flex-col">
+            <p className="text-center text-[11px] text-body-gray py-2 shrink-0">
                 🔴🟡 Game Started • {player1.username} vs {player2.username}
                 {isPlayer2Bot ? " 🤖" : ""}
               </p>
               {moveHistory.length === 0 ? (
-                <p className="text-center text-sm text-body-gray py-4">Drop a disc to start!</p>
+              <p className="text-center text-[11px] text-body-gray py-3">Drop a disc to start!</p>
               ) : (
                 moveHistory.map((entry, i) => {
                   const isP1 = entry.player === 1;

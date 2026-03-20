@@ -31,6 +31,7 @@ function reactionLabel(ms: number): { text: string; color: string } {
 
 import type { GameMultiplayerProps } from "./Chess";
 import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
+import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
 
 interface ReactionDuelProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -87,7 +88,8 @@ export default function ReactionDuel({
   const areaSizeRef = useRef({ w: GAME_AREA_MIN.w, h: GAME_AREA_MIN.h });
   const roundStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-  const gameLogRef = useRef<HTMLDivElement | null>(null);
+  const gameLogMobileRef = useRef<HTMLDivElement | null>(null);
+  const gameLogDesktopRef = useRef<HTMLDivElement | null>(null);
   const atBottomRef = useRef(true);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
@@ -149,9 +151,10 @@ export default function ReactionDuel({
 
   // Auto-scroll game log to the latest round result when user hasn't scrolled up.
   useEffect(() => {
-    if (!gameLogRef.current) return;
+    const activeLogRef = window.innerWidth < 768 ? gameLogMobileRef.current : gameLogDesktopRef.current;
+    if (!activeLogRef) return;
     if (!atBottomRef.current) return;
-    gameLogRef.current.scrollTop = gameLogRef.current.scrollHeight;
+    activeLogRef.scrollTop = activeLogRef.scrollHeight;
   }, [roundHistory.length]);
 
   // Incoming multiplayer: round_start (show target after delay), reaction_result (opponent's time)
@@ -448,6 +451,10 @@ export default function ReactionDuel({
     p2Reaction === null &&
     (!isMultiplayer || myRole === "player2");
 
+  const ACCENT_P1 = "#FF5E00";
+  const ACCENT_P2 = "#A855F7";
+  const isMyTurn = isMultiplayer ? (myRole === "player1" ? p1RowActive : p2RowActive) : p1RowActive;
+
   return (
     <div
       className="flex h-full min-h-0 w-full flex-col overflow-hidden touch-manipulation"
@@ -455,223 +462,151 @@ export default function ReactionDuel({
     >
       {/* Mobile */}
       <div className="flex h-full min-h-0 flex-col overflow-hidden md:hidden">
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-              <span className="text-sm font-semibold text-white">Reaction Duel ⚡</span>
-              <span className="text-body-gray tabular-nums text-xs">
-                Round {phase === "match_over" ? TOTAL_ROUNDS : round}/{TOTAL_ROUNDS}
-              </span>
-            </div>
+        <MobilePlayerCards
+          player1Name={player1.username}
+          player1Right={`${p1Wins}`}
+          player2Name={player2.username}
+          player2Right={`${p2Wins}`}
+          player1Active={p1RowActive}
+          player2Active={p2RowActive}
+        />
 
-            <div className="shrink-0 px-2 pt-2">
-              <GamePlayerStack>
-                <GamePlayerRow
-                  username={player1.username}
-                  avatarLetter={player1.username.charAt(0)}
-                  avatarClassName="bg-gradient-to-br from-teal/40 to-purple/40"
-                  scoreRight={`Score: ${p1Wins}`}
-                  active={p1RowActive}
-                  isPractice={isPractice}
-                  rating={player1.rating}
-                  footer={
-                    p1Streak >= 3 ? (
-                      <span className="text-[10px] text-amber-400">🔥 {p1Streak} streak</span>
-                    ) : undefined
-                  }
-                />
-                <GamePlayerRow
-                  username={player2.username}
-                  avatarLetter={player2.username.charAt(0)}
-                  avatarClassName="bg-gradient-to-br from-purple/40 to-rose-500/40"
-                  scoreRight={`Score: ${p2Wins}`}
-                  active={p2RowActive}
-                  isPractice={isPractice}
-                  rating={player2.rating}
-                  isBot={isPlayer2Bot}
-                  footer={
-                    p2Streak >= 3 ? (
-                      <span className="text-[10px] text-amber-400">🔥 {p2Streak} streak</span>
-                    ) : undefined
-                  }
-                />
-              </GamePlayerStack>
-            </div>
+        <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+          <div
+            ref={gameAreaMobileRef}
+            className="game-play-area-mobile flex min-w-0 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
+            style={{
+              backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
+              minWidth: 0,
+              touchAction: "manipulation",
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              const t = e.changedTouches[0];
+              if (t) handleGameAreaTap(t.clientX, t.clientY);
+            }}
+            onPointerDown={(e) => {
+              if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
+            }}
+          >
+            {phase === "countdown" && (
+              <div className="text-center">
+                {countdownN > 0 ? (
+                  <span
+                    className="text-6xl font-black animate-fade-in"
+                    style={{
+                      color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
+                    }}
+                  >
+                    {countdownN}
+                  </span>
+                ) : (
+                  <span className="text-6xl font-black text-teal animate-pulse">GO!</span>
+                )}
+              </div>
+            )}
 
-            <div className="flex shrink-0 items-center gap-1 px-3 pb-1 pt-1">
-              {Array.from({ length: TOTAL_ROUNDS }).map((_, i) => (
-                <div
-                  key={i}
-                  className="h-2 w-2 rounded-full flex-1 max-w-[8px]"
-                  style={{
-                    backgroundColor: i < roundHistory.length
-                      ? roundHistory[i].winner === "player1"
-                        ? "var(--color-teal, #0d9488)"
-                        : roundHistory[i].winner === "player2"
-                          ? "#a855f7"
-                          : "#6b7280"
-                      : "rgba(255,255,255,0.15)",
-                  }}
-                />
-              ))}
-            </div>
+            {phase === "get_ready" && (
+              <div className="text-center">
+                <p className="text-3xl font-bold text-white animate-pulse">Get Ready...</p>
+                <p className="mt-2 text-body-gray">Round {round} of {TOTAL_ROUNDS}</p>
+              </div>
+            )}
 
-            <div className="mx-3 mb-1 flex h-2 shrink-0 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full bg-teal transition-all duration-300" style={{ width: `${progressP1 * 50}%` }} />
-              <div className="h-full bg-purple-500 transition-all duration-300" style={{ width: `${progressP2 * 50}%` }} />
-            </div>
+            {phase === "target" && targetPos && (
+              <div
+                className="absolute rounded-full border-[3px] border-white pointer-events-none animate-scale-in"
+                style={{
+                  left: targetPos.x - targetDiameter / 2,
+                  top: targetPos.y - targetDiameter / 2,
+                  width: targetDiameter,
+                  height: targetDiameter,
+                  backgroundColor: targetColor,
+                  boxShadow: `0 0 20px ${targetColor}, 0 0 40px ${targetColor}40`,
+                }}
+              >
+                <div className="absolute inset-[20%] rounded-full border-2 border-white/50" />
+                <div className="absolute inset-[35%] rounded-full border border-white/30" />
+              </div>
+            )}
 
-            <div
-              ref={gameAreaMobileRef}
-              className="game-play-area-mobile mx-2 mb-2 flex min-h-0 flex-1 select-none items-center justify-center overflow-hidden rounded-2xl border border-white/10"
-              style={{
-                backgroundColor: phase === "target" ? "#1A1A22" : "#0E0E12",
-                minWidth: 0,
-                touchAction: "manipulation",
-              }}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                const t = e.changedTouches[0];
-                if (t) handleGameAreaTap(t.clientX, t.clientY);
-              }}
-              onPointerDown={(e) => {
-                if (e.pointerType === "mouse") handleGameAreaTap(e.clientX, e.clientY);
-              }}
-            >
-          {phase === "countdown" && (
-            <div className="text-center">
-              {countdownN > 0 ? (
-                <span
-                  className="text-6xl font-black animate-fade-in"
-                  style={{
-                    color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
-                  }}
-                >
-                  {countdownN}
+            {phase === "tapped" && tapPos && p1Reaction !== null && p1Reaction !== "false_start" && p1Reaction !== "timeout" && (
+              <div
+                className="absolute pointer-events-none text-2xl font-bold text-teal"
+                style={{ left: tapPos.x - 30, top: tapPos.y - 50 }}
+              >
+                {p1Reaction}ms
+                <span className="block text-sm font-normal" style={{ color: reactionLabel(p1Reaction).color }}>
+                  {reactionLabel(p1Reaction).text}
                 </span>
-              ) : (
-                <span className="text-6xl font-black text-teal animate-pulse">GO!</span>
-              )}
-            </div>
-          )}
-
-          {phase === "get_ready" && (
-            <div className="text-center">
-              <p className="text-3xl font-bold text-white animate-pulse">Get Ready...</p>
-              <p className="mt-2 text-body-gray">Round {round} of {TOTAL_ROUNDS}</p>
-            </div>
-          )}
-
-          {phase === "target" && targetPos && (
-            <div
-              className="absolute rounded-full border-[3px] border-white pointer-events-none animate-scale-in"
-              style={{
-                left: targetPos.x - targetDiameter / 2,
-                top: targetPos.y - targetDiameter / 2,
-                width: targetDiameter,
-                height: targetDiameter,
-                backgroundColor: targetColor,
-                boxShadow: `0 0 20px ${targetColor}, 0 0 40px ${targetColor}40`,
-              }}
-            >
-              <div className="absolute inset-[20%] rounded-full border-2 border-white/50" />
-              <div className="absolute inset-[35%] rounded-full border border-white/30" />
-            </div>
-          )}
-
-          {phase === "tapped" && tapPos && p1Reaction !== null && p1Reaction !== "false_start" && p1Reaction !== "timeout" && (
-            <div
-              className="absolute pointer-events-none text-2xl font-bold text-teal"
-              style={{ left: tapPos.x - 30, top: tapPos.y - 50 }}
-            >
-              {p1Reaction}ms
-              <span className="block text-sm font-normal" style={{ color: reactionLabel(p1Reaction).color }}>
-                {reactionLabel(p1Reaction).text}
-              </span>
-            </div>
-          )}
-
-          {showTooEarly && (
-            <p className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-red-500 animate-pulse">
-              TOO EARLY!
-            </p>
-          )}
-
-          {showMiss && tapPos && (
-            <p
-              className="absolute text-xl font-bold text-red-500"
-              style={{ left: tapPos.x - 30, top: tapPos.y - 20 }}
-            >
-              MISS!
-            </p>
-          )}
-            </div>
-
-            {(phase === "round_result" || phase === "tapped") && p1Reaction !== null && p2Reaction !== null && (
-              <div className="shrink-0 mx-4 mb-4 p-4 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between gap-4">
-                <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player1" ? "text-teal font-semibold" : "text-body-gray opacity-70"}`}>
-                  <p className="text-sm">{player1.username}</p>
-                  <p className="text-lg tabular-nums">
-                    {p1Reaction === "false_start" || p1Reaction === "timeout"
-                      ? (p1Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
-                      : `${p1Reaction}ms`}
-                  </p>
-                  {typeof p1Reaction === "number" && p1Reaction < 5000 && (
-                    <p className="text-xs" style={{ color: reactionLabel(p1Reaction).color }}>{reactionLabel(p1Reaction).text}</p>
-                  )}
-                  {getRoundWinner(p1Reaction, p2Reaction) === "player1" && <span className="text-teal">✓</span>}
-                </div>
-                <span className="text-body-gray font-medium">VS</span>
-                <div className={`text-center ${getRoundWinner(p1Reaction, p2Reaction) === "player2" ? "text-purple-400 font-semibold" : "text-body-gray opacity-70"}`}>
-                  <p className="text-sm">{player2.username}{isPlayer2Bot ? " 🤖" : ""}</p>
-                  <p className="text-lg tabular-nums">
-                    {p2Reaction === "false_start" || p2Reaction === "timeout"
-                      ? (p2Reaction === "false_start" ? "FALSE START" : "TIMEOUT")
-                      : `${p2Reaction}ms`}
-                  </p>
-                  {typeof p2Reaction === "number" && <p className="text-xs" style={{ color: reactionLabel(p2Reaction).color }}>{reactionLabel(p2Reaction).text}</p>}
-                  {getRoundWinner(p1Reaction, p2Reaction) === "player2" && <span className="text-purple-400">✓</span>}
-                </div>
               </div>
             )}
 
-            {phase === "match_over" && (
-              <div className="shrink-0 mx-4 mb-4 p-6 rounded-xl bg-white/5 border border-white/10 space-y-4">
-                <h3 className="text-xl font-bold text-white text-center">Match Over</h3>
-                <div className="flex justify-between gap-4">
-                  <div className="text-center">
-                    <p className="text-teal font-semibold">{player1.username}</p>
-                    <p className="text-2xl font-bold text-white">{p1Wins} wins</p>
-                    <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p1TotalMs / roundHistory.length) : 0}ms</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-purple-400 font-semibold">{player2.username}</p>
-                    <p className="text-2xl font-bold text-white">{p2Wins} wins</p>
-                    <p className="text-sm text-body-gray">Avg: {roundHistory.length ? Math.round(p2TotalMs / roundHistory.length) : 0}ms</p>
-                  </div>
-                </div>
-                <div className="text-sm text-body-gray space-y-1 max-h-32 overflow-y-auto">
-                  {roundHistory.map((r, i) => (
-                    <div key={i} className="flex justify-between">
-                      <span>{typeof r.p1 === "number" ? `${r.p1}ms` : r.p1}</span>
-                      <span>Round {i + 1}</span>
-                      <span>{typeof r.p2 === "number" ? `${r.p2}ms` : r.p2}</span>
+            {showTooEarly && (
+              <p className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-red-500 animate-pulse">
+                TOO EARLY!
+              </p>
+            )}
+
+            {showMiss && tapPos && (
+              <p
+                className="absolute text-xl font-bold text-red-500"
+                style={{ left: tapPos.x - 30, top: tapPos.y - 20 }}
+              >
+                MISS!
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Game status (~30px) */}
+        <div className="flex h-[30px] shrink-0 items-center justify-between px-3">
+          <span
+            className="min-w-0 truncate text-[13px] font-medium"
+            style={{ color: isMyTurn ? (myRole === "player1" ? ACCENT_P1 : ACCENT_P2) : "rgba(148, 163, 184, 1)" }}
+          >
+            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
+          </span>
+          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">15s</span>
+        </div>
+
+        {/* Game Log (~100px fixed) */}
+        <div className="h-[100px] min-h-[100px] max-h-[100px] shrink-0 overflow-hidden rounded-lg border border-white/10 bg-card/80">
+          <h3 className="shrink-0 border-b border-white/10 px-3 py-2 text-[11px] font-semibold text-white">
+            Game Log
+          </h3>
+          <div
+            ref={gameLogMobileRef}
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+            }}
+          >
+            {roundHistory.length === 0 ? (
+              <p className="py-2 text-center text-[11px] text-body-gray">Rounds will appear here.</p>
+            ) : (
+              roundHistory.map((r, i) => {
+                const p1Label = typeof r.p1 === "number" ? `${r.p1}ms` : r.p1;
+                const p2Label = typeof r.p2 === "number" ? `${r.p2}ms` : r.p2;
+                const winnerText =
+                  r.winner === "draw"
+                    ? "Round tied 🤝"
+                    : r.winner === "player1"
+                      ? `${player1.username} wins!`
+                      : `${player2.username}${isPlayer2Bot ? " 🤖" : ""} wins!`;
+
+                return (
+                  <div key={i} className="mb-2 rounded-xl border border-white/5 bg-white/5 px-2 py-2">
+                    <div className="text-[11px] font-semibold text-white/90">Round {i + 1} · {winnerText}</div>
+                    <div className="mt-1 text-[11px] text-white/80">
+                      {player1.username}: {p1Label} · {player2.username}: {p2Label}
                     </div>
-                  ))}
-                </div>
-                {roundHistory.length > 0 && (() => {
-                  const times = roundHistory.flatMap((r) => [
-                    ...(typeof r.p1 === "number" ? [r.p1] : []),
-                    ...(typeof r.p2 === "number" ? [r.p2] : []),
-                  ]);
-                  const best = times.length ? Math.min(...times) : 0;
-                  return (
-                    <p className="text-center text-teal text-sm">
-                      Best: {best}ms 🔥
-                    </p>
-                  );
-                })()}
-              </div>
+                  </div>
+                );
+              })
             )}
+          </div>
         </div>
       </div>
 
@@ -851,7 +786,7 @@ export default function ReactionDuel({
               <h3 className="text-sm font-semibold text-white">Game Log</h3>
             </div>
             <div
-              ref={gameLogRef}
+              ref={gameLogDesktopRef}
               className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3"
               onScroll={(e) => {
                 const el = e.currentTarget;

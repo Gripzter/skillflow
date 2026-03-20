@@ -195,9 +195,10 @@ main,
 
 /* In-match: boards must fit in viewport (no page scroll) */
 .game-board-slot-mobile {
-  width: 100%;
-  max-width: min(calc(100vw - 2rem), calc(100dvh - 350px));
-  max-height: min(calc(100dvh - 350px), calc(100vw - 2rem));
+  /* Mobile fixed-height board: 100dvh minus match chrome (nav/header/player/status/log/footer). */
+  /* Nav(56) + Header(40) + Players(60) + Status(30) + Log(100) + Footer(44) + padding(12) = 342px */
+  width: min(calc(100vw - 24px), calc(100dvh - 342px));
+  height: min(calc(100vw - 24px), calc(100dvh - 342px));
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
   margin-left: auto;
@@ -218,10 +219,11 @@ main,
 
 /* Connect 4: rectangular board inside a square slot (letterbox) */
 .game-connect4-slot-mobile {
-  width: 100%;
-  max-width: min(calc(100vw - 2rem), calc(100dvh - 350px));
-  max-height: min(calc(100dvh - 350px), calc(100vw - 2rem));
-  aspect-ratio: 1 / 1;
+  /* Connect 4 is 7 columns x 6 rows => aspect-ratio 7/6. */
+  /* Keep the same vertical constraint as other boards. */
+  width: min(calc(100vw - 24px), calc((100dvh - 342px) * 7 / 6));
+  aspect-ratio: 7 / 6;
+  max-height: calc(100dvh - 342px);
   flex-shrink: 0;
   margin-left: auto;
   margin-right: auto;
@@ -249,8 +251,12 @@ main,
 
 /* Reaction / spelling: main tap or word area */
 .game-play-area-mobile {
-  max-height: min(400px, calc(100dvh - 380px));
+  /* Same fixed board sizing constraints as square boards (1/1). */
+  width: min(calc(100vw - 24px), calc(100dvh - 342px));
+  height: min(calc(100vw - 24px), calc(100dvh - 342px));
+  aspect-ratio: 1 / 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .game-play-area-desktop {

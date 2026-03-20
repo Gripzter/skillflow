@@ -7,6 +7,7 @@ import { getCheckersBotDelayMs, getCheckersBotTurnMove } from "@/lib/games/check
 import type { BotDifficulty } from "@/lib/games/bot-engine";
 import Link from "next/link";
 import { GamePlayerRow, GamePlayerStack } from "@/components/games/GamePlayerStrip";
+import { MobilePlayerCards } from "@/components/games/MobilePlayerCards";
 
 export interface CheckersChatMessage {
   id: string;
@@ -843,31 +844,18 @@ export default function Checkers({
 
       {/* Left: board + turn info */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:pr-0">
-        <div className="shrink-0 px-2 pb-2 pt-1 md:hidden">
-          <GamePlayerStack>
-            <GamePlayerRow
-              username={player1.username}
-              avatarLetter={player1.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-orange-500/80 to-orange-700 text-white"
-              scoreRight={`Captured: ${p1Captured}`}
-              active={currentTurn === 1}
-              isPractice={isPractice}
-              rating={player1.rating}
-            />
-            <GamePlayerRow
-              username={player2.username}
-              avatarLetter={player2.username.charAt(0)}
-              avatarClassName="bg-gradient-to-br from-slate-400 to-slate-600 text-charcoal"
-              scoreRight={`Captured: ${p2Captured}`}
-              active={currentTurn === 2}
-              isPractice={isPractice}
-              rating={player2.rating}
-              isBot={isPlayer2Bot && !isMultiplayer}
-            />
-          </GamePlayerStack>
+        <div className="shrink-0 md:hidden">
+          <MobilePlayerCards
+            player1Name={player1.username}
+            player1Right={String(p1Captured)}
+            player2Name={player2.username}
+            player2Right={String(p2Captured)}
+            player1Active={currentTurn === 1}
+            player2Active={currentTurn === 2}
+          />
         </div>
 
-        <div className="px-2 pb-3 md:px-4">
+        <div className="hidden md:block px-2 pb-3 md:px-4">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-white">{showTurnText}</p>
             {isMyTurn && (isMultiplayer || !isPlayer2Bot || currentTurn !== 2) ? (
@@ -886,7 +874,7 @@ export default function Checkers({
         </div>
 
         {/* Board */}
-        <div className="flex min-h-0 flex-1 items-center justify-center px-2 pb-2 md:px-4">
+        <div className="flex min-h-0 flex-1 items-center justify-center px-0 pb-0 md:px-4 md:pb-2">
           <div
             className="game-board-slot-mobile md:game-board-slot-desktop relative grid w-full rounded-lg"
             style={{
@@ -1008,7 +996,7 @@ export default function Checkers({
           </div>
         </div>
 
-        <div className="px-4 pb-4 pt-2">
+        <div className="hidden md:block px-4 pb-4 pt-2">
           <div className="flex items-center justify-between gap-3 text-xs text-body-gray">
             <div>
               {mustCapture && !chainActive ? (
@@ -1024,11 +1012,22 @@ export default function Checkers({
             </div>
           </div>
         </div>
+
+        {/* Mobile status row (~30px) */}
+        <div className="md:hidden flex h-[30px] shrink-0 items-center justify-between px-3">
+          <span
+            className="min-w-0 truncate text-[13px] font-medium"
+            style={{ color: isMyTurn ? (myRole === "player1" ? ACCENT_ORANGE : ACCENT_PURPLE) : "rgba(148, 163, 184, 1)" }}
+          >
+            {isMyTurn ? "Your Turn" : "Opponent's Turn"}
+          </span>
+          <span className="shrink-0 text-[13px] text-body-gray tabular-nums">{timerSec}s</span>
+        </div>
       </div>
 
       {/* Right: chat + game log (fixed height) */}
       <div
-        className="w-full md:w-[320px] md:flex-shrink-0 md:border md:border-[#2A3A5C] md:bg-[#1A1A22] md:p-0 md:rounded-lg overflow-hidden"
+        className="w-full h-[100px] min-h-[100px] max-h-[100px] md:h-auto md:min-h-0 md:max-h-none md:w-[320px] md:flex-shrink-0 md:border md:border-[#2A3A5C] md:bg-[#1A1A22] md:p-0 md:rounded-lg overflow-hidden"
         style={{ background: "#1A1A22" }}
       >
         {/* Desktop */}
@@ -1059,32 +1058,17 @@ export default function Checkers({
           )}
         </div>
 
-        {/* Mobile stacking */}
+        {/* Mobile: strictly fixed game log (~100px). Chat is removed to keep the 100vh layout stable. */}
         <div className="flex md:hidden h-full flex-col min-h-0">
-          {/* Mobile real-money: chat 120px + log 150px */}
-          {chatEnabled ? (
-            <>
-              <div className="h-[120px] min-h-[120px] overflow-hidden">
-                <ChatPanel
-                  enabled={chatEnabled}
-                  isPractice={isPractice}
-                  messages={chatMessages}
-                  onSend={onSendChatMessage ?? (() => {})}
-                  onReport={onReportChatMessage ?? (() => {})}
-                  playerName={player1.username}
-                  opponentName={player2.username}
-                  playerId={playerId}
-                />
-              </div>
-              <div className="h-[150px] min-h-[150px] max-h-[150px] overflow-hidden overflow-x-hidden border-t border-[#2A3A5C] flex-shrink-0 flex-grow-0">
-                <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} />
-              </div>
-            </>
-          ) : (
-            <div className="h-[150px] min-h-[150px] max-h-[150px] overflow-hidden">
-              <GameLogFeed log={log} player1Name={player1.username} player2Name={player2.username} isPlayer2Bot={isPlayer2Bot} isPracticeOnly />
-            </div>
-          )}
+          <div className="h-full min-h-0 overflow-hidden">
+            <GameLogFeed
+              log={log}
+              player1Name={player1.username}
+              player2Name={player2.username}
+              isPlayer2Bot={isPlayer2Bot}
+              isPracticeOnly={!isPractice}
+            />
+          </div>
         </div>
       </div>
     </div>
