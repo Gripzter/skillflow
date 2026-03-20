@@ -223,7 +223,7 @@ export default function GameLayout({
             {timerDisplay}
           </span>
         </div>
-        <div className="shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           {mode === "practice" ? (
             <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#a855f7" }}>
               PRACTICE
@@ -233,6 +233,13 @@ export default function GameLayout({
               {realStakeDisplay ?? "—"}
             </span>
           )}
+          <button
+            type="button"
+            onClick={onLeaveMatch}
+            className="rounded-md border border-[#2a2a34] px-2.5 py-0.5 text-[11px] text-[#666] hover:bg-white/5 md:hidden"
+          >
+            Leave
+          </button>
         </div>
       </header>
 
@@ -250,7 +257,10 @@ export default function GameLayout({
 
           {/* Board — flex:1 centers the game content in all remaining space */}
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-2 py-1 md:px-5">
-            <div className="flex h-full max-h-full w-full max-w-[480px] items-center justify-center" style={{ minHeight: 0 }}>
+            <div
+              className="flex h-full max-h-full w-full items-center justify-center"
+              style={{ minHeight: 0, maxWidth: "min(480px, 100%)" }}
+            >
               {children}
             </div>
           </div>
@@ -265,8 +275,11 @@ export default function GameLayout({
             ) : null}
           </div>
 
-          {/* ─── Mobile: combined feed (fixed height) ─── */}
-          <div className="flex shrink-0 flex-col border-t border-[#1a1a22] md:hidden" style={{ height: 140 }}>
+          {/* ─── Mobile: combined feed ─── */}
+          <div
+            className="flex shrink-0 flex-col border-t border-[#1a1a22] md:hidden"
+            style={{ maxHeight: 160 }}
+          >
             <div className="flex shrink-0 items-center justify-between border-b border-[#1a1a22] px-3 py-1">
               <span className="text-[11px] text-[#666]">Live feed</span>
               <span className="text-[10px] text-[#555]">log + chat</span>
@@ -367,7 +380,7 @@ export default function GameLayout({
       </div>
 
       {/* ─── Footer ─── */}
-      <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[#1a1a22] px-3 py-1.5">
+      <footer className="hidden shrink-0 flex-wrap items-center justify-between gap-2 border-t border-[#1a1a22] px-3 py-1.5 md:flex">
         <p className="text-[11px] text-[#444]">{footerLeft} · ID {shortId}</p>
         <div className="flex gap-2">
           <button type="button" onClick={onReportIssue} className="rounded-md border border-[#2a2a34] px-3 py-1 text-[11px] text-[#666] hover:bg-white/5">

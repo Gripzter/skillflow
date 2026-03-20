@@ -316,7 +316,10 @@ export default function ConnectFour({
     <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
         <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
           <div ref={boardSlotRef} className="relative flex h-full max-h-full w-full items-center justify-center overflow-hidden">
-            <div className="relative flex max-h-full max-w-full shrink-0 flex-col items-center overflow-hidden">
+            <div
+              className="relative flex max-h-full w-full max-w-full shrink-0 flex-col items-center overflow-hidden"
+              style={{ aspectRatio: "7 / 6" }}
+            >
               {/* Hover disc preview above board */}
               <div
                 className="relative flex justify-center"
@@ -347,6 +350,8 @@ export default function ConnectFour({
                   boxShadow: "0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
                   width: boardWidth,
                   height: boardHeight,
+                  maxWidth: "100%",
+                  boxSizing: "border-box",
                   cursor:
                     hoverCol !== null && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2"))
                       ? isColumnFull(hoverCol)
