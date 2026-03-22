@@ -25,6 +25,7 @@ import SpellingBee from "@/components/games/SpellingBee";
 import Checkers from "@/components/games/Checkers";
 import { type ChatMessage } from "@/components/GameChat";
 import GameLayout, { type GameLayoutLogEntry } from "@/components/game/GameLayout";
+import GameResultOverlay from "@/components/game/GameResultOverlay";
 import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -906,176 +907,19 @@ function MatchPageContent() {
       )}
       </div>
 
-      {/* Victory overlay — only shown when THIS player won */}
-      {outcome === "victory" && match.gameType !== "spelling-bee" && (
-        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
-          <div className={`absolute inset-0 victory-glow ${match.isPractice ? "bg-gradient-to-t from-purple-500/10 via-transparent to-purple-500/10" : "bg-gradient-to-t from-teal/10 via-transparent to-teal/10"}`} aria-hidden />
-          <div className="animate-fade-in relative text-center">
-            <p className="text-5xl font-bold text-white sm:text-6xl">
-              {match.isPractice ? "You won!" : "VICTORY!"}
-            </p>
-            {wonByForfeit && (
-              <p className="mt-4 text-xl font-semibold text-amber-400">Opponent left the match. You win by forfeit!</p>
-            )}
-            {!wonByForfeit && (
-              <p className="mt-4 text-lg text-white/90">
-                {match.isPractice ? "Nice work!" : "Congratulations! You outplayed your opponent!"}
-              </p>
-            )}
-            {!match.isPractice && (
-              <p className="mt-3 text-2xl font-bold text-teal">+${match.winnerPayout.toFixed(2)}</p>
-            )}
-            <p className="mt-2 text-body-gray">Defeated {opponentUsername}</p>
-            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = `/play/${match.gameType}`;
-                }}
-                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
-              >
-                Rematch
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/play";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
-              >
-                New Match
-              </button>
-              {match.isPractice && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = "/play";
-                  }}
-                  className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
-                >
-                  Play for Real Money
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/dashboard";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
-              >
-                Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Draw overlay */}
-      {outcome === "draw" && match.gameType !== "spelling-bee" && (
-        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
-          <div className="absolute inset-0 bg-gradient-to-t from-amber-500/5 via-transparent to-amber-500/5" aria-hidden />
-          <div className="animate-fade-in relative text-center">
-            <p className="text-4xl font-bold text-white sm:text-5xl">It&apos;s a Draw!</p>
-            {match.isPractice ? (
-              <p className="mt-4 text-lg text-purple-400">Practice match — no stakes.</p>
-            ) : (
-              <>
-                <p className="mt-4 text-lg text-white/90">Evenly matched! Your stake has been returned.</p>
-                <p className="mt-2 text-xl font-semibold text-amber-400">${match.stakeAmount.toFixed(2)} returned</p>
-              </>
-            )}
-            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = `/play/${match.gameType}`;
-                }}
-                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
-              >
-                Rematch
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/play";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
-              >
-                New Match
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/dashboard";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
-              >
-                Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Defeat overlay — only shown when THIS player lost (respectful, encouraging) */}
-      {outcome === "defeat" && match.gameType !== "spelling-bee" && (
-        <div className="fixed left-0 right-0 bottom-0 top-[148px] z-40 flex flex-col items-center justify-center bg-charcoal/98 px-4 md:top-[132px]">
-          <div className="absolute inset-0 bg-gradient-to-t from-red-500/5 via-transparent to-red-500/5" aria-hidden />
-          <div className="animate-fade-in relative text-center">
-            <p className="text-4xl font-bold text-white sm:text-5xl">Defeated</p>
-            <p className="mt-4 text-lg text-white/90">Good effort! Every match makes you better.</p>
-            {!match.isPractice && (
-              <p className="mt-2 text-base text-red-400/90">-${match.stakeAmount.toFixed(2)}</p>
-            )}
-            <p className="mt-1 text-body-gray">{opponentUsername} won</p>
-            {!match.isPractice && (
-              <p className="mt-4 max-w-sm text-sm text-body-gray">
-                Tip: Practice mode is great for sharpening your skills!
-              </p>
-            )}
-            {match.isPractice && <p className="mt-2 text-body-gray">Try again?</p>}
-            <div className="mt-8 flex w-full flex-col gap-3 md:grid md:w-auto md:grid-cols-2 md:gap-4">
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = `/play/${match.gameType}`;
-                }}
-                className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
-              >
-                Rematch
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/play";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white hover:bg-white/10 md:w-auto"
-              >
-                New Match
-              </button>
-              {match.isPractice && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = "/play";
-                  }}
-                  className="w-full rounded-lg bg-[#FF5E00] px-6 py-3 text-center font-semibold text-white hover:bg-[#FF7A2E] md:w-auto"
-                >
-                  Play for Real Money
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  window.location.href = "/dashboard";
-                }}
-                className="w-full rounded-lg border border-[#2A3A5C] px-6 py-3 text-center font-semibold text-white/90 hover:bg-white/10 md:w-auto"
-              >
-                Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Game result overlay — victory, defeat, or draw */}
+      {outcome && (
+        <GameResultOverlay
+          outcome={outcome}
+          isPractice={match.isPractice}
+          stakeAmount={match.stakeAmount}
+          winnerPayout={match.winnerPayout}
+          gameType={match.gameType}
+          opponentUsername={opponentUsername}
+          wonByForfeit={wonByForfeit}
+          onPlayAgain={() => { window.location.href = `/play/${match.gameType}`; }}
+          onLeave={() => { window.location.href = "/play"; }}
+        />
       )}
 
       {/* Forfeit / Leave confirmation modal */}

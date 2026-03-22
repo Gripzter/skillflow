@@ -13,6 +13,7 @@
     "@stripe/stripe-js": "^8.8.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.95.3",
+    "canvas-confetti": "^1.9.4",
     "chess.js": "^1.4.0",
     "matter-js": "^0.20.0",
     "next": "^14.2.35",
@@ -21,6 +22,7 @@
     "stripe": "^20.4.0"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/matter-js": "^0.20.2",
     "@types/node": "^20",
     "@types/react": "^18",
