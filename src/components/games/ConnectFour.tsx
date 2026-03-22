@@ -17,7 +17,6 @@ import {
 import { getConnect4BotMove, getConnect4BotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 
 const BOARD_BG = "#1A1A22";
-const CELL_BORDER = "#2A2A38";
 const HOLE_BG = "#0E0E12";
 const RED_CENTER = "#FF4444";
 const RED_EDGE = "#CC0000";
@@ -72,19 +71,21 @@ export default function ConnectFour({
     [board]
   );
 
-  // Size board from the actual board column so it never overflows or gets cut off.
-  // Board width = 7*cellSize + 24, board + preview height = 7*cellSize + 37.
+  // GAP = 4px between cells, PAD = 8px board padding
+  // boardWidth  = COLS*cs + (COLS-1)*4 + 16  →  maxByW = (availW - 40) / 7
+  // hoverRow    = cs + 12
+  // boardHeight = ROWS*cs + (ROWS-1)*4 + 16  →  totalH = (ROWS+1)*cs + 48
+  //                                           →  maxByH = (availH - 48) / 7
   const updateCellSize = useCallback(() => {
     const el = boardSlotRef.current;
     if (!el) return;
     const w = el.clientWidth;
     const h = el.clientHeight;
     if (w <= 0 || h <= 0) return;
-    const pad = 8;
-    const availableWidth = Math.max(120, w - pad * 2);
-    const availableHeight = Math.max(120, h - pad * 2);
-    const maxByWidth = (availableWidth - 24) / COLS;
-    const maxByHeight = (availableHeight - 37) / (ROWS + 1);
+    const availW = Math.max(120, w - 8);
+    const availH = Math.max(120, h - 8);
+    const maxByWidth = (availW - (COLS - 1) * 4 - 16) / COLS;
+    const maxByHeight = (availH - (ROWS - 1) * 4 - 28) / (ROWS + 1);
     const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
     if (!Number.isFinite(raw) || raw <= 0) return;
     setCellSize(Math.max(28, Math.min(raw, 75)));
@@ -254,8 +255,10 @@ export default function ConnectFour({
     return new Set(winResult.cells.map(([r, c]) => `${r},${c}`));
   }, [winResult]);
 
-  const boardWidth = cellSize * COLS + (COLS + 1) * 3;
-  const boardHeight = cellSize * ROWS + (ROWS + 1) * 3;
+  const GAP = 4;
+  const PAD = 8;
+  const boardWidth = COLS * cellSize + (COLS - 1) * GAP + PAD * 2;
+  const boardHeight = ROWS * cellSize + (ROWS - 1) * GAP + PAD * 2;
   const isMyTurn = (turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2");
 
   useEffect(() => {
@@ -313,129 +316,116 @@ export default function ConnectFour({
   ]);
 
   return (
-    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
-        <div className="relative flex min-h-0 w-full flex-1 items-center justify-center overflow-hidden">
-          <div ref={boardSlotRef} className="relative flex h-full max-h-full w-full items-center justify-center overflow-hidden">
-            <div
-              className="relative flex max-h-full w-full max-w-full shrink-0 flex-col items-center overflow-hidden"
-            >
-              {/* Hover disc preview above board */}
-              <div
-                className="relative flex justify-center"
-                style={{ width: boardWidth, height: cellSize + 16 }}
-              >
-                {hoverCol !== null && !isColumnFull(hoverCol) && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2")) && !dropping && !gameOverRef.current && (
-                  <div
-                    className="absolute rounded-full opacity-50 pointer-events-none"
-                    style={{
-                      width: cellSize - 6,
-                      height: cellSize - 6,
-                      left: 3 + hoverCol * (cellSize + 3) + (cellSize - (cellSize - 6)) / 2,
-                      top: 8,
-                      background: turn === 1
-                        ? `radial-gradient(circle at 30% 30%, ${RED_CENTER}, ${RED_EDGE})`
-                        : `radial-gradient(circle at 30% 30%, ${YELLOW_CENTER}, ${YELLOW_EDGE})`,
-                      boxShadow: "inset -2px -2px 4px rgba(0,0,0,0.3), inset 2px 2px 4px rgba(255,255,255,0.2)",
-                    }}
-                  />
-                )}
-              </div>
+    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center">
+      <div ref={boardSlotRef} className="relative flex min-h-0 w-full flex-1 items-center justify-center">
+        <div className="flex flex-col items-center">
 
-              {/* Board */}
+          {/* Hover disc preview row */}
+          <div className="relative" style={{ width: boardWidth, height: cellSize + 12 }}>
+            {hoverCol !== null && !isColumnFull(hoverCol) && isMyTurn && !dropping && !gameOverRef.current && (
               <div
-                className="rounded-2xl p-3 flex flex-col gap-[3px] relative overflow-hidden"
+                className="absolute rounded-full pointer-events-none"
                 style={{
-                  backgroundColor: BOARD_BG,
-                  boxShadow: "0 8px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)",
-                  width: boardWidth,
-                  height: boardHeight,
-                  maxWidth: "100%",
-                  boxSizing: "border-box",
-                  cursor:
-                    hoverCol !== null && ((turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2"))
-                      ? isColumnFull(hoverCol)
-                        ? "not-allowed"
-                        : "pointer"
-                      : "default",
+                  width: cellSize - 8,
+                  height: cellSize - 8,
+                  left: PAD + hoverCol * (cellSize + GAP) + 4,
+                  top: 6,
+                  opacity: 0.55,
+                  background: turn === 1
+                    ? `radial-gradient(circle at 30% 30%, ${RED_CENTER}, ${RED_EDGE})`
+                    : `radial-gradient(circle at 30% 30%, ${YELLOW_CENTER}, ${YELLOW_EDGE})`,
+                  boxShadow: "inset -2px -2px 4px rgba(0,0,0,0.3)",
                 }}
-              >
-                {[0, 1, 2, 3, 4, 5].map((row) => (
-                  <div
-                    key={row}
-                    className="flex gap-[3px] flex-none"
-                    style={{ height: cellSize + 3, width: boardWidth - 24 }}
-                  >
-                    {[0, 1, 2, 3, 4, 5, 6].map((col) => {
-                      const cell = board[row][col];
-                      const isWinCell = winSet?.has(`${row},${col}`);
-                      const isDroppingHere = dropping?.col === col && dropping?.row === row;
-                      const dropPlayer = isDroppingHere ? dropping!.player : null;
-                      const showDisc = cell !== 0 || dropPlayer;
-                      const discPlayer = cell || dropPlayer;
-                      const dropFromY = -(row * (cellSize + 3));
-                      return (
-                        <div
-                          key={`${row}-${col}`}
-                          data-col={col}
-                          data-row={row}
-                          className="rounded-full flex items-center justify-center transition-opacity flex-none"
-                          style={{
-                            width: cellSize + 3,
-                            height: cellSize + 3,
-                            backgroundColor: HOLE_BG,
-                            border: `3px solid ${CELL_BORDER}`,
-                            opacity: winResult && !isWinCell ? 0.5 : 1,
-                          }}
-                          onMouseEnter={() => setHoverCol(col)}
-                          onMouseLeave={() => setHoverCol(null)}
-                          onClick={() => handleDrop(col)}
-                        >
-                          {showDisc && (
-                            <div
-                              className="rounded-full connect4-disc"
-                              style={{
-                                width: cellSize - 4,
-                                height: cellSize - 4,
-                                background:
-                                  discPlayer === 1
-                                    ? `radial-gradient(circle at 32% 28%, ${RED_CENTER}, 70%, ${RED_EDGE})`
-                                    : `radial-gradient(circle at 32% 28%, ${YELLOW_CENTER}, 70%, ${YELLOW_EDGE})`,
-                                boxShadow: isWinCell
-                                  ? "0 0 16px rgba(255, 94, 0, 0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
-                                  : "inset -3px -3px 6px rgba(0,0,0,0.35), inset 3px 3px 6px rgba(255,255,255,0.25)",
-                                border: isWinCell ? "3px solid rgba(255, 94, 0, 0.9)" : undefined,
-                                ["--drop-from" as string]: `${dropFromY}px`,
-                                animation: isDroppingHere ? "connect4Drop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards" : "none",
-                              }}
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-                {winResult && (
-                  <svg
-                    className="absolute pointer-events-none inset-0 rounded-2xl"
-                    width={boardWidth}
-                    height={boardHeight}
-                    style={{ left: 0, top: 0 }}
-                  >
-                    <line
-                      x1={3 + winResult.cells[0][1] * (cellSize + 3) + cellSize / 2}
-                      y1={3 + winResult.cells[0][0] * (cellSize + 3) + cellSize / 2}
-                      x2={3 + winResult.cells[3][1] * (cellSize + 3) + cellSize / 2}
-                      y2={3 + winResult.cells[3][0] * (cellSize + 3) + cellSize / 2}
-                      stroke="rgba(255, 94, 0, 0.95)"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                )}
-              </div>
-            </div>
+              />
+            )}
           </div>
+
+          {/* Board — flat CSS grid, no border-radius, no overflow-hidden */}
+          <div
+            className="relative"
+            style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${COLS}, ${cellSize}px)`,
+              gridTemplateRows: `repeat(${ROWS}, ${cellSize}px)`,
+              gap: GAP,
+              padding: PAD,
+              backgroundColor: BOARD_BG,
+              cursor: hoverCol !== null && isMyTurn
+                ? isColumnFull(hoverCol) ? "not-allowed" : "pointer"
+                : "default",
+            }}
+            onMouseLeave={() => setHoverCol(null)}
+          >
+            {[0, 1, 2, 3, 4, 5].map((row) =>
+              [0, 1, 2, 3, 4, 5, 6].map((col) => {
+                const cell = board[row][col];
+                const isWinCell = winSet?.has(`${row},${col}`);
+                const isDroppingHere = dropping?.col === col && dropping?.row === row;
+                const dropPlayer = isDroppingHere ? dropping!.player : null;
+                const showDisc = cell !== 0 || !!dropPlayer;
+                const discPlayer = cell || dropPlayer;
+                const dropFromY = -(row * (cellSize + GAP));
+                return (
+                  <div
+                    key={`${row}-${col}`}
+                    className="flex items-center justify-center"
+                    style={{
+                      width: cellSize,
+                      height: cellSize,
+                      borderRadius: "50%",
+                      backgroundColor: HOLE_BG,
+                      boxShadow: "inset 0 4px 10px rgba(0,0,0,0.8), inset 0 1px 4px rgba(0,0,0,0.95)",
+                      opacity: winResult && !isWinCell ? 0.4 : 1,
+                    }}
+                    onMouseEnter={() => setHoverCol(col)}
+                    onClick={() => handleDrop(col)}
+                  >
+                    {showDisc && (
+                      <div
+                        className="rounded-full connect4-disc"
+                        style={{
+                          width: cellSize - 6,
+                          height: cellSize - 6,
+                          background: discPlayer === 1
+                            ? `radial-gradient(circle at 32% 28%, ${RED_CENTER}, 70%, ${RED_EDGE})`
+                            : `radial-gradient(circle at 32% 28%, ${YELLOW_CENTER}, 70%, ${YELLOW_EDGE})`,
+                          boxShadow: isWinCell
+                            ? "0 0 16px rgba(255,94,0,0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
+                            : "inset -3px -3px 6px rgba(0,0,0,0.35), inset 3px 3px 6px rgba(255,255,255,0.25)",
+                          border: isWinCell ? "3px solid rgba(255,94,0,0.9)" : undefined,
+                          ["--drop-from" as string]: `${dropFromY}px`,
+                          animation: isDroppingHere ? "connect4Drop 500ms cubic-bezier(0.34,1.56,0.64,1) forwards" : "none",
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })
+            )}
+
+            {/* Win line SVG overlay */}
+            {winResult && (
+              <svg
+                className="absolute pointer-events-none"
+                style={{ left: 0, top: 0 }}
+                width={boardWidth}
+                height={boardHeight}
+              >
+                <line
+                  x1={PAD + winResult.cells[0][1] * (cellSize + GAP) + cellSize / 2}
+                  y1={PAD + winResult.cells[0][0] * (cellSize + GAP) + cellSize / 2}
+                  x2={PAD + winResult.cells[3][1] * (cellSize + GAP) + cellSize / 2}
+                  y2={PAD + winResult.cells[3][0] * (cellSize + GAP) + cellSize / 2}
+                  stroke="rgba(255,94,0,0.95)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </div>
+
         </div>
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes connect4Drop {
