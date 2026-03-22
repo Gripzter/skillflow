@@ -781,7 +781,7 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
     gameState.player2Group === "solid" ? "Solids" : gameState.player2Group === "stripe" ? "Stripes" : "—";
 
   return (
-    <div ref={containerRef} className="flex w-full flex-col items-center overflow-x-auto" style={{ width: "100%" }}>
+    <div ref={containerRef} className="flex w-full flex-col items-center overflow-hidden" style={{ width: "100%" }}>
       <div className="flex w-full items-center justify-between gap-2 px-2 py-2">
         <div
           className={`flex flex-col items-start gap-1 rounded-lg px-3 py-2 ${

@@ -638,8 +638,6 @@ export default function Checkers({
   const showTurnText = isMyTurn ? "Your Turn" : "Opponent's Turn";
 
   // Board sizing.
-  const cellMin = 40;
-
   const selectedPieceCode = selected ? board[selected.r][selected.c] : 0;
   const selectedIsKing = selected ? Math.abs(selectedPieceCode) === 2 : false;
 
@@ -712,8 +710,6 @@ export default function Checkers({
                   onClick={() => handleSquareClick({ r, c })}
                   className="relative flex items-center justify-center p-0 focus:outline-none"
                   style={{
-                    minWidth: cellMin,
-                    minHeight: cellMin,
                     background: bg,
                     border: cellBorder,
                     padding: 0,

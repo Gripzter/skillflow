@@ -318,7 +318,6 @@ export default function ConnectFour({
           <div ref={boardSlotRef} className="relative flex h-full max-h-full w-full items-center justify-center overflow-hidden">
             <div
               className="relative flex max-h-full w-full max-w-full shrink-0 flex-col items-center overflow-hidden"
-              style={{ aspectRatio: "7 / 6" }}
             >
               {/* Hover disc preview above board */}
               <div

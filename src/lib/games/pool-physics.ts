@@ -110,7 +110,7 @@ export function getPocketRadiusSide(ballRadius: number): number {
  * Table size in pixels. Outer aspect 110:60 (WPA).
  */
 export function getTableSize(containerWidth: number): { width: number; height: number } {
-  const width = Math.max(600, containerWidth || 800);
+  const width = Math.max(320, containerWidth || 800);
   return { width, height: width * (WPA.OUTER_WIDTH / WPA.OUTER_LENGTH) };
 }
 

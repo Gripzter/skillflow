@@ -39,7 +39,7 @@ type LogEntry = {
 const GRID_COLS = 6;
 const GRID_ROWS = 6;
 const CARD_GAP = 8;
-const MIN_CARD_SIZE = 50;
+const MIN_CARD_SIZE = 36;
 const MAX_CARD_SIZE = 90;
 
 export default function MemoryMatch({

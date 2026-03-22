@@ -162,6 +162,7 @@ export default function GameLayout({
   realStakeDisplay,
 }: GameLayoutProps) {
   const [chatInput, setChatInput] = useState("");
+  const [mobileFeedOpen, setMobileFeedOpen] = useState(false);
   const mobileFeedRef = useRef<HTMLDivElement>(null);
   const desktopLogRef = useRef<HTMLDivElement>(null);
   const desktopChatRef = useRef<HTMLDivElement>(null);
@@ -275,54 +276,65 @@ export default function GameLayout({
             ) : null}
           </div>
 
-          {/* ─── Mobile: combined feed ─── */}
-          <div
-            className="flex shrink-0 flex-col border-t border-[#1a1a22] md:hidden"
-            style={{ maxHeight: 160 }}
-          >
-            <div className="flex shrink-0 items-center justify-between border-b border-[#1a1a22] px-3 py-1">
-              <span className="text-[11px] text-[#666]">Live feed</span>
-              <span className="text-[10px] text-[#555]">log + chat</span>
-            </div>
-            <div ref={mobileFeedRef} className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto overflow-x-hidden px-2 py-1">
-              {sortedLog.map((entry) =>
-                entry.type === "system" ? (
-                  <p key={entry.id} className="py-0.5 text-[11px] leading-snug" style={{ color: "#444" }}>
-                    <span className="mr-1 opacity-80">●</span>{entry.text}
-                  </p>
-                ) : (
-                  <p key={entry.id} className="py-0.5 text-[12px] leading-snug">
-                    <span className="text-[11px] font-bold" style={{ color: "#FF5E00" }}>{entry.sender ?? "?"}: </span>
-                    <span style={{ color: "#ccc" }}>{entry.text}</span>
-                  </p>
-                ),
-              )}
-            </div>
-            <div className="shrink-0 border-t border-[#1a1a22] px-2 py-1">
-              {chatPresets && chatPresets.length > 0 && (
-                <div className="mb-1 flex gap-1 overflow-x-auto">
-                  {chatPresets.map((p) => (
-                    <button key={p} type="button" onClick={() => onSendChat(p)} className="shrink-0 rounded-md border border-[#2a2a34] px-2 py-0.5 text-[10px] text-[#aaa] hover:bg-white/5">
-                      {p}
-                    </button>
-                  ))}
+          {/* ─── Mobile: collapsible feed ─── */}
+          <div className="flex shrink-0 flex-col border-t border-[#1a1a22] md:hidden">
+            {/* Toggle bar — always visible */}
+            <button
+              type="button"
+              onClick={() => setMobileFeedOpen((o) => !o)}
+              className="flex w-full shrink-0 items-center justify-between px-3 py-1.5"
+              style={{ background: "#0E0E12" }}
+            >
+              <span className="text-[11px] text-[#666]">
+                {sortedLog.length > 0 ? sortedLog[sortedLog.length - 1].text.slice(0, 40) : "Live feed"}
+                {sortedLog.length > 0 && sortedLog[sortedLog.length - 1].text.length > 40 ? "…" : ""}
+              </span>
+              <span className="ml-2 shrink-0 text-[10px] text-[#444]">{mobileFeedOpen ? "▼" : "▲"}</span>
+            </button>
+            {/* Expanded feed + chat */}
+            {mobileFeedOpen && (
+              <>
+                <div ref={mobileFeedRef} className="flex max-h-[110px] min-h-0 flex-col justify-end overflow-y-auto overflow-x-hidden border-t border-[#1a1a22] px-2 py-1">
+                  {sortedLog.map((entry) =>
+                    entry.type === "system" ? (
+                      <p key={entry.id} className="py-0.5 text-[11px] leading-snug" style={{ color: "#444" }}>
+                        <span className="mr-1 opacity-80">●</span>{entry.text}
+                      </p>
+                    ) : (
+                      <p key={entry.id} className="py-0.5 text-[12px] leading-snug">
+                        <span className="text-[11px] font-bold" style={{ color: "#FF5E00" }}>{entry.sender ?? "?"}: </span>
+                        <span style={{ color: "#ccc" }}>{entry.text}</span>
+                      </p>
+                    ),
+                  )}
                 </div>
-              )}
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
-                  placeholder="Type a message..."
-                  className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
-                  style={{ background: "#1a1a22" }}
-                />
-                <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-medium text-white" style={{ background: "#FF5E00" }}>
-                  Send
-                </button>
-              </div>
-            </div>
+                <div className="shrink-0 border-t border-[#1a1a22] px-2 py-1">
+                  {chatPresets && chatPresets.length > 0 && (
+                    <div className="mb-1 flex gap-1 overflow-x-auto">
+                      {chatPresets.map((p) => (
+                        <button key={p} type="button" onClick={() => onSendChat(p)} className="shrink-0 rounded-md border border-[#2a2a34] px-2 py-0.5 text-[10px] text-[#aaa] hover:bg-white/5">
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") sendChat(); }}
+                      placeholder="Type a message..."
+                      className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
+                      style={{ background: "#1a1a22" }}
+                    />
+                    <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-medium text-white" style={{ background: "#FF5E00" }}>
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
