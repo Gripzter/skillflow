@@ -345,7 +345,7 @@ export default function Chess({
       window.removeEventListener("resize", measure);
     };
   }, []);
-  const squareSize = Math.floor(boardSize / 8);
+  const squareSize = Math.floor((boardSize - 8) / 8); // subtract 4px border × 2 sides
 
   const scoreP1 = useMemo(
     () => capturedBlack.reduce((s, t) => s + PIECE_VALUE[t], 0),
