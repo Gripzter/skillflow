@@ -363,7 +363,7 @@ export default function ConnectFour({
                   <div
                     key={row}
                     className="flex gap-[3px] flex-none"
-                    style={{ height: cellSize + 3, width: boardWidth - 6 }}
+                    style={{ height: cellSize + 3, width: boardWidth - 24 }}
                   >
                     {[0, 1, 2, 3, 4, 5, 6].map((col) => {
                       const cell = board[row][col];
