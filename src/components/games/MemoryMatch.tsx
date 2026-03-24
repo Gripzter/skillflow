@@ -16,7 +16,7 @@ import {
   allPairsFound,
   remainingPairs,
 } from "@/lib/games/memory-logic";
-import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs } from "@/lib/games/bot-engine";
+import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 import type { MatchUiState } from "@/components/game/matchUi";
 
 interface MemoryMatchProps {
@@ -25,6 +25,7 @@ interface MemoryMatchProps {
   onGameEnd: (winner: "player1" | "player2") => void;
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
+  botDifficulty?: BotDifficulty;
   /** Real-money vs practice accent on active row (defaults true = practice). */
   isPractice?: boolean;
   onMatchUi?: (state: MatchUiState) => void;
@@ -48,6 +49,7 @@ export default function MemoryMatch({
   onGameEnd,
   onGameDraw,
   isPlayer2Bot = true,
+  botDifficulty = "gamer",
   isPractice: _isPractice = true,
   onMatchUi,
 }: MemoryMatchProps) {
@@ -301,7 +303,7 @@ export default function MemoryMatch({
     const botDecision = getMemoryMatchBotMove({
       cards: snapshot,
       memory: botMemoryRef.current,
-      accuracy: "medium",
+      botDifficulty,
     });
 
     botMemoryRef.current = botDecision.updatedMemory;
@@ -321,7 +323,7 @@ export default function MemoryMatch({
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [cards, currentPlayer, gameOver, isPlayer2Bot, flipCardAt, isProcessing]);
+  }, [cards, currentPlayer, gameOver, isPlayer2Bot, botDifficulty, flipCardAt, isProcessing]);
 
   const handleCardClick = useCallback(
     (index: number) => {

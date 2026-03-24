@@ -9,7 +9,7 @@ export type BotDifficulty = "rookie" | "gamer" | "professional";
 const DEFAULT_DIFFICULTY: BotDifficulty = "gamer";
 import type { Board } from "./connect4-logic";
 import type { SpellingDifficulty } from "./spelling-words";
-import { COLS, getValidColumns, dropDisc, checkWin } from "./connect4-logic";
+import { COLS, ROWS, getValidColumns, dropDisc, checkWin, isBoardFull } from "./connect4-logic";
 
 const BOT_PLAYER = 2 as const;
 const HUMAN_PLAYER = 1 as const;
@@ -80,16 +80,18 @@ export function getChessBotMove(
   const sorted = [...moves].sort((a, b) => scoreChessMove(b) - scoreChessMove(a));
 
   if (difficulty === "rookie") {
-    if (Math.random() < 0.3) {
+    // 50% pure blunder (random move), else pick from top 7
+    if (Math.random() < 0.5) {
       const m = moves[Math.floor(Math.random() * moves.length)];
       return withPromo(m);
     }
-    const topN = sorted.slice(0, Math.min(5, sorted.length));
+    const topN = sorted.slice(0, Math.min(7, sorted.length));
     return withPromo(topN[Math.floor(Math.random() * topN.length)]);
   }
 
   if (difficulty === "gamer") {
-    if (Math.random() < 0.1) {
+    // 15% picks from top 5 (mistake), 85% picks from top 3
+    if (Math.random() < 0.15) {
       const topN = sorted.slice(0, Math.min(5, sorted.length));
       return withPromo(topN[Math.floor(Math.random() * topN.length)]);
     }
@@ -97,9 +99,12 @@ export function getChessBotMove(
     return withPromo(topN[Math.floor(Math.random() * topN.length)]);
   }
 
-  // professional: best or top 2
-  const topN = sorted.slice(0, Math.min(2, sorted.length));
-  return withPromo(topN[Math.floor(Math.random() * topN.length)]);
+  // professional: almost always best, rarely top 2
+  if (Math.random() < 0.05) {
+    const topN = sorted.slice(0, Math.min(2, sorted.length));
+    return withPromo(topN[Math.floor(Math.random() * topN.length)]);
+  }
+  return withPromo(sorted[0]);
 }
 
 /**
@@ -185,13 +190,113 @@ export function getPoolBotDelayMs(): number {
 
 // --- Connect 4 bot ---
 
-/** Columns ordered by preference (center first) */
-const COL_PRIORITY = [3, 2, 4, 1, 5, 0, 6];
+/** Score a window of 4 cells for `player` (higher = better for player) */
+function scoreC4Window(w: number[], player: number): number {
+  const opp = 3 - player;
+  const p = w.filter((c) => c === player).length;
+  const o = w.filter((c) => c === opp).length;
+  const e = w.filter((c) => c === 0).length;
+  if (p === 4) return 100;
+  if (p === 3 && e === 1) return 5;
+  if (p === 2 && e === 2) return 2;
+  if (o === 3 && e === 1) return -4;
+  return 0;
+}
+
+/** Heuristic board evaluation for Connect 4 (from `botPlayer` perspective) */
+function evaluateC4(board: Board, botPlayer: number): number {
+  let score = 0;
+
+  // Center column bonus — controlling the center gives more winning paths
+  for (let r = 0; r < ROWS; r++) {
+    if (board[r][CENTER_COL] === botPlayer) score += 3;
+  }
+
+  // Score all horizontal windows
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c <= COLS - 4; c++) {
+      score += scoreC4Window([board[r][c], board[r][c + 1], board[r][c + 2], board[r][c + 3]], botPlayer);
+    }
+  }
+
+  // Score all vertical windows
+  for (let c = 0; c < COLS; c++) {
+    for (let r = 0; r <= ROWS - 4; r++) {
+      score += scoreC4Window([board[r][c], board[r + 1][c], board[r + 2][c], board[r + 3][c]], botPlayer);
+    }
+  }
+
+  // Score diagonal \
+  for (let r = 0; r <= ROWS - 4; r++) {
+    for (let c = 0; c <= COLS - 4; c++) {
+      score += scoreC4Window([board[r][c], board[r + 1][c + 1], board[r + 2][c + 2], board[r + 3][c + 3]], botPlayer);
+    }
+  }
+
+  // Score diagonal /
+  for (let r = 0; r <= ROWS - 4; r++) {
+    for (let c = 3; c < COLS; c++) {
+      score += scoreC4Window([board[r][c], board[r + 1][c - 1], board[r + 2][c - 2], board[r + 3][c - 3]], botPlayer);
+    }
+  }
+
+  return score;
+}
+
+/** Sort columns center-outward for better alpha-beta pruning */
+function c4OrderedCols(valid: number[]): number[] {
+  return [...valid].sort((a, b) => Math.abs(a - CENTER_COL) - Math.abs(b - CENTER_COL));
+}
 
 /**
- * Connect 4 bot (Player 2). Strategy:
- * 1. Win if possible 2. Block player win 3. Double threat 4. Center 5. Prefer center 6. Random.
- * difficulty: rookie = 40% random, misses setup; gamer = current logic (depth ~3-4); professional = always win/block, strong.
+ * Minimax with alpha-beta pruning for Connect 4.
+ * `maximizing` = it is botPlayer's turn to move.
+ */
+function minimaxC4(
+  board: Board,
+  depth: number,
+  alpha: number,
+  beta: number,
+  maximizing: boolean,
+  botPlayer: number
+): number {
+  const win = checkWin(board);
+  if (win) return win.player === botPlayer ? 1000 + depth : -(1000 + depth);
+  if (isBoardFull(board)) return 0;
+  if (depth === 0) return evaluateC4(board, botPlayer);
+
+  const humanPlayer = (3 - botPlayer) as 1 | 2;
+  const mover = (maximizing ? botPlayer : humanPlayer) as 1 | 2;
+  const valid = c4OrderedCols(getValidColumns(board));
+
+  if (maximizing) {
+    let value = -Infinity;
+    for (const col of valid) {
+      const res = dropDisc(board, col, mover);
+      if (!res) continue;
+      value = Math.max(value, minimaxC4(res.board, depth - 1, alpha, beta, false, botPlayer));
+      alpha = Math.max(alpha, value);
+      if (beta <= alpha) break;
+    }
+    return value;
+  } else {
+    let value = Infinity;
+    for (const col of valid) {
+      const res = dropDisc(board, col, mover);
+      if (!res) continue;
+      value = Math.min(value, minimaxC4(res.board, depth - 1, alpha, beta, true, botPlayer));
+      beta = Math.min(beta, value);
+      if (beta <= alpha) break;
+    }
+    return value;
+  }
+}
+
+/**
+ * Connect 4 bot (Player 2).
+ * Rookie: mostly random with occasional blocking of obvious wins.
+ * Gamer: minimax depth 4 — blocks wins, sets up traps, 15% random slip.
+ * Professional: minimax depth 7 with alpha-beta pruning, near-optimal play.
  */
 export function getConnect4BotMove(
   board: Board,
@@ -200,50 +305,43 @@ export function getConnect4BotMove(
   const valid = getValidColumns(board);
   if (valid.length === 0) return null;
 
-  // Always win if possible
-  for (const col of valid) {
-    const result = dropDisc(board, col, BOT_PLAYER as 1 | 2);
-    if (result && checkWin(result.board)?.player === BOT_PLAYER) return col;
-  }
-  // Always block if possible (except rookie 40% of the time we ignore)
-  const blockCols = valid.filter((col) => {
-    const result = dropDisc(board, col, HUMAN_PLAYER as 1 | 2);
-    return result && checkWin(result.board)?.player === HUMAN_PLAYER;
-  });
-  if (blockCols.length > 0) {
-    if (difficulty === "rookie" && Math.random() < 0.4) {
-      // skip block, fall through to random
-    } else {
-      return blockCols[Math.floor(Math.random() * blockCols.length)];
-    }
-  }
-
+  // --- Rookie: win if you can, block ~50% of the time, otherwise random ---
   if (difficulty === "rookie") {
+    for (const col of valid) {
+      const res = dropDisc(board, col, BOT_PLAYER as 1 | 2);
+      if (res && checkWin(res.board)?.player === BOT_PLAYER) return col;
+    }
+    if (Math.random() < 0.5) {
+      for (const col of valid) {
+        const res = dropDisc(board, col, HUMAN_PLAYER as 1 | 2);
+        if (res && checkWin(res.board)?.player === HUMAN_PLAYER) return col;
+      }
+    }
     return valid[Math.floor(Math.random() * valid.length)];
   }
 
-  const doubleThreatCols = valid.filter((col) => {
-    const result = dropDisc(board, col, BOT_PLAYER as 1 | 2);
-    if (!result) return false;
-    let wins = 0;
-    for (let c = 0; c < COLS; c++) {
-      const r2 = dropDisc(result.board, c, BOT_PLAYER as 1 | 2);
-      if (r2 && checkWin(r2.board)?.player === BOT_PLAYER) wins++;
+  // --- Gamer / Professional: minimax with alpha-beta ---
+  const depth = difficulty === "professional" ? 7 : 4;
+
+  let bestScore = -Infinity;
+  let bestCol = c4OrderedCols(valid)[0];
+
+  for (const col of c4OrderedCols(valid)) {
+    const res = dropDisc(board, col, BOT_PLAYER as 1 | 2);
+    if (!res) continue;
+    const score = minimaxC4(res.board, depth - 1, -Infinity, Infinity, false, BOT_PLAYER);
+    if (score > bestScore) {
+      bestScore = score;
+      bestCol = col;
     }
-    return wins >= 2;
-  });
-  const useDoubleThreat = difficulty === "professional" ? 1 : 0.7;
-  if (doubleThreatCols.length > 0 && Math.random() < useDoubleThreat) {
-    return doubleThreatCols[Math.floor(Math.random() * doubleThreatCols.length)];
   }
 
-  if (valid.includes(CENTER_COL) && Math.random() < (difficulty === "professional" ? 0.8 : 0.4))
-    return CENTER_COL;
+  // Gamer: 15% chance to play a random valid column instead of the optimal one
+  if (difficulty === "gamer" && Math.random() < 0.15) {
+    return valid[Math.floor(Math.random() * valid.length)];
+  }
 
-  const nearCenter = COL_PRIORITY.filter((c) => valid.includes(c));
-  if (nearCenter.length > 0) return nearCenter[0];
-
-  return valid[Math.floor(Math.random() * valid.length)];
+  return bestCol;
 }
 
 export function getConnect4BotDelayMs(difficulty: BotDifficulty = DEFAULT_DIFFICULTY): number {
@@ -296,12 +394,19 @@ export interface MemoryMatchBotContext {
   cards: MemoryMatchCardSnapshot[];
   memory: Record<string, number[]>;
   accuracy?: MemoryAccuracy;
+  botDifficulty?: BotDifficulty;
 }
 
 function getAccuracyRate(acc: MemoryAccuracy): number {
   if (acc === "easy") return 0.4;
   if (acc === "hard") return 0.85;
   return 0.65;
+}
+
+function difficultyToAccuracy(d: BotDifficulty): MemoryAccuracy {
+  if (d === "rookie") return "easy";
+  if (d === "professional") return "hard";
+  return "medium";
 }
 
 /**
@@ -311,7 +416,10 @@ function getAccuracyRate(acc: MemoryAccuracy): number {
 function updateMemoryFromVisible(
   ctx: MemoryMatchBotContext
 ): Record<string, number[]> {
-  const accuracy = getAccuracyRate(ctx.accuracy ?? "medium");
+  const resolvedAccuracy = ctx.botDifficulty
+    ? difficultyToAccuracy(ctx.botDifficulty)
+    : (ctx.accuracy ?? "medium");
+  const accuracy = getAccuracyRate(resolvedAccuracy);
   const next: Record<string, number[]> = {};
 
   // Start from previous memory but drop indices that are no longer hidden/revealed

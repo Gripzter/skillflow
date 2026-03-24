@@ -41,8 +41,8 @@ function evaluateBoard(board: Board, botPlayer: Player): number {
 
 function getDepthForDifficulty(difficulty: BotDifficulty): number {
   if (difficulty === "rookie") return 1;
-  if (difficulty === "gamer") return 2;
-  return 4; // professional depth 4-6; clamp to keep responsive.
+  if (difficulty === "gamer") return 3;
+  return 6; // professional: deep search, near-optimal.
 }
 
 /**
@@ -58,39 +58,25 @@ export function getCheckersBotTurnMove(board: Board, toPlay: Player, difficulty:
     return moves[Math.floor(Math.random() * moves.length)];
   }
 
-  // Gamer: heuristic ordering (captures/multi-jumps first, then advancement).
-  if (difficulty === "gamer") {
-    const scored = [...moves].sort((a, b) => {
-      const aCap = a.capturedCount;
-      const bCap = b.capturedCount;
-      if (aCap !== bCap) return bCap - aCap;
-
-      const aAdv = a.end.r * (toPlay === 1 ? -1 : 1); // smaller r for player1 => "higher"
-      const bAdv = b.end.r * (toPlay === 1 ? -1 : 1);
-      return bAdv - aAdv;
-    });
-    const top = scored.slice(0, Math.min(3, scored.length));
-    return top[Math.floor(Math.random() * top.length)];
-  }
-
-  // Professional: minimax depth search + occasional deliberate mistake.
+  // Gamer & Professional: minimax depth search.
   const depth = getDepthForDifficulty(difficulty);
   const bot = toPlay;
   const opp = opposite(bot);
 
-  // To get "second best", we score all moves at the root and sort.
   const scoredRoot = moves
     .map((m) => {
       const next = simulateTurn(board, m, toPlay);
-      const nextPlayer = opp; // after bot move, opponent plays
-      const value = minimax(next.board, nextPlayer, depth - 1, -Infinity, Infinity, bot);
+      const value = minimax(next.board, opp, depth - 1, -Infinity, Infinity, bot);
       return { m, value };
     })
     .sort((a, b) => b.value - a.value);
 
   const best = scoredRoot[0];
   const second = scoredRoot[1];
-  const mistake = Math.random() < 0.1 && !!second;
+
+  // Gamer: 25% chance to play a suboptimal move; Professional: 5% chance.
+  const mistakeChance = difficulty === "gamer" ? 0.25 : 0.05;
+  const mistake = Math.random() < mistakeChance && !!second;
   return mistake ? second.m : best.m;
 }
 
