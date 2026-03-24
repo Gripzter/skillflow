@@ -624,7 +624,9 @@ export { getPracticeMatches, getPracticeStats } from "@/lib/practice-matches";
 
 export async function submitReport(params: {
   reporterUserId: string;
+  reporterUsername?: string;
   reportedUserId: string | null;
+  reportedUsername?: string;
   matchId: string;
   gameType: string;
   reportReason: string;
@@ -656,7 +658,9 @@ export async function submitReport(params: {
 
   const payload = {
     reporter_user_id: user.id,          // always the real auth UID
+    reporter_username: params.reporterUsername || null,
     reported_user_id: safeReportedId,
+    reported_username: params.reportedUsername || null,
     match_id: safeMatchId,
     game_type: params.gameType || null,
     report_reason: params.reportReason,

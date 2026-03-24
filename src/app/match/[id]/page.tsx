@@ -1052,7 +1052,9 @@ function MatchPageContent() {
                       try {
                         await submitReport({
                           reporterUserId: userId,
+                          reporterUsername: username,
                           reportedUserId: opponentId ?? null,
+                          reportedUsername: opponentUsername,
                           matchId: match.id,
                           gameType: match.gameType,
                           reportReason,

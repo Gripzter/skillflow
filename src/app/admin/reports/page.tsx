@@ -8,7 +8,9 @@ type ReportStatus = "new" | "reviewed" | "resolved";
 interface Report {
   id: string;
   reporter_user_id: string;
+  reporter_username: string | null;
   reported_user_id: string | null;
+  reported_username: string | null;
   match_id: string | null;
   game_type: string | null;
   report_reason: string;
@@ -18,7 +20,7 @@ interface Report {
   created_at: string;
   updated_at: string | null;
   resolved_at: string | null;
-  // enriched
+  // enriched at load time (profiles lookup fallback)
   reporterName?: string;
   reportedName?: string;
 }
@@ -82,11 +84,11 @@ function MatchDetail({ matchId }: { matchId: string }) {
         .from("matches")
         .select("*")
         .eq("id", matchId)
-        .single();
-      if (error || !data) {
-        setErr(error?.message ?? "Match not found");
+        .maybeSingle();
+      if (error) {
+        setErr(error.message);
       } else {
-        setMatch(data as MatchRow);
+        setMatch((data as MatchRow) ?? null);
       }
       setLoading(false);
     }
@@ -198,22 +200,35 @@ export default function AdminReportsPage() {
       const reportData = (data ?? []) as Report[];
 
       if (reportData.length > 0) {
-        const pids = Array.from(
+        // Primary: use usernames stored at report-submission time.
+        // Fallback: profiles table lookup (may be blocked by RLS for some rows).
+        const missingPids = Array.from(
           new Set(
-            reportData.flatMap((r) =>
-              [r.reporter_user_id, r.reported_user_id].filter(Boolean)
-            )
+            reportData
+              .flatMap((r) => [
+                !r.reporter_username ? r.reporter_user_id : null,
+                !r.reported_username && r.reported_user_id ? r.reported_user_id : null,
+              ])
+              .filter(Boolean)
           )
         ) as string[];
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, username")
-          .in("id", pids);
-        const pm = new Map(profiles?.map((p) => [p.id, p.username]) ?? []);
+
+        const pm = new Map<string, string>();
+        if (missingPids.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username")
+            .in("id", missingPids);
+          (profiles ?? []).forEach((p) => pm.set(p.id, p.username));
+        }
+
         reportData.forEach((r) => {
-          r.reporterName = pm.get(r.reporter_user_id) ?? r.reporter_user_id.slice(0, 8);
+          r.reporterName =
+            r.reporter_username ||
+            pm.get(r.reporter_user_id) ||
+            r.reporter_user_id.slice(0, 8);
           r.reportedName = r.reported_user_id
-            ? (pm.get(r.reported_user_id) ?? r.reported_user_id.slice(0, 8))
+            ? (r.reported_username || pm.get(r.reported_user_id) || r.reported_user_id.slice(0, 8))
             : "—";
         });
       }
@@ -314,19 +329,21 @@ export default function AdminReportsPage() {
             <pre className="mx-auto mt-4 max-w-2xl rounded-lg bg-admin-bg p-4 text-left text-xs text-[#9CA3AF]">
 {`-- Run in Supabase SQL editor:
 CREATE TABLE IF NOT EXISTS reports (
-  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  reporter_user_id uuid        REFERENCES auth.users(id) NOT NULL,
-  reported_user_id uuid        REFERENCES auth.users(id),
-  match_id         uuid,
-  game_type        text,
-  report_reason    text        NOT NULL,
-  report_comment   text,
-  status           text        NOT NULL DEFAULT 'new'
-                               CHECK (status IN ('new','reviewed','resolved')),
-  admin_notes      text,
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  updated_at       timestamptz,
-  resolved_at      timestamptz
+  id                uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  reporter_user_id  uuid        REFERENCES auth.users(id) NOT NULL,
+  reporter_username text,
+  reported_user_id  uuid        REFERENCES auth.users(id),
+  reported_username text,
+  match_id          uuid,
+  game_type         text,
+  report_reason     text        NOT NULL,
+  report_comment    text,
+  status            text        NOT NULL DEFAULT 'new'
+                                CHECK (status IN ('new','reviewed','resolved')),
+  admin_notes       text,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz,
+  resolved_at       timestamptz
 );
 
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
