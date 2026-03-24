@@ -10,6 +10,7 @@ import {
   getMatch,
   completeMatchAndSettle,
   updateMatch as apiUpdateMatch,
+  submitReport,
   type StoredMatch,
 } from "@/lib/api";
 import { updateMatch } from "@/lib/matchmaking";
@@ -65,6 +66,11 @@ function MatchPageContent() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [matchUi, setMatchUi] = useState<MatchUiState | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportComment, setReportComment] = useState("");
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
@@ -555,7 +561,7 @@ function MatchPageContent() {
     },
     chatPresets: ["gl hf!", "gg", "Nice move!", "Rematch?"],
     onLeaveMatch: () => setForfeitConfirm(true),
-    onReportIssue: () => showToast("Thanks — we received your report.", "info"),
+    onReportIssue: () => { setReportOpen(true); setReportSubmitted(false); },
     realStakeDisplay: match.isPractice ? undefined : `$${match.stakeAmount.toFixed(2)}`,
   };
 
@@ -943,6 +949,7 @@ function MatchPageContent() {
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={() => { setReportOpen(true); setReportSubmitted(false); }}
               className="hidden md:inline-flex rounded-lg border border-white/10 px-4 py-2 text-sm text-body-gray hover:text-white"
             >
               Report Issue
@@ -978,6 +985,96 @@ function MatchPageContent() {
           onPlayAgain={() => { window.location.href = `/play/${match.gameType}`; }}
           onLeave={() => { window.location.href = "/play"; }}
         />
+      )}
+
+      {/* Report Issue modal */}
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="card-border w-full max-w-md rounded-card bg-card p-6">
+            {reportSubmitted ? (
+              <div className="flex flex-col items-center gap-4 py-4 text-center">
+                <span className="text-3xl">✓</span>
+                <p className="font-medium text-white">Report submitted</p>
+                <p className="text-sm text-body-gray">Our team will review this and take action if needed.</p>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="mt-2 rounded-lg border border-white/20 px-6 py-2 text-sm text-white hover:bg-white/10"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              <>
+                <h2 className="mb-4 text-lg font-semibold text-white">Report Issue</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-body-gray">Reason</label>
+                    <select
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-teal focus:outline-none"
+                    >
+                      <option value="" disabled>Select a reason…</option>
+                      <option value="Cheating / Hacking">Cheating / Hacking</option>
+                      <option value="Abusive Behavior">Abusive Behavior</option>
+                      <option value="Unsportsmanlike Conduct">Unsportsmanlike Conduct</option>
+                      <option value="Technical Issue">Technical Issue</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-body-gray">Additional details (optional)</label>
+                    <textarea
+                      rows={3}
+                      value={reportComment}
+                      onChange={(e) => setReportComment(e.target.value)}
+                      placeholder="Describe what happened…"
+                      className="w-full resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-body-gray focus:border-teal focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="mt-6 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(false)}
+                    className="flex-1 rounded-lg border border-white/20 py-2.5 text-white hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!reportReason || reportSubmitting}
+                    onClick={async () => {
+                      if (!reportReason || !match) return;
+                      setReportSubmitting(true);
+                      const opponentId = myRole === "player1" ? match.player2Id : match.player1Id;
+                      try {
+                        await submitReport({
+                          reporterUserId: userId,
+                          reportedUserId: opponentId ?? null,
+                          matchId: match.id,
+                          gameType: match.gameType,
+                          reportReason,
+                          reportComment,
+                        });
+                        setReportSubmitted(true);
+                        setReportReason("");
+                        setReportComment("");
+                      } catch {
+                        showToast("Failed to submit report. Please try again.", "error");
+                      }
+                      setReportSubmitting(false);
+                    }}
+                    className="flex-1 rounded-lg bg-red-500/20 py-2.5 text-sm font-medium text-red-400 hover:bg-red-500/30 disabled:opacity-40"
+                  >
+                    {reportSubmitting ? "Submitting…" : "Submit Report"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Forfeit / Leave confirmation modal */}

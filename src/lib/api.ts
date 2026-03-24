@@ -619,3 +619,27 @@ export type { StoredMatch, PlayerInfo };
 
 // Practice stats (from practice-matches)
 export { getPracticeMatches, getPracticeStats } from "@/lib/practice-matches";
+
+// ============ REPORTS ============
+
+export async function submitReport(params: {
+  reporterUserId: string;
+  reportedUserId: string | null;
+  matchId: string;
+  gameType: string;
+  reportReason: string;
+  reportComment: string;
+}): Promise<void> {
+  const supabase = createClient();
+  if (!supabase) return;
+  const { error } = await supabase.from("reports").insert({
+    reporter_user_id: params.reporterUserId,
+    reported_user_id: params.reportedUserId || null,
+    match_id: params.matchId,
+    game_type: params.gameType,
+    report_reason: params.reportReason,
+    report_comment: params.reportComment || null,
+    status: "new",
+  });
+  if (error) throw error;
+}
