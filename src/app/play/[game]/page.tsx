@@ -41,6 +41,7 @@ const GAME_SLUG_TO_NAME: Record<string, string> = {
   "memory-match": "Memory Match",
   checkers: "Checkers",
   "spelling-bee": "Spelling Bee",
+  trivia: "Trivia",
 };
 
 export default function PlayGamePage() {

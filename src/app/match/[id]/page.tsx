@@ -23,6 +23,7 @@ import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
 import Checkers from "@/components/games/Checkers";
+import Trivia from "@/components/games/Trivia";
 import { type ChatMessage } from "@/components/GameChat";
 import GameLayout, { type GameLayoutLogEntry } from "@/components/game/GameLayout";
 import GameResultOverlay from "@/components/game/GameResultOverlay";
@@ -496,6 +497,7 @@ function MatchPageContent() {
     "memory-match",
     "checkers",
     "spelling-bee",
+    "trivia",
   ] as const;
   const lockGameViewport =
     match.status === "in_progress" &&
@@ -510,6 +512,7 @@ function MatchPageContent() {
     "memory-match": "Memory Match",
     checkers: "Checkers",
     "spelling-bee": "Spelling Bee",
+    trivia: "Trivia",
   };
 
   function toLayoutConnection(
@@ -599,7 +602,9 @@ function MatchPageContent() {
                       ? "Checkers"
                       : match.gameType === "spelling-bee"
                         ? "Spelling Bee"
-                        : match.gameDisplayName}
+                        : match.gameType === "trivia"
+                          ? "Trivia"
+                          : match.gameDisplayName}
             </span>
             {match.isPractice && (
               <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-xs font-medium text-purple-400">
@@ -628,7 +633,9 @@ function MatchPageContent() {
                         ? "Checkers"
                         : match.gameType === "spelling-bee"
                           ? "Spelling Bee"
-                          : match.gameDisplayName}
+                          : match.gameType === "trivia"
+                            ? "Trivia"
+                            : match.gameDisplayName}
             </span>
             {match.isPractice ? (
               <span className="rounded-full bg-purple-500/20 px-2 py-0.5 text-[10px] font-semibold text-purple-400">PRACTICE</span>
@@ -792,6 +799,28 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <SpellingBee
+                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
+                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+                isPractice={match.isPractice}
+                onMatchUi={setMatchUi}
+              />
+            </GameLayout>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "trivia" ? (
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
+          {match.status === "in_progress" && !outcome ? (
+            <GameLayout {...gameLayoutProps}>
+              <Trivia
                 player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
                 player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
                 onGameEnd={handleGameEnd}
