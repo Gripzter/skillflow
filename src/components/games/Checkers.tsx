@@ -683,6 +683,7 @@ export default function Checkers({
             style={{
               aspectRatio: "1",
               gridTemplateColumns: "repeat(8, 1fr)",
+              gridTemplateRows: "repeat(8, 1fr)",
               border: `2px solid ${BOARD_BORDER}`,
               background: BOARD_LIGHT,
             }}
@@ -701,7 +702,6 @@ export default function Checkers({
               const isLastTo = lastToKey === key;
 
               const bg = dark ? BOARD_DARK : BOARD_LIGHT;
-              const cellBorder = isSelected ? `2px solid ${accent}` : "1px solid rgba(255,255,255,0.02)";
 
               return (
                 <button
@@ -711,7 +711,9 @@ export default function Checkers({
                   className="relative flex items-center justify-center p-0 focus:outline-none"
                   style={{
                     background: bg,
-                    border: cellBorder,
+                    border: "1px solid rgba(255,255,255,0.02)",
+                    // inset box-shadow never affects layout — zero impact on cell/row dimensions
+                    boxShadow: isSelected ? `inset 0 0 0 2px ${accent}` : undefined,
                     padding: 0,
                     cursor: "pointer",
                   }}
@@ -762,11 +764,12 @@ export default function Checkers({
                         height: "72%",
                         borderRadius: 9999,
                         background: piece > 0 ? P1 : P2,
-                        boxShadow:
-                          piece > 0
-                            ? "inset 0 3px 7px rgba(0,0,0,0.45), inset 0 -3px 7px rgba(255,255,255,0.05)"
-                            : "inset 0 3px 7px rgba(0,0,0,0.25), inset 0 -3px 7px rgba(255,255,255,0.12)",
-                        border: isSelected ? `2px solid ${accent}` : "1px solid rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        boxShadow: isSelected
+                          ? `inset 0 3px 7px rgba(0,0,0,0.45), inset 0 -3px 7px rgba(255,255,255,0.05), 0 0 0 2px ${accent}`
+                          : piece > 0
+                          ? "inset 0 3px 7px rgba(0,0,0,0.45), inset 0 -3px 7px rgba(255,255,255,0.05)"
+                          : "inset 0 3px 7px rgba(0,0,0,0.25), inset 0 -3px 7px rgba(255,255,255,0.12)",
                       }}
                     >
                       {/* King crown / ring */}
