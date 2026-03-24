@@ -344,7 +344,11 @@ export default function Trivia({
     }
   }, [phase, myAnswer, stopTimer]);
 
-  // Advance to reveal when both have answered (or timed out)
+  // Advance to reveal when both have answered (or timed out).
+  // NOTE: Only schedules the 200ms → "answer_reveal" hop here.
+  // The subsequent "answer_reveal" → "between_questions" → "question" transitions
+  // are handled by dedicated phase-based effects below so that this effect's
+  // cleanup cannot cancel timers that belong to a later phase.
   useEffect(() => {
     if (phase !== "question") return;
     const myDone = myAnswer !== null;
@@ -356,31 +360,53 @@ export default function Trivia({
       clearBotTimeout();
       revealTimeoutRef.current = setTimeout(() => {
         setPhase("answer_reveal");
-        revealTimeoutRef.current = setTimeout(() => {
-          setPhase("between_questions");
-          betweenTimeoutRef.current = setTimeout(() => {
-            const nextIndex = qIndex + 1;
-            if (nextIndex >= TOTAL_QUESTIONS) {
-              // Match over — check scores
-              // Use ref callback to access latest state
-              setPhase("match_over");
-            } else {
-              setQIndex(nextIndex);
-              setMyAnswer(null);
-              setOpponentAnswer(null);
-              setPhase("question");
-            }
-          }, BETWEEN_QUESTIONS_MS);
-        }, ANSWER_REVEAL_MS);
       }, 200);
     }
 
     return () => {
-      if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
-      if (betweenTimeoutRef.current) clearTimeout(betweenTimeoutRef.current);
+      if (revealTimeoutRef.current) {
+        clearTimeout(revealTimeoutRef.current);
+        revealTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, myAnswer, opponentAnswer]);
+
+  // answer_reveal → between_questions
+  useEffect(() => {
+    if (phase !== "answer_reveal") return;
+    revealTimeoutRef.current = setTimeout(() => {
+      setPhase("between_questions");
+    }, ANSWER_REVEAL_MS);
+    return () => {
+      if (revealTimeoutRef.current) {
+        clearTimeout(revealTimeoutRef.current);
+        revealTimeoutRef.current = null;
+      }
+    };
+  }, [phase]);
+
+  // between_questions → question (or match_over)
+  useEffect(() => {
+    if (phase !== "between_questions") return;
+    betweenTimeoutRef.current = setTimeout(() => {
+      const nextIndex = qIndex + 1;
+      if (nextIndex >= TOTAL_QUESTIONS) {
+        setPhase("match_over");
+      } else {
+        setQIndex(nextIndex);
+        setMyAnswer(null);
+        setOpponentAnswer(null);
+        setPhase("question");
+      }
+    }, BETWEEN_QUESTIONS_MS);
+    return () => {
+      if (betweenTimeoutRef.current) {
+        clearTimeout(betweenTimeoutRef.current);
+        betweenTimeoutRef.current = null;
+      }
+    };
+  }, [phase, qIndex]);
 
   // ─── Handle user answer ──────────────────────────────────────────────────────
 

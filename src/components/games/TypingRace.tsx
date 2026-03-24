@@ -318,6 +318,7 @@ export default function TypingRace({
     const t = setTimeout(() => {
       raceStartRef.current = performance.now();
       settledRef.current = false;
+      botCleanupRef.current = null; // allow bot to (re-)start
       setTyped("");
       setMyWpm(0);
       setMyAccuracy(100);
@@ -342,9 +343,14 @@ export default function TypingRace({
   }, [phase]);
 
   // ── Bot simulation ──────────────────────────────────────────────────────────
+  // NOTE: No cleanup return here — the bot must keep running even after the
+  // player finishes (phase → "finished"). Cancelling timers here would prevent
+  // opponentAdjustedMs from ever being set, causing a permanent freeze.
+  // Timers are only cancelled on component unmount (see cleanup effect below).
   useEffect(() => {
     if (phase !== "racing" || !passage) return;
     if (isMultiplayer || !isPlayer2Bot) return;
+    if (botCleanupRef.current) return; // already running — don't restart
 
     const profile = getBotProfile(botDifficulty);
 
@@ -366,12 +372,8 @@ export default function TypingRace({
         setOpponentPos(passage.length);
       }
     );
-
-    return () => {
-      botCleanupRef.current?.();
-      botCleanupRef.current = null;
-    };
-  }, [phase, passage, isMultiplayer, isPlayer2Bot, botDifficulty]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, passage]);
 
   // ── Finish timeout (2 min hard cap) ─────────────────────────────────────────
   useEffect(() => {
