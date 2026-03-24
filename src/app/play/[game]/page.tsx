@@ -42,6 +42,7 @@ const GAME_SLUG_TO_NAME: Record<string, string> = {
   checkers: "Checkers",
   "spelling-bee": "Spelling Bee",
   trivia: "Trivia",
+  "typing-race": "Typing Race",
 };
 
 export default function PlayGamePage() {

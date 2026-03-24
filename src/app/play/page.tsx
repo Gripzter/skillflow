@@ -24,6 +24,7 @@ const GAMES = [
   { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: true },
   { name: "Checkers", slug: "checkers", gradient: "from-[#FF5E00]/25 to-[#2A3A5C]/25", active: true },
   { name: "Trivia", slug: "trivia", gradient: "from-violet-500/30 to-blue-500/30", active: true },
+  { name: "Typing Race", slug: "typing-race", gradient: "from-teal/30 to-cyan-500/20", active: true },
   { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
   { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
   { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: false },
@@ -184,6 +185,34 @@ function GameCard({
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
         </>
       )}
+      {slug === "typing-race" && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background: "linear-gradient(135deg, #071A1E 0%, #0E0E12 100%)",
+              opacity: 0.97,
+            }}
+          />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
+            {["T", "y", "p", "e", "W", "P", "M", "⌨", "a", "b", "c", "d"].map((ch, i) => (
+              <span
+                key={i}
+                className="absolute font-mono text-teal select-none"
+                style={{
+                  fontSize: 11 + (i % 3) * 3,
+                  left: `${(i * 23 + 7) % 90}%`,
+                  top: `${(i * 17 + 5) % 80}%`,
+                  opacity: 0.6 + (i % 3) * 0.15,
+                }}
+              >
+                {ch}
+              </span>
+            ))}
+          </div>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
+        </>
+      )}
       {!active && (
         <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
       )}
@@ -191,7 +220,7 @@ function GameCard({
         <div>
           <p className="font-semibold text-white flex items-center gap-2">
             <span>{name}</span>
-            {active && (slug === "checkers" || slug === "memory-match" || slug === "trivia") && emoji ? (
+            {active && (slug === "checkers" || slug === "memory-match" || slug === "trivia" || slug === "typing-race") && emoji ? (
               <span className="text-[18px] leading-none">{emoji}</span>
             ) : null}
           </p>
@@ -373,7 +402,7 @@ export default function PlayPage() {
               playersOnline={onlineCount}
               waitSec={playersWait[i]?.wait ?? 15}
               isPractice={isPractice}
-              emoji={game.slug === "checkers" ? "⬛" : game.slug === "memory-match" ? "🧠" : game.slug === "trivia" ? "🧠" : undefined}
+              emoji={game.slug === "checkers" ? "⬛" : game.slug === "memory-match" ? "🧠" : game.slug === "trivia" ? "🧠" : game.slug === "typing-race" ? "⌨️" : undefined}
             />
           ))}
         </div>
