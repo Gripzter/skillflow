@@ -631,8 +631,13 @@ export async function submitReport(params: {
   reportComment: string;
 }): Promise<void> {
   const supabase = createClient();
-  if (!supabase) return;
-  const { error } = await supabase.from("reports").insert({
+  if (!supabase) {
+    console.error("[submitReport] Supabase client is null — check env vars");
+    return;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const payload = {
     reporter_user_id: params.reporterUserId,
     reported_user_id: params.reportedUserId || null,
     match_id: params.matchId,
@@ -640,6 +645,19 @@ export async function submitReport(params: {
     report_reason: params.reportReason,
     report_comment: params.reportComment || null,
     status: "new",
-  });
+  };
+
+  console.log("[submitReport] auth.uid =", user?.id);
+  console.log("[submitReport] payload =", payload);
+
+  const { data, error } = await supabase.from("reports").insert(payload).select();
+
+  console.log("[submitReport] response data =", data);
+  console.log("[submitReport] response error =", error);
+  console.log("[submitReport] error code =", error?.code);
+  console.log("[submitReport] error message =", error?.message);
+  console.log("[submitReport] error details =", error?.details);
+  console.log("[submitReport] error hint =", error?.hint);
+
   if (error) throw error;
 }
