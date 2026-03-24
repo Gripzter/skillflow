@@ -636,28 +636,34 @@ export async function submitReport(params: {
     return;
   }
 
+  // Use the live session UID, not the locally-stored userId state.
+  // In dev mode getCurrentUser() returns "dev-user-id" which fails the FK
+  // constraint on reporter_user_id even with RLS disabled.
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    console.warn("[submitReport] No authenticated Supabase session — skipping insert (dev/practice mode)");
+    return;
+  }
+
+  // Postgres uuid columns reject non-UUID strings with error 22P02.
+  // Practice/dev match IDs can be "id-<timestamp>-<rand>" when crypto.randomUUID
+  // is unavailable, so coerce to null rather than letting the insert blow up.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const safeMatchId = params.matchId && UUID_RE.test(params.matchId) ? params.matchId : null;
+  const safeReportedId = params.reportedUserId && UUID_RE.test(params.reportedUserId)
+    ? params.reportedUserId
+    : null;
+
   const payload = {
-    reporter_user_id: params.reporterUserId,
-    reported_user_id: params.reportedUserId || null,
-    match_id: params.matchId,
-    game_type: params.gameType,
+    reporter_user_id: user.id,          // always the real auth UID
+    reported_user_id: safeReportedId,
+    match_id: safeMatchId,
+    game_type: params.gameType || null,
     report_reason: params.reportReason,
     report_comment: params.reportComment || null,
     status: "new",
   };
 
-  console.log("[submitReport] auth.uid =", user?.id);
-  console.log("[submitReport] payload =", payload);
-
-  const { data, error } = await supabase.from("reports").insert(payload).select();
-
-  console.log("[submitReport] response data =", data);
-  console.log("[submitReport] response error =", error);
-  console.log("[submitReport] error code =", error?.code);
-  console.log("[submitReport] error message =", error?.message);
-  console.log("[submitReport] error details =", error?.details);
-  console.log("[submitReport] error hint =", error?.hint);
-
+  const { error } = await supabase.from("reports").insert(payload);
   if (error) throw error;
 }
