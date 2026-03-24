@@ -1,51 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { isAdminAuthenticated } from "@/lib/admin-auth";
-import AdminNavbar from "@/components/admin/AdminNavbar";
+import { useRouter } from "next/navigation";
+import { checkAdminAccess } from "@/lib/admin-auth";
+import AdminSidebar from "@/components/admin/AdminSidebar";
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [checked, setChecked] = useState(false);
 
-  const isLoginPage = pathname === "/admin/login";
-
   useEffect(() => {
-    if (isLoginPage) {
+    checkAdminAccess().then((ok) => {
+      if (!ok) {
+        router.replace("/login");
+        return;
+      }
       setChecked(true);
-      return;
-    }
-    const ok = isAdminAuthenticated();
-    if (!ok) {
-      router.replace("/admin/login");
-      return;
-    }
-    setChecked(true);
-  }, [isLoginPage, pathname, router]);
+    });
+  }, [router]);
 
   if (!checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-admin-bg">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-admin-accent border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-[#080A0E]">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
+        />
       </div>
     );
   }
 
-  if (isLoginPage) {
-    return <div className="min-h-screen bg-admin-bg">{children}</div>;
-  }
-
   return (
-    <div className="min-h-screen bg-admin-bg">
-      <AdminNavbar />
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
-        {children}
+    <div className="flex min-h-screen bg-admin-bg">
+      <AdminSidebar />
+      <main className="ml-56 flex-1 overflow-auto">
+        <div className="mx-auto max-w-[1400px] p-8">{children}</div>
       </main>
     </div>
   );

@@ -1,253 +1,227 @@
 "use client";
 
 import { Fragment, useEffect, useState, useMemo } from "react";
-import { getMatches } from "@/lib/matchmaking";
-import type { StoredMatch } from "@/lib/matchmaking";
+import { createClient } from "@/lib/supabase";
 
-type MatchStatus = "in_progress" | "completed" | "disputed" | "cancelled";
-type DateRange = "today" | "week" | "month" | "all";
-type StakeRange = "all" | "1-5" | "5-25" | "25-100" | "100+";
-
-type MatchRow = Omit<StoredMatch, "status"> & {
-  status: MatchStatus;
-  duration?: number;
-  completedAt?: string;
-};
-
-const GAME_OPTIONS = ["All", "8 Ball Pool", "Chess", "Connect 4", "Reaction Duel", "CS2"];
-const STATUS_OPTIONS: MatchStatus[] = ["in_progress", "completed", "disputed", "cancelled"];
-
-function padMatches(matches: StoredMatch[]): MatchRow[] {
-  const rows: MatchRow[] = matches.map((m) => ({
-    ...m,
-    status: m.status as MatchStatus,
-    duration: 2 + Math.floor(Math.random() * 8),
-    completedAt: m.status === "completed" ? m.createdAt : undefined,
-  }));
-  const gameTypes = ["8-ball-pool", "chess", "connect-4", "reaction-duel"];
-  const gameNames = ["8 Ball Pool", "Chess", "Connect 4", "Reaction Duel"];
-  while (rows.length < 20 + matches.length) {
-    const i = rows.length % gameTypes.length;
-    const d = new Date(Date.now() - rows.length * 1800000);
-    rows.push({
-      id: `fake-m-${rows.length}`,
-      gameType: gameTypes[i],
-      gameDisplayName: gameNames[i],
-      player1: { username: "PlayerA", rating: 1000, winRate: 50, matchesPlayed: 20 },
-      player2: { username: "PlayerB", rating: 1000, winRate: 50, matchesPlayed: 20 },
-      stakeAmount: [2, 10, 50, 150][rows.length % 4],
-      platformFee: 0.6,
-      totalPot: 20,
-      winnerPayout: 19.4,
-      status: rows.length % 10 === 0 ? "disputed" : rows.length % 5 === 0 ? "in_progress" : "completed",
-      winner: "player1",
-      createdAt: d.toISOString(),
-      duration: 3 + (rows.length % 5),
-      completedAt: d.toISOString(),
-    });
-  }
-  return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+interface MatchRow {
+  id: string;
+  game_type: string;
+  player1_id: string;
+  player2_id: string | null;
+  player1Name: string;
+  player2Name: string;
+  stake_amount: number;
+  platform_fee: number;
+  total_pot: number;
+  winner_payout: number;
+  status: string;
+  result: string | null;
+  created_at: string;
+  bot_difficulty: string | null;
 }
+
+type DateRange = "today" | "week" | "month" | "all";
+type StakeRange = "all" | "low" | "mid" | "high" | "vhigh";
+
+const GAMES = ["all", "chess", "checkers", "connect-four", "pool", "memory", "reaction", "spelling", "last-touch"];
+const STATUSES = ["all", "completed", "in_progress", "waiting", "draw"];
+const DATE_LABELS: Record<DateRange, string> = { today: "Today", week: "This Week", month: "This Month", all: "All Time" };
+const STAKE_LABELS: Record<StakeRange, string> = { all: "Any Stake", low: "$1–$5", mid: "$5–$25", high: "$25–$100", vhigh: "$100+" };
+
+function gameLabel(s: string) {
+  const m: Record<string, string> = {
+    chess: "Chess", checkers: "Checkers", "connect-four": "Connect 4",
+    pool: "8-Ball Pool", memory: "Memory", reaction: "Reaction", spelling: "Spelling", "last-touch": "Last Touch",
+  };
+  return m[s] ?? s;
+}
+
+function outcomeLabel(m: MatchRow): string {
+  if (!m.result) return "—";
+  if (m.result === "draw") return "Draw";
+  const winnerName = m.result === "player1_win" ? m.player1Name : m.player2Name;
+  return `${winnerName} wins`;
+}
+
+const PER_PAGE = 25;
 
 export default function AdminMatchesPage() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
-  const [gameFilter, setGameFilter] = useState("All");
-  const [statusFilter, setStatusFilter] = useState<MatchStatus | "all">("all");
+  const [loading, setLoading] = useState(true);
+  const [game, setGame] = useState("all");
+  const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [stakeRange, setStakeRange] = useState<StakeRange>("all");
+  const [page, setPage] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = getMatches();
-    setMatches(padMatches(raw));
+    async function load() {
+      const supabase = createClient();
+      if (!supabase) { setLoading(false); return; }
+
+      const { data: raw } = await supabase
+        .from("matches")
+        .select("id, game_type, player1_id, player2_id, stake_amount, platform_fee, total_pot, winner_payout, status, result, created_at, bot_difficulty")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (!raw || raw.length === 0) { setLoading(false); return; }
+
+      // Collect player IDs
+      const pids = Array.from(new Set(raw.flatMap((m) => [m.player1_id, m.player2_id].filter(Boolean))));
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username")
+        .in("id", pids);
+      const profileMap = new Map(profiles?.map((p) => [p.id, p.username]) ?? []);
+
+      setMatches(
+        raw.map((m) => ({
+          ...m,
+          player1Name: profileMap.get(m.player1_id) ?? "Player 1",
+          player2Name: m.player2_id
+            ? (profileMap.get(m.player2_id) ?? "Player 2")
+            : `Bot (${m.bot_difficulty ?? "?"})`,
+        }))
+      );
+      setLoading(false);
+    }
+    load();
   }, []);
 
   const filtered = useMemo(() => {
-    let list = matches;
-    if (gameFilter !== "All") {
-      list = list.filter((m) => m.gameDisplayName === gameFilter);
-    }
-    if (statusFilter !== "all") {
-      list = list.filter((m) => m.status === statusFilter);
-    }
     const now = Date.now();
-    if (dateRange === "today") {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      list = list.filter((m) => new Date(m.createdAt).getTime() >= start.getTime());
-    } else if (dateRange === "week") {
-      list = list.filter((m) => now - new Date(m.createdAt).getTime() < 7 * 86400000);
-    } else if (dateRange === "month") {
-      list = list.filter((m) => now - new Date(m.createdAt).getTime() < 30 * 86400000);
-    }
-    if (stakeRange !== "all") {
-      const [lo, hi] =
-        stakeRange === "1-5"
-          ? [1, 5]
-          : stakeRange === "5-25"
-            ? [5, 25]
-            : stakeRange === "25-100"
-              ? [25, 100]
-              : [100, 1e9];
-      list = list.filter((m) => m.stakeAmount >= lo && m.stakeAmount < hi);
-    }
-    return list;
-  }, [matches, gameFilter, statusFilter, dateRange, stakeRange]);
+    return matches.filter((m) => {
+      if (game !== "all" && m.game_type !== game) return false;
+      if (status !== "all" && m.status !== status) return false;
+      if (dateRange === "today") {
+        const start = new Date(); start.setHours(0, 0, 0, 0);
+        if (new Date(m.created_at).getTime() < start.getTime()) return false;
+      } else if (dateRange === "week" && now - new Date(m.created_at).getTime() > 7 * 86400_000) return false;
+      else if (dateRange === "month" && now - new Date(m.created_at).getTime() > 30 * 86400_000) return false;
+      if (stakeRange !== "all") {
+        const s = m.stake_amount;
+        if (stakeRange === "low" && (s < 1 || s >= 5)) return false;
+        if (stakeRange === "mid" && (s < 5 || s >= 25)) return false;
+        if (stakeRange === "high" && (s < 25 || s >= 100)) return false;
+        if (stakeRange === "vhigh" && s < 100) return false;
+      }
+      return true;
+    });
+  }, [matches, game, status, dateRange, stakeRange]);
 
-  const stats = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const completedToday = matches.filter(
-      (m) => m.status === "completed" && new Date(m.createdAt).getTime() >= todayStart.getTime()
-    ).length;
-    const revenueToday = completedToday * 0.5; // approximate
-    return {
-      total: matches.length,
-      inProgress: matches.filter((m) => m.status === "in_progress").length,
-      completedToday,
-      disputes: matches.filter((m) => m.status === "disputed").length,
-      revenueToday: matches
-        .filter((m) => m.status === "completed" && new Date(m.createdAt).getTime() >= todayStart.getTime())
-        .reduce((s, m) => s + m.platformFee, 0),
-    };
-  }, [matches]);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const curPage = Math.min(page, totalPages - 1);
+  const pageMatches = filtered.slice(curPage * PER_PAGE, (curPage + 1) * PER_PAGE);
 
-  const statusColor = (s: MatchStatus) =>
-    s === "completed"
-      ? "bg-admin-success"
-      : s === "in_progress"
-        ? "bg-admin-warning"
-        : s === "disputed"
-          ? "bg-admin-danger"
-          : "bg-admin-body";
+  const stats = useMemo(() => ({
+    total: filtered.length,
+    completed: filtered.filter((m) => m.status === "completed").length,
+    inProgress: filtered.filter((m) => m.status === "in_progress").length,
+    fees: filtered.filter((m) => m.status === "completed").reduce((s, m) => s + (m.platform_fee || 0), 0),
+  }), [filtered]);
+
+  const selectCls = "rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FF5E00] focus:outline-none";
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Match Management</h1>
+      <h1 className="text-2xl font-bold text-white">Matches</h1>
 
-      <div className="flex flex-wrap gap-4 rounded-xl border border-white/5 bg-admin-card p-4">
-        <span className="text-admin-body">Total Matches: <strong className="text-white">{stats.total}</strong></span>
-        <span className="text-admin-body">In Progress: <strong className="text-admin-warning">{stats.inProgress}</strong></span>
-        <span className="text-admin-body">Completed Today: <strong className="text-white">{stats.completedToday}</strong></span>
-        <span className="text-admin-body">Disputes: <strong className="text-admin-danger">{stats.disputes}</strong></span>
-        <span className="text-admin-body">Revenue Today: <strong className="text-admin-success">${stats.revenueToday.toFixed(2)}</strong></span>
+      {/* Quick stats */}
+      <div className="flex flex-wrap gap-6 rounded-xl border border-white/5 bg-admin-card px-6 py-4 text-sm">
+        <span className="text-[#9CA3AF]">Showing <strong className="text-white">{filtered.length}</strong></span>
+        <span className="text-[#9CA3AF]">Completed <strong className="text-white">{stats.completed}</strong></span>
+        <span className="text-[#9CA3AF]">In Progress <strong className="text-yellow-400">{stats.inProgress}</strong></span>
+        <span className="text-[#9CA3AF]">Fees <strong className="text-admin-success">${stats.fees.toFixed(2)}</strong></span>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <select
-          value={gameFilter}
-          onChange={(e) => setGameFilter(e.target.value)}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-admin-accent focus:outline-none"
-        >
-          {GAME_OPTIONS.map((o) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <select value={game} onChange={(e) => { setGame(e.target.value); setPage(0); }} className={selectCls}>
+          {GAMES.map((g) => <option key={g} value={g}>{g === "all" ? "All Games" : gameLabel(g)}</option>)}
         </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as MatchStatus | "all")}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-admin-accent focus:outline-none"
-        >
-          <option value="all">All</option>
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
+        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} className={selectCls}>
+          {STATUSES.map((s) => <option key={s} value={s}>{s === "all" ? "All Statuses" : s}</option>)}
         </select>
-        <select
-          value={dateRange}
-          onChange={(e) => setDateRange(e.target.value as DateRange)}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-admin-accent focus:outline-none"
-        >
-          <option value="today">Today</option>
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-          <option value="all">All Time</option>
+        <select value={dateRange} onChange={(e) => { setDateRange(e.target.value as DateRange); setPage(0); }} className={selectCls}>
+          {(Object.keys(DATE_LABELS) as DateRange[]).map((k) => <option key={k} value={k}>{DATE_LABELS[k]}</option>)}
         </select>
-        <select
-          value={stakeRange}
-          onChange={(e) => setStakeRange(e.target.value as StakeRange)}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-admin-accent focus:outline-none"
-        >
-          <option value="all">All</option>
-          <option value="1-5">$1-$5</option>
-          <option value="5-25">$5-$25</option>
-          <option value="25-100">$25-$100</option>
-          <option value="100+">$100+</option>
+        <select value={stakeRange} onChange={(e) => { setStakeRange(e.target.value as StakeRange); setPage(0); }} className={selectCls}>
+          {(Object.keys(STAKE_LABELS) as StakeRange[]).map((k) => <option key={k} value={k}>{STAKE_LABELS[k]}</option>)}
         </select>
       </div>
 
+      {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-white/5 bg-admin-card">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-admin-body">
-              <th className="px-4 py-3 font-medium">Match ID</th>
+            <tr className="border-b border-white/5 text-[#9CA3AF]">
+              <th className="px-4 py-3 font-medium">ID</th>
               <th className="px-4 py-3 font-medium">Game</th>
               <th className="px-4 py-3 font-medium">Player 1</th>
               <th className="px-4 py-3 font-medium">Player 2</th>
               <th className="px-4 py-3 font-medium">Stake</th>
-              <th className="px-4 py-3 font-medium">Pot</th>
               <th className="px-4 py-3 font-medium">Fee</th>
-              <th className="px-4 py-3 font-medium">Winner</th>
+              <th className="px-4 py-3 font-medium">Outcome</th>
               <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Duration</th>
               <th className="px-4 py-3 font-medium">Date</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((m) => (
+            {pageMatches.map((m) => (
               <Fragment key={m.id}>
                 <tr
-                  key={m.id}
-                  className="cursor-pointer border-b border-white/5 hover:bg-white/5"
+                  className="cursor-pointer border-b border-white/5 last:border-0 hover:bg-white/[0.03]"
                   onClick={() => setExpandedId(expandedId === m.id ? null : m.id)}
                 >
-                  <td className="px-4 py-3 font-mono text-admin-body">{m.id.slice(0, 8)}</td>
-                  <td className="px-4 py-3 text-white">{m.gameDisplayName}</td>
-                  <td className="px-4 py-3 text-admin-body">{m.player1.username}</td>
-                  <td className="px-4 py-3 text-admin-body">{m.player2.username}</td>
-                  <td className="px-4 py-3 text-admin-body">${m.stakeAmount.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-admin-body">${m.totalPot.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-admin-success">${m.platformFee.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-admin-body">
-                    {m.winner ? (m.winner === "player1" ? m.player1.username : m.player2.username) : "—"}
-                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-[#9CA3AF]">{m.id.slice(0, 8)}</td>
+                  <td className="px-4 py-3 text-white">{gameLabel(m.game_type)}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{m.player1Name}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{m.player2Name}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">${(m.stake_amount || 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-admin-success">${(m.platform_fee || 0).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{outcomeLabel(m)}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block h-2 w-2 rounded-full ${statusColor(m.status)}`} />
-                    <span className="ml-2 text-admin-body">{m.status}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      m.status === "completed" ? "bg-green-500/10 text-green-400"
+                      : m.status === "in_progress" ? "bg-yellow-500/10 text-yellow-400"
+                      : "bg-white/5 text-[#9CA3AF]"
+                    }`}>
+                      {m.status}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 text-admin-body">{m.duration ?? "—"} min</td>
-                  <td className="px-4 py-3 text-admin-body">{new Date(m.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">
+                    {new Date(m.created_at).toLocaleDateString()}
+                  </td>
                 </tr>
                 {expandedId === m.id && (
-                  <tr key={`${m.id}-exp`} className="border-b border-white/10 bg-white/5">
-                    <td colSpan={11} className="px-4 py-4">
-                      <div className="space-y-4">
-                        <pre className="overflow-auto rounded bg-admin-bg p-3 text-xs text-admin-body">
-                          {JSON.stringify(m, null, 2)}
-                        </pre>
-                        <p className="text-admin-body">Connection logs: (placeholder)</p>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            className="rounded bg-admin-accent px-3 py-1.5 text-sm text-white"
-                            onClick={(e) => { e.stopPropagation(); alert("Override result"); }}
-                          >
-                            Override Result
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded bg-admin-warning/20 px-3 py-1.5 text-sm text-admin-warning"
-                            onClick={(e) => { e.stopPropagation(); alert("Refund match"); }}
-                          >
-                            Refund Match
-                          </button>
-                          <button
-                            type="button"
-                            className="rounded border border-admin-danger px-3 py-1.5 text-sm text-admin-danger"
-                            onClick={(e) => { e.stopPropagation(); alert("Cancel match"); }}
-                          >
-                            Cancel Match
-                          </button>
+                  <tr className="border-b border-white/5 bg-white/[0.02]">
+                    <td colSpan={9} className="px-6 py-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Match ID</p>
+                          <p className="mt-0.5 font-mono text-xs text-white">{m.id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Total Pot</p>
+                          <p className="mt-0.5 text-white">${(m.total_pot || 0).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Winner Payout</p>
+                          <p className="mt-0.5 text-admin-success">${(m.winner_payout || 0).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Bot Difficulty</p>
+                          <p className="mt-0.5 text-white capitalize">{m.bot_difficulty ?? "—"}</p>
                         </div>
                       </div>
                     </td>
@@ -255,8 +229,33 @@ export default function AdminMatchesPage() {
                 )}
               </Fragment>
             ))}
+            {pageMatches.length === 0 && (
+              <tr>
+                <td colSpan={9} className="px-4 py-10 text-center text-sm text-[#9CA3AF]">
+                  No matches match the current filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-sm text-[#9CA3AF]">
+        <span>
+          {filtered.length === 0 ? "No results"
+            : `${curPage * PER_PAGE + 1}–${Math.min((curPage + 1) * PER_PAGE, filtered.length)} of ${filtered.length}`}
+        </span>
+        <div className="flex gap-2">
+          <button type="button" disabled={curPage === 0} onClick={() => setPage((p) => p - 1)}
+            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5">
+            ← Prev
+          </button>
+          <button type="button" disabled={curPage >= totalPages - 1} onClick={() => setPage((p) => p + 1)}
+            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5">
+            Next →
+          </button>
+        </div>
       </div>
     </div>
   );

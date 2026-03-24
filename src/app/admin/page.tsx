@@ -1,293 +1,313 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getMatches } from "@/lib/matchmaking";
-import type { StoredMatch } from "@/lib/matchmaking";
+import { createClient } from "@/lib/supabase";
 import StatCard from "@/components/admin/StatCard";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
 
-// Fake totals (replace with real aggregates later)
-const FAKE_TOTAL_USERS = 1247;
-const FAKE_USERS_TODAY = 23;
-const FAKE_TOTAL_MATCHES = 8432;
-const FAKE_MATCHES_TODAY = 156;
-const FAKE_TOTAL_REVENUE = 12847.3;
-const FAKE_REVENUE_TODAY = 847.2;
-const FAKE_TOTAL_WAGERED = 428243;
-const FAKE_WAGERED_TODAY = 28430;
+interface RecentMatch {
+  id: string;
+  game_type: string;
+  player1Name: string;
+  player2Name: string;
+  stake_amount: number;
+  platform_fee: number;
+  status: string;
+  result: string | null;
+  created_at: string;
+}
 
-function generateRevenue30Days(): RevenueDataPoint[] {
-  const out: RevenueDataPoint[] = [];
-  const now = new Date();
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const base = 200 + (29 - i) * 15 + Math.random() * 800;
-    const amount = Math.round(base * 100) / 100;
-    out.push({
-      date: d.toISOString().slice(0, 10),
-      amount,
-      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    });
-  }
-  return out;
+function gameLabel(type: string): string {
+  const map: Record<string, string> = {
+    chess: "Chess",
+    checkers: "Checkers",
+    "connect-four": "Connect 4",
+    pool: "8-Ball Pool",
+    memory: "Memory",
+    reaction: "Reaction Duel",
+    spelling: "Spelling Bee",
+    "last-touch": "Last Touch",
+  };
+  return map[type] ?? type;
 }
 
 function timeAgo(iso: string): string {
   const sec = (Date.now() - new Date(iso).getTime()) / 1000;
   if (sec < 60) return "just now";
-  if (sec < 3600) return `${Math.floor(sec / 60)} min ago`;
-  if (sec < 86400) return `${Math.floor(sec / 3600)} hr ago`;
-  return `${Math.floor(sec / 86400)} days ago`;
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  return `${Math.floor(sec / 86400)}d ago`;
 }
 
-const TOP_GAMES_FAKE = [
-  { name: "8 Ball Pool", matches: 3421, pct: 40.6 },
-  { name: "Chess", matches: 2156, pct: 25.6 },
-  { name: "Connect 4", matches: 1543, pct: 18.3 },
-  { name: "Reaction Duel", matches: 876, pct: 10.4 },
-  { name: "CS2 (External)", matches: 436, pct: 5.1 },
-];
-
-const USER_GROWTH_FAKE = [42, 28, 55, 31, 48, 39, 52];
-
-const ALERTS_FAKE = [
-  { severity: "danger" as const, msg: "3 disputes awaiting resolution", href: "/admin/disputes" },
-  { severity: "warning" as const, msg: "User 'xKiller99' reported for suspicious activity", href: null },
-  { severity: "success" as const, msg: "Daily backup completed successfully", href: null },
-  { severity: "warning" as const, msg: "High traffic detected — 342 concurrent users", href: null },
-];
-
 export default function AdminOverviewPage() {
-  const [matches, setMatches] = useState<StoredMatch[]>([]);
-  const [revenueData] = useState(() => generateRevenue30Days());
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    activeUsers: 0,
+    matchesToday: 0,
+    signupsThisWeek: 0,
+  });
+  const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
+  const [recentMatches, setRecentMatches] = useState<RecentMatch[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMatches(getMatches());
+    async function load() {
+      const supabase = createClient();
+      if (!supabase) {
+        setError("Supabase not configured.");
+        setLoading(false);
+        return;
+      }
+
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      const weekAgo = new Date(now.getTime() - 7 * 86400_000);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400_000);
+
+      const [
+        { data: allMatchFees },
+        { data: recentPlayers },
+        { count: matchesToday },
+        { count: signupsThisWeek },
+        { data: last30Matches },
+        { data: recentRaw },
+      ] = await Promise.all([
+        supabase.from("matches").select("platform_fee").eq("status", "completed"),
+        supabase
+          .from("matches")
+          .select("player1_id, player2_id")
+          .gte("created_at", weekAgo.toISOString()),
+        supabase
+          .from("matches")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", todayStart.toISOString()),
+        supabase
+          .from("profiles")
+          .select("*", { count: "exact", head: true })
+          .gte("created_at", weekAgo.toISOString()),
+        supabase
+          .from("matches")
+          .select("platform_fee, created_at")
+          .eq("status", "completed")
+          .gte("created_at", thirtyDaysAgo.toISOString())
+          .order("created_at"),
+        supabase
+          .from("matches")
+          .select("id, game_type, player1_id, player2_id, stake_amount, platform_fee, status, result, created_at")
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      // Total revenue
+      const totalRevenue = allMatchFees?.reduce((s, m) => s + (m.platform_fee || 0), 0) ?? 0;
+
+      // Active users (distinct players last 7 days)
+      const ids = new Set<string>();
+      recentPlayers?.forEach((m) => {
+        if (m.player1_id) ids.add(m.player1_id);
+        if (m.player2_id) ids.add(m.player2_id);
+      });
+
+      // Revenue chart: group completed match fees by day
+      const byDate: Record<string, number> = {};
+      last30Matches?.forEach((m) => {
+        const d = m.created_at.slice(0, 10);
+        byDate[d] = (byDate[d] || 0) + (m.platform_fee || 0);
+      });
+      const chartData: RevenueDataPoint[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().slice(0, 10);
+        chartData.push({
+          date: dateStr,
+          amount: Math.round((byDate[dateStr] || 0) * 100) / 100,
+          label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        });
+      }
+
+      // Recent matches — join profiles for names
+      let enrichedMatches: RecentMatch[] = [];
+      if (recentRaw && recentRaw.length > 0) {
+        const pids = Array.from(
+          new Set(recentRaw.flatMap((m) => [m.player1_id, m.player2_id].filter(Boolean)))
+        );
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username")
+          .in("id", pids);
+        const profileMap = new Map(profiles?.map((p) => [p.id, p.username]) ?? []);
+        enrichedMatches = recentRaw.map((m) => ({
+          ...m,
+          player1Name: profileMap.get(m.player1_id) ?? "Player 1",
+          player2Name: profileMap.get(m.player2_id) ?? "Bot",
+        }));
+      }
+
+      setStats({
+        totalRevenue,
+        activeUsers: ids.size,
+        matchesToday: matchesToday ?? 0,
+        signupsThisWeek: signupsThisWeek ?? 0,
+      });
+      setRevenueData(chartData);
+      setRecentMatches(enrichedMatches);
+      setLoading(false);
+    }
+    load();
   }, []);
 
-  const recentMatches = useMemo(() => {
-    const withStatus = matches.slice(0, 20).map((m) => ({
-      ...m,
-      displayStatus: m.status as "completed" | "in_progress" | "disputed",
-    }));
-    while (withStatus.length < 10) {
-      const d = new Date(Date.now() - withStatus.length * 3600000);
-      withStatus.push({
-        id: `fake-${withStatus.length}`,
-        gameType: "8-ball-pool",
-        gameDisplayName: "8 Ball Pool",
-        player1: { username: "Player1", rating: 1000, winRate: 50, matchesPlayed: 10 },
-        player2: { username: "Player2", rating: 1000, winRate: 50, matchesPlayed: 10 },
-        stakeAmount: 5 + Math.random() * 45,
-        platformFee: 0.45,
-        totalPot: 20,
-        winnerPayout: 19.55,
-        status: "completed",
-        winner: "player1",
-        createdAt: d.toISOString(),
-        displayStatus: "completed" as const,
-      } as StoredMatch & { displayStatus: "completed" | "in_progress" | "disputed" });
-    }
-    return withStatus
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 10);
-  }, [matches]);
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
+        />
+      </div>
+    );
+  }
 
-  const totalRevenueFromData = revenueData.reduce((s, d) => s + d.amount, 0);
-  const avgDaily = revenueData.length ? totalRevenueFromData / revenueData.length : 0;
+  const totalChart = revenueData.reduce((s, d) => s + d.amount, 0);
+  const avgChart = revenueData.length ? totalChart / revenueData.length : 0;
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-white">Admin Overview</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Overview</h1>
+        {error && <p className="text-sm text-red-400">{error}</p>}
+      </div>
 
-      {/* Key metrics */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Stat cards */}
+      <div className="grid gap-4 lg:grid-cols-4">
         <StatCard
-          title="Total Users"
-          value={FAKE_TOTAL_USERS.toLocaleString()}
-          subtitle={`+${FAKE_USERS_TODAY} today`}
-          trend="up"
-          icon="👥"
-        />
-        <StatCard
-          title="Total Matches"
-          value={FAKE_TOTAL_MATCHES.toLocaleString()}
-          subtitle={`+${FAKE_MATCHES_TODAY} today`}
-          trend="up"
-          icon="🎮"
-        />
-        <StatCard
-          title="Total Revenue (Platform Fees)"
-          value={`$${FAKE_TOTAL_REVENUE.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-          subtitle={`+$${FAKE_REVENUE_TODAY.toFixed(2)} today`}
+          title="Total Revenue"
+          value={`$${stats.totalRevenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          subtitle="All-time platform fees"
           trend="up"
           icon="💰"
         />
         <StatCard
-          title="Total Wagered"
-          value={`$${FAKE_TOTAL_WAGERED.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
-          subtitle={`+$${FAKE_WAGERED_TODAY.toLocaleString()} today`}
+          title="Active Users"
+          value={stats.activeUsers.toLocaleString()}
+          subtitle="Played in last 7 days"
+          trend="neutral"
+          icon="👥"
+        />
+        <StatCard
+          title="Matches Today"
+          value={stats.matchesToday.toLocaleString()}
+          subtitle="Since midnight"
+          trend="neutral"
+          icon="🎮"
+        />
+        <StatCard
+          title="Signups This Week"
+          value={stats.signupsThisWeek.toLocaleString()}
+          subtitle="New profiles (7 days)"
           trend="up"
-          icon="📊"
+          icon="✨"
         />
       </div>
 
       {/* Revenue chart */}
       <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-        <h2 className="text-lg font-semibold text-white">Revenue (Last 30 Days)</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Platform Revenue — Last 30 Days</h2>
+          <Link
+            href="/admin/revenue"
+            className="text-sm hover:underline"
+            style={{ color: "#FF5E00" }}
+          >
+            Full report →
+          </Link>
+        </div>
         <div className="mt-4">
           <RevenueChart
             data={revenueData}
-            totalValue={totalRevenueFromData}
-            averageValue={avgDaily}
-            totalLabel="Total this month"
-            averageLabel="Average daily"
+            totalValue={totalChart}
+            averageValue={avgChart}
+            totalLabel="30-day total"
+            averageLabel="Daily avg"
+            color="#FF5E00"
           />
         </div>
       </div>
 
-      {/* Recent Matches + Platform Health */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Recent Matches</h2>
-            <Link href="/admin/matches" className="text-sm text-admin-accent hover:underline">
-              View All →
-            </Link>
-          </div>
-          <ul className="mt-4 space-y-2">
-            {recentMatches.map((m) => (
-              <li
-                key={m.id}
-                className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/5 px-3 py-2 text-sm"
-              >
-                <span
-                  className={`h-2 w-2 shrink-0 rounded-full ${
-                    m.displayStatus === "completed"
-                      ? "bg-admin-success"
-                      : m.displayStatus === "in_progress"
-                        ? "bg-admin-warning"
-                        : "bg-admin-danger"
-                  }`}
-                />
-                <span className="text-admin-body">{m.gameDisplayName}</span>
-                <span className="text-white">
-                  {m.player1.username} vs {m.player2.username}
-                </span>
-                <span className="text-admin-body">${m.stakeAmount.toFixed(2)}</span>
-                <span className="text-admin-body">
-                  {m.status === "completed" && m.winner
-                    ? `Winner: ${m.winner === "player1" ? m.player1.username : m.player2.username}`
-                    : m.status}
-                </span>
-                <span className="text-admin-success">Fee ${m.platformFee.toFixed(2)}</span>
-                <span className="ml-auto text-admin-body">{timeAgo(m.createdAt)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <h2 className="text-lg font-semibold text-white">Platform Health</h2>
-          <dl className="mt-4 space-y-3">
-            {[
-              ["Active Users (24h)", "342", "success"],
-              ["Matches Today", "156", "neutral"],
-              ["Average Match Duration", "4.2 min", "neutral"],
-              ["Disputes Open", "3", "danger"],
-              ["Dispute Rate", "0.8%", "neutral"],
-              ["Average Stake", "$8.50", "neutral"],
-              ["Most Popular Game", "8 Ball Pool (42%)", "neutral"],
-              ["Server Uptime", "99.97%", "success"],
-            ].map(([label, value, type]) => (
-              <div key={label} className="flex items-center justify-between border-b border-white/5 pb-2 last:border-0">
-                <span className="flex items-center gap-2 text-admin-body">
-                  {type === "success" && <span className="h-2 w-2 rounded-full bg-admin-success" />}
-                  {type === "danger" && <span className="h-2 w-2 rounded-full bg-admin-danger" />}
-                  {label}
-                </span>
-                <span className="font-medium text-white">{value}</span>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-
-      {/* Top Games + User Growth */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <h2 className="text-lg font-semibold text-white">Top Games (by matches)</h2>
-          <div className="mt-4 space-y-3">
-            {TOP_GAMES_FAKE.map((g) => (
-              <div key={g.name}>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white">{g.name}</span>
-                  <span className="text-admin-body">
-                    {g.matches.toLocaleString()} matches ({g.pct}%)
-                  </span>
-                </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-admin-accent"
-                    style={{ width: `${g.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <h2 className="text-lg font-semibold text-white">User Growth (Last 7 Days)</h2>
-          <div className="mt-4 flex items-end justify-between gap-2" style={{ height: "160px" }}>
-            {USER_GROWTH_FAKE.map((val, i) => (
-              <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                <span className="text-xs text-admin-body">{val}</span>
-                <div
-                  className="w-full rounded-t bg-admin-accent transition-all"
-                  style={{ height: `${(val / 60) * 140}px`, minHeight: "8px" }}
-                />
-                <span className="text-[10px] text-admin-body">
-                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][i]}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Alerts */}
+      {/* Recent matches */}
       <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-        <h2 className="text-lg font-semibold text-white">Alerts & Notifications</h2>
-        <ul className="mt-4 space-y-2">
-          {ALERTS_FAKE.map((a, i) => (
-            <li key={i} className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/5 px-4 py-2 text-sm">
-              <span
-                className={
-                  a.severity === "danger"
-                    ? "text-admin-danger"
-                    : a.severity === "warning"
-                      ? "text-admin-warning"
-                      : "text-admin-success"
-                }
-              >
-                {a.severity === "danger" ? "🔴" : a.severity === "warning" ? "🟡" : "🟢"}
-              </span>
-              <span className="text-admin-body">{a.msg}</span>
-              {a.href && (
-                <Link href={a.href} className="ml-auto text-admin-accent hover:underline">
-                  Resolve
-                </Link>
-              )}
-              <span className="text-admin-body text-xs">
-                {new Date(Date.now() - i * 3600000).toLocaleString()}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-white">Recent Matches</h2>
+          <Link
+            href="/admin/matches"
+            className="text-sm hover:underline"
+            style={{ color: "#FF5E00" }}
+          >
+            View all →
+          </Link>
+        </div>
+
+        {recentMatches.length === 0 ? (
+          <p className="mt-4 text-sm text-[#9CA3AF]">No matches yet.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/5 text-[#9CA3AF]">
+                  <th className="pb-2 pr-4 font-medium">Game</th>
+                  <th className="pb-2 pr-4 font-medium">Players</th>
+                  <th className="pb-2 pr-4 font-medium">Stake</th>
+                  <th className="pb-2 pr-4 font-medium">Fee</th>
+                  <th className="pb-2 pr-4 font-medium">Status</th>
+                  <th className="pb-2 font-medium">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentMatches.map((m) => (
+                  <tr key={m.id} className="border-b border-white/5 last:border-0">
+                    <td className="py-2 pr-4 text-white">{gameLabel(m.game_type)}</td>
+                    <td className="py-2 pr-4 text-[#9CA3AF]">
+                      {m.player1Name} vs {m.player2Name}
+                    </td>
+                    <td className="py-2 pr-4 text-[#9CA3AF]">
+                      ${(m.stake_amount || 0).toFixed(2)}
+                    </td>
+                    <td className="py-2 pr-4 text-admin-success">
+                      ${(m.platform_fee || 0).toFixed(2)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${
+                          m.status === "completed"
+                            ? "bg-green-500/10 text-green-400"
+                            : m.status === "in_progress"
+                              ? "bg-yellow-500/10 text-yellow-400"
+                              : "bg-white/5 text-[#9CA3AF]"
+                        }`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            m.status === "completed"
+                              ? "bg-green-400"
+                              : m.status === "in_progress"
+                                ? "bg-yellow-400"
+                                : "bg-gray-400"
+                          }`}
+                        />
+                        {m.status}
+                      </span>
+                    </td>
+                    <td className="py-2 text-[#9CA3AF]">{timeAgo(m.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

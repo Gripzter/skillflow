@@ -1,279 +1,284 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { getMatches } from "@/lib/matchmaking";
-
-type UserStatus = "Active" | "Suspended" | "New";
+import { createClient } from "@/lib/supabase";
 
 interface AdminUser {
   id: string;
-  username: string;
   email: string;
-  joined: string;
-  matches: number;
-  winRate: number;
+  username: string;
   balance: number;
-  totalWagered: number;
-  status: UserStatus;
+  total_deposited: number;
+  total_withdrawn: number;
+  total_matches: number;
+  total_wins: number;
+  total_earnings: number;
+  created_at: string;
+  last_sign_in_at?: string;
 }
 
-function generateFakeUsers(): AdminUser[] {
-  const names = [
-    "xKiller99", "PoolShark", "ChessMaster", "SniperElite", "NoScope360",
-    "EzWin", "TryHard_1", "CasualPro", "DevPro", "AcePlayer", "QuickDraw",
-    "LuckySeven", "DarkKnight", "StormRider", "ShadowFox", "NeonBlade",
-    "PhoenixRise", "IceCold", "FireStorm", "ThunderBolt", "SilentAssassin",
-    "GoldenEye", "SilverBullet", "CrimsonTide", "OceanView", "MountainKing",
-  ];
-  const users: AdminUser[] = [];
-  const statuses: UserStatus[] = ["Active", "Active", "Active", "New", "Suspended"];
-  for (let i = 0; i < 30; i++) {
-    const name = names[i % names.length] + (i > names.length - 1 ? i : "");
-    users.push({
-      id: `user-${i}`,
-      username: name,
-      email: `${name.toLowerCase().replace(/[^a-z0-9]/g, "")}@example.com`,
-      joined: new Date(Date.now() - Math.random() * 365 * 24 * 3600000).toISOString().slice(0, 10),
-      matches: 5 + Math.floor(Math.random() * 200),
-      winRate: Math.round(35 + Math.random() * 45),
-      balance: Math.round((5 + Math.random() * 500) * 100) / 100,
-      totalWagered: Math.round((100 + Math.random() * 5000) * 100) / 100,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-    });
-  }
-  return users.sort((a, b) => new Date(b.joined).getTime() - new Date(a.joined).getTime());
-}
+type SortKey = keyof Pick<AdminUser, "username" | "email" | "balance" | "total_matches" | "total_earnings" | "created_at">;
 
-const PER_PAGE = 15;
+const PER_PAGE = 20;
+
+function winRate(u: AdminUser): number {
+  if (!u.total_matches) return 0;
+  return Math.round((u.total_wins / u.total_matches) * 1000) / 10;
+}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "Active" | "Suspended" | "New">("all");
   const [page, setPage] = useState(0);
-  const [suspendedIds, setSuspendedIds] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    let list = generateFakeUsers();
-    const devUser = typeof window !== "undefined" ? localStorage.getItem("skillflow_dev_user") : null;
-    if (devUser) {
-      try {
-        const dev = JSON.parse(devUser);
-        const matches = getMatches();
-        const wins = matches.filter((m) => m.winner === "player1").length;
-        const completed = matches.filter((m) => m.status === "completed").length;
-        list = [
-          {
-            id: "dev-user",
-            username: dev.username || "Developer",
-            email: "developer@skillflow.dev",
-            joined: new Date().toISOString().slice(0, 10),
-            matches: matches.length,
-            // Real matches win rate as percentage with one decimal place
-            winRate: completed ? Math.round((wins / completed) * 1000) / 10 : 0,
-            balance: parseFloat(localStorage.getItem("skillflow_wallet_balance") || "0") || 0,
-            totalWagered: matches.reduce((s, m) => s + m.stakeAmount * 2, 0),
-            status: "Active" as UserStatus,
-          },
-          ...list.filter((u) => u.id !== "dev-user"),
-        ];
-      } catch {
-        // ignore
+    async function load() {
+      const supabase = createClient();
+      if (!supabase) {
+        setError("Supabase not configured.");
+        setLoading(false);
+        return;
       }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      if (token) {
+        // Try service-role API for emails
+        try {
+          const res = await fetch("/api/admin/users", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setUsers(data);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Fall through to profile-only query
+        }
+      }
+
+      // Fallback: query profiles + wallets without email
+      const [{ data: profiles }, { data: wallets }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, username, total_matches, total_wins, total_earnings, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from("wallets").select("user_id, balance, total_deposited, total_withdrawn"),
+      ]);
+
+      const walletMap = new Map(wallets?.map((w) => [w.user_id, w]) ?? []);
+
+      const merged: AdminUser[] = (profiles ?? []).map((p) => {
+        const w = walletMap.get(p.id);
+        return {
+          id: p.id,
+          email: "—",
+          username: p.username,
+          balance: w?.balance ?? 0,
+          total_deposited: w?.total_deposited ?? 0,
+          total_withdrawn: w?.total_withdrawn ?? 0,
+          total_matches: p.total_matches ?? 0,
+          total_wins: p.total_wins ?? 0,
+          total_earnings: p.total_earnings ?? 0,
+          created_at: p.created_at,
+        };
+      });
+
+      setUsers(merged);
+      if (!token) setError("Add SUPABASE_SERVICE_ROLE_KEY to .env.local to see emails.");
+      setLoading(false);
     }
-    setUsers(list);
+    load();
   }, []);
 
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("desc"); }
+    setPage(0);
+  }
+
   const filtered = useMemo(() => {
-    let list = users;
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(
-        (u) =>
-          u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
-      );
-    }
-    if (filter !== "all") {
-      if (filter === "New") {
-        const weekAgo = Date.now() - 7 * 24 * 3600000;
-        list = list.filter((u) => new Date(u.joined).getTime() > weekAgo);
-      } else {
-        list = list.filter((u) => {
-          const status = suspendedIds.has(u.id) ? "Suspended" : u.status;
-          return status === filter;
-        });
-      }
-    }
-    return list;
-  }, [users, search, filter, suspendedIds]);
+    const q = search.trim().toLowerCase();
+    return users.filter(
+      (u) =>
+        !q ||
+        u.username.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        u.id.toLowerCase().includes(q)
+    );
+  }, [users, search]);
 
-  const [sortKey, setSortKey] = useState<keyof AdminUser>("joined");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  const sortedFiltered = useMemo(() => {
+  const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
-      const va = a[sortKey];
-      const vb = b[sortKey];
-      if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;
-      if (typeof va === "string" && typeof vb === "string") return sortDir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-      return 0;
+      const va = a[sortKey], vb = b[sortKey];
+      const dir = sortDir === "asc" ? 1 : -1;
+      if (typeof va === "number" && typeof vb === "number") return dir * (va - vb);
+      return dir * String(va).localeCompare(String(vb));
     });
   }, [filtered, sortKey, sortDir]);
 
-  const totalPages = Math.ceil(sortedFiltered.length / PER_PAGE) || 1;
-  const currentPage = Math.min(page, totalPages - 1);
-  const pageUsers = useMemo(
-    () => sortedFiltered.slice(currentPage * PER_PAGE, (currentPage + 1) * PER_PAGE),
-    [sortedFiltered, currentPage]
-  );
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const curPage = Math.min(page, totalPages - 1);
+  const pageUsers = sorted.slice(curPage * PER_PAGE, (curPage + 1) * PER_PAGE);
 
-  function toggleSort(key: keyof AdminUser) {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else setSortKey(key);
+  function SortTh({ k, label }: { k: SortKey; label: string }) {
+    return (
+      <th
+        className="cursor-pointer whitespace-nowrap px-4 py-3 text-left text-xs font-medium text-[#9CA3AF] hover:text-white"
+        onClick={() => toggleSort(k)}
+      >
+        {label}
+        {sortKey === k && <span className="ml-1">{sortDir === "asc" ? "↑" : "↓"}</span>}
+      </th>
+    );
   }
 
-  function toggleSuspend(id: string) {
-    setSuspendedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
+        />
+      </div>
+    );
   }
-
-  const stats = useMemo(() => {
-    const active = users.filter((u) => !suspendedIds.has(u.id) && u.status !== "Suspended").length;
-    const suspended = users.filter((u) => suspendedIds.has(u.id) || u.status === "Suspended").length;
-    const weekAgo = Date.now() - 7 * 24 * 3600000;
-    const newThisWeek = users.filter((u) => new Date(u.joined).getTime() > weekAgo).length;
-    return { total: users.length, activeToday: 342, newThisWeek: newThisWeek || 89, suspended };
-  }, [users, suspendedIds]);
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">User Management</h1>
-
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/5 bg-admin-card p-4">
-        <span className="text-admin-body">Total Users: <strong className="text-white">{stats.total}</strong></span>
-        <span className="text-admin-body">Active Today: <strong className="text-admin-success">{stats.activeToday}</strong></span>
-        <span className="text-admin-body">New This Week: <strong className="text-white">{stats.newThisWeek}</strong></span>
-        <span className="text-admin-body">Suspended: <strong className="text-admin-danger">{stats.suspended}</strong></span>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Users</h1>
+        <div className="flex items-center gap-3 text-sm text-[#9CA3AF]">
+          <span>{users.length.toLocaleString()} total</span>
+          {error && (
+            <span className="rounded bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400">
+              {error}
+            </span>
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-4">
-        <input
-          type="search"
-          placeholder="Search users..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white placeholder-admin-body focus:border-admin-accent focus:outline-none"
-        />
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as typeof filter)}
-          className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-white focus:border-admin-accent focus:outline-none"
-        >
-          <option value="all">All Users</option>
-          <option value="Active">Active</option>
-          <option value="Suspended">Suspended</option>
-          <option value="New">New (7 days)</option>
-        </select>
-      </div>
+      {/* Search */}
+      <input
+        type="search"
+        placeholder="Search by username, email, or ID…"
+        value={search}
+        onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+        className="w-full max-w-sm rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-[#6B7280] focus:border-[#FF5E00] focus:outline-none"
+      />
 
+      {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-white/5 bg-admin-card">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-admin-body">
-              {(["username", "email", "joined", "matches", "winRate", "balance", "totalWagered", "status"] as const).map((key) => (
-                <th
-                  key={key}
-                  className="cursor-pointer px-4 py-3 font-medium hover:text-white"
-                  onClick={() => toggleSort(key)}
-                >
-                  {key === "username" ? "Username" : key === "totalWagered" ? "Total Wagered" : key.charAt(0).toUpperCase() + key.slice(1)}
-                  {sortKey === key && (sortDir === "asc" ? " ↑" : " ↓")}
-                </th>
-              ))}
-              <th className="px-4 py-3 font-medium text-admin-body">Actions</th>
+            <tr className="border-b border-white/5">
+              <SortTh k="username" label="Username" />
+              <SortTh k="email" label="Email" />
+              <SortTh k="balance" label="Balance" />
+              <SortTh k="total_matches" label="Matches" />
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#9CA3AF]">Win Rate</th>
+              <SortTh k="total_earnings" label="Earnings" />
+              <SortTh k="created_at" label="Signed Up" />
             </tr>
           </thead>
           <tbody>
-            {pageUsers.map((u) => {
-              const status = suspendedIds.has(u.id) ? "Suspended" : u.status;
-              return (
-                <tr key={u.id} className="border-b border-white/5 hover:bg-white/5">
+            {pageUsers.map((u) => (
+              <>
+                <tr
+                  key={u.id}
+                  className="cursor-pointer border-b border-white/5 last:border-0 hover:bg-white/[0.03]"
+                  onClick={() => setExpandedId(expandedId === u.id ? null : u.id)}
+                >
                   <td className="px-4 py-3 font-medium text-white">{u.username}</td>
-                  <td className="px-4 py-3 text-admin-body">{u.email}</td>
-                  <td className="px-4 py-3 text-admin-body">{u.joined}</td>
-                  <td className="px-4 py-3 text-admin-body">{u.matches}</td>
-                  <td className="px-4 py-3 text-admin-body">{u.winRate.toFixed(1)}%</td>
-                  <td className="px-4 py-3 text-admin-body">${u.balance.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-admin-body">${u.totalWagered.toFixed(2)}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        status === "Active"
-                          ? "bg-admin-success/20 text-admin-success"
-                          : status === "Suspended"
-                            ? "bg-admin-danger/20 text-admin-danger"
-                            : "bg-admin-accent/20 text-admin-accent"
-                      }`}
-                    >
-                      {status}
-                    </span>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{u.email}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">
+                    ${u.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => alert(JSON.stringify(u, null, 2))}
-                        className="rounded border border-white/10 px-2 py-1 text-xs text-admin-body hover:bg-white/10"
-                      >
-                        View
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleSuspend(u.id)}
-                        className="rounded border border-admin-danger/50 px-2 py-1 text-xs text-admin-danger hover:bg-admin-danger/10"
-                      >
-                        {status === "Suspended" ? "Restore" : "Suspend"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => alert("Adjust balance: coming soon")}
-                        className="rounded border border-white/10 px-2 py-1 text-xs text-admin-body hover:bg-white/10"
-                      >
-                        Adjust Balance
-                      </button>
-                    </div>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{u.total_matches}</td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">{winRate(u)}%</td>
+                  <td className="px-4 py-3 text-admin-success">
+                    ${u.total_earnings.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-3 text-[#9CA3AF]">
+                    {new Date(u.created_at).toLocaleDateString()}
                   </td>
                 </tr>
-              );
-            })}
+                {expandedId === u.id && (
+                  <tr key={`${u.id}-exp`} className="border-b border-white/10 bg-white/[0.02]">
+                    <td colSpan={7} className="px-6 py-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <div>
+                          <p className="text-xs text-[#6B7280]">User ID</p>
+                          <p className="mt-0.5 font-mono text-xs text-white">{u.id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Total Deposited</p>
+                          <p className="mt-0.5 text-sm text-white">
+                            ${u.total_deposited.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Total Withdrawn</p>
+                          <p className="mt-0.5 text-sm text-white">
+                            ${u.total_withdrawn.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Last Sign In</p>
+                          <p className="mt-0.5 text-sm text-white">
+                            {u.last_sign_in_at
+                              ? new Date(u.last_sign_in_at).toLocaleString()
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
+            ))}
+            {pageUsers.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#9CA3AF]">
+                  No users found.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-admin-body">
-          Showing {currentPage * PER_PAGE + 1}-{Math.min((currentPage + 1) * PER_PAGE, filtered.length)} of {filtered.length}
-        </p>
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-sm text-[#9CA3AF]">
+        <span>
+          {sorted.length === 0
+            ? "No results"
+            : `${curPage * PER_PAGE + 1}–${Math.min((curPage + 1) * PER_PAGE, sorted.length)} of ${sorted.length}`}
+        </span>
         <div className="flex gap-2">
           <button
             type="button"
-            disabled={currentPage === 0}
+            disabled={curPage === 0}
             onClick={() => setPage((p) => p - 1)}
-            className="rounded border border-white/10 px-3 py-1 text-sm text-admin-body disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/5"
+            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5"
           >
-            Previous
+            ← Prev
           </button>
           <button
             type="button"
-            disabled={currentPage >= totalPages - 1}
+            disabled={curPage >= totalPages - 1}
             onClick={() => setPage((p) => p + 1)}
-            className="rounded border border-white/10 px-3 py-1 text-sm text-admin-body disabled:cursor-not-allowed disabled:border-white/5 disabled:bg-white/5"
+            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5"
           >
-            Next
+            Next →
           </button>
         </div>
       </div>

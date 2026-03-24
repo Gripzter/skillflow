@@ -30,7 +30,7 @@ const config: Config = {
         // Admin dashboard (distinct from player site)
         "admin-bg": "#0A0B0F",
         "admin-card": "#12131A",
-        "admin-accent": "#6366F1",
+        "admin-accent": "#FF5E00",
         "admin-pink": "#EC4899",
         "admin-success": "#22C55E",
         "admin-warning": "#F59E0B",

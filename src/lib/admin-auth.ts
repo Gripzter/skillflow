@@ -1,35 +1,27 @@
-/**
- * Admin authentication for SkillFlow admin dashboard.
- * Temporary: hardcoded admin code. Replace with proper auth (e.g. Supabase admin role) later.
- */
+import { createClient } from "@/lib/supabase";
 
-export const ADMIN_AUTH_KEY = "skillflow_admin_auth";
-export const ADMIN_CODE = "SK-ADMIN-2026";
+export const ADMIN_EMAIL = "aras.axmas@gmail.com";
 
-export function isAdminAuthenticated(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(ADMIN_AUTH_KEY) === "true";
+export async function checkAdminAccess(): Promise<boolean> {
+  const supabase = createClient();
+  if (!supabase) return false;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email === ADMIN_EMAIL;
 }
 
-export function setAdminAuthenticated(value: boolean): void {
-  if (typeof window === "undefined") return;
-  if (value) {
-    localStorage.setItem(ADMIN_AUTH_KEY, "true");
-  } else {
-    localStorage.removeItem(ADMIN_AUTH_KEY);
-  }
+export async function getAdminSession(): Promise<{ user: { id: string; email: string } } | null> {
+  const supabase = createClient();
+  if (!supabase) return null;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session || session.user.email !== ADMIN_EMAIL) return null;
+  return session as { user: { id: string; email: string } };
 }
 
-export function verifyAdminCode(code: string): boolean {
-  return code.trim() === ADMIN_CODE;
-}
-
-export function adminLogin(code: string): boolean {
-  if (!verifyAdminCode(code)) return false;
-  setAdminAuthenticated(true);
-  return true;
-}
-
-export function adminLogout(): void {
-  setAdminAuthenticated(false);
+export async function adminLogout(): Promise<void> {
+  const supabase = createClient();
+  if (supabase) await supabase.auth.signOut();
 }

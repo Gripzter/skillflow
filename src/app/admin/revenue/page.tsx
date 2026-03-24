@@ -1,249 +1,272 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { createClient } from "@/lib/supabase";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
 
-const PERIOD_LABELS = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" } as const;
-type Period = keyof typeof PERIOD_LABELS;
+type Period = "daily" | "weekly" | "monthly";
 
-function generateRevenueDays(days: number): RevenueDataPoint[] {
-  const out: RevenueDataPoint[] = [];
-  const now = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dayOfWeek = d.getDay();
-    const weekendBoost = dayOfWeek === 0 || dayOfWeek === 6 ? 1.2 : 1;
-    const trend = 1 + (days - i) * 0.002;
-    const amount = Math.round((250 + Math.random() * 600) * weekendBoost * trend * 100) / 100;
-    out.push({
-      date: d.toISOString().slice(0, 10),
-      amount,
-      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    });
-  }
-  return out;
+interface RevSummary {
+  deposits: number;
+  withdrawals: number;
+  matchFees: number;
+  withdrawalFees: number;
+  stripeFees: number;
+  netProfit: number;
 }
 
-const TOP_METRICS_FAKE = {
-  today: { value: 847.2, change: 12.3 },
-  week: { value: 4231.5, change: 8.7 },
-  month: { value: 12847.3, change: 15.2 },
-  allTime: { value: 67432.8, change: null },
-};
+interface TxRow {
+  type: string;
+  amount: number;
+  created_at: string;
+}
 
-const REVENUE_BY_GAME = [
-  { name: "8 Ball Pool", pct: 38, value: 4882 },
-  { name: "Chess", pct: 24, value: 3083 },
-  { name: "Connect 4", pct: 16, value: 2056 },
-  { name: "Reaction Duel", pct: 12, value: 1542 },
-  { name: "CS2 External", pct: 10, value: 1284 },
-];
+interface MatchFeeRow {
+  platform_fee: number;
+  stake_amount: number;
+  created_at: string;
+}
 
-const GAME_COLORS = ["#6366F1", "#8B5CF6", "#A855F7", "#EC4899", "#F59E0B"];
+function bucketDate(iso: string, period: Period): string {
+  const d = new Date(iso);
+  if (period === "daily") return d.toISOString().slice(0, 10);
+  if (period === "weekly") {
+    // ISO week start (Monday)
+    const day = d.getDay() || 7;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - day + 1);
+    return monday.toISOString().slice(0, 10);
+  }
+  return d.toISOString().slice(0, 7); // YYYY-MM
+}
 
-const REVENUE_BY_STAKE = [
-  { range: "$1-$5", value: 2847, pct: 22 },
-  { range: "$5-$10", value: 4231, pct: 33 },
-  { range: "$10-$25", value: 3543, pct: 28 },
-  { range: "$25-$50", value: 1456, pct: 11 },
-  { range: "$50-$100", value: 770, pct: 6 },
-];
+function bucketLabel(key: string, period: Period): string {
+  if (period === "monthly") {
+    const [y, m] = key.split("-");
+    return new Date(+y, +m - 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+  }
+  const d = new Date(key + "T00:00:00");
+  if (period === "weekly") return `Wk ${d.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
-const TOP_PLAYERS_FAKE = [
-  { username: "PoolShark", matches: 421, totalWagered: 8420, feesGenerated: 252.6 },
-  { username: "xKiller99", matches: 387, totalWagered: 7740, feesGenerated: 232.2 },
-  { username: "ChessMaster", matches: 356, totalWagered: 7120, feesGenerated: 213.6 },
-  { username: "SniperElite", matches: 298, totalWagered: 5960, feesGenerated: 178.8 },
-  { username: "NoScope360", matches: 267, totalWagered: 5340, feesGenerated: 160.2 },
-  { username: "EzWin", matches: 243, totalWagered: 4860, feesGenerated: 145.8 },
-  { username: "TryHard_1", matches: 221, totalWagered: 4420, feesGenerated: 132.6 },
-  { username: "CasualPro", matches: 198, totalWagered: 3960, feesGenerated: 118.8 },
-  { username: "AcePlayer", matches: 176, totalWagered: 3520, feesGenerated: 105.6 },
-  { username: "QuickDraw", matches: 154, totalWagered: 3080, feesGenerated: 92.4 },
-];
+function buildChartData(matchFees: MatchFeeRow[], period: Period): RevenueDataPoint[] {
+  const byBucket: Record<string, number> = {};
+  matchFees.forEach((m) => {
+    const key = bucketDate(m.created_at, period);
+    byBucket[key] = (byBucket[key] || 0) + (m.platform_fee || 0);
+  });
+
+  const sorted = Object.entries(byBucket).sort(([a], [b]) => a.localeCompare(b));
+  return sorted.map(([key, amount]) => ({
+    date: key,
+    amount: Math.round(amount * 100) / 100,
+    label: bucketLabel(key, period),
+  }));
+}
 
 export default function AdminRevenuePage() {
   const [period, setPeriod] = useState<Period>("daily");
+  const [loading, setLoading] = useState(true);
+  const [txRows, setTxRows] = useState<TxRow[]>([]);
+  const [matchFees, setMatchFees] = useState<MatchFeeRow[]>([]);
 
-  const chartData = useMemo(() => {
-    const days = period === "daily" ? 90 : period === "weekly" ? 52 : 12;
-    return generateRevenueDays(days);
-  }, [period]);
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      if (!supabase) { setLoading(false); return; }
 
-  const chartLabel = period === "daily" ? "Revenue (Last 90 Days)" : period === "weekly" ? "Revenue by Week" : "Revenue by Month";
+      const [{ data: txData }, { data: mData }] = await Promise.all([
+        supabase
+          .from("transactions")
+          .select("type, amount, created_at")
+          .order("created_at"),
+        supabase
+          .from("matches")
+          .select("platform_fee, stake_amount, created_at")
+          .eq("status", "completed")
+          .order("created_at"),
+      ]);
+
+      setTxRows(txData ?? []);
+      setMatchFees(mData ?? []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const summary = useMemo((): RevSummary => {
+    const deposits = txRows
+      .filter((t) => t.type === "deposit" && t.amount > 0)
+      .reduce((s, t) => s + t.amount, 0);
+
+    const withdrawals = txRows
+      .filter((t) => t.type === "withdrawal")
+      .reduce((s, t) => s + Math.abs(t.amount), 0);
+
+    const matchFeesTotal = matchFees.reduce((s, m) => s + (m.platform_fee || 0), 0);
+
+    // Stripe deposit fees: 2.9% + $0.30 per deposit transaction
+    const depositTxCount = txRows.filter((t) => t.type === "deposit" && t.amount > 0).length;
+    const stripeFees = deposits * 0.029 + depositTxCount * 0.3;
+
+    // Withdrawal payout fees: ~0.25% (Stripe Connect)
+    const withdrawalFees = withdrawals * 0.0025;
+
+    const netProfit = matchFeesTotal - stripeFees - withdrawalFees;
+
+    return {
+      deposits,
+      withdrawals,
+      matchFees: matchFeesTotal,
+      withdrawalFees,
+      stripeFees,
+      netProfit,
+    };
+  }, [txRows, matchFees]);
+
+  const chartData = useMemo(() => buildChartData(matchFees, period), [matchFees, period]);
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div
+          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
+          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
+        />
+      </div>
+    );
+  }
+
+  const statCards = [
+    {
+      label: "Total Deposits",
+      value: summary.deposits,
+      color: "text-green-400",
+      hint: "Sum of all user deposits",
+    },
+    {
+      label: "Total Withdrawals",
+      value: summary.withdrawals,
+      color: "text-red-400",
+      hint: "Sum of all user withdrawals",
+    },
+    {
+      label: "Match Fees (Platform)",
+      value: summary.matchFees,
+      color: "text-[#FF5E00]",
+      hint: "5% cut from completed matches",
+    },
+    {
+      label: "Stripe Fees (est.)",
+      value: summary.stripeFees,
+      color: "text-yellow-400",
+      hint: "2.9% + $0.30 per deposit",
+    },
+    {
+      label: "Withdrawal Fees (est.)",
+      value: summary.withdrawalFees,
+      color: "text-yellow-400",
+      hint: "~0.25% Stripe Connect payout",
+    },
+    {
+      label: "Net Profit",
+      value: summary.netProfit,
+      color: summary.netProfit >= 0 ? "text-green-400" : "text-red-400",
+      hint: "Match fees − Stripe fees − payout fees",
+    },
+  ];
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-white">Revenue Analytics</h1>
+      <h1 className="text-2xl font-bold text-white">Revenue</h1>
 
-      {/* Top metrics */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-white/5 bg-admin-card p-5">
-          <p className="text-sm text-admin-body">Today&apos;s Revenue</p>
-          <p className="mt-1 text-2xl font-bold text-white">${TOP_METRICS_FAKE.today.value.toFixed(2)}</p>
-          <p className="mt-1 text-xs text-admin-success">+{TOP_METRICS_FAKE.today.change}% vs yesterday</p>
-        </div>
-        <div className="rounded-xl border border-white/5 bg-admin-card p-5">
-          <p className="text-sm text-admin-body">This Week</p>
-          <p className="mt-1 text-2xl font-bold text-white">${TOP_METRICS_FAKE.week.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
-          <p className="mt-1 text-xs text-admin-success">+{TOP_METRICS_FAKE.week.change}% vs last week</p>
-        </div>
-        <div className="rounded-xl border border-white/5 bg-admin-card p-5">
-          <p className="text-sm text-admin-body">This Month</p>
-          <p className="mt-1 text-2xl font-bold text-white">${TOP_METRICS_FAKE.month.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
-          <p className="mt-1 text-xs text-admin-success">+{TOP_METRICS_FAKE.month.change}% vs last month</p>
-        </div>
-        <div className="rounded-xl border border-white/5 bg-admin-card p-5">
-          <p className="text-sm text-admin-body">All Time</p>
-          <p className="mt-1 text-2xl font-bold text-white">${TOP_METRICS_FAKE.allTime.value.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
-        </div>
+      {/* Summary stat cards */}
+      <div className="grid gap-4 lg:grid-cols-3 xl:grid-cols-6">
+        {statCards.map((c) => (
+          <div key={c.label} className="rounded-xl border border-white/5 bg-admin-card p-5">
+            <p className="text-xs font-medium text-[#9CA3AF]">{c.label}</p>
+            <p className={`mt-2 text-xl font-bold ${c.color}`}>
+              ${Math.abs(c.value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="mt-1 text-[10px] text-[#6B7280]">{c.hint}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Main chart */}
+      {/* Line chart */}
       <div className="rounded-xl border border-white/5 bg-admin-card p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold text-white">{chartLabel}</h2>
+          <h2 className="text-lg font-semibold text-white">Platform Revenue (Match Fees)</h2>
           <div className="flex gap-2">
-            {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+            {(["daily", "weekly", "monthly"] as Period[]).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                  period === p ? "bg-admin-accent text-white" : "bg-white/5 text-admin-body hover:bg-white/10"
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                  period === p
+                    ? "text-white"
+                    : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
                 }`}
+                style={period === p ? { background: "#FF5E00" } : {}}
               >
-                {PERIOD_LABELS[p]}
+                {p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
             ))}
           </div>
         </div>
         <div className="mt-4">
-          <RevenueChart
-            data={chartData}
-            showTotal={period === "daily"}
-            totalLabel="Total this period"
-            averageLabel="Average daily"
-          />
+          {chartData.length > 0 ? (
+            <RevenueChart
+              data={chartData}
+              totalLabel="Total this period"
+              averageLabel="Average"
+              color="#FF5E00"
+            />
+          ) : (
+            <p className="py-8 text-center text-sm text-[#9CA3AF]">No data yet.</p>
+          )}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Revenue by game - donut */}
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <h2 className="text-lg font-semibold text-white">Revenue Breakdown by Game</h2>
-          <div className="mt-4 flex flex-wrap items-center gap-6">
-            <div className="relative h-48 w-48 shrink-0">
-              <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                {REVENUE_BY_GAME.map((g, i) => {
-                  const startDeg = REVENUE_BY_GAME.slice(0, i).reduce((s, x) => s + (x.pct / 100) * 360, 0);
-                  const angle = (g.pct / 100) * 360;
-                  const endDeg = startDeg + angle;
-                  const x1 = 50 + 40 * Math.cos((startDeg * Math.PI) / 180);
-                  const y1 = 50 + 40 * Math.sin((startDeg * Math.PI) / 180);
-                  const x2 = 50 + 40 * Math.cos((endDeg * Math.PI) / 180);
-                  const y2 = 50 + 40 * Math.sin((endDeg * Math.PI) / 180);
-                  const large = angle > 180 ? 1 : 0;
-                  const d = `M 50 50 L ${x1} ${y1} A 40 40 0 ${large} 1 ${x2} ${y2} Z`;
-                  return (
-                    <path key={g.name} d={d} fill={GAME_COLORS[i]} stroke="#12131A" strokeWidth={2} />
-                  );
-                })}
-                <circle cx="50" cy="50" r="28" fill="#12131A" />
-              </svg>
-            </div>
-            <ul className="space-y-2">
-              {REVENUE_BY_GAME.map((g, i) => (
-                <li key={g.name} className="flex items-center gap-2 text-sm">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: GAME_COLORS[i] }}
-                  />
-                  <span className="text-white">{g.name}</span>
-                  <span className="text-admin-body">{g.pct}% (${g.value.toLocaleString()})</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        {/* Revenue by stake tier */}
-        <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-          <h2 className="text-lg font-semibold text-white">Revenue by Stake Tier</h2>
-          <div className="mt-4 space-y-3">
-            {REVENUE_BY_STAKE.map((t) => (
-              <div key={t.range}>
-                <div className="flex justify-between text-sm">
-                  <span className="text-white">{t.range}</span>
-                  <span className="text-admin-body">${t.value.toLocaleString()} ({t.pct}%)</span>
-                </div>
-                <div className="mt-1 h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-admin-accent"
-                    style={{ width: `${t.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Top players by revenue */}
+      {/* Transaction breakdown table */}
       <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-        <h2 className="text-lg font-semibold text-white">Top Players by Revenue Generated</h2>
-        <p className="mt-1 text-sm text-admin-body">VIP players — they drive platform fees</p>
+        <h2 className="text-lg font-semibold text-white">Transaction Breakdown</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-white/10 text-admin-body">
-                <th className="px-4 py-3 font-medium">Username</th>
-                <th className="px-4 py-3 font-medium">Total Matches</th>
-                <th className="px-4 py-3 font-medium">Total Wagered</th>
-                <th className="px-4 py-3 font-medium">Fees Generated</th>
+              <tr className="border-b border-white/5 text-[#9CA3AF]">
+                <th className="pb-3 pr-8 font-medium">Category</th>
+                <th className="pb-3 pr-8 font-medium text-right">Count</th>
+                <th className="pb-3 pr-8 font-medium text-right">Total Amount</th>
+                <th className="pb-3 font-medium text-right">Avg per tx</th>
               </tr>
             </thead>
             <tbody>
-              {TOP_PLAYERS_FAKE.map((p) => (
-                <tr key={p.username} className="border-b border-white/5">
-                  <td className="px-4 py-3 font-medium text-white">{p.username}</td>
-                  <td className="px-4 py-3 text-admin-body">{p.matches}</td>
-                  <td className="px-4 py-3 text-admin-body">${p.totalWagered.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-admin-success">${p.feesGenerated.toFixed(2)}</td>
-                </tr>
-              ))}
+              {["deposit", "withdrawal", "match_entry", "match_win", "match_refund"].map((type) => {
+                const rows = txRows.filter((t) => t.type === type);
+                const total = rows.reduce((s, t) => s + Math.abs(t.amount), 0);
+                const avg = rows.length ? total / rows.length : 0;
+                return (
+                  <tr key={type} className="border-b border-white/5 last:border-0">
+                    <td className="py-3 pr-8 font-medium capitalize text-white">
+                      {type.replace(/_/g, " ")}
+                    </td>
+                    <td className="py-3 pr-8 text-right text-[#9CA3AF]">{rows.length}</td>
+                    <td className="py-3 pr-8 text-right text-[#9CA3AF]">
+                      ${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3 text-right text-[#9CA3AF]">
+                      ${avg.toFixed(2)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Financial summary */}
-      <div className="rounded-xl border border-white/5 bg-admin-card p-6">
-        <h2 className="text-lg font-semibold text-white">Financial Summary</h2>
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-lg border border-white/5 p-4">
-            <dt className="text-sm text-admin-body">Total Deposited (all users)</dt>
-            <dd className="mt-1 text-xl font-bold text-white">$284,392.00</dd>
-          </div>
-          <div className="rounded-lg border border-white/5 p-4">
-            <dt className="text-sm text-admin-body">Total Withdrawn</dt>
-            <dd className="mt-1 text-xl font-bold text-white">$216,959.20</dd>
-          </div>
-          <div className="rounded-lg border border-white/5 p-4">
-            <dt className="text-sm text-admin-body">Platform Balance</dt>
-            <dd className="mt-1 text-xl font-bold text-white">$67,432.80</dd>
-          </div>
-          <div className="rounded-lg border border-white/5 p-4">
-            <dt className="text-sm text-admin-body">Total Fees Collected</dt>
-            <dd className="mt-1 text-xl font-bold text-admin-success">$67,432.80</dd>
-          </div>
-          <div className="rounded-lg border border-white/5 p-4">
-            <dt className="text-sm text-admin-body">Average Fee per Match</dt>
-            <dd className="mt-1 text-xl font-bold text-white">$1.52</dd>
-          </div>
-        </dl>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ interface RevenueChartProps {
   averageLabel?: string;
   totalValue?: number;
   averageValue?: number;
+  color?: string;
 }
 
 export default function RevenueChart({
@@ -26,6 +27,7 @@ export default function RevenueChart({
   averageLabel = "Average daily",
   totalValue,
   averageValue,
+  color = "#FF5E00",
 }: RevenueChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const padding = { top: 20, right: 20, bottom: 40, left: 56 };
@@ -75,8 +77,8 @@ export default function RevenueChart({
       >
         <defs>
           <linearGradient id="admin-revenue-gradient" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stopColor="#6366F1" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#6366F1" stopOpacity="0.05" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.03" />
           </linearGradient>
         </defs>
         {/* Y-axis labels */}
@@ -116,7 +118,7 @@ export default function RevenueChart({
         <path
           d={path}
           fill="none"
-          stroke="#6366F1"
+          stroke={color}
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -128,7 +130,7 @@ export default function RevenueChart({
               cx={pt.x}
               cy={pt.y}
               r={hoveredIndex === pt.i ? 6 : 4}
-              fill="#6366F1"
+              fill={color}
               className="cursor-pointer"
               onMouseEnter={() => setHoveredIndex(pt.i)}
             />
@@ -141,7 +143,7 @@ export default function RevenueChart({
                   height={28}
                   rx={4}
                   fill="#12131A"
-                  stroke="#6366F1"
+                  stroke={color}
                   strokeWidth={1}
                 />
                 <text x={pt.x} y={pt.y - 18} textAnchor="middle" className="fill-white text-xs">
