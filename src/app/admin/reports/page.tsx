@@ -16,6 +16,7 @@ interface Report {
   status: ReportStatus;
   admin_notes: string | null;
   created_at: string;
+  updated_at: string | null;
   resolved_at: string | null;
   // enriched
   reporterName?: string;
@@ -240,11 +241,13 @@ export default function AdminReportsPage() {
     const supabase = createClient();
     if (!supabase) { setSaving(null); return; }
 
+    const now = new Date().toISOString();
     const update: Record<string, unknown> = {
       status: newStatus,
       admin_notes: notes[id] ?? reports.find((r) => r.id === id)?.admin_notes ?? null,
+      updated_at: now,
     };
-    if (newStatus === "resolved") update.resolved_at = new Date().toISOString();
+    if (newStatus === "resolved") update.resolved_at = now;
 
     const { error: err } = await supabase.from("reports").update(update).eq("id", id);
     if (!err) {
@@ -310,24 +313,47 @@ export default function AdminReportsPage() {
           {error && (
             <pre className="mx-auto mt-4 max-w-2xl rounded-lg bg-admin-bg p-4 text-left text-xs text-[#9CA3AF]">
 {`-- Run in Supabase SQL editor:
-CREATE TABLE reports (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  reporter_user_id uuid REFERENCES auth.users(id) NOT NULL,
-  reported_user_id uuid REFERENCES auth.users(id),
-  match_id uuid,
-  game_type text,
-  report_reason text NOT NULL,
-  report_comment text,
-  status text DEFAULT 'new' CHECK (status IN ('new','reviewed','resolved')),
-  admin_notes text,
-  created_at timestamptz DEFAULT now(),
-  resolved_at timestamptz
+CREATE TABLE IF NOT EXISTS reports (
+  id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  reporter_user_id uuid        REFERENCES auth.users(id) NOT NULL,
+  reported_user_id uuid        REFERENCES auth.users(id),
+  match_id         uuid,
+  game_type        text,
+  report_reason    text        NOT NULL,
+  report_comment   text,
+  status           text        NOT NULL DEFAULT 'new'
+                               CHECK (status IN ('new','reviewed','resolved')),
+  admin_notes      text,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz,
+  resolved_at      timestamptz
 );
+
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can insert own reports" ON reports
-  FOR INSERT WITH CHECK (auth.uid() = reporter_user_id);
-CREATE POLICY "Admin can read/update all reports" ON reports
-  FOR ALL USING (auth.jwt() ->> 'email' = 'aras.axmas@gmail.com');`}
+
+-- Players can insert their own reports
+CREATE POLICY "reports_insert_own"
+  ON reports FOR INSERT
+  WITH CHECK (auth.uid() = reporter_user_id);
+
+-- Admin can do everything (SELECT, UPDATE, DELETE)
+CREATE POLICY "reports_admin_all"
+  ON reports FOR ALL
+  USING (auth.email() = 'aras.axmas@gmail.com')
+  WITH CHECK (auth.email() = 'aras.axmas@gmail.com');
+
+-- Auto-update updated_at on every row change
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER reports_set_updated_at
+  BEFORE UPDATE ON reports
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();`}
             </pre>
           )}
         </div>
