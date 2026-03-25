@@ -779,7 +779,14 @@ function MatchPageContent() {
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isPractice={match.isPractice}
+                seed={matchId}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEvent}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
               />
             </GameLayout>

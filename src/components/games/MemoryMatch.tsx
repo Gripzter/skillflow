@@ -17,9 +17,10 @@ import {
   remainingPairs,
 } from "@/lib/games/memory-logic";
 import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
+import type { GameMultiplayerProps } from "@/components/games/Chess";
 import type { MatchUiState } from "@/components/game/matchUi";
 
-interface MemoryMatchProps {
+interface MemoryMatchProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
   player2: { username: string; rating: number };
   onGameEnd: (winner: "player1" | "player2") => void;
@@ -28,7 +29,8 @@ interface MemoryMatchProps {
   botDifficulty?: BotDifficulty;
   /** Real-money vs practice accent on active row (defaults true = practice). */
   isPractice?: boolean;
-  onMatchUi?: (state: MatchUiState) => void;
+  /** Match ID used as a seed so both multiplayer clients get the same deck. */
+  seed?: string;
 }
 
 type LogEntry = {
@@ -51,9 +53,15 @@ export default function MemoryMatch({
   isPlayer2Bot = true,
   botDifficulty = "gamer",
   isPractice: _isPractice = true,
+  seed,
+  isMultiplayer = false,
+  myRole = "player1",
+  sendGameEvent,
+  incomingEvent,
+  onEventProcessed,
   onMatchUi,
 }: MemoryMatchProps) {
-  const [cards, setCards] = useState<MemoryCard[]>(() => createShuffledDeck());
+  const [cards, setCards] = useState<MemoryCard[]>(() => createShuffledDeck(undefined, seed));
   const [currentPlayer, setCurrentPlayer] = useState<MemoryMatchPlayer>(1);
   const [selected, setSelected] = useState<number[]>([]);
   const [scores, setScores] = useState<{ 1: number; 2: number }>({ 1: 0, 2: 0 });
@@ -71,6 +79,12 @@ export default function MemoryMatch({
   const processingRef = useRef(false);
   const gameEndCalledRef = useRef(false);
   const botMemoryRef = useRef<Record<string, number[]>>({});
+  const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
+
+  // In multiplayer, "my turn" depends on myRole; in single-player the human is always player 1.
+  const isMyTurn = !isMultiplayer
+    ? currentPlayer === 1
+    : (currentPlayer === 1 && myRole === "player1") || (currentPlayer === 2 && myRole === "player2");
 
   const totalPairs = useMemo(() => cards.length / 2, [cards.length]);
   const remaining = useMemo(() => remainingPairs(cards), [cards]);
@@ -145,11 +159,11 @@ export default function MemoryMatch({
         player,
         message:
           player === 1
-            ? `Developer flipped ${card.icon}`
+            ? `${player1.username} flipped ${card.icon}`
             : `${player2.username} flipped ${card.icon}`,
       });
     },
-    [cards, addLog, gameOver, player2.username]
+    [cards, addLog, gameOver, player1.username, player2.username]
   );
 
   const resolveSelection = useCallback(
@@ -290,6 +304,24 @@ export default function MemoryMatch({
     }
   }, [selected, currentPlayer, resolveSelection]);
 
+  // Handle incoming multiplayer events from the opponent.
+  useEffect(() => {
+    if (!incomingEvent || !onEventProcessed) return;
+    if (incomingEvent === lastProcessedEventRef.current) return;
+    lastProcessedEventRef.current = incomingEvent;
+
+    const type = incomingEvent.type as string | undefined;
+    if (type === "memory_flip") {
+      const cardIndex = incomingEvent.cardIndex as number | undefined;
+      if (typeof cardIndex === "number" && cardIndex >= 0) {
+        // Apply the opponent's flip locally so both players see it.
+        const opponentRole: MemoryMatchPlayer = myRole === "player1" ? 2 : 1;
+        flipCardAt(cardIndex, opponentRole);
+      }
+    }
+    onEventProcessed();
+  }, [incomingEvent, onEventProcessed, myRole, flipCardAt]);
+
   useEffect(() => {
     if (!isPlayer2Bot || currentPlayer !== 2 || gameOver || isProcessing) {
       return;
@@ -327,21 +359,19 @@ export default function MemoryMatch({
 
   const handleCardClick = useCallback(
     (index: number) => {
-      // Single source of truth for interactivity on human side:
-      // - must be player's turn
-      // - game not over
-      // - cannot pick more than 2 cards
-      if (gameOver || currentPlayer !== 1) {
-        return;
-      }
-      if (selected.length >= 2) {
-        return;
-      }
+      // Must be this player's turn, game not over, and fewer than 2 cards selected.
+      if (gameOver || !isMyTurn) return;
+      if (selected.length >= 2) return;
       const card = cards[index];
       if (!card || card.state !== "hidden") return;
-      flipCardAt(index, 1);
+      // In multiplayer, the local human may be player 1 or player 2.
+      const localPlayer: MemoryMatchPlayer = isMultiplayer && myRole === "player2" ? 2 : 1;
+      flipCardAt(index, localPlayer);
+      if (isMultiplayer && sendGameEvent) {
+        sendGameEvent({ type: "memory_flip", cardIndex: index }).catch(() => {});
+      }
     },
-    [cards, currentPlayer, gameOver, flipCardAt, selected.length]
+    [cards, isMyTurn, gameOver, flipCardAt, selected.length, isMultiplayer, myRole, sendGameEvent]
   );
 
   const activeColor =
@@ -443,7 +473,7 @@ export default function MemoryMatch({
                       resolvingRef.current ||
                       isProcessing ||
                       card.state !== "hidden" ||
-                      currentPlayer !== 1
+                      !isMyTurn
                     }
                     className="memory-card group relative flex items-center justify-center rounded-[10px] outline-none"
                     style={{

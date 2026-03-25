@@ -46,8 +46,13 @@ export const MEMORY_ICONS = [
 /**
  * Create a shuffled deck of cards.
  * Each icon appears exactly twice.
+ * When a seed string is provided the shuffle is deterministic, so both
+ * multiplayer clients produce the identical card layout.
  */
-export function createShuffledDeck(config: MemoryMatchConfig = DEFAULT_MEMORY_MATCH_CONFIG): MemoryCard[] {
+export function createShuffledDeck(
+  config: MemoryMatchConfig = DEFAULT_MEMORY_MATCH_CONFIG,
+  seed?: string,
+): MemoryCard[] {
   const { pairs } = config;
   if (pairs > MEMORY_ICONS.length) {
     throw new Error(`Requested ${pairs} pairs but only ${MEMORY_ICONS.length} icons available`);
@@ -61,13 +66,30 @@ export function createShuffledDeck(config: MemoryMatchConfig = DEFAULT_MEMORY_MA
       { id: id++, icon, state: "hidden", matchedBy: 0 }
     );
   }
-  return shuffle(cards);
+  return seed !== undefined ? seededShuffle(cards, seed) : shuffle(cards);
 }
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/** Deterministic Fisher-Yates shuffle driven by a string seed (LCG). */
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  // Hash the seed string into an unsigned 32-bit integer
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  }
+  let s = h >>> 0;
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    const j = s % (i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
