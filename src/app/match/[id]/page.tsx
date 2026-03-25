@@ -17,6 +17,7 @@ import { updateMatch } from "@/lib/matchmaking";
 import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
 import type { ConnectionSnapshot } from "@/lib/connection-logger";
 import { useMultiplayer } from "@/hooks/useMultiplayer";
+import { useAfkTimer } from "@/hooks/useAfkTimer";
 import EightBallPool from "@/components/games/EightBallPool";
 import Chess from "@/components/games/Chess";
 import ConnectFour from "@/components/games/ConnectFour";
@@ -34,7 +35,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 
-const OPPONENT_RECONNECT_SEC = 30;
+const OPPONENT_RECONNECT_SEC = 60;
 
 type Outcome = null | "victory" | "defeat" | "draw";
 
@@ -71,6 +72,8 @@ function MatchPageContent() {
   const [reportComment, setReportComment] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  /** Set to true when we receive an afk_forfeit event from the opponent. */
+  const [afkForfeitPending, setAfkForfeitPending] = useState(false);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
@@ -87,6 +90,12 @@ function MatchPageContent() {
       const e = event as { type?: string };
       if (e.type === "opponent_disconnected") {
         setOpponentDisconnectedAt((t) => (t === null ? Date.now() : t));
+        return;
+      }
+      if (e.type === "afk_forfeit") {
+        // Opponent forfeited due to AFK — mark pending so the effect below can fire
+        // once myRole and handleGameEnd are in scope.
+        setAfkForfeitPending(true);
         return;
       }
       if (e.type === "chat_message") {
@@ -160,6 +169,11 @@ function MatchPageContent() {
   }, [matchId, router]);
 
   const isRealMultiplayerMatch = match?.isRealMultiplayer ?? false;
+  // Computed before early-returns so hooks below can reference it.
+  const myRoleComputed: "player1" | "player2" =
+    isRealMultiplayerMatch && match?.player1Id && match?.player2Id
+      ? match.player1Id === userId ? "player1" : "player2"
+      : "player1";
   const realtimeConnectedRef = useRef(realtimeConnected);
   realtimeConnectedRef.current = realtimeConnected;
 
@@ -395,6 +409,49 @@ function MatchPageContent() {
     }
   }, [handleGameEnd, match, sendGameEvent]);
 
+  // ── AFK forfeit triggered BY US (timer expired on our turn) ──────────────
+  const handleAfkForfeit = useCallback(() => {
+    if (forfeitHandledRef.current || !match) return;
+    forfeitHandledRef.current = true;
+    const opponentRole: "player1" | "player2" =
+      myRoleComputed === "player1" ? "player2" : "player1";
+    if (match.isRealMultiplayer) {
+      // Notify opponent so they get the victory screen instantly.
+      sendGameEvent({ type: "afk_forfeit" }).catch(() => {});
+    }
+    handleGameEnd(opponentRole);
+  }, [match, myRoleComputed, sendGameEvent, handleGameEnd]);
+
+  // ── AFK forfeit triggered BY OPPONENT (we receive their afk_forfeit) ─────
+  useEffect(() => {
+    if (!afkForfeitPending || forfeitHandledRef.current || !match) return;
+    setAfkForfeitPending(false);
+    forfeitHandledRef.current = true;
+    setWonByForfeit(true);
+    handleGameEnd(myRoleComputed); // we are the winner
+  }, [afkForfeitPending, match, myRoleComputed, handleGameEnd]);
+
+  // ── AFK timer ─────────────────────────────────────────────────────────────
+  const afkTimerEnabled =
+    (match?.status === "in_progress") === true && !outcome;
+  const isMyTurnNow = matchUi?.currentTurn === myRoleComputed;
+
+  const { secondsLeft: afkSecondsLeft, showWarning: afkShowWarning, resetTimer: afkResetTimer } =
+    useAfkTimer({
+      enabled: afkTimerEnabled,
+      isMyTurn: isMyTurnNow ?? false,
+      onForfeit: handleAfkForfeit,
+    });
+
+  // Wrap sendGameEvent so any move the local player makes resets the AFK timer.
+  const sendGameEventWithAfkReset = useCallback(
+    async (event: Record<string, unknown>) => {
+      afkResetTimer();
+      return sendGameEvent(event);
+    },
+    [sendGameEvent, afkResetTimer]
+  );
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -468,12 +525,7 @@ function MatchPageContent() {
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   const shortId = match.id.slice(0, 8);
-  const myRole: "player1" | "player2" =
-    isRealMultiplayer && match.player1Id && match.player2Id
-      ? match.player1Id === userId
-        ? "player1"
-        : "player2"
-      : "player1";
+  const myRole = myRoleComputed;
   const opponentUsername =
     myRole === "player1" ? safePlayer2.username : safePlayer1.username;
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
@@ -718,7 +770,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -739,7 +791,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -760,7 +812,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -784,7 +836,7 @@ function MatchPageContent() {
                 seed={matchId}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -805,7 +857,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -827,7 +879,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -849,7 +901,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -871,7 +923,7 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
-                sendGameEvent={sendGameEvent}
+                sendGameEvent={sendGameEventWithAfkReset}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -978,6 +1030,34 @@ function MatchPageContent() {
       </div>
       )}
       </div>
+
+      {/* AFK warning banner — shown when ≤30 s remain on the local player's turn */}
+      {afkShowWarning && !outcome && match.status === "in_progress" && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-40 border-t px-4 py-3 backdrop-blur-sm"
+          style={{
+            background: "rgba(185, 28, 28, 0.93)",
+            borderColor: "rgba(239, 68, 68, 0.5)",
+          }}
+        >
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
+            <p className="font-semibold text-white">
+              ⚠ Make a move or you&apos;ll forfeit in {afkSecondsLeft}s
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="h-2 w-28 overflow-hidden rounded-full bg-red-950">
+                <div
+                  className="h-full bg-white/70 transition-all duration-1000 ease-linear"
+                  style={{ width: `${((afkSecondsLeft ?? 0) / 60) * 100}%` }}
+                />
+              </div>
+              <span className="min-w-[2.5rem] font-mono text-sm font-bold text-white">
+                {afkSecondsLeft}s
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Game result overlay — victory, defeat, or draw */}
       {outcome && (
