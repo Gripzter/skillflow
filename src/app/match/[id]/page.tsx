@@ -158,6 +158,26 @@ function MatchPageContent() {
           return;
         }
         setMatch(m);
+
+        // Fix 1 + 3: If the match is already completed (player refreshed the page,
+        // closed and reopened the tab, or returned after a forfeit), derive the outcome
+        // directly from the database record.  Never trust local React state for this.
+        if (m.status === "completed") {
+          // In practice / bot matches the current user is always player1.
+          // In real-multiplayer matches resolve by comparing stored player IDs.
+          const iAmPlayer1 = !m.isRealMultiplayer
+            ? true
+            : m.player1Id === user.id;
+
+          if (!m.winner) {
+            setOutcome("draw");
+          } else {
+            const iWon =
+              (m.winner === "player1" && iAmPlayer1) ||
+              (m.winner === "player2" && !iAmPlayer1);
+            setOutcome(iWon ? "victory" : "defeat");
+          }
+        }
       } catch (err) {
         console.error("Failed to load match:", err);
         setLoadError("Failed to load match. Please try again.");

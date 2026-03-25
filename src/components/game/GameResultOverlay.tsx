@@ -32,7 +32,7 @@ export default function GameResultOverlay({
 
     function burst() {
       confetti({
-        particleCount: 60,
+        particleCount: 20,
         angle: 60,
         spread: 55,
         origin: { x: 0, y: 0.65 },
@@ -40,7 +40,7 @@ export default function GameResultOverlay({
         zIndex: 60,
       });
       confetti({
-        particleCount: 60,
+        particleCount: 20,
         angle: 120,
         spread: 55,
         origin: { x: 1, y: 0.65 },
