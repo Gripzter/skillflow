@@ -58,6 +58,7 @@ export default function PlayGamePage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [myGameRating, setMyGameRating] = useState(1000);
 
   const [stake, setStake] = useState(5);
   const [customStake, setCustomStake] = useState("");
@@ -105,6 +106,16 @@ export default function PlayGamePage() {
         setEmailVerified(user.emailVerified ?? true);
         const bal = await getWalletBalance();
         setBalance(bal);
+        // Fetch player's Glicko-2 rating for this game
+        if (user.id && gameSlug) {
+          try {
+            const { getPlayerGameRating } = await import("@/lib/ranking/updateRating");
+            const ratingData = await getPlayerGameRating(user.id, gameSlug);
+            setMyGameRating(ratingData.rating);
+          } catch {
+            // non-fatal — defaults to 1000
+          }
+        }
       } catch {
         router.push("/login");
       } finally {
@@ -246,7 +257,8 @@ export default function PlayGamePage() {
           stakeAmount,
           userId,
           username,
-          rating: 1000,
+          rating: myGameRating,
+          isRealMoney: true,
           onMatchReady: handleMatchReady,
         });
       } catch {

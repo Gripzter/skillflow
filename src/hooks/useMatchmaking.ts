@@ -22,6 +22,7 @@ export interface MatchmakingOptions {
   userId: string;
   username: string;
   rating: number;
+  isRealMoney?: boolean;
   onMatchReady?: (match: DbMatch, role: "player1" | "player2") => void;
 }
 
@@ -59,6 +60,7 @@ export function useMatchmaking() {
         options.userId,
         options.username,
         options.rating,
+        options.isRealMoney ?? false,
         (updateStatus, matchData) => {
           setStatus(updateStatus as MatchmakingStatus);
           if (matchData) setMatch(matchData);
