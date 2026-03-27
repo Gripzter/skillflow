@@ -136,6 +136,22 @@ main,
   animation: gameLayoutActivePulse 2s ease-in-out infinite;
 }
 
+@keyframes afkRingPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.06);
+  }
+}
+
+.animate-afk-ring-pulse {
+  animation: afkRingPulse 900ms ease-in-out infinite;
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);

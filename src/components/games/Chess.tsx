@@ -32,6 +32,7 @@ interface ChessProps extends GameMultiplayerProps {
 }
 
 type PieceCode = string;
+const CHESS_TOTAL_TIME_SEC = 10 * 60;
 
 function boardFromGame(game: ChessEngine): (PieceCode | null)[][] {
   const b = game.board();
@@ -88,12 +89,17 @@ export default function Chess({
   const [botThinking, setBotThinking] = useState(false);
   const [drawOfferReceived, setDrawOfferReceived] = useState(false);
   const [drawOfferSent, setDrawOfferSent] = useState(false);
+  const [whiteTimeLeft, setWhiteTimeLeft] = useState(CHESS_TOTAL_TIME_SEC);
+  const [blackTimeLeft, setBlackTimeLeft] = useState(CHESS_TOTAL_TIME_SEC);
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
 
   const board = useMemo(() => boardFromGame(game), [game]);
   const turn = game.turn();
+  const myColor: PieceColor = isMultiplayer ? (myRole === "player1" ? "w" : "b") : "w";
+  const opponentColor: PieceColor = myColor === "w" ? "b" : "w";
+  const canActOnTurn = !isMultiplayer || turn === myColor;
   const legalMoves = useMemo(() => {
     if (!selectedSquare) return [];
     return game.moves({ verbose: true, square: selectedSquare as any });
@@ -115,6 +121,7 @@ export default function Chess({
   const executeMove = useCallback(
     (from: string, to: string, promotion?: PieceType) => {
       if (gameOverRef.current) return;
+      if (isMultiplayer && turn !== myColor) return;
       const next = new ChessEngine(game.fen());
       const moveOpt: { from: string; to: string; promotion?: "q" | "r" | "b" | "n" } = { from, to };
       if (promotion) moveOpt.promotion = promotion as "q" | "r" | "b" | "n";
@@ -146,6 +153,7 @@ export default function Chess({
               from,
               to,
               promotion: promotion ?? null,
+              byRole: myRole,
             }).catch(() => {});
           }
         }
@@ -153,12 +161,13 @@ export default function Chess({
         console.log("[Chess] move", { from, to, success: false, error: e, fen: game.fen() });
       }
     },
-    [game, player1.username, player2.username, isMultiplayer, sendGameEvent]
+    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole]
   );
 
   const handleSquareClick = useCallback(
     (square: string) => {
       if (promotionPending || gameOverRef.current) return;
+      if (!canActOnTurn) return;
       if (selectedSquare && legalTargetsSet.has(square)) {
         const move = legalMoves.find((m) => (m as { to: string }).to === square);
         const prom = (move as { promotion?: string })?.promotion;
@@ -176,18 +185,19 @@ export default function Chess({
         setSelectedSquare(null);
       }
     },
-    [selectedSquare, legalTargetsSet, legalMoves, turn, game, executeMove, promotionPending]
+    [selectedSquare, legalTargetsSet, legalMoves, turn, game, executeMove, promotionPending, canActOnTurn]
   );
 
   const handlePieceDragStart = useCallback(
     (square: string, piece: PieceCode, clientX: number, clientY: number) => {
       if (promotionPending || gameOverRef.current) return;
+      if (!canActOnTurn) return;
       if ((piece[0] as PieceColor) === turn) {
         setSelectedSquare(square);
         setDragging({ square, piece, x: clientX, y: clientY });
       }
     },
-    [turn, promotionPending]
+    [turn, promotionPending, canActOnTurn]
   );
 
   const handlePieceDragMove = useCallback((clientX: number, clientY: number) => {
@@ -197,6 +207,10 @@ export default function Chess({
   const handlePieceDragEnd = useCallback(
     (targetSquare: string | null) => {
       if (!dragging) return;
+      if (!canActOnTurn) {
+        setDragging(null);
+        return;
+      }
       const from = dragging.square;
       setDragging(null);
       if (targetSquare && legalTargetsSet.has(targetSquare)) {
@@ -209,8 +223,41 @@ export default function Chess({
         executeMove(from, targetSquare);
       }
     },
-    [dragging, legalTargetsSet, legalMoves, turn, executeMove]
+    [dragging, legalTargetsSet, legalMoves, turn, executeMove, canActOnTurn]
   );
+
+  useEffect(() => {
+    if (gameOverRef.current) return;
+    const t = setInterval(() => {
+      if (gameOverRef.current) return;
+      if (turn === "w") {
+        setWhiteTimeLeft((prev) => {
+          if (prev <= 1) {
+            gameOverRef.current = true;
+            if (isMultiplayer && sendGameEvent) {
+              sendGameEvent({ type: "chess_timeout", loserRole: "player1" }).catch(() => {});
+            }
+            onGameEnd("player2");
+            return 0;
+          }
+          return prev - 1;
+        });
+      } else {
+        setBlackTimeLeft((prev) => {
+          if (prev <= 1) {
+            gameOverRef.current = true;
+            if (isMultiplayer && sendGameEvent) {
+              sendGameEvent({ type: "chess_timeout", loserRole: "player2" }).catch(() => {});
+            }
+            onGameEnd("player1");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [turn, onGameEnd, isMultiplayer, sendGameEvent]);
 
   const handlePromotionChoose = useCallback(
     (piece: PieceType) => {
@@ -240,6 +287,11 @@ export default function Chess({
   useEffect(() => {
     if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
     const type = incomingEvent.type as string | undefined;
+    const byRole = incomingEvent.byRole as "player1" | "player2" | undefined;
+    if (byRole && byRole === myRole) {
+      onEventProcessed();
+      return;
+    }
     if (type === "chess_move") {
       const from = incomingEvent.from as string | undefined;
       const to = incomingEvent.to as string | undefined;
@@ -251,6 +303,10 @@ export default function Chess({
         try {
           const result = next.move(moveOpt);
           if (result) {
+            if (result.color !== opponentColor) {
+              onEventProcessed();
+              return;
+            }
             lastProcessedEventRef.current = incomingEvent;
             if (result.captured) {
               if (result.color === "w") setCapturedBlack((prev) => [...prev, result.captured as PieceType]);
@@ -279,6 +335,15 @@ export default function Chess({
       }
       return;
     }
+    if (type === "chess_timeout") {
+      lastProcessedEventRef.current = incomingEvent;
+      gameOverRef.current = true;
+      const loserRole = (incomingEvent.loserRole as "player1" | "player2" | undefined) ?? "player1";
+      const winner = loserRole === "player1" ? "player2" : "player1";
+      onGameEnd(winner);
+      onEventProcessed();
+      return;
+    }
     if (type === "resign") {
       lastProcessedEventRef.current = incomingEvent;
       gameOverRef.current = true;
@@ -301,7 +366,7 @@ export default function Chess({
       }
       onEventProcessed();
     }
-  }, [incomingEvent, onEventProcessed, game, player1.username, player2.username, myRole, onGameEnd, onGameDraw]);
+  }, [incomingEvent, onEventProcessed, game, player1.username, player2.username, myRole, onGameEnd, onGameDraw, opponentColor]);
 
   // Bot plays when it's Black's turn (only when not multiplayer).
   const fen = game.fen();
@@ -385,6 +450,7 @@ export default function Chess({
       scoreLabel: "Pts",
       currentTurn: turn === "w" ? "player1" : "player2",
       turnText,
+      turnTimerDisplay: `${Math.max(turn === "w" ? whiteTimeLeft : blackTimeLeft, 0)}s`,
       systemLogEntries,
     });
   }, [
@@ -401,6 +467,8 @@ export default function Chess({
     myRole,
     scoreP1,
     scoreP2,
+    whiteTimeLeft,
+    blackTimeLeft,
   ]);
 
   return (

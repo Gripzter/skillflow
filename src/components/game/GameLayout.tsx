@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import AfkCountdownRing from "@/components/game/AfkCountdownRing";
 
 export interface GameLayoutLogEntry {
   id: string;
@@ -49,6 +50,8 @@ export interface GameLayoutProps {
   onLeaveMatch: () => void;
   onReportIssue: () => void;
   realStakeDisplay?: string;
+  afkSecondsLeft?: number | null;
+  afkActivePlayer?: "player1" | "player2" | null;
 }
 
 /* ── tiny helpers ────────────────────────────────────────── */
@@ -76,11 +79,15 @@ function PlayerCard({
   playerKey,
   isActive,
   scoreLabelDefault,
+  afkSecondsLeft,
+  afkRingVisible,
 }: {
   player: GameLayoutProps["player1"];
   playerKey: "player1" | "player2";
   isActive: boolean;
   scoreLabelDefault: string;
+  afkSecondsLeft?: number | null;
+  afkRingVisible?: boolean;
 }) {
   const initial = (player.username || "?").charAt(0).toUpperCase();
   const avatarBg = playerKey === "player1" ? "#FF5E00" : "#2A3A5C";
@@ -103,20 +110,29 @@ function PlayerCard({
         />
       )}
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
-        {player.avatar ? (
-          <img
-            src={player.avatar}
-            alt=""
-            className="h-[34px] w-[34px] shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <div
-            className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
-            style={{ background: avatarBg }}
-          >
-            {initial}
-          </div>
-        )}
+        <div className="relative h-[34px] w-[34px] shrink-0">
+          {afkRingVisible && afkSecondsLeft !== null ? (
+            <AfkCountdownRing
+              secondsLeft={afkSecondsLeft}
+              totalSeconds={60}
+              isDanger={afkSecondsLeft <= 10}
+            />
+          ) : null}
+          {player.avatar ? (
+            <img
+              src={player.avatar}
+              alt=""
+              className="h-[34px] w-[34px] rounded-full object-cover"
+            />
+          ) : (
+            <div
+              className="flex h-[34px] w-[34px] items-center justify-center rounded-full text-sm font-semibold text-white"
+              style={{ background: avatarBg }}
+            >
+              {initial}
+            </div>
+          )}
+        </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-medium text-white">
             {player.username}
@@ -160,6 +176,8 @@ export default function GameLayout({
   onLeaveMatch,
   onReportIssue,
   realStakeDisplay,
+  afkSecondsLeft = null,
+  afkActivePlayer = null,
 }: GameLayoutProps) {
   const [chatInput, setChatInput] = useState("");
   const [mobileFeedOpen, setMobileFeedOpen] = useState(false);
@@ -252,8 +270,22 @@ export default function GameLayout({
 
           {/* Player cards */}
           <div className="mx-auto flex w-full max-w-[600px] shrink-0 gap-2.5 px-3 py-2 md:px-5">
-            <PlayerCard playerKey="player1" player={player1} isActive={currentTurn === "player1"} scoreLabelDefault="Score" />
-            <PlayerCard playerKey="player2" player={player2} isActive={currentTurn === "player2"} scoreLabelDefault="Score" />
+            <PlayerCard
+              playerKey="player1"
+              player={player1}
+              isActive={currentTurn === "player1"}
+              scoreLabelDefault="Score"
+              afkSecondsLeft={afkSecondsLeft}
+              afkRingVisible={mode === "real" && afkActivePlayer === "player1"}
+            />
+            <PlayerCard
+              playerKey="player2"
+              player={player2}
+              isActive={currentTurn === "player2"}
+              scoreLabelDefault="Score"
+              afkSecondsLeft={afkSecondsLeft}
+              afkRingVisible={mode === "real" && afkActivePlayer === "player2"}
+            />
           </div>
 
           {/* Board — flex:1 centers the game content in all remaining space */}

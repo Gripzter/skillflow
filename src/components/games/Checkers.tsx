@@ -250,6 +250,11 @@ export default function Checkers({
     if (!type) return;
 
     if (type === "checkers_timeout") {
+      const byRole = incomingEvent.byRole as "player1" | "player2" | undefined;
+      if (byRole && byRole === myRole) {
+        onEventProcessed();
+        return;
+      }
       lastProcessedEventRef.current = incomingEvent;
       if (!gameOverRef.current) {
         gameOverRef.current = true;
@@ -261,6 +266,11 @@ export default function Checkers({
     }
 
     if (type === "checkers_resign") {
+      const byRole = incomingEvent.byRole as "player1" | "player2" | undefined;
+      if (byRole && byRole === myRole) {
+        onEventProcessed();
+        return;
+      }
       lastProcessedEventRef.current = incomingEvent;
       if (!gameOverRef.current) {
         gameOverRef.current = true;
@@ -272,6 +282,11 @@ export default function Checkers({
     }
 
     if (type === "checkers_move") {
+      const byRole = incomingEvent.byRole as "player1" | "player2" | undefined;
+      if (byRole && byRole === myRole) {
+        onEventProcessed();
+        return;
+      }
       lastProcessedEventRef.current = incomingEvent;
       const payload = incomingEvent as any;
       if (payload?.moveId && payload.moveId === lastSentMoveIdRef.current) {

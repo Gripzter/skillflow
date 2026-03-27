@@ -138,7 +138,7 @@ export default function ConnectFour({
         setTurn(turn === 1 ? 2 : 1);
       }
       if (isMultiplayer && sendGameEvent) {
-        sendGameEvent({ type: "connect4_move", column: col }).catch(() => {});
+        sendGameEvent({ type: "connect4_move", column: col, byRole: myRole }).catch(() => {});
       }
     },
     [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent]
@@ -149,6 +149,17 @@ export default function ConnectFour({
     if (!incomingEvent || !onEventProcessed || incomingEvent === lastProcessedEventRef.current) return;
     const type = incomingEvent.type as string | undefined;
     if (type === "connect4_move") {
+      const byRole = incomingEvent.byRole as "player1" | "player2" | undefined;
+      if (byRole && byRole === myRole) {
+        onEventProcessed();
+        return;
+      }
+      const isLocalTurn =
+        (turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2");
+      if (isLocalTurn) {
+        onEventProcessed();
+        return;
+      }
       const column = incomingEvent.column as number | undefined;
       if (typeof column !== "number" || column < 0 || column > 6 || gameOverRef.current) {
         onEventProcessed();

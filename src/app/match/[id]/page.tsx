@@ -635,6 +635,8 @@ function MatchPageContent() {
     onLeaveMatch: () => setForfeitConfirm(true),
     onReportIssue: () => { setReportOpen(true); setReportSubmitted(false); },
     realStakeDisplay: match.isPractice ? undefined : `$${match.stakeAmount.toFixed(2)}`,
+    afkSecondsLeft,
+    afkActivePlayer: !match.isPractice && afkSecondsLeft !== null ? myRole : null,
   };
 
   return (
