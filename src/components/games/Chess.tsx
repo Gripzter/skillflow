@@ -154,6 +154,7 @@ export default function Chess({
               to,
               promotion: promotion ?? null,
               byRole: myRole,
+              san: result.san,
             }).catch(() => {});
           }
         }

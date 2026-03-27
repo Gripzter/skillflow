@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
+import ChessReplayViewer from "@/components/admin/ChessReplayViewer";
 
 interface MatchRow {
   id: string;
@@ -18,6 +19,11 @@ interface MatchRow {
   result: string | null;
   created_at: string;
   bot_difficulty: string | null;
+  move_log: Array<{
+    player_id: string;
+    action: Record<string, unknown>;
+    timestamp_ms: number;
+  }> | null;
 }
 
 type DateRange = "today" | "week" | "month" | "all";
@@ -62,7 +68,7 @@ export default function AdminMatchesPage() {
 
       const { data: raw } = await supabase
         .from("matches")
-        .select("id, game_type, player1_id, player2_id, stake_amount, platform_fee, total_pot, winner_payout, status, result, created_at, bot_difficulty")
+        .select("id, game_type, player1_id, player2_id, stake_amount, platform_fee, total_pot, winner_payout, status, result, created_at, bot_difficulty, move_log")
         .order("created_at", { ascending: false })
         .limit(500);
 
@@ -223,7 +229,17 @@ export default function AdminMatchesPage() {
                           <p className="text-xs text-[#6B7280]">Bot Difficulty</p>
                           <p className="mt-0.5 text-white capitalize">{m.bot_difficulty ?? "—"}</p>
                         </div>
+                        <div>
+                          <p className="text-xs text-[#6B7280]">Move Log Entries</p>
+                          <p className="mt-0.5 text-white">{Array.isArray(m.move_log) ? m.move_log.length : 0}</p>
+                        </div>
                       </div>
+                      {m.game_type === "chess" && Array.isArray(m.move_log) && m.move_log.length > 0 && (
+                        <div className="mt-4">
+                          <p className="mb-2 text-xs font-medium text-[#9CA3AF]">Replay (Admin only)</p>
+                          <ChessReplayViewer moveLog={m.move_log} />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}

@@ -62,6 +62,12 @@ export interface StoredMatch {
   player2Id?: string;
   /** Practice only: bot difficulty */
   botDifficulty?: "rookie" | "gamer" | "professional";
+  /** Persisted replay log (Supabase JSONB: move_log). */
+  moveLog?: Array<{
+    player_id: string;
+    action: Record<string, unknown>;
+    timestamp_ms: number;
+  }>;
 }
 
 export function generateMatchId(): string {

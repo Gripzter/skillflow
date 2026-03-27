@@ -38,6 +38,76 @@ import { useToast } from "@/components/Toast";
 const OPPONENT_RECONNECT_SEC = 60;
 
 type Outcome = null | "victory" | "defeat" | "draw";
+type MoveLogEntry = {
+  player_id: string;
+  action: Record<string, unknown>;
+  timestamp_ms: number;
+};
+
+function toMoveAction(gameType: string, event: Record<string, unknown>): Record<string, unknown> | null {
+  const type = event.type as string | undefined;
+  if (!type) return null;
+  if (gameType === "chess" && type === "chess_move") {
+    return {
+      type,
+      san: event.san ?? null,
+      from: event.from ?? null,
+      to: event.to ?? null,
+      promotion: event.promotion ?? null,
+    };
+  }
+  if (gameType === "connect-4" && type === "connect4_move") {
+    return { type, column: event.column ?? null };
+  }
+  if (gameType === "checkers" && type === "checkers_move") {
+    const lm = event.lastMove as { from?: unknown; to?: unknown } | undefined;
+    return { type, from: lm?.from ?? null, to: lm?.to ?? null };
+  }
+  if (gameType === "trivia" && type === "trivia_answer") {
+    return {
+      type,
+      question_number: typeof event.questionIndex === "number" ? (event.questionIndex as number) + 1 : null,
+      answer_chosen: event.answerIndex ?? null,
+      correct: event.correct ?? null,
+    };
+  }
+  if (gameType === "typing-race" && type === "race_progress") {
+    return {
+      type,
+      wpm: event.wpm ?? null,
+      accuracy: event.accuracy ?? null,
+      progress: event.progress ?? null,
+    };
+  }
+  if (gameType === "typing-race" && type === "race_finish") {
+    return {
+      type,
+      finishMs: event.finishMs ?? null,
+      adjustedMs: event.adjustedMs ?? null,
+      wpm: event.wpm ?? null,
+      accuracy: event.accuracy ?? null,
+    };
+  }
+  if (gameType === "memory-match" && type === "memory_flip") {
+    return { type, card_index: event.cardIndex ?? null };
+  }
+  if (gameType === "spelling-bee" && type === "spelling_answer") {
+    return {
+      type,
+      round: event.round ?? null,
+      word_attempt: event.answer ?? null,
+      time_ms: event.timeMs ?? null,
+    };
+  }
+  if (gameType === "reaction-duel" && type === "reaction_result") {
+    return {
+      type,
+      round: event.round ?? null,
+      reaction_time_ms: event.reactionTime ?? null,
+    };
+  }
+  return null;
+}
 
 function MatchPageContent() {
   const router = useRouter();
@@ -72,12 +142,27 @@ function MatchPageContent() {
   const [reportComment, setReportComment] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [moveLog, setMoveLog] = useState<MoveLogEntry[]>([]);
   /** Set to true when we receive an afk_forfeit event from the opponent. */
   const [afkForfeitPending, setAfkForfeitPending] = useState(false);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
+  const matchStartMsRef = useRef<number>(Date.now());
+  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   matchRef.current = match;
+
+  const appendMoveLog = useCallback(
+    (playerId: string, event: Record<string, unknown>) => {
+      const current = matchRef.current;
+      if (!current) return;
+      const action = toMoveAction(current.gameType, event);
+      if (!action) return;
+      const timestamp_ms = Math.max(0, Date.now() - matchStartMsRef.current);
+      setMoveLog((prev) => [...prev, { player_id: playerId, action, timestamp_ms }]);
+    },
+    []
+  );
 
   const {
     connected: realtimeConnected,
@@ -125,6 +210,10 @@ function MatchPageContent() {
         }
         return;
       }
+      appendMoveLog(
+        typeof event.player_id === "string" ? (event.player_id as string) : "opponent",
+        event as Record<string, unknown>
+      );
       setIncomingEvent(event as Record<string, unknown>);
     },
   });
@@ -158,6 +247,9 @@ function MatchPageContent() {
           return;
         }
         setMatch(m);
+        setMoveLog(Array.isArray(m.moveLog) ? m.moveLog : []);
+        const createdAtMs = new Date(m.createdAt).getTime();
+        matchStartMsRef.current = Number.isFinite(createdAtMs) ? createdAtMs : Date.now();
 
         // Fix 1 + 3: If the match is already completed (player refreshed the page,
         // closed and reopened the tab, or returned after a forfeit), derive the outcome
@@ -467,10 +559,27 @@ function MatchPageContent() {
   const sendGameEventWithAfkReset = useCallback(
     async (event: Record<string, unknown>) => {
       afkResetTimer();
-      return sendGameEvent(event);
+      const enriched = {
+        ...event,
+        player_id: userId || "unknown",
+      };
+      appendMoveLog(userId || "unknown", enriched);
+      return sendGameEvent(enriched);
     },
-    [sendGameEvent, afkResetTimer]
+    [sendGameEvent, afkResetTimer, userId, appendMoveLog]
   );
+
+  useEffect(() => {
+    if (!match || match.isPractice) return;
+    if (!moveLog.length) return;
+    if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+    persistTimeoutRef.current = setTimeout(() => {
+      apiUpdateMatch(match.id, { moveLog }).catch(() => {});
+    }, 800);
+    return () => {
+      if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
+    };
+  }, [match, moveLog]);
 
   async function handleLogout() {
     setLoggingOut(true);

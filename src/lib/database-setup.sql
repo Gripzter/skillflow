@@ -84,6 +84,10 @@ CREATE TABLE IF NOT EXISTS matches (
   completed_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Replay / move history log for admin playback
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS move_log JSONB DEFAULT '[]'::jsonb;
+
 -- 5. GAME STATS TABLE (per-game statistics for each player)
 CREATE TABLE IF NOT EXISTS game_stats (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

@@ -46,7 +46,7 @@ type Phase =
 
 const COUNTDOWN_FROM = 3;
 // Throttle rate for sending progress events (ms)
-const PROGRESS_THROTTLE_MS = 200;
+const PROGRESS_THROTTLE_MS = 1000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

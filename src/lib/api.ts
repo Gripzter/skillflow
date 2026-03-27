@@ -63,6 +63,11 @@ function mapDbMatchToStoredMatch(row: {
   player2_id?: string | null;
   player1_id?: string | null;
   bot_difficulty?: string | null;
+  move_log?: Array<{
+    player_id: string;
+    action: Record<string, unknown>;
+    timestamp_ms: number;
+  }> | null;
 }): StoredMatch {
   const status =
     row.status === "completed" || row.status === "draw"
@@ -103,6 +108,7 @@ function mapDbMatchToStoredMatch(row: {
       row.bot_difficulty === "rookie" || row.bot_difficulty === "gamer" || row.bot_difficulty === "professional"
         ? row.bot_difficulty
         : undefined,
+    moveLog: Array.isArray(row.move_log) ? row.move_log : [],
   };
 }
 
@@ -450,7 +456,11 @@ export async function getMatches(): Promise<StoredMatch[]> {
 
 export async function updateMatch(
   id: string,
-  updates: Partial<{ status: string; winner: "player1" | "player2" | "draw" }>
+  updates: Partial<{
+    status: string;
+    winner: "player1" | "player2" | "draw";
+    moveLog: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
+  }>
 ): Promise<void> {
   const practice = getPracticeMatch(id);
   if (practice) {
@@ -470,11 +480,17 @@ export async function updateMatch(
   }
   const supabase = createClient();
   if (!supabase) return;
-  const row: { status?: string; result?: string; completed_at?: string } = {};
+  const row: {
+    status?: string;
+    result?: string;
+    completed_at?: string;
+    move_log?: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
+  } = {};
   if (updates.status) row.status = updates.status;
   if (updates.winner === "draw") row.result = "draw";
   else if (updates.winner) row.result = updates.winner === "player1" ? "player1_win" : "player2_win";
   if (updates.status === "completed") row.completed_at = new Date().toISOString();
+  if (updates.moveLog) row.move_log = updates.moveLog;
   const { error } = await supabase.from("matches").update(row).eq("id", id);
   if (error) throw error;
 }
