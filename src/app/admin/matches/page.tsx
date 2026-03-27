@@ -7,8 +7,10 @@ import ChessReplayViewer from "@/components/admin/ChessReplayViewer";
 interface MatchRow {
   id: string;
   game_type: string;
-  player1_id: string;
+  player1_id: string | null;
   player2_id: string | null;
+  player1_username?: string | null;
+  player2_username?: string | null;
   player1Name: string;
   player2Name: string;
   stake_amount: number;
@@ -36,8 +38,9 @@ const STAKE_LABELS: Record<StakeRange, string> = { all: "Any Stake", low: "$1–
 
 function gameLabel(s: string) {
   const m: Record<string, string> = {
-    chess: "Chess", checkers: "Checkers", "connect-four": "Connect 4",
+    chess: "Chess", checkers: "Checkers", "connect-four": "Connect 4", "connect-4": "Connect 4",
     pool: "8-Ball Pool", memory: "Memory", reaction: "Reaction", spelling: "Spelling", "last-touch": "Last Touch",
+    "memory-match": "Memory Match", "reaction-duel": "Reaction Duel", "spelling-bee": "Spelling Bee", "typing-race": "Typing Race",
   };
   return m[s] ?? s;
 }
@@ -66,11 +69,17 @@ export default function AdminMatchesPage() {
       const supabase = createClient();
       if (!supabase) { setLoading(false); return; }
 
-      const { data: raw } = await supabase
+      const { data: raw, error } = await supabase
         .from("matches")
-        .select("id, game_type, player1_id, player2_id, stake_amount, platform_fee, total_pot, winner_payout, status, result, created_at, bot_difficulty, move_log")
+        .select("*")
         .order("created_at", { ascending: false })
-        .limit(500);
+        .limit(2000);
+
+      if (error) {
+        console.error("[AdminMatches] Failed to load matches:", error);
+        setLoading(false);
+        return;
+      }
 
       if (!raw || raw.length === 0) { setLoading(false); return; }
 
@@ -84,10 +93,13 @@ export default function AdminMatchesPage() {
 
       setMatches(
         raw.map((m) => ({
-          ...m,
-          player1Name: profileMap.get(m.player1_id) ?? "Player 1",
+          ...(m as MatchRow),
+          player1Name:
+            (m.player1_username as string | null) ||
+            (m.player1_id ? profileMap.get(m.player1_id) : null) ||
+            "Player 1",
           player2Name: m.player2_id
-            ? (profileMap.get(m.player2_id) ?? "Player 2")
+            ? ((m.player2_username as string | null) || profileMap.get(m.player2_id) || "Player 2")
             : `Bot (${m.bot_difficulty ?? "?"})`,
         }))
       );

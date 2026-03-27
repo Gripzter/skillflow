@@ -523,6 +523,43 @@ export async function completeMatchAndSettle(
     !!currentUserId &&
     ((outcome === "player1" && match.player1Id === currentUserId) ||
       (outcome === "player2" && match.player2Id === currentUserId));
+  const didDraw = outcome === "draw";
+  const didLoss = !isWinner && !didDraw;
+
+  async function updateGameStatsForCurrentUser() {
+    if (isDevMode()) return;
+    if (!currentUserId) return;
+    const supabase = createClient();
+    if (!supabase) return;
+
+    const { data: existing } = await supabase
+      .from("game_stats")
+      .select("matches_played, wins, losses, draws, total_earnings")
+      .eq("user_id", currentUserId)
+      .eq("game_type", match.gameType)
+      .maybeSingle();
+
+    const matchesPlayed = Number(existing?.matches_played ?? 0) + 1;
+    const wins = Number(existing?.wins ?? 0) + (isWinner ? 1 : 0);
+    const losses = Number(existing?.losses ?? 0) + (didLoss ? 1 : 0);
+    const draws = Number(existing?.draws ?? 0) + (didDraw ? 1 : 0);
+    const totalEarnings =
+      Number(existing?.total_earnings ?? 0) + (isWinner ? Number(match.winnerPayout) : 0);
+
+    await supabase.from("game_stats").upsert(
+      {
+        user_id: currentUserId,
+        game_type: match.gameType,
+        matches_played: matchesPlayed,
+        wins,
+        losses,
+        draws,
+        total_earnings: totalEarnings,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,game_type" }
+    );
+  }
 
   if (outcome === "player1" || outcome === "player2") {
     if (isWinner) {
@@ -533,6 +570,7 @@ export async function completeMatchAndSettle(
       );
     }
     await updateMatch(match.id, { status: "completed", winner: outcome });
+    await updateGameStatsForCurrentUser();
     return;
   }
 
@@ -543,6 +581,7 @@ export async function completeMatchAndSettle(
     "match_refund"
   );
   await updateMatch(match.id, { status: "completed", winner: "draw" });
+  await updateGameStatsForCurrentUser();
 }
 
 // ============ LEADERBOARD ============
