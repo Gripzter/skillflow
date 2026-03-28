@@ -16,12 +16,13 @@ export default function MobileTabBar() {
   const pathname = usePathname();
   const { isPractice } = usePlayMode();
 
-  // Hide on unauth / marketing / admin routes
+  // Hide on unauth / marketing / admin routes and during active gameplay
   if (
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
-    pathname.startsWith("/admin")
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/match")
   ) {
     return null;
   }
