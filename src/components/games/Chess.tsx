@@ -449,6 +449,10 @@ export default function Chess({
     onMatchUi({
       scores: { player1: scoreP1, player2: scoreP2 },
       scoreLabel: "Pts",
+      playerTimeLeftSec: {
+        player1: whiteTimeLeft,
+        player2: blackTimeLeft,
+      },
       currentTurn: turn === "w" ? "player1" : "player2",
       turnText,
       turnTimerDisplay: `${Math.max(turn === "w" ? whiteTimeLeft : blackTimeLeft, 0)}s`,

@@ -38,6 +38,7 @@ import { useToast } from "@/components/Toast";
 const OPPONENT_RECONNECT_SEC = 60;
 
 type Outcome = null | "victory" | "defeat" | "draw";
+type ChatToastItem = { id: string; sender: string; message: string };
 type MoveLogEntry = {
   player_id: string;
   action: Record<string, unknown>;
@@ -133,6 +134,9 @@ function MatchPageContent() {
   const [wonByForfeit, setWonByForfeit] = useState(false);
   const [incomingEvent, setIncomingEvent] = useState<Record<string, unknown> | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatToastQueue, setChatToastQueue] = useState<ChatToastItem[]>([]);
+  const [activeChatToast, setActiveChatToast] = useState<ChatToastItem | null>(null);
+  const [chatToastVisible, setChatToastVisible] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -202,6 +206,14 @@ function MatchPageContent() {
               isPreset: !!ev.isPreset,
               timestamp: ev.timestamp,
               reported: false,
+            },
+          ]);
+          setChatToastQueue((prev) => [
+            ...prev,
+            {
+              id: crypto.randomUUID(),
+              sender: ev.senderName || "Opponent",
+              message: ev.message as string,
             },
           ]);
           if (!chatOpen) {
@@ -363,9 +375,31 @@ function MatchPageContent() {
       if (!chatOpen && senderId !== userId && senderId !== "system") {
         setUnreadCount((c) => c + 1);
       }
+      setChatToastQueue((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), sender: senderName || "Player", message: text },
+      ]);
     },
     [chatOpen, userId]
   );
+
+  useEffect(() => {
+    if (activeChatToast || chatToastQueue.length === 0) return;
+    const [next, ...rest] = chatToastQueue;
+    setChatToastQueue(rest);
+    setActiveChatToast(next);
+    setChatToastVisible(true);
+  }, [chatToastQueue, activeChatToast]);
+
+  useEffect(() => {
+    if (!activeChatToast) return;
+    const hideTimer = setTimeout(() => setChatToastVisible(false), 3000);
+    const clearTimer = setTimeout(() => setActiveChatToast(null), 3350);
+    return () => {
+      clearTimeout(hideTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [activeChatToast]);
 
   const handleSendChatMessage = useCallback(
     (message: string, isPreset: boolean) => {
@@ -723,6 +757,7 @@ function MatchPageContent() {
       score: matchUi?.scores.player1 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
       isBot: false,
+      timeLeftSec: matchUi?.playerTimeLeftSec?.player1,
     },
     player2: {
       username: safePlayer2.username,
@@ -730,6 +765,7 @@ function MatchPageContent() {
       score: matchUi?.scores.player2 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
       isBot: !isRealMultiplayer,
+      timeLeftSec: matchUi?.playerTimeLeftSec?.player2,
     },
     currentTurn: matchUi?.currentTurn ?? "player1",
     timerDisplay: formatTime(timerSec),
@@ -884,6 +920,18 @@ function MatchPageContent() {
           }}
         >
           Connection lost — trying to reconnect...
+        </div>
+      )}
+
+      {/* In-game chat toast (queued, one-at-a-time, 3s visible) */}
+      {activeChatToast && (
+        <div
+          className={`pointer-events-none fixed left-1/2 z-[70] w-[min(92vw,420px)] -translate-x-1/2 rounded-xl border border-white/10 bg-black/70 px-4 py-2.5 shadow-lg backdrop-blur-sm transition-all duration-300 ${
+            chatToastVisible ? "top-3 opacity-100" : "-top-12 opacity-0"
+          }`}
+        >
+          <p className="truncate text-xs font-semibold text-[#FF5E00]">{activeChatToast.sender}</p>
+          <p className="truncate text-sm text-white/90">{activeChatToast.message}</p>
         </div>
       )}
 

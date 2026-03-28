@@ -29,6 +29,7 @@ export interface GameLayoutProps {
     score: number;
     scoreLabel?: string;
     isBot: boolean;
+    timeLeftSec?: number;
   };
   player2: {
     username: string;
@@ -37,6 +38,7 @@ export interface GameLayoutProps {
     score: number;
     scoreLabel?: string;
     isBot: boolean;
+    timeLeftSec?: number;
   };
   currentTurn: "player1" | "player2";
   timerDisplay: string;
@@ -74,6 +76,14 @@ function connectionLabel(s: GameLayoutProps["connectionStatus"]): string {
   return "Disconnected";
 }
 
+function formatPlayerClock(sec?: number): string | null {
+  if (typeof sec !== "number" || Number.isNaN(sec)) return null;
+  const clamped = Math.max(0, Math.floor(sec));
+  const m = Math.floor(clamped / 60);
+  const s = clamped % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function PlayerCard({
   player,
   playerKey,
@@ -91,6 +101,8 @@ function PlayerCard({
 }) {
   const initial = (player.username || "?").charAt(0).toUpperCase();
   const avatarBg = playerKey === "player1" ? "#FF5E00" : "#2A3A5C";
+  const clockText = formatPlayerClock(player.timeLeftSec);
+  const clockDanger = typeof player.timeLeftSec === "number" && player.timeLeftSec < 60;
 
   return (
     <div
@@ -140,7 +152,17 @@ function PlayerCard({
               <span className="ml-1 text-[10px] text-[#888]">BOT</span>
             ) : null}
           </p>
-          <p className="text-[11px] text-[#555]">{player.rating}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] text-[#555]">{player.rating}</p>
+            {clockText ? (
+              <span
+                className="text-[11px] font-semibold tabular-nums"
+                style={{ color: clockDanger ? "#ef4444" : "#888" }}
+              >
+                {clockText}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="ml-auto flex shrink-0 flex-col items-end">
           <span className="text-[20px] font-medium tabular-nums" style={{ color: "#FF5E00" }}>

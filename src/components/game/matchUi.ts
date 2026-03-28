@@ -1,6 +1,7 @@
 export interface MatchUiState {
   scores: { player1: number; player2: number };
   scoreLabel?: string;
+  playerTimeLeftSec?: { player1: number; player2: number };
   currentTurn: "player1" | "player2";
   turnText: string;
   turnTimerDisplay?: string;
