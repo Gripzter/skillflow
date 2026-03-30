@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
+
+const AUTO_REDIRECT_SEC = 30;
 
 interface GameResultOverlayProps {
   outcome: "victory" | "defeat" | "draw";
@@ -25,6 +28,10 @@ export default function GameResultOverlay({
   onPlayAgain,
   onLeave,
 }: GameResultOverlayProps) {
+  const router = useRouter();
+  const [countdown, setCountdown] = useState(AUTO_REDIRECT_SEC);
+  const cancelledRef = useRef(false);
+
   useEffect(() => {
     if (outcome !== "victory") return;
     const duration = 2200;
@@ -32,7 +39,7 @@ export default function GameResultOverlay({
 
     function burst() {
       confetti({
-        particleCount: 20,
+        particleCount: 10,
         angle: 60,
         spread: 55,
         origin: { x: 0, y: 0.65 },
@@ -40,7 +47,7 @@ export default function GameResultOverlay({
         zIndex: 60,
       });
       confetti({
-        particleCount: 20,
+        particleCount: 10,
         angle: 120,
         spread: 55,
         origin: { x: 1, y: 0.65 },
@@ -54,6 +61,31 @@ export default function GameResultOverlay({
 
     burst();
   }, [outcome]);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (cancelledRef.current) return;
+      setCountdown((prev) => {
+        const next = prev - 1;
+        if (next <= 0) {
+          clearInterval(t);
+          router.push("/play");
+        }
+        return Math.max(0, next);
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [router]);
+
+  const handlePlayAgain = useCallback(() => {
+    cancelledRef.current = true;
+    onPlayAgain();
+  }, [onPlayAgain]);
+
+  const handleLeave = useCallback(() => {
+    cancelledRef.current = true;
+    onLeave();
+  }, [onLeave]);
 
   const isVictory = outcome === "victory";
   const isDefeat = outcome === "defeat";
@@ -130,7 +162,7 @@ export default function GameResultOverlay({
         <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
           <button
             type="button"
-            onClick={onPlayAgain}
+            onClick={handlePlayAgain}
             className="w-full rounded-xl py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
             style={{ background: "#FF5E00" }}
           >
@@ -138,13 +170,19 @@ export default function GameResultOverlay({
           </button>
           <button
             type="button"
-            onClick={onLeave}
+            onClick={handleLeave}
             className="w-full rounded-xl border py-3.5 text-[15px] font-semibold transition-colors hover:bg-white/5"
             style={{ borderColor: "#2A3A5C", color: "#aaa" }}
           >
             Leave
           </button>
         </div>
+
+        {countdown > 0 && (
+          <p className="mt-6 text-[12px] tabular-nums text-[#555]">
+            Returning to lobby in {countdown}s…
+          </p>
+        )}
       </div>
     </div>
   );

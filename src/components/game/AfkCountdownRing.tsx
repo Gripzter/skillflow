@@ -11,36 +11,39 @@ export default function AfkCountdownRing({
   totalSeconds = 60,
   isDanger = false,
 }: AfkCountdownRingProps) {
-  const size = 42;
-  const stroke = 3;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
+  const stroke = 2.5;
+  const circumference = 2 * Math.PI * 50;
   const clamped = Math.max(0, Math.min(secondsLeft, totalSeconds));
   const progress = clamped / totalSeconds;
   const offset = circumference * (1 - progress);
 
   return (
-    <div className={isDanger ? "animate-afk-ring-pulse" : ""}>
-      <svg width={size} height={size} className="pointer-events-none absolute -inset-1 z-10 overflow-visible">
+    <div className={`absolute inset-[-3px] z-10 ${isDanger ? "animate-afk-ring-pulse" : ""}`}>
+      <svg
+        viewBox="0 0 100 100"
+        className="pointer-events-none h-full w-full overflow-visible"
+      >
         <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
+          cx="50"
+          cy="50"
+          r="50"
           fill="none"
           stroke="rgba(255,255,255,0.15)"
           strokeWidth={stroke}
+          vectorEffect="non-scaling-stroke"
         />
         <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
+          cx="50"
+          cy="50"
+          r="50"
           fill="none"
           stroke={isDanger ? "#ef4444" : "#FF5E00"}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          transform={`rotate(90 ${size / 2} ${size / 2}) scale(-1,1) translate(${-size},0)`}
+          vectorEffect="non-scaling-stroke"
+          transform="rotate(90 50 50) scale(-1,1) translate(-100,0)"
         />
       </svg>
     </div>

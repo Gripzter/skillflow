@@ -80,6 +80,12 @@ CREATE TABLE IF NOT EXISTS matches (
   status TEXT DEFAULT 'waiting' CHECK (status IN ('waiting', 'matched', 'in_progress', 'completed', 'cancelled', 'draw')),
   match_duration INTEGER,
   bot_difficulty TEXT DEFAULT 'gamer',
+  match_start_time TIMESTAMP WITH TIME ZONE,
+  time_limit_ms INTEGER,
+  player1_remaining_time_ms INTEGER,
+  player2_remaining_time_ms INTEGER,
+  active_turn TEXT CHECK (active_turn IN ('player1', 'player2', NULL)),
+  turn_started_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE
 );
@@ -87,6 +93,18 @@ CREATE TABLE IF NOT EXISTS matches (
 -- Replay / move history log for admin playback
 ALTER TABLE matches
   ADD COLUMN IF NOT EXISTS move_log JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS match_start_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS time_limit_ms INTEGER;
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS player1_remaining_time_ms INTEGER;
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS player2_remaining_time_ms INTEGER;
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS active_turn TEXT CHECK (active_turn IN ('player1', 'player2', NULL));
+ALTER TABLE matches
+  ADD COLUMN IF NOT EXISTS turn_started_at TIMESTAMP WITH TIME ZONE;
 
 -- 5. GAME STATS TABLE (per-game statistics for each player)
 CREATE TABLE IF NOT EXISTS game_stats (

@@ -68,6 +68,15 @@ export interface StoredMatch {
     action: Record<string, unknown>;
     timestamp_ms: number;
   }>;
+  /** Server-authoritative match timer start timestamp (UTC ISO). */
+  matchStartTime?: string;
+  /** Match countdown limit in milliseconds. */
+  timeLimitMs?: number;
+  /** Server-authoritative per-player clock state (used by chess). */
+  player1RemainingTimeMs?: number;
+  player2RemainingTimeMs?: number;
+  activeTurn?: "player1" | "player2";
+  turnStartedAt?: string;
 }
 
 export function generateMatchId(): string {

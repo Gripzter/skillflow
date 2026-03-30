@@ -48,6 +48,12 @@ CREATE TABLE matches (
   platform_fee DECIMAL(10,2) DEFAULT 0.00,
   winner_id UUID REFERENCES auth.users(id),
   status TEXT DEFAULT 'waiting' CHECK (status IN ('waiting', 'matched', 'in_progress', 'completed', 'cancelled', 'disputed')),
+  match_start_time TIMESTAMP WITH TIME ZONE,
+  time_limit_ms INTEGER,
+  player1_remaining_time_ms INTEGER,
+  player2_remaining_time_ms INTEGER,
+  active_turn TEXT CHECK (active_turn IN ('player1', 'player2', NULL)),
+  turn_started_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE
 );

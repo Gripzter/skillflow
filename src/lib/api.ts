@@ -22,6 +22,7 @@ import {
   type StoredMatch,
   type PlayerInfo,
 } from "@/lib/matchmaking";
+import { CHESS_INITIAL_CLOCK_MS } from "@/lib/games/match-timers";
 import {
   getPracticeMatch,
   getPracticeMatches,
@@ -68,6 +69,12 @@ function mapDbMatchToStoredMatch(row: {
     action: Record<string, unknown>;
     timestamp_ms: number;
   }> | null;
+  match_start_time?: string | null;
+  time_limit_ms?: number | null;
+  player1_remaining_time_ms?: number | null;
+  player2_remaining_time_ms?: number | null;
+  active_turn?: string | null;
+  turn_started_at?: string | null;
 }): StoredMatch {
   const status =
     row.status === "completed" || row.status === "draw"
@@ -109,6 +116,14 @@ function mapDbMatchToStoredMatch(row: {
         ? row.bot_difficulty
         : undefined,
     moveLog: Array.isArray(row.move_log) ? row.move_log : [],
+    matchStartTime: row.match_start_time ?? undefined,
+    timeLimitMs: typeof row.time_limit_ms === "number" ? row.time_limit_ms : undefined,
+    player1RemainingTimeMs:
+      typeof row.player1_remaining_time_ms === "number" ? row.player1_remaining_time_ms : undefined,
+    player2RemainingTimeMs:
+      typeof row.player2_remaining_time_ms === "number" ? row.player2_remaining_time_ms : undefined,
+    activeTurn: row.active_turn === "player1" || row.active_turn === "player2" ? row.active_turn : undefined,
+    turnStartedAt: row.turn_started_at ?? undefined,
   };
 }
 
@@ -421,6 +436,9 @@ export async function createMatch(params: {
       total_pot: totalPot,
       winner_payout: winnerPayout,
       status: "in_progress",
+      player1_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
+      player2_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
+      active_turn: params.gameType === "chess" ? "player1" : null,
     })
     .select()
     .single();
@@ -460,6 +478,12 @@ export async function updateMatch(
     status: string;
     winner: "player1" | "player2" | "draw";
     moveLog: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
+    matchStartTime: string;
+    timeLimitMs: number;
+    player1RemainingTimeMs: number;
+    player2RemainingTimeMs: number;
+    activeTurn: "player1" | "player2";
+    turnStartedAt: string;
   }>
 ): Promise<void> {
   const practice = getPracticeMatch(id);
@@ -485,12 +509,24 @@ export async function updateMatch(
     result?: string;
     completed_at?: string;
     move_log?: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
+    match_start_time?: string;
+    time_limit_ms?: number;
+    player1_remaining_time_ms?: number;
+    player2_remaining_time_ms?: number;
+    active_turn?: "player1" | "player2";
+    turn_started_at?: string;
   } = {};
   if (updates.status) row.status = updates.status;
   if (updates.winner === "draw") row.result = "draw";
   else if (updates.winner) row.result = updates.winner === "player1" ? "player1_win" : "player2_win";
   if (updates.status === "completed") row.completed_at = new Date().toISOString();
   if (updates.moveLog) row.move_log = updates.moveLog;
+  if (updates.matchStartTime) row.match_start_time = updates.matchStartTime;
+  if (typeof updates.timeLimitMs === "number") row.time_limit_ms = updates.timeLimitMs;
+  if (typeof updates.player1RemainingTimeMs === "number") row.player1_remaining_time_ms = updates.player1RemainingTimeMs;
+  if (typeof updates.player2RemainingTimeMs === "number") row.player2_remaining_time_ms = updates.player2RemainingTimeMs;
+  if (updates.activeTurn) row.active_turn = updates.activeTurn;
+  if (updates.turnStartedAt) row.turn_started_at = updates.turnStartedAt;
   const { error } = await supabase.from("matches").update(row).eq("id", id);
   if (error) throw error;
 }

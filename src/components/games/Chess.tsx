@@ -12,6 +12,7 @@ import {
 } from "@/lib/games/chess-utils";
 import { getChessBotMove, getChessBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 import type { MatchUiState } from "@/components/game/matchUi";
+import { CHESS_INITIAL_CLOCK_MS } from "@/lib/games/match-timers";
 
 export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
@@ -29,10 +30,21 @@ interface ChessProps extends GameMultiplayerProps {
   onGameDraw: () => void;
   isPlayer2Bot?: boolean;
   botDifficulty?: BotDifficulty;
+  initialClockState?: {
+    player1RemainingTimeMs?: number;
+    player2RemainingTimeMs?: number;
+    activeTurn?: "player1" | "player2";
+    turnStartedAt?: string;
+  };
+  onTurnClockUpdate?: (clock: {
+    player1RemainingTimeMs: number;
+    player2RemainingTimeMs: number;
+    activeTurn: "player1" | "player2";
+    turnStartedAt: string;
+  }) => Promise<void> | void;
 }
 
 type PieceCode = string;
-const CHESS_TOTAL_TIME_SEC = 10 * 60;
 
 function boardFromGame(game: ChessEngine): (PieceCode | null)[][] {
   const b = game.board();
@@ -67,6 +79,8 @@ export default function Chess({
   incomingEvent,
   onEventProcessed,
   onMatchUi,
+  initialClockState,
+  onTurnClockUpdate,
 }: ChessProps) {
   const [game, setGame] = useState(() => new ChessEngine());
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
@@ -89,11 +103,30 @@ export default function Chess({
   const [botThinking, setBotThinking] = useState(false);
   const [drawOfferReceived, setDrawOfferReceived] = useState(false);
   const [drawOfferSent, setDrawOfferSent] = useState(false);
-  const [whiteTimeLeft, setWhiteTimeLeft] = useState(CHESS_TOTAL_TIME_SEC);
-  const [blackTimeLeft, setBlackTimeLeft] = useState(CHESS_TOTAL_TIME_SEC);
+  const [clockState, setClockState] = useState(() => ({
+    player1RemainingTimeMs: initialClockState?.player1RemainingTimeMs ?? CHESS_INITIAL_CLOCK_MS,
+    player2RemainingTimeMs: initialClockState?.player2RemainingTimeMs ?? CHESS_INITIAL_CLOCK_MS,
+    activeTurn: initialClockState?.activeTurn ?? "player1",
+    turnStartedAt: initialClockState?.turnStartedAt ?? new Date().toISOString(),
+  }));
+  const [clockNowMs, setClockNowMs] = useState(Date.now());
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
+
+  const resolveClockRemainingMs = useCallback(
+    (player: "player1" | "player2", nowMs: number) => {
+      const base =
+        player === "player1"
+          ? clockState.player1RemainingTimeMs
+          : clockState.player2RemainingTimeMs;
+      if (clockState.activeTurn !== player) return Math.max(0, base);
+      const startMs = new Date(clockState.turnStartedAt).getTime();
+      if (!Number.isFinite(startMs)) return Math.max(0, base);
+      return Math.max(0, base - Math.max(0, nowMs - startMs));
+    },
+    [clockState]
+  );
 
   const board = useMemo(() => boardFromGame(game), [game]);
   const turn = game.turn();
@@ -118,6 +151,22 @@ export default function Chess({
   const insufficientMaterial = typeof game.isInsufficientMaterial === "function" && game.isInsufficientMaterial();
   const checkSquare = inCheck ? getKingSquare(game, turn) : null;
 
+  useEffect(() => {
+    if (!initialClockState) return;
+    setClockState((prev) => ({
+      player1RemainingTimeMs:
+        typeof initialClockState.player1RemainingTimeMs === "number"
+          ? initialClockState.player1RemainingTimeMs
+          : prev.player1RemainingTimeMs,
+      player2RemainingTimeMs:
+        typeof initialClockState.player2RemainingTimeMs === "number"
+          ? initialClockState.player2RemainingTimeMs
+          : prev.player2RemainingTimeMs,
+      activeTurn: initialClockState.activeTurn ?? prev.activeTurn,
+      turnStartedAt: initialClockState.turnStartedAt ?? prev.turnStartedAt,
+    }));
+  }, [initialClockState]);
+
   const executeMove = useCallback(
     (from: string, to: string, promotion?: PieceType) => {
       if (gameOverRef.current) return;
@@ -135,6 +184,31 @@ export default function Chess({
           setLastMove({ from, to });
           setSelectedSquare(null);
           setGame(next);
+          const nowIso = new Date().toISOString();
+          const nowMs = new Date(nowIso).getTime();
+          const moverRole: "player1" | "player2" = result.color === "w" ? "player1" : "player2";
+          const nextTurnRole: "player1" | "player2" = moverRole === "player1" ? "player2" : "player1";
+          setClockState((prev) => {
+            const startMs = new Date(prev.turnStartedAt).getTime();
+            const elapsed =
+              prev.activeTurn === moverRole && Number.isFinite(startMs)
+                ? Math.max(0, nowMs - startMs)
+                : 0;
+            const nextClock = {
+              player1RemainingTimeMs:
+                moverRole === "player1"
+                  ? Math.max(0, prev.player1RemainingTimeMs - elapsed)
+                  : prev.player1RemainingTimeMs,
+              player2RemainingTimeMs:
+                moverRole === "player2"
+                  ? Math.max(0, prev.player2RemainingTimeMs - elapsed)
+                  : prev.player2RemainingTimeMs,
+              activeTurn: nextTurnRole,
+              turnStartedAt: nowIso,
+            };
+            onTurnClockUpdate?.(nextClock);
+            return nextClock;
+          });
           const ts = (Date.now() - gameStartTimeRef.current) / 1000;
           const player: 1 | 2 = result.color === "w" ? 1 : 2;
           const playerName = result.color === "w" ? player1.username : player2.username;
@@ -162,7 +236,7 @@ export default function Chess({
         console.log("[Chess] move", { from, to, success: false, error: e, fen: game.fen() });
       }
     },
-    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole]
+    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole, onTurnClockUpdate]
   );
 
   const handleSquareClick = useCallback(
@@ -229,36 +303,21 @@ export default function Chess({
 
   useEffect(() => {
     if (gameOverRef.current) return;
-    const t = setInterval(() => {
-      if (gameOverRef.current) return;
-      if (turn === "w") {
-        setWhiteTimeLeft((prev) => {
-          if (prev <= 1) {
-            gameOverRef.current = true;
-            if (isMultiplayer && sendGameEvent) {
-              sendGameEvent({ type: "chess_timeout", loserRole: "player1" }).catch(() => {});
-            }
-            onGameEnd("player2");
-            return 0;
-          }
-          return prev - 1;
-        });
-      } else {
-        setBlackTimeLeft((prev) => {
-          if (prev <= 1) {
-            gameOverRef.current = true;
-            if (isMultiplayer && sendGameEvent) {
-              sendGameEvent({ type: "chess_timeout", loserRole: "player2" }).catch(() => {});
-            }
-            onGameEnd("player1");
-            return 0;
-          }
-          return prev - 1;
-        });
-      }
-    }, 1000);
+    const t = setInterval(() => setClockNowMs(Date.now()), 250);
     return () => clearInterval(t);
-  }, [turn, onGameEnd, isMultiplayer, sendGameEvent]);
+  }, []);
+
+  useEffect(() => {
+    if (gameOverRef.current) return;
+    const active = clockState.activeTurn;
+    const activeRemaining = resolveClockRemainingMs(active, clockNowMs);
+    if (activeRemaining > 0) return;
+    gameOverRef.current = true;
+    if (isMultiplayer && sendGameEvent) {
+      sendGameEvent({ type: "chess_timeout", loserRole: active }).catch(() => {});
+    }
+    onGameEnd(active === "player1" ? "player2" : "player1");
+  }, [clockNowMs, clockState.activeTurn, isMultiplayer, onGameEnd, resolveClockRemainingMs, sendGameEvent]);
 
   const handlePromotionChoose = useCallback(
     (piece: PieceType) => {
@@ -316,6 +375,29 @@ export default function Chess({
             setLastMove({ from, to });
             setSelectedSquare(null);
             setGame(next);
+            const nowIso = new Date().toISOString();
+            const nowMs = new Date(nowIso).getTime();
+            const moverRole: "player1" | "player2" = result.color === "w" ? "player1" : "player2";
+            const nextTurnRole: "player1" | "player2" = moverRole === "player1" ? "player2" : "player1";
+            setClockState((prev) => {
+              const startMs = new Date(prev.turnStartedAt).getTime();
+              const elapsed =
+                prev.activeTurn === moverRole && Number.isFinite(startMs)
+                  ? Math.max(0, nowMs - startMs)
+                  : 0;
+              return {
+                player1RemainingTimeMs:
+                  moverRole === "player1"
+                    ? Math.max(0, prev.player1RemainingTimeMs - elapsed)
+                    : prev.player1RemainingTimeMs,
+                player2RemainingTimeMs:
+                  moverRole === "player2"
+                    ? Math.max(0, prev.player2RemainingTimeMs - elapsed)
+                    : prev.player2RemainingTimeMs,
+                activeTurn: nextTurnRole,
+                turnStartedAt: nowIso,
+              };
+            });
             const ts = (Date.now() - gameStartTimeRef.current) / 1000;
             const player: 1 | 2 = result.color === "w" ? 1 : 2;
             const playerName = result.color === "w" ? player1.username : player2.username;
@@ -412,6 +494,8 @@ export default function Chess({
     };
   }, []);
   const squareSize = Math.floor((boardSize - 8) / 8); // subtract 4px border × 2 sides
+  const whiteTimeLeft = Math.ceil(resolveClockRemainingMs("player1", clockNowMs) / 1000);
+  const blackTimeLeft = Math.ceil(resolveClockRemainingMs("player2", clockNowMs) / 1000);
 
   const scoreP1 = useMemo(
     () => capturedBlack.reduce((s, t) => s + PIECE_VALUE[t], 0),
@@ -455,7 +539,10 @@ export default function Chess({
       },
       currentTurn: turn === "w" ? "player1" : "player2",
       turnText,
-      turnTimerDisplay: `${Math.max(turn === "w" ? whiteTimeLeft : blackTimeLeft, 0)}s`,
+      turnTimerDisplay:
+        clockState.activeTurn === "player1"
+          ? `${Math.max(whiteTimeLeft, 0)}s`
+          : `${Math.max(blackTimeLeft, 0)}s`,
       systemLogEntries,
     });
   }, [
@@ -474,6 +561,7 @@ export default function Chess({
     scoreP2,
     whiteTimeLeft,
     blackTimeLeft,
+    clockState.activeTurn,
   ]);
 
   return (

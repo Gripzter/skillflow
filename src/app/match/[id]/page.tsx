@@ -14,6 +14,8 @@ import {
   type StoredMatch,
 } from "@/lib/api";
 import { updateMatch } from "@/lib/matchmaking";
+import { createClient } from "@/lib/supabase";
+import { CHESS_INITIAL_CLOCK_MS, getMatchTimeLimitMs } from "@/lib/games/match-timers";
 import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
 import type { ConnectionSnapshot } from "@/lib/connection-logger";
 import { useMultiplayer } from "@/hooks/useMultiplayer";
@@ -123,7 +125,7 @@ function MatchPageContent() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [match, setMatch] = useState<StoredMatch | null>(null);
-  const [timerSec, setTimerSec] = useState(0);
+  const [timerNowMs, setTimerNowMs] = useState(Date.now());
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [forfeitConfirm, setForfeitConfirm] = useState(false);
   const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
@@ -155,6 +157,12 @@ function MatchPageContent() {
   const matchStartMsRef = useRef<number>(Date.now());
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   matchRef.current = match;
+
+  useEffect(() => {
+    if (!match?.matchStartTime) return;
+    const ms = new Date(match.matchStartTime).getTime();
+    if (Number.isFinite(ms)) matchStartMsRef.current = ms;
+  }, [match?.matchStartTime]);
 
   const appendMoveLog = useCallback(
     (playerId: string, event: Record<string, unknown>) => {
@@ -260,8 +268,10 @@ function MatchPageContent() {
         }
         setMatch(m);
         setMoveLog(Array.isArray(m.moveLog) ? m.moveLog : []);
+        const matchStartMs = m.matchStartTime ? new Date(m.matchStartTime).getTime() : NaN;
         const createdAtMs = new Date(m.createdAt).getTime();
-        matchStartMsRef.current = Number.isFinite(createdAtMs) ? createdAtMs : Date.now();
+        const fallbackMs = Number.isFinite(createdAtMs) ? createdAtMs : Date.now();
+        matchStartMsRef.current = Number.isFinite(matchStartMs) ? matchStartMs : fallbackMs;
 
         // Fix 1 + 3: If the match is already completed (player refreshed the page,
         // closed and reopened the tab, or returned after a forfeit), derive the outcome
@@ -346,7 +356,7 @@ function MatchPageContent() {
 
   useEffect(() => {
     if (!match || match.status !== "in_progress") return;
-    const t = setInterval(() => setTimerSec((s) => s + 1), 1000);
+    const t = setInterval(() => setTimerNowMs(Date.now()), 250);
     return () => clearInterval(t);
   }, [match]);
 
@@ -472,8 +482,73 @@ function MatchPageContent() {
     if (!match?.isRealMultiplayer || !realtimeConnected || !opponentConnected) return;
     if (inProgressSetRef.current) return;
     inProgressSetRef.current = true;
-    apiUpdateMatch(matchId, { status: "in_progress" });
-  }, [match?.isRealMultiplayer, matchId, realtimeConnected, opponentConnected]);
+    const supabase = createClient();
+    const startedAt = new Date().toISOString();
+    const timeLimitMs = getMatchTimeLimitMs(match.gameType);
+
+    if (!supabase) {
+      apiUpdateMatch(matchId, {
+        status: "in_progress",
+        matchStartTime: startedAt,
+        timeLimitMs,
+        ...(match.gameType === "chess"
+          ? {
+              player1RemainingTimeMs: CHESS_INITIAL_CLOCK_MS,
+              player2RemainingTimeMs: CHESS_INITIAL_CLOCK_MS,
+              activeTurn: "player1" as const,
+              turnStartedAt: startedAt,
+            }
+          : {}),
+      }).catch(() => {});
+      return;
+    }
+
+    supabase
+      .from("matches")
+      .update({
+        status: "in_progress",
+        match_start_time: startedAt,
+        time_limit_ms: timeLimitMs,
+        ...(match.gameType === "chess"
+          ? {
+              player1_remaining_time_ms: CHESS_INITIAL_CLOCK_MS,
+              player2_remaining_time_ms: CHESS_INITIAL_CLOCK_MS,
+              active_turn: "player1",
+              turn_started_at: startedAt,
+            }
+          : {}),
+      })
+      .eq("id", matchId)
+      .is("match_start_time", null)
+      .select("match_start_time, time_limit_ms, player1_remaining_time_ms, player2_remaining_time_ms, active_turn, turn_started_at")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        setMatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                matchStartTime: data.match_start_time ?? prev.matchStartTime,
+                timeLimitMs: typeof data.time_limit_ms === "number" ? data.time_limit_ms : prev.timeLimitMs,
+                player1RemainingTimeMs:
+                  typeof data.player1_remaining_time_ms === "number"
+                    ? data.player1_remaining_time_ms
+                    : prev.player1RemainingTimeMs,
+                player2RemainingTimeMs:
+                  typeof data.player2_remaining_time_ms === "number"
+                    ? data.player2_remaining_time_ms
+                    : prev.player2RemainingTimeMs,
+                activeTurn:
+                  data.active_turn === "player1" || data.active_turn === "player2"
+                    ? data.active_turn
+                    : prev.activeTurn,
+                turnStartedAt: data.turn_started_at ?? prev.turnStartedAt,
+              }
+            : prev
+        );
+      })
+      .catch(() => {});
+  }, [match, matchId, realtimeConnected, opponentConnected]);
 
   // Opponent disconnect: 30s countdown then forfeit win
   useEffect(() => {
@@ -589,6 +664,30 @@ function MatchPageContent() {
       onForfeit: handleAfkForfeit,
     });
 
+  const handleTurnClockUpdate = useCallback(
+    async (clock: {
+      player1RemainingTimeMs: number;
+      player2RemainingTimeMs: number;
+      activeTurn: "player1" | "player2";
+      turnStartedAt: string;
+    }) => {
+      if (!match?.isRealMultiplayer || match.gameType !== "chess") return;
+      await apiUpdateMatch(match.id, clock);
+      setMatch((prev) =>
+        prev
+          ? {
+              ...prev,
+              player1RemainingTimeMs: clock.player1RemainingTimeMs,
+              player2RemainingTimeMs: clock.player2RemainingTimeMs,
+              activeTurn: clock.activeTurn,
+              turnStartedAt: clock.turnStartedAt,
+            }
+          : prev
+      );
+    },
+    [match]
+  );
+
   // Wrap sendGameEvent so any move the local player makes resets the AFK timer.
   const sendGameEventWithAfkReset = useCallback(
     async (event: Record<string, unknown>) => {
@@ -689,6 +788,15 @@ function MatchPageContent() {
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
   const shortId = match.id.slice(0, 8);
   const myRole = myRoleComputed;
+  const matchStartMs =
+    typeof match.matchStartTime === "string" ? new Date(match.matchStartTime).getTime() : NaN;
+  const effectiveMatchStartMs =
+    Number.isFinite(matchStartMs) ? matchStartMs : new Date(match.createdAt).getTime();
+  const timeLimitMs = match.timeLimitMs ?? getMatchTimeLimitMs(match.gameType);
+  const timerSec =
+    match.status === "in_progress"
+      ? Math.max(0, Math.ceil((timeLimitMs - Math.max(0, timerNowMs - effectiveMatchStartMs)) / 1000))
+      : 0;
   const opponentUsername =
     myRole === "player1" ? safePlayer2.username : safePlayer1.username;
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
@@ -953,6 +1061,13 @@ function MatchPageContent() {
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
+                initialClockState={{
+                  player1RemainingTimeMs: match.player1RemainingTimeMs,
+                  player2RemainingTimeMs: match.player2RemainingTimeMs,
+                  activeTurn: match.activeTurn,
+                  turnStartedAt: match.turnStartedAt,
+                }}
+                onTurnClockUpdate={handleTurnClockUpdate}
               />
             </GameLayout>
           ) : null}

@@ -103,6 +103,7 @@ function PlayerCard({
   const avatarBg = playerKey === "player1" ? "#FF5E00" : "#2A3A5C";
   const clockText = formatPlayerClock(player.timeLeftSec);
   const clockDanger = typeof player.timeLeftSec === "number" && player.timeLeftSec < 60;
+  const clockColor = clockDanger ? "#ef4444" : isActive ? "#e0e0e0" : "#555";
 
   return (
     <div
@@ -157,7 +158,7 @@ function PlayerCard({
             {clockText ? (
               <span
                 className="text-[10px] font-semibold tabular-nums md:text-[11px]"
-                style={{ color: clockDanger ? "#ef4444" : "#888" }}
+                style={{ color: clockColor }}
               >
                 {clockText}
               </span>
