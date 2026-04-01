@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef } from "react";
+
 interface AfkCountdownRingProps {
   secondsLeft: number;
   totalSeconds?: number;
@@ -12,10 +14,15 @@ export default function AfkCountdownRing({
   isDanger = false,
 }: AfkCountdownRingProps) {
   const stroke = 2.5;
-  const circumference = 2 * Math.PI * 50;
+  const R = 46;
+  const circumference = 2 * Math.PI * R;
   const clamped = Math.max(0, Math.min(secondsLeft, totalSeconds));
   const progress = clamped / totalSeconds;
   const offset = circumference * (1 - progress);
+
+  const prevSecondsRef = useRef(secondsLeft);
+  const isReset = secondsLeft > prevSecondsRef.current + 2;
+  prevSecondsRef.current = secondsLeft;
 
   return (
     <div className={`absolute inset-[-3px] z-10 ${isDanger ? "animate-afk-ring-pulse" : ""}`}>
@@ -26,7 +33,7 @@ export default function AfkCountdownRing({
         <circle
           cx="50"
           cy="50"
-          r="50"
+          r={R}
           fill="none"
           stroke="rgba(255,255,255,0.15)"
           strokeWidth={stroke}
@@ -35,7 +42,7 @@ export default function AfkCountdownRing({
         <circle
           cx="50"
           cy="50"
-          r="50"
+          r={R}
           fill="none"
           stroke={isDanger ? "#ef4444" : "#FF5E00"}
           strokeWidth={stroke}
@@ -43,7 +50,12 @@ export default function AfkCountdownRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           vectorEffect="non-scaling-stroke"
-          transform="rotate(90 50 50) scale(-1,1) translate(-100,0)"
+          transform={`rotate(-90 50 50)`}
+          style={{
+            transition: isReset
+              ? "none"
+              : "stroke-dashoffset 1s linear",
+          }}
         />
       </svg>
     </div>

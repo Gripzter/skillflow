@@ -111,26 +111,7 @@ export default function AppNavbar({
           >
             Play
           </Link>
-          {!isPractice && (
-            <>
-              <Link
-                href="/last-touch"
-                className="rounded-lg px-3 py-2 text-sm font-medium transition-colors text-teal hover:text-teal/90"
-              >
-                Last Touch
-              </Link>
-              <Link
-                href="/external"
-                className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  currentPage === "external"
-                    ? "active bg-white/10 text-white"
-                    : "text-body-gray hover:text-white"
-                }`}
-              >
-                Arena
-              </Link>
-            </>
-          )}
+          {/* Arena + Last Touch removed — not yet built */}
           <Link
             href="/leaderboard"
             className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
