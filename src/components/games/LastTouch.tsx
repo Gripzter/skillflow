@@ -35,6 +35,8 @@ const CHALLENGE_MAX_DURATION_SEC = 30;
 const DEV_CHALLENGE_EMAIL = "aras.axmas@gmail.com";
 const NORMAL_LOBBY_COUNTDOWN_SEC = 15 * 60;
 const DEV_LOBBY_COUNTDOWN_SEC = 30;
+const LOBBY_HEARTBEAT_MS = 10_000;
+const LOBBY_DISCONNECT_GRACE_MS = 60_000;
 
 type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
 
@@ -47,6 +49,12 @@ interface ChallengeState {
   sizeScale?: number;
   shape?: "triangle" | "star" | "l-shape";
   rapidTarget?: { x: number; y: number; deadlineMs: number; hitsLeft: number };
+}
+
+interface LobbyParticipant {
+  userId: string;
+  username: string;
+  lastSeenMs: number;
 }
 
 interface LastTouchProps {
@@ -107,20 +115,18 @@ export default function LastTouch({
   const [nextChallengeAtMs, setNextChallengeAtMs] = useState<number | null>(null);
   const [challengeBanner, setChallengeBanner] = useState<string | null>(null);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
-  const [realtimePlayersJoined, setRealtimePlayersJoined] = useState(0);
-  const [realtimePlayersEliminated, setRealtimePlayersEliminated] = useState(0);
   const [splitSpacePressed, setSplitSpacePressed] = useState(false);
   const [activeTouchCount, setActiveTouchCount] = useState(0);
   const [releaseGraceDeadline, setReleaseGraceDeadline] = useState<number | null>(null);
   const [lobbyFeed, setLobbyFeed] = useState<Array<{ id: string; username: string; message: string; atMs: number }>>([]);
-  const [lobbyJoinedCount, setLobbyJoinedCount] = useState(0);
+  const [lobbyParticipants, setLobbyParticipants] = useState<Record<string, LobbyParticipant>>({});
   const touchZoneRef = useRef<HTMLDivElement>(null);
   const activePointersRef = useRef<Set<number>>(new Set());
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const releaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const splitFailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChallengeTypeRef = useRef<ChallengeType | null>(null);
-  const sessionKeyRef = useRef<string>(`${userId || username}-${Math.random().toString(36).slice(2, 8)}`);
+  const selfLobbyIdRef = useRef<string>((userId && userId.trim()) || `u:${username.toLowerCase()}`);
   const seenLobbyUsersRef = useRef<Set<string>>(new Set());
   const channelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>>["channel"]> | null>(null);
 
@@ -131,7 +137,8 @@ export default function LastTouch({
   const totalPlayers = state.players.length;
   const realPlayer = state.players.find((p) => p.isReal);
   const isEliminated = state.realPlayerEliminated;
-  const playersRemaining = Math.max(remaining.length, remaining.length + realtimePlayersJoined - 1 - realtimePlayersEliminated);
+  const lobbyJoinedCount = Object.keys(lobbyParticipants).length;
+  const playersRemaining = remaining.length;
   const eliminatedThisSession = Math.max(0, totalPlayers - playersRemaining);
   const gameElapsedMs = state.gameStartMs != null ? Date.now() - state.gameStartMs : 0;
   const difficulty = Math.min(1, gameElapsedMs / (60 * 60 * 1000));
@@ -142,19 +149,27 @@ export default function LastTouch({
   const netPool = netPrizePool(state.prizePool);
   const liveLobbyPrizePool = lobbyJoinedCount * entryFee;
 
-  const updateRealtimePresence = useCallback(
-    async (eliminated: boolean) => {
-      const ch = channelRef.current;
-      if (!ch || !joined) return;
-      await ch.track({
-        joined: true,
-        eliminated,
-        username,
-        atMs: Date.now(),
-      }).catch(() => {});
-    },
-    [joined, username]
-  );
+  useEffect(() => {
+    selfLobbyIdRef.current = (userId && userId.trim()) || `u:${username.toLowerCase()}`;
+  }, [userId, username]);
+
+  const broadcastLobbyUpsert = useCallback(async () => {
+    const ch = channelRef.current;
+    if (!ch || !joined || state.phase !== "lobby") return;
+    const payload = {
+      userId: selfLobbyIdRef.current,
+      username,
+      lastSeenMs: Date.now(),
+    };
+    localStorage.setItem(`lasttouch:lobby:${payload.userId}`, JSON.stringify(payload));
+    await ch
+      .send({
+        type: "broadcast",
+        event: "last_touch_lobby_upsert",
+        payload,
+      })
+      .catch(() => {});
+  }, [joined, state.phase, username]);
 
   const eliminateMe = useCallback(
     (reason: "lift" | "challenge" | "visibility") => {
@@ -165,7 +180,6 @@ export default function LastTouch({
       if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       if (splitFailTimeoutRef.current) clearTimeout(splitFailTimeoutRef.current);
       setState((s) => eliminateRealPlayer(s, reason, Date.now()));
-      updateRealtimePresence(true);
       channelRef.current
         ?.send({
           type: "broadcast",
@@ -175,7 +189,7 @@ export default function LastTouch({
         .catch(() => {});
       if (navigator.vibrate) navigator.vibrate(50);
     },
-    [isEliminated, updateRealtimePresence, username]
+    [isEliminated, username]
   );
 
   // Lobby: next game countdown
@@ -343,7 +357,7 @@ export default function LastTouch({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [entryFee]);
+  }, []);
 
   // Visibility: tab hidden = eliminated
   useEffect(() => {
@@ -356,72 +370,47 @@ export default function LastTouch({
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, [isHolding, isEliminated, eliminateMe]);
 
-  // realtime live presence + eliminations
+  // Realtime lobby sync + elimination events
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
-    const channel = supabase.channel("last-touch:global", {
-      config: { presence: { key: sessionKeyRef.current } },
-    });
+    const channel = supabase.channel("last-touch:global");
     channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const metas = Object.values(state).flatMap((x) => x as Array<Record<string, unknown>>);
-        const joinedMetas = metas.filter((m) => m.joined === true);
-        const eliminatedCount = joinedMetas.filter((m) => m.eliminated === true).length;
-        const activeUsernames = Array.from(
-          new Set(
-            joinedMetas
-              .map((m) => (typeof m.username === "string" ? m.username : ""))
-              .filter(Boolean)
-          )
-        );
-        const joinedCount = activeUsernames.length;
-        setRealtimePlayersJoined(joinedCount);
-        setRealtimePlayersEliminated(eliminatedCount);
-        setLobbyJoinedCount(joinedCount);
+      .on("broadcast", { event: "last_touch_lobby_upsert" }, ({ payload }) => {
+        if (!payload || typeof payload !== "object") return;
+        const p = payload as { userId?: unknown; username?: unknown; lastSeenMs?: unknown };
+        if (typeof p.userId !== "string" || !p.userId) return;
+        if (typeof p.username !== "string" || !p.username) return;
+        const lastSeenMs = typeof p.lastSeenMs === "number" ? p.lastSeenMs : Date.now();
 
-        // Keep the lobby feed real-only from actual realtime users.
-        for (const u of activeUsernames) {
-          if (seenLobbyUsersRef.current.has(u)) continue;
-          seenLobbyUsersRef.current.add(u);
+        setLobbyParticipants((prev) => {
+          const existing = prev[p.userId];
+          return {
+            ...prev,
+            [p.userId]: {
+              userId: p.userId,
+              username: p.username,
+              lastSeenMs: Math.max(lastSeenMs, existing?.lastSeenMs ?? 0),
+            },
+          };
+        });
+
+        // One player = one feed entry.
+        if (!seenLobbyUsersRef.current.has(p.userId)) {
+          seenLobbyUsersRef.current.add(p.userId);
           setLobbyFeed((prev) => [
             {
-              id: `join-${u}-${Date.now()}`,
-              username: u,
-              message: `${u} joined Last Touch`,
+              id: `join-${p.userId}`,
+              username: p.username,
+              message: `${p.username} joined Last Touch`,
               atMs: Date.now(),
             },
             ...prev,
           ].slice(0, 50));
         }
-
-        // During lobby keep pool derived from real joined players only.
-        setState((s) =>
-          s.phase === "lobby"
-            ? {
-                ...s,
-                prizePool: joinedCount * entryFee,
-              }
-            : s
-        );
       })
       .on("broadcast", { event: "last_touch_elimination" }, () => {
-        // Sync is authoritative; this just nudges UI updates faster.
-      })
-      .on("broadcast", { event: "last_touch_join" }, ({ payload }) => {
-        if (!payload || typeof payload !== "object") return;
-        const p = payload as { username?: unknown };
-        if (typeof p.username !== "string") return;
-        setLobbyFeed((prev) => [
-          {
-            id: `join-${p.username}-${Date.now()}`,
-            username: p.username,
-            message: `${p.username} joined Last Touch`,
-            atMs: Date.now(),
-          },
-          ...prev,
-        ].slice(0, 50));
+        // Reserved for future live elimination feed UI.
       })
       .subscribe();
     channelRef.current = channel;
@@ -429,11 +418,60 @@ export default function LastTouch({
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [entryFee]);
+  }, []);
 
+  // Heartbeat while in lobby and joined.
   useEffect(() => {
-    updateRealtimePresence(isEliminated);
-  }, [updateRealtimePresence, isEliminated]);
+    if (!joined || state.phase !== "lobby") return;
+    broadcastLobbyUpsert();
+    const t = setInterval(() => {
+      broadcastLobbyUpsert();
+    }, LOBBY_HEARTBEAT_MS);
+    return () => clearInterval(t);
+  }, [joined, state.phase, broadcastLobbyUpsert]);
+
+  // Reconnect previous lobby entry after refresh/navigation if seen recently.
+  useEffect(() => {
+    const key = `lasttouch:lobby:${selfLobbyIdRef.current}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { userId?: string; username?: string; lastSeenMs?: number };
+      if (!parsed?.userId || typeof parsed.lastSeenMs !== "number") return;
+      if (Date.now() - parsed.lastSeenMs > LOBBY_DISCONNECT_GRACE_MS) {
+        localStorage.removeItem(key);
+        return;
+      }
+      if (state.phase === "lobby") {
+        setJoined(true);
+        setState((s) =>
+          s.players.some((p) => p.isReal)
+            ? s
+            : {
+                ...s,
+                players: addRealPlayer(s.players, username, entryFee),
+              }
+        );
+      }
+    } catch {
+      // ignore malformed local storage
+    }
+  }, [state.phase, username, entryFee]);
+
+  // Drop disconnected lobby players after 60s.
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = Date.now();
+      setLobbyParticipants((prev) => {
+        const next: Record<string, LobbyParticipant> = {};
+        for (const [id, p] of Object.entries(prev)) {
+          if (now - p.lastSeenMs <= LOBBY_DISCONNECT_GRACE_MS) next[id] = p;
+        }
+        return next;
+      });
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const randomChallengeDelayMs = useCallback(() => {
     if (canUseDevMode) return DEV_CHALLENGE_INTERVAL_MS;
@@ -569,6 +607,11 @@ export default function LastTouch({
   }, [challenge, difficulty, randomChallengeDelayMs]);
 
   const handleJoin = useCallback(async () => {
+    const selfId = selfLobbyIdRef.current;
+    if (joined || lobbyParticipants[selfId]) {
+      setJoined(true);
+      return;
+    }
     const ok = await onJoinRequest(entryFee);
     if (!ok) return;
     setJoined(true);
@@ -578,23 +621,25 @@ export default function LastTouch({
       prizePool: Math.max(s.prizePool, (lobbyJoinedCount + 1) * entryFee),
       feed: s.feed,
     }));
-    setLobbyFeed((prev) => [
-      {
-        id: `join-${username}-${Date.now()}`,
-        username,
-        message: `${username} joined Last Touch`,
-        atMs: Date.now(),
-      },
+    setLobbyParticipants((prev) => ({
       ...prev,
-    ].slice(0, 50));
-    seenLobbyUsersRef.current.add(username);
-    channelRef.current?.send({
-      type: "broadcast",
-      event: "last_touch_join",
-      payload: { username, atMs: Date.now() },
-    }).catch(() => {});
+      [selfId]: { userId: selfId, username, lastSeenMs: Date.now() },
+    }));
+    if (!seenLobbyUsersRef.current.has(selfId)) {
+      seenLobbyUsersRef.current.add(selfId);
+      setLobbyFeed((prev) => [
+        {
+          id: `join-${selfId}`,
+          username,
+          message: `${username} joined Last Touch`,
+          atMs: Date.now(),
+        },
+        ...prev,
+      ].slice(0, 50));
+    }
+    broadcastLobbyUpsert();
     setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
-  }, [username, entryFee, onJoinRequest, randomChallengeDelayMs, lobbyJoinedCount]);
+  }, [joined, lobbyParticipants, onJoinRequest, entryFee, username, lobbyJoinedCount, broadcastLobbyUpsert, randomChallengeDelayMs]);
 
   const handleDevStartNow = useCallback(() => {
     if (!canUseDevMode || state.phase !== "lobby") return;
@@ -715,14 +760,16 @@ export default function LastTouch({
         </div>
 
         {canUseDevMode && (
-          <button
-            type="button"
-            onClick={handleDevStartNow}
-            className="absolute bottom-0 right-0 rounded-full border px-3 py-1 text-[12px] font-medium"
-            style={{ background: "#0E0E12", borderColor: "#FF5E00", color: "#FF5E00" }}
-          >
-            Start Now (Dev)
-          </button>
+          <div className="mx-auto w-full max-w-md">
+            <button
+              type="button"
+              onClick={handleDevStartNow}
+              className="w-full rounded-full border-2 px-4 py-2 text-[12px] font-semibold"
+              style={{ background: "#FF5E00", borderColor: "#FF5E00", color: "#0E0E12" }}
+            >
+              Start Now (Dev)
+            </button>
+          </div>
         )}
       </div>
     );
