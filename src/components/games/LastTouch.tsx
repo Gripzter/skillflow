@@ -10,9 +10,7 @@ import {
 } from "react";
 import { createClient } from "@/lib/supabase";
 import {
-  createInitialBots,
   addRealPlayer,
-  tickSimulation,
   eliminateRealPlayer,
   setRealPlayerHolding,
   addRealPlayerWarning,
@@ -25,14 +23,16 @@ import {
   isUserJoined,
   fetchActiveSession,
   markSessionLive,
+  markSessionCancelled,
   markSessionCompleted,
+  ensureUpcomingSessions,
   type LastTouchSession,
 } from "@/lib/games/last-touch-sessions";
 
-const TICK_MS = 2000;
-const START_COUNTDOWN_SEC = 5;
+const START_COUNTDOWN_SEC = 3;
 const RELEASE_GRACE_MS = 1000;
 const MAX_WARNINGS = 3;
+const MIN_PLAYERS_TO_START = 2;
 const CHALLENGE_MIN_MS = 20 * 60 * 1000;
 const CHALLENGE_MAX_MS = 30 * 60 * 1000;
 const CHALLENGE_MIN_SEC = 15;
@@ -60,6 +60,7 @@ interface Props {
   onWin: (amount: number) => void;
   onEliminated: (rank: number, total: number) => void;
   onSessionUpdate: (s: LastTouchSession) => void;
+  onSessionCancelled: (sessionId: string, amount: number) => void | Promise<void>;
 }
 
 function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string }) {
@@ -94,10 +95,12 @@ export default function LastTouch({
   onWin,
   onEliminated,
   onSessionUpdate,
+  onSessionCancelled,
 }: Props) {
   // Live session — starts from prop, updated by realtime
   const [liveSession, setLiveSession] = useState<LastTouchSession | null>(session);
   const [dbPlayerCount, setDbPlayerCount] = useState(0);
+  const [dbAliveCount, setDbAliveCount] = useState(0);
   const [joined, setJoined] = useState(false);
   const [countdownSec, setCountdownSec] = useState(0);
   const [startCountdownNum, setStartCountdownNum] = useState<number | null>(null);
@@ -112,6 +115,7 @@ export default function LastTouch({
   const [splitSpacePressed, setSplitSpacePressed] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   const activePointersRef = useRef<Set<number>>(new Set());
   const releaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,16 +169,19 @@ export default function LastTouch({
     const supabase = createClient();
     if (!supabase) return;
 
-    // Initial player count
-    supabase
-      .from("last_touch_players")
-      .select("*", { count: "exact", head: true })
-      .eq("session_id", session.id)
-      .then(({ count }) => {
-        const c = count ?? 0;
-        setDbPlayerCount(c);
-        dbPlayerCountRef.current = c;
-      });
+    const refreshCounts = async () => {
+      const { data } = await supabase
+        .from("last_touch_players")
+        .select("status")
+        .eq("session_id", session.id);
+      if (!Array.isArray(data)) return;
+      const total = data.length;
+      const alive = data.filter((row) => row.status === "alive").length;
+      setDbPlayerCount(total);
+      setDbAliveCount(alive);
+      dbPlayerCountRef.current = total;
+    };
+    void refreshCounts();
 
     const ch = supabase
       .channel(`lt-session:${session.id}`)
@@ -190,13 +197,8 @@ export default function LastTouch({
       )
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "last_touch_players", filter: `session_id=eq.${session.id}` },
-        () => {
-          setDbPlayerCount((c) => {
-            dbPlayerCountRef.current = c + 1;
-            return c + 1;
-          });
-        }
+        { event: "*", schema: "public", table: "last_touch_players", filter: `session_id=eq.${session.id}` },
+        () => void refreshCounts()
       )
       .subscribe();
 
@@ -222,8 +224,31 @@ export default function LastTouch({
     if (markedLiveRef.current) return;
     markedLiveRef.current = true;
     const supabase = createClient();
-    if (supabase) markSessionLive(supabase, liveSession.id);
-  }, [countdownSec, liveSession]);
+    if (!supabase) return;
+    void (async () => {
+      if (dbPlayerCountRef.current < MIN_PLAYERS_TO_START) {
+        await markSessionCancelled(supabase, liveSession.id);
+        if (joined) {
+          await onSessionCancelled(liveSession.id, liveSession.entry_fee);
+          setJoined(false);
+          setCancelMessage(
+            `Not enough players — game cancelled. Your $${liveSession.entry_fee.toFixed(2)} has been refunded.`
+          );
+        } else {
+          setCancelMessage("Not enough players — game cancelled.");
+        }
+        await ensureUpcomingSessions(supabase);
+        const next = await fetchActiveSession(supabase);
+        if (next && next.status === "upcoming") {
+          setLiveSession(next);
+          liveSessionRef.current = next;
+          onSessionUpdate(next);
+        }
+        return;
+      }
+      await markSessionLive(supabase, liveSession.id);
+    })();
+  }, [countdownSec, liveSession, joined, onSessionCancelled, onSessionUpdate]);
 
   // When session goes live + user joined → start 5s game countdown
   useEffect(() => {
@@ -232,32 +257,20 @@ export default function LastTouch({
     setStartCountdownNum(START_COUNTDOWN_SEC);
   }, [liveSession?.status, joined]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 5, 4, 3, 2, 1 → init simulation
+  // 3, 2, 1 -> init live game state.
   useEffect(() => {
     if (startCountdownNum === null) return;
     if (startCountdownNum === 0) {
       setStartCountdownNum(null);
       const sess = liveSessionRef.current;
-      const botCount = Math.max(100, dbPlayerCountRef.current * 8 - 1);
-      const bots = createInitialBots(botCount);
-      const allPlayers = addRealPlayer(bots, username, sess?.entry_fee ?? 1);
+      const allPlayers = addRealPlayer([], username, sess?.entry_fee ?? 1);
       const prizePool = sess?.prize_pool ?? dbPlayerCountRef.current;
       setSimState({
         phase: "playing",
         gameStartMs: Date.now(),
         players: allPlayers,
         prizePool,
-        feed: bots
-          .slice(-20)
-          .reverse()
-          .map((p, i) => ({
-            id: `f${i}`,
-            type: "join" as const,
-            username: p.username,
-            message: `${p.username} just joined!`,
-            atMs: Date.now() - (20 - i) * 2000,
-            amount: 1,
-          })),
+        feed: [],
         realPlayerEliminated: false,
         realPlayerRank: null,
         realPlayerHoldStartMs: null,
@@ -290,8 +303,9 @@ export default function LastTouch({
   const gameElapsedMs = simState?.gameStartMs != null ? Date.now() - simState.gameStartMs : 0;
   const difficulty = Math.min(1, gameElapsedMs / (60 * 60 * 1000));
   const myHoldMs = holdStartMs != null ? Date.now() - holdStartMs : 0;
-  const playersRemaining = remaining.length;
-  const eliminatedThisSession = Math.max(0, totalPlayers - playersRemaining);
+  const playersRemaining = Math.max(0, dbAliveCount || remaining.length);
+  const sessionTotalPlayers = Math.max(dbPlayerCount, totalPlayers, playersRemaining);
+  const eliminatedThisSession = Math.max(0, sessionTotalPlayers - playersRemaining);
   const netPool = netPrizePool(liveSession?.prize_pool ?? 0);
   const challengeSecLeft =
     challenge == null ? 0 : Math.max(0, Math.ceil((challenge.endsAtMs - Date.now()) / 1000));
@@ -309,39 +323,40 @@ export default function LastTouch({
       if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       if (splitFailTimeoutRef.current) clearTimeout(splitFailTimeoutRef.current);
       setSimState((s) => (s ? eliminateRealPlayer(s, reason, Date.now()) : s));
+      const supabase = createClient();
+      if (supabase && liveSessionRef.current) {
+        void supabase
+          .from("last_touch_players")
+          .update({ status: "eliminated" })
+          .eq("session_id", liveSessionRef.current.id)
+          .eq("user_id", userId);
+      }
       if (navigator.vibrate) navigator.vibrate(50);
     },
-    [isEliminated]
+    [isEliminated, userId]
   );
-
-  // Sim tick
-  useEffect(() => {
-    if (!isGameActive) return;
-    const t = setInterval(() => {
-      setSimState((s) => (s ? tickSimulation(s, Date.now(), isHolding) : s));
-    }, TICK_MS);
-    return () => clearInterval(t);
-  }, [isGameActive, isHolding]);
 
   // Win detection
   useEffect(() => {
-    if (!simState || simState.phase !== "winner" || onWinCalledRef.current) return;
-    const onlyReal = remaining.length === 1 && remaining[0]?.isReal;
-    if (onlyReal && simState.gameStartMs != null) {
+    if (!simState || onWinCalledRef.current) return;
+    if (!["playing", "final10", "final3", "final2", "winner"].includes(simState.phase)) return;
+    if (dbAliveCount > 1) return;
+    if (simState.phase !== "winner") {
+      setSimState((s) => (s ? { ...s, phase: "winner" } : s));
+    }
+    if (!simState.realPlayerEliminated && simState.gameStartMs != null) {
       onWinCalledRef.current = true;
       onWin(netPool);
       const supabase = createClient();
       if (supabase && liveSession) markSessionCompleted(supabase, liveSession.id);
     }
-  }, [simState?.phase, remaining, netPool, onWin, liveSession]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [simState, dbAliveCount, netPool, onWin, liveSession]);
 
   // Elimination callback
   useEffect(() => {
     if (!simState?.realPlayerEliminated || simState.realPlayerRank == null) return;
-    onEliminated(simState.realPlayerRank, totalPlayers);
-    const supabase = createClient();
-    if (supabase && liveSession) markSessionCompleted(supabase, liveSession.id);
-  }, [simState?.realPlayerEliminated, simState?.realPlayerRank, totalPlayers, onEliminated, liveSession]); // eslint-disable-line react-hooks/exhaustive-deps
+    onEliminated(simState.realPlayerRank, sessionTotalPlayers);
+  }, [simState?.realPlayerEliminated, simState?.realPlayerRank, sessionTotalPlayers, onEliminated]);
 
   // Pointer handlers
   const handlePointerDown = useCallback(
@@ -723,7 +738,7 @@ export default function LastTouch({
         <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2">
           <span className="text-body-gray">Players Remaining</span>
           <span className="font-mono font-bold text-white tabular-nums">
-            {playersRemaining} / {Math.max(totalPlayers, playersRemaining)}
+            {playersRemaining} / {sessionTotalPlayers}
           </span>
         </div>
         <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2 text-sm">
@@ -740,7 +755,7 @@ export default function LastTouch({
           <div
             className="h-full rounded-full bg-teal/80 transition-all duration-500"
             style={{
-              width: `${Math.max(0, Math.min(100, (playersRemaining / Math.max(totalPlayers, 1)) * 100))}%`,
+              width: `${Math.max(0, Math.min(100, (playersRemaining / Math.max(sessionTotalPlayers, 1)) * 100))}%`,
             }}
           />
         </div>
@@ -818,6 +833,7 @@ export default function LastTouch({
                 </p>
               )}
               <p className="mt-1 text-sm text-white">Rank #{simState.realPlayerRank}</p>
+              <p className="mt-1 text-sm text-body-gray">Players remaining: {playersRemaining}</p>
             </div>
           )}
         </div>
@@ -843,7 +859,7 @@ export default function LastTouch({
           <div className="rounded-lg border border-white/10 bg-card/60 p-3 text-sm">
             <p>Your Hold Time: {formatHoldTime(myHoldMs)}</p>
             <p>
-              Your Rank: #{Math.max(1, playersRemaining)} / {Math.max(totalPlayers, playersRemaining)}
+              Your Rank: #{Math.max(1, playersRemaining)} / {sessionTotalPlayers}
             </p>
             <p>Warnings: {simState.realPlayerWarnings} / {MAX_WARNINGS}</p>
             {releaseGraceDeadline && (
@@ -914,9 +930,12 @@ export default function LastTouch({
                 <p className="mt-1 text-xs text-body-gray">{timeLabel}</p>
               </>
             ) : (
-              <p className="text-lg font-semibold text-[#FF5E00]">Game starting…</p>
+              <p className="text-lg font-semibold text-[#FF5E00]">Game in progress…</p>
             )}
           </div>
+          {cancelMessage && (
+            <p className="text-center text-sm text-amber-300">{cancelMessage}</p>
+          )}
 
           {/* Join / Already joined */}
           {joinError && (
@@ -932,7 +951,7 @@ export default function LastTouch({
                 <p className="mt-1 text-sm text-body-gray">
                   {liveSession.status === "upcoming"
                     ? `Next game starts at ${timeLabel}`
-                    : "Game is starting…"}
+                    : "Game is in progress…"}
                 </p>
               </div>
             ) : (

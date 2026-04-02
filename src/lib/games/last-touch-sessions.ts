@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export interface LastTouchSession {
   id: string;
   scheduled_start_at: string; // ISO
-  status: "upcoming" | "live" | "completed";
+  status: "upcoming" | "live" | "completed" | "cancelled";
   prize_pool: number;
   entry_fee: number;
   created_at: string;
@@ -138,6 +138,17 @@ export async function markSessionCompleted(
   await supabase
     .from("last_touch_sessions")
     .update({ status: "completed" })
+    .eq("id", sessionId);
+}
+
+/** Transition session -> cancelled */
+export async function markSessionCancelled(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<void> {
+  await supabase
+    .from("last_touch_sessions")
+    .update({ status: "cancelled" })
     .eq("id", sessionId);
 }
 
