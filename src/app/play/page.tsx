@@ -16,6 +16,12 @@ interface DisplayUser {
   email?: string;
 }
 
+interface UpcomingLastTouchSession {
+  id: string;
+  scheduledStartAtMs: number;
+  prizePool: number;
+}
+
 const GAMES = [
   { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
   { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
@@ -275,6 +281,8 @@ export default function PlayPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [playersWait, setPlayersWait] = useState<{ players: number; wait: number }[]>([]);
+  const [lastTouchSession, setLastTouchSession] = useState<UpcomingLastTouchSession | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const onlineCount = useOnlinePlayers(userId);
 
   useEffect(() => {
@@ -304,6 +312,52 @@ export default function PlayPage() {
     }
     getUser();
   }, [router]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) return;
+    let active = true;
+    async function loadUpcoming() {
+      const nowIso = new Date().toISOString();
+      const { data } = await supabase
+        .from("last_touch_sessions")
+        .select("id, scheduled_start_at, prize_pool")
+        .eq("status", "upcoming")
+        .gte("scheduled_start_at", nowIso)
+        .order("scheduled_start_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!active) return;
+      if (!data?.id || !data.scheduled_start_at) {
+        setLastTouchSession(null);
+        return;
+      }
+      const scheduledStartAtMs = new Date(data.scheduled_start_at).getTime();
+      if (!Number.isFinite(scheduledStartAtMs)) {
+        setLastTouchSession(null);
+        return;
+      }
+      setLastTouchSession({
+        id: data.id,
+        scheduledStartAtMs,
+        prizePool: Number(data.prize_pool ?? 0),
+      });
+    }
+    void loadUpcoming();
+    const ch = supabase
+      .channel("lt-play-banner")
+      .on("postgres_changes", { event: "*", schema: "public", table: "last_touch_sessions" }, () => void loadUpcoming())
+      .subscribe();
+    return () => {
+      active = false;
+      ch.unsubscribe();
+    };
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -339,6 +393,9 @@ export default function PlayPage() {
   }
 
   const username = user?.user_metadata?.username || "Player";
+  const ltCountdownSec = lastTouchSession == null ? null : Math.max(0, Math.ceil((lastTouchSession.scheduledStartAtMs - nowMs) / 1000));
+  const ltMins = Math.floor((ltCountdownSec ?? 0) / 60);
+  const ltSecs = (ltCountdownSec ?? 0) % 60;
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
@@ -376,7 +433,10 @@ export default function PlayPage() {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-xs text-body-gray">Prize Pool</p>
-                  <p className="text-xl font-bold text-white">$1,247</p>
+                  <p className="text-xl font-bold text-white">${(lastTouchSession?.prizePool ?? 0).toFixed(2)}</p>
+                  <p className="text-xs text-body-gray">
+                    Starts in {ltCountdownSec == null ? "—:—" : `${ltMins}:${ltSecs.toString().padStart(2, "0")}`}
+                  </p>
                 </div>
                 <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(255,94,0,0.5)]">
                   Join Now

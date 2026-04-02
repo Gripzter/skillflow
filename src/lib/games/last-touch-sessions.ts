@@ -60,14 +60,23 @@ export async function ensureUpcomingSessions(
 export async function fetchActiveSession(
   supabase: SupabaseClient
 ): Promise<LastTouchSession | null> {
-  const { data } = await supabase
+  const { data: upcoming } = await supabase
     .from("last_touch_sessions")
     .select("*")
-    .in("status", ["upcoming", "live"])
+    .eq("status", "upcoming")
     .order("scheduled_start_at", { ascending: true })
     .limit(1)
     .maybeSingle();
-  return (data as LastTouchSession) ?? null;
+  if (upcoming) return upcoming as LastTouchSession;
+
+  const { data: live } = await supabase
+    .from("last_touch_sessions")
+    .select("*")
+    .eq("status", "live")
+    .order("scheduled_start_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (live as LastTouchSession) ?? null;
 }
 
 /** Join a session (inserts player row; DB trigger updates prize_pool) */

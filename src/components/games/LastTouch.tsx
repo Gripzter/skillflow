@@ -23,6 +23,7 @@ import {
 import {
   joinSession,
   isUserJoined,
+  fetchActiveSession,
   markSessionLive,
   markSessionCompleted,
   type LastTouchSession,
@@ -37,6 +38,7 @@ const CHALLENGE_MIN_MS = 20 * 60 * 1000;
 const CHALLENGE_MAX_MS = 30 * 60 * 1000;
 const CHALLENGE_MIN_SEC = 15;
 const CHALLENGE_MAX_SEC = 30;
+const NOTIFICATION_PERMISSION_KEY = "lasttouch:notification-permission";
 
 type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
 
@@ -124,6 +126,7 @@ export default function LastTouch({
   const gameStartedRef = useRef(false);
   const dbPlayerCountRef = useRef(0);
   const liveSessionRef = useRef<LastTouchSession | null>(session);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sync session from parent
   useEffect(() => {
@@ -133,6 +136,22 @@ export default function LastTouch({
     gameStartedRef.current = false;
     onWinCalledRef.current = false;
   }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // If a live session is shown to a non-joined user, immediately move them to the next upcoming session.
+  useEffect(() => {
+    if (!liveSession || liveSession.status !== "live" || joined) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    let cancelled = false;
+    void (async () => {
+      const next = await fetchActiveSession(supabase);
+      if (cancelled || !next || next.id === liveSession.id || next.status !== "upcoming") return;
+      setLiveSession(next);
+      liveSessionRef.current = next;
+      onSessionUpdate(next);
+    })();
+    return () => { cancelled = true; };
+  }, [liveSession, joined, onSessionUpdate]);
 
   // Check if user is already joined (handles page refresh)
   useEffect(() => {
@@ -546,7 +565,49 @@ export default function LastTouch({
       }
     }
     setJoined(true);
+
+    if (typeof window !== "undefined" && "Notification" in window) {
+      const saved = localStorage.getItem(NOTIFICATION_PERMISSION_KEY);
+      if (saved !== "granted") {
+        const wants = window.confirm("Get notified when the game starts?");
+        if (wants) {
+          const permission = await Notification.requestPermission();
+          localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission);
+        } else {
+          localStorage.setItem(NOTIFICATION_PERMISSION_KEY, "denied");
+        }
+      }
+    }
   }, [joined, liveSession, onJoinRequest, userId, username]);
+
+  // 5-minute pre-start browser notification for joined players.
+  useEffect(() => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+    if (!joined || !liveSession || liveSession.status !== "upcoming") return;
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    const saved = localStorage.getItem(NOTIFICATION_PERMISSION_KEY);
+    if (saved !== "granted" || Notification.permission !== "granted") return;
+
+    const triggerAtMs = new Date(liveSession.scheduled_start_at).getTime() - 5 * 60 * 1000;
+    const delayMs = triggerAtMs - Date.now();
+    if (delayMs <= 0) return;
+
+    notificationTimeoutRef.current = setTimeout(() => {
+      new Notification("Last Touch starts in 5 minutes!", {
+        body: `Prize pool: $${liveSession.prize_pool.toFixed(2)}. Don't miss it!`,
+      });
+    }, delayMs);
+
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+        notificationTimeoutRef.current = null;
+      }
+    };
+  }, [joined, liveSession]);
 
   // ─── Rendering ────────────────────────────────────────────────────────────
 
@@ -808,7 +869,6 @@ export default function LastTouch({
   }
 
   // ─── Lobby ────────────────────────────────────────────────────────────────
-  const isLiveNoJoin = liveSession.status === "live" && !joined;
   const mins = Math.floor(countdownSec / 60);
   const secs = countdownSec % 60;
 
@@ -843,19 +903,7 @@ export default function LastTouch({
         </p>
       </div>
 
-      {isLiveNoJoin ? (
-        /* Game already started — didn't join in time */
-        <div className="mx-auto w-full max-w-md rounded-xl border border-white/10 bg-card/60 p-6 text-center">
-          <p className="text-lg font-semibold text-white">Game in progress</p>
-          <p className="mt-2 text-sm text-body-gray">
-            This session started at {timeLabel}. Join the next one!
-          </p>
-          <div className="mt-4 rounded-lg bg-white/5 px-4 py-3 text-sm text-body-gray">
-            Sessions run daily at <span className="text-white">02:00, 14:00, and 20:00 UTC</span>.
-          </div>
-        </div>
-      ) : (
-        <>
+      <>
           {/* Entry fee info */}
           <div className="card-border mx-auto w-full max-w-md rounded-xl bg-card/80 p-5">
             <p className="text-sm text-body-gray">Entry Fee</p>
@@ -897,7 +945,7 @@ export default function LastTouch({
                 <p className="font-semibold text-teal">✓ You&apos;re in!</p>
                 <p className="mt-1 text-sm text-body-gray">
                   {liveSession.status === "upcoming"
-                    ? `Game starts in ${mins}:${secs.toString().padStart(2, "0")}`
+                    ? `Next game starts at ${timeLabel}`
                     : "Game is starting…"}
                 </p>
               </div>
@@ -940,8 +988,7 @@ export default function LastTouch({
               </div>
             )}
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 }
