@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -9,7 +9,7 @@ import LastTouch from "@/components/games/LastTouch";
 
 const ENTRY_FEE = 1;
 
-export default function LastTouchPage() {
+function LastTouchPageContent() {
   const router = useRouter();
   const [username, setUsername] = useState("Player");
   const [userId, setUserId] = useState("");
@@ -151,5 +151,13 @@ export default function LastTouchPage() {
         />
       </main>
     </div>
+  );
+}
+
+export default function LastTouchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-charcoal text-white flex items-center justify-center">Loading...</div>}>
+      <LastTouchPageContent />
+    </Suspense>
   );
 }
