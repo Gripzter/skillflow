@@ -122,6 +122,7 @@ export default function LastTouch({
   const [releaseGraceDeadline, setReleaseGraceDeadline] = useState<number | null>(null);
   const [lobbyFeed, setLobbyFeed] = useState<Array<{ id: string; username: string; message: string; atMs: number }>>([]);
   const [lobbyParticipants, setLobbyParticipants] = useState<Record<string, LobbyParticipant>>({});
+  const [firstPlayerJoinedAtMs, setFirstPlayerJoinedAtMs] = useState<number | null>(null);
   const [sessionStartAtMs, setSessionStartAtMs] = useState<number | null>(null);
   const touchZoneRef = useRef<HTMLDivElement>(null);
   const activePointersRef = useRef<Set<number>>(new Set());
@@ -157,7 +158,9 @@ export default function LastTouch({
   const netPool = netPrizePool(state.prizePool);
   const liveLobbyPrizePool = lobbyJoinedCount * entryFee;
   const serverLobbyCountdownSec =
-    sessionStartAtMs == null ? (canUseDevMode ? DEV_LOBBY_COUNTDOWN_SEC : NORMAL_LOBBY_COUNTDOWN_SEC) : Math.max(0, Math.ceil((sessionStartAtMs - nowMs) / 1000));
+    firstPlayerJoinedAtMs == null || sessionStartAtMs == null
+      ? null
+      : Math.max(0, Math.ceil((sessionStartAtMs - nowMs) / 1000));
 
   useEffect(() => {
     const t = setInterval(() => setNowMs(Date.now()), 250);
@@ -207,20 +210,20 @@ export default function LastTouch({
 
   // Mirror server-authoritative lobby countdown into local state for existing UI.
   useEffect(() => {
-    if (state.phase !== "lobby") return;
+    if (state.phase !== "lobby" || serverLobbyCountdownSec == null) return;
     setState((s) => ({ ...s, nextGameCountdownSec: serverLobbyCountdownSec }));
   }, [state.phase, serverLobbyCountdownSec]);
 
   // When lobby countdown hits 0 and joined → start game countdown
   useEffect(() => {
-    if (state.phase !== "lobby" || !joined || state.nextGameCountdownSec > 0) return;
+    if (state.phase !== "lobby" || !joined || serverLobbyCountdownSec == null || serverLobbyCountdownSec > 0) return;
     setState((s) => ({
       ...s,
       phase: "countdown",
       gameStartMs: null,
     }));
     setCountdownNum(COUNTDOWN_GAME_START_SEC);
-  }, [state.phase, joined, state.nextGameCountdownSec]);
+  }, [state.phase, joined, serverLobbyCountdownSec]);
 
   // Keep lobby timer capped to the current testing target (60s).
   useEffect(() => {
@@ -385,26 +388,26 @@ export default function LastTouch({
 
     async function boot() {
       try {
-        const defaultStart = new Date(Date.now() + NORMAL_LOBBY_COUNTDOWN_SEC * 1000).toISOString();
-        await supabase
-          .from("last_touch_sessions")
-          .upsert(
-            {
-              id: LAST_TOUCH_SESSION_ID,
-              game_start_time: defaultStart,
-              status: "lobby",
-            },
-            { onConflict: "id" }
-          );
-
         const { data: session } = await supabase
           .from("last_touch_sessions")
-          .select("game_start_time, status")
+          .select("game_start_time, first_player_joined_at, status")
           .eq("id", LAST_TOUCH_SESSION_ID)
           .maybeSingle();
-        if (session?.game_start_time) {
-          const ms = new Date(session.game_start_time).getTime();
-          if (Number.isFinite(ms)) setSessionStartAtMs(ms);
+
+        if (!session) {
+          await supabase
+            .from("last_touch_sessions")
+            .insert({
+              id: LAST_TOUCH_SESSION_ID,
+              game_start_time: null,
+              first_player_joined_at: null,
+              status: "lobby",
+            });
+        } else {
+          const startMs = session.game_start_time ? new Date(session.game_start_time).getTime() : NaN;
+          const firstJoinMs = session.first_player_joined_at ? new Date(session.first_player_joined_at).getTime() : NaN;
+          setSessionStartAtMs(Number.isFinite(startMs) ? startMs : null);
+          setFirstPlayerJoinedAtMs(Number.isFinite(firstJoinMs) ? firstJoinMs : null);
         }
         const { data: entries } = await supabase
           .from("last_touch_lobby_entries")
@@ -459,10 +462,12 @@ export default function LastTouch({
         "postgres_changes",
         { event: "*", schema: "public", table: "last_touch_sessions", filter: `id=eq.${LAST_TOUCH_SESSION_ID}` },
         (payload) => {
-          const row = payload.new as { game_start_time?: string | null } | null;
-          if (!row?.game_start_time) return;
-          const ms = new Date(row.game_start_time).getTime();
-          if (Number.isFinite(ms)) setSessionStartAtMs(ms);
+          const row = payload.new as { game_start_time?: string | null; first_player_joined_at?: string | null } | null;
+          if (!row) return;
+          const startMs = row.game_start_time ? new Date(row.game_start_time).getTime() : NaN;
+          const firstJoinMs = row.first_player_joined_at ? new Date(row.first_player_joined_at).getTime() : NaN;
+          setSessionStartAtMs(Number.isFinite(startMs) ? startMs : null);
+          setFirstPlayerJoinedAtMs(Number.isFinite(firstJoinMs) ? firstJoinMs : null);
         }
       )
       .subscribe();
@@ -686,7 +691,8 @@ export default function LastTouch({
     }
     void (async () => {
       try {
-        await supabaseRef.current
+        const supabase = supabaseRef.current;
+        await supabase
           ?.from("last_touch_lobby_entries")
           .upsert(
             {
@@ -697,6 +703,32 @@ export default function LastTouch({
             },
             { onConflict: "session_id,user_id" }
           );
+        const firstJoinIso = new Date().toISOString();
+        const startIso = new Date(Date.now() + NORMAL_LOBBY_COUNTDOWN_SEC * 1000).toISOString();
+        const { data: currentSession } = await supabase
+          ?.from("last_touch_sessions")
+          .select("id, first_player_joined_at")
+          .eq("id", LAST_TOUCH_SESSION_ID)
+          .maybeSingle() ?? { data: null };
+        if (!currentSession) {
+          await supabase
+            ?.from("last_touch_sessions")
+            .insert({
+              id: LAST_TOUCH_SESSION_ID,
+              first_player_joined_at: firstJoinIso,
+              game_start_time: startIso,
+              status: "lobby",
+            });
+        } else if (!currentSession.first_player_joined_at) {
+          await supabase
+            ?.from("last_touch_sessions")
+            .update({
+              first_player_joined_at: firstJoinIso,
+              game_start_time: startIso,
+            })
+            .eq("id", LAST_TOUCH_SESSION_ID)
+            .is("first_player_joined_at", null);
+        }
       } catch {
         // Ignore transient realtime sync errors.
       }
@@ -711,7 +743,7 @@ export default function LastTouch({
       try {
         await supabaseRef.current
           ?.from("last_touch_sessions")
-          .update({ game_start_time: nowIso })
+          .update({ game_start_time: nowIso, first_player_joined_at: nowIso })
           .eq("id", LAST_TOUCH_SESSION_ID);
       } catch {
         // Ignore transient realtime sync errors.
@@ -732,8 +764,9 @@ export default function LastTouch({
 
   // ----- Lobby -----
   if (state.phase === "lobby") {
-    const mins = Math.floor(state.nextGameCountdownSec / 60);
-    const secs = state.nextGameCountdownSec % 60;
+    const mins = Math.floor((serverLobbyCountdownSec ?? 0) / 60);
+    const secs = (serverLobbyCountdownSec ?? 0) % 60;
+    const waitingForFirstPlayer = firstPlayerJoinedAtMs == null;
     return (
       <div className="relative flex flex-col gap-6 pb-8">
         {devBadge}
@@ -758,10 +791,10 @@ export default function LastTouch({
         <div className="card-border mx-auto w-full max-w-md rounded-xl bg-card/80 p-5">
           <p className="text-sm text-body-gray">Entry Fee</p>
           <p className="mt-1 text-2xl font-bold text-emerald-400">${currentFee.toFixed(2)}</p>
-          {nextTier && (
+          {nextTier && !waitingForFirstPlayer && (
             <p className="mt-1 text-xs text-body-gray">
-              Price increases in: {Math.floor(state.nextGameCountdownSec / 60)}:
-              {(state.nextGameCountdownSec % 60).toString().padStart(2, "0")}
+              Price increases in: {Math.floor((serverLobbyCountdownSec ?? 0) / 60)}:
+              {((serverLobbyCountdownSec ?? 0) % 60).toString().padStart(2, "0")}
             </p>
           )}
           <ul className="mt-4 space-y-1 text-xs text-body-gray">
@@ -775,10 +808,14 @@ export default function LastTouch({
         </div>
 
         <div className="text-center">
-          <p className="text-body-gray">Next Game Starts In</p>
-          <p className="mt-2 font-mono text-4xl font-bold text-white tabular-nums">
-            {mins}:{secs.toString().padStart(2, "0")}
-          </p>
+          <p className="text-body-gray">{waitingForFirstPlayer ? "Match Status" : "Next Game Starts In"}</p>
+          {waitingForFirstPlayer ? (
+            <p className="mt-2 text-xl font-semibold text-white">Waiting for first player...</p>
+          ) : (
+            <p className="mt-2 font-mono text-4xl font-bold text-white tabular-nums">
+              {mins}:{secs.toString().padStart(2, "0")}
+            </p>
+          )}
           <p className="mt-1 text-sm text-body-gray">{lobbyJoinedCount} players already in lobby</p>
           {canUseDevMode && (
             <p className="mt-1 text-xs text-purple-300">Dev mode active: use Start Now to skip waiting</p>
