@@ -1,34 +1,43 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { getCurrentUser, getWalletBalance, debitWallet, creditWallet } from "@/lib/api";
 import LastTouch from "@/components/games/LastTouch";
+import { createClient } from "@/lib/supabase";
+import {
+  ensureUpcomingSessions,
+  fetchActiveSession,
+  createTestSession,
+  type LastTouchSession,
+} from "@/lib/games/last-touch-sessions";
 
-const ENTRY_FEE = 1;
+const DEV_EMAIL = "aras.axmas@gmail.com";
 
 function LastTouchPageContent() {
   const router = useRouter();
   const [username, setUsername] = useState("Player");
   const [userId, setUserId] = useState("");
-  const [userEmail, setUserEmail] = useState<string>("");
+  const [userEmail, setUserEmail] = useState("");
+  const [isDevMode, setIsDevMode] = useState(false);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [isDevMode, setIsDevMode] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const searchParams = useSearchParams();
+  const [session, setSession] = useState<LastTouchSession | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [creatingTest, setCreatingTest] = useState(false);
 
+  const isDevUser = userEmail.toLowerCase() === DEV_EMAIL;
+
+  // Load user
   useEffect(() => {
     async function load() {
       try {
         const user = await getCurrentUser();
-        if (!user) {
-          router.push("/login");
-          return;
-        }
+        if (!user) { router.push("/login"); return; }
         setUserId(user.id);
         setUsername(user.username);
         setUserEmail(user.email ?? "");
@@ -44,35 +53,77 @@ function LastTouchPageContent() {
     load();
   }, [router]);
 
-  const handleJoinRequest = useCallback(
-    async (fee: number): Promise<boolean> => {
-      setJoinError(null);
-      try {
-        await debitWallet(fee, "Last Touch entry");
-        dispatchWalletUpdated();
-        return true;
-      } catch (e) {
-        setJoinError(e instanceof Error ? e.message : "Insufficient balance");
-        return false;
-      }
-    },
-    []
-  );
+  // Ensure upcoming sessions exist, then load the active one
+  useEffect(() => {
+    async function loadSession() {
+      const supabase = createClient();
+      if (!supabase) { setSessionLoading(false); return; }
+      await ensureUpcomingSessions(supabase);
+      const s = await fetchActiveSession(supabase);
+      setSession(s);
+      setSessionLoading(false);
+    }
+    loadSession();
+  }, []);
 
-  const handleWin = useCallback(
-    async (amount: number) => {
-      try {
-        await creditWallet(amount, "Last Touch – You won!", "match_win");
-        dispatchWalletUpdated();
-      } catch {
-        dispatchWalletUpdated();
-      }
-    },
-    []
-  );
+  // Subscribe to session INSERTs — so test sessions or newly created ones appear immediately
+  useEffect(() => {
+    const supabase = createClient();
+    if (!supabase) return;
+    const ch = supabase
+      .channel("lt-sessions-list")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "last_touch_sessions" },
+        async () => {
+          const s = await fetchActiveSession(supabase);
+          setSession((prev) => {
+            // Switch to the new session only if it starts sooner than the current one
+            if (!prev) return s;
+            if (!s) return prev;
+            return new Date(s.scheduled_start_at) < new Date(prev.scheduled_start_at) ? s : prev;
+          });
+        }
+      )
+      .subscribe();
+    return () => { ch.unsubscribe(); };
+  }, []);
 
-  const handleEliminated = useCallback((_rank: number, _total: number) => {
-    // Optional: toast or analytics
+  const handleJoinRequest = useCallback(async (fee: number): Promise<boolean> => {
+    setJoinError(null);
+    try {
+      await debitWallet(fee, "Last Touch entry");
+      dispatchWalletUpdated();
+      setBalance((b) => b - fee);
+      return true;
+    } catch (e) {
+      setJoinError(e instanceof Error ? e.message : "Insufficient balance");
+      return false;
+    }
+  }, []);
+
+  const handleWin = useCallback(async (amount: number) => {
+    try {
+      await creditWallet(amount, "Last Touch – You won!", "match_win");
+      dispatchWalletUpdated();
+    } catch {
+      dispatchWalletUpdated();
+    }
+  }, []);
+
+  const handleEliminated = useCallback((_rank: number, _total: number) => {}, []);
+
+  const handleSessionUpdate = useCallback((updated: LastTouchSession) => {
+    setSession(updated);
+  }, []);
+
+  const handleCreateTestSession = useCallback(async () => {
+    const supabase = createClient();
+    if (!supabase) return;
+    setCreatingTest(true);
+    const s = await createTestSession(supabase);
+    if (s) setSession(s);
+    setCreatingTest(false);
   }, []);
 
   async function handleLogout() {
@@ -100,7 +151,7 @@ function LastTouchPageContent() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[#0a0a0f]">
-      {/* Aurora-style animated background */}
+      {/* Aurora background */}
       <div
         className="pointer-events-none fixed inset-0 opacity-40"
         aria-hidden
@@ -136,19 +187,44 @@ function LastTouchPageContent() {
             {joinError}
           </div>
         )}
-        <p className="mb-2 text-center text-xs text-body-gray">
-          Balance: ${balance.toFixed(2)} • Entry: ${ENTRY_FEE.toFixed(2)}
-        </p>
-        <LastTouch
-          userId={userId}
-          userEmail={userEmail}
-          devModeRequested={searchParams.get("dev") === "true"}
-          username={username}
-          entryFee={ENTRY_FEE}
-          onJoinRequest={handleJoinRequest}
-          onWin={handleWin}
-          onEliminated={handleEliminated}
-        />
+
+        {/* Dev-only: create a test session starting in 30s */}
+        {isDevUser && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={handleCreateTestSession}
+              disabled={creatingTest}
+              className="w-full rounded-lg border-2 border-purple-400/60 bg-purple-500/20 py-2 text-sm font-semibold text-purple-200 transition hover:bg-purple-500/30 disabled:opacity-50"
+            >
+              {creatingTest ? "Creating…" : "⚡ Create Test Session (starts in 30s)"}
+            </button>
+            <p className="mt-1 text-center text-xs text-purple-400/60">
+              Balance: ${balance.toFixed(2)}
+            </p>
+          </div>
+        )}
+
+        {sessionLoading ? (
+          <div className="flex justify-center py-16">
+            <svg className="h-8 w-8 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+          </div>
+        ) : (
+          <LastTouch
+            session={session}
+            userId={userId}
+            userEmail={userEmail}
+            username={username}
+            isDevUser={isDevUser}
+            onJoinRequest={handleJoinRequest}
+            onWin={handleWin}
+            onEliminated={handleEliminated}
+            onSessionUpdate={handleSessionUpdate}
+          />
+        )}
       </main>
     </div>
   );
@@ -156,7 +232,13 @@ function LastTouchPageContent() {
 
 export default function LastTouchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-charcoal text-white flex items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-charcoal text-white">
+          Loading…
+        </div>
+      }
+    >
       <LastTouchPageContent />
     </Suspense>
   );
