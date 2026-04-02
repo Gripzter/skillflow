@@ -596,6 +596,17 @@ export default function LastTouch({
     setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
   }, [username, entryFee, onJoinRequest, randomChallengeDelayMs, lobbyJoinedCount]);
 
+  const handleDevStartNow = useCallback(() => {
+    if (!canUseDevMode || state.phase !== "lobby") return;
+    setCountdownNum(null);
+    setState((s) => ({
+      ...s,
+      phase: "playing",
+      gameStartMs: Date.now(),
+      nextGameCountdownSec: 0,
+    }));
+  }, [canUseDevMode, state.phase]);
+
   const nextTier = state.phase === "lobby" ? getNextTierMinutes(0) : null;
   const currentFee = state.phase === "lobby" ? (getEntryFeeAtMinute(0) ?? 1) : state.lateEntryFee;
   const devBadge = canUseDevMode ? (
@@ -609,7 +620,7 @@ export default function LastTouch({
     const mins = Math.floor(state.nextGameCountdownSec / 60);
     const secs = state.nextGameCountdownSec % 60;
     return (
-      <div className="flex flex-col gap-6 pb-8">
+      <div className="relative flex flex-col gap-6 pb-8">
         {devBadge}
         <div className="text-center">
           <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
@@ -702,6 +713,17 @@ export default function LastTouch({
             ))}
           </div>
         </div>
+
+        {canUseDevMode && (
+          <button
+            type="button"
+            onClick={handleDevStartNow}
+            className="absolute bottom-0 right-0 rounded-full border px-3 py-1 text-[12px] font-medium"
+            style={{ background: "#0E0E12", borderColor: "#FF5E00", color: "#FF5E00" }}
+          >
+            Start Now (Dev)
+          </button>
+        )}
       </div>
     );
   }
