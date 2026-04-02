@@ -158,6 +158,11 @@ function MatchPageContent() {
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   matchRef.current = match;
 
+  // AFK ring display timer (shown to BOTH players on the active player's avatar).
+  const afkTurnStartedAtMsRef = useRef<number | null>(null);
+  const lastAfkTurnRef = useRef<"player1" | "player2" | null>(null);
+  const [afkNowMs, setAfkNowMs] = useState(() => Date.now());
+
   useEffect(() => {
     if (!match?.matchStartTime) return;
     const ms = new Date(match.matchStartTime).getTime();
@@ -664,6 +669,28 @@ function MatchPageContent() {
       onForfeit: handleAfkForfeit,
     });
 
+  // Keep a smooth clock for the ring display.
+  useEffect(() => {
+    if (!afkTimerEnabled) return;
+    const t = setInterval(() => setAfkNowMs(Date.now()), 100);
+    return () => clearInterval(t);
+  }, [afkTimerEnabled]);
+
+  // Reset the ring whenever the active turn changes.
+  useEffect(() => {
+    if (!afkTimerEnabled) return;
+    const active = (matchUi?.currentTurn ?? null) as "player1" | "player2" | null;
+    if (!active) return;
+    if (lastAfkTurnRef.current === active) return;
+    lastAfkTurnRef.current = active;
+    afkTurnStartedAtMsRef.current = Date.now();
+  }, [afkTimerEnabled, matchUi?.currentTurn]);
+
+  const afkRemainingMs =
+    afkTimerEnabled && afkTurnStartedAtMsRef.current !== null && matchUi?.currentTurn
+      ? Math.max(0, 60_000 - Math.max(0, afkNowMs - afkTurnStartedAtMsRef.current))
+      : null;
+
   const handleTurnClockUpdate = useCallback(
     async (clock: {
       player1RemainingTimeMs: number;
@@ -888,8 +915,8 @@ function MatchPageContent() {
     onLeaveMatch: () => setForfeitConfirm(true),
     onReportIssue: () => { setReportOpen(true); setReportSubmitted(false); },
     realStakeDisplay: match.isPractice ? undefined : `$${match.stakeAmount.toFixed(2)}`,
-    afkSecondsLeft,
-    afkActivePlayer: !match.isPractice && afkSecondsLeft !== null ? myRole : null,
+    afkRemainingMs,
+    afkActivePlayer: !match.isPractice && afkRemainingMs !== null ? matchUi?.currentTurn ?? null : null,
   };
 
   return (

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 
 const AUTO_REDIRECT_SEC = 30;
@@ -28,7 +27,6 @@ export default function GameResultOverlay({
   onPlayAgain,
   onLeave,
 }: GameResultOverlayProps) {
-  const router = useRouter();
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_SEC);
   const cancelledRef = useRef(false);
 
@@ -69,13 +67,13 @@ export default function GameResultOverlay({
         const next = prev - 1;
         if (next <= 0) {
           clearInterval(t);
-          router.push("/play");
+          window.location.href = "/play";
         }
         return Math.max(0, next);
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [router]);
+  }, []);
 
   const handlePlayAgain = useCallback(() => {
     cancelledRef.current = true;
