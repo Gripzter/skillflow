@@ -43,6 +43,7 @@ const GAME_SLUG_TO_NAME: Record<string, string> = {
   "spelling-bee": "Spelling Bee",
   trivia: "Trivia",
   "typing-race": "Typing Race",
+  "last-touch": "Last Touch",
 };
 
 export default function PlayGamePage() {
@@ -50,6 +51,12 @@ export default function PlayGamePage() {
   const params = useParams();
   const gameSlug = (params?.game as string) || "";
   const gameName = GAME_SLUG_TO_NAME[gameSlug] || gameSlug.replace(/-/g, " ");
+
+  useEffect(() => {
+    if (gameSlug === "last-touch") {
+      router.replace("/last-touch");
+    }
+  }, [gameSlug, router]);
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");

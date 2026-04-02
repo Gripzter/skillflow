@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { getCurrentUser, getWalletBalance, debitWallet, creditWallet } from "@/lib/api";
@@ -12,11 +12,14 @@ const ENTRY_FEE = 1;
 export default function LastTouchPage() {
   const router = useRouter();
   const [username, setUsername] = useState("Player");
+  const [userId, setUserId] = useState("");
+  const [userEmail, setUserEmail] = useState<string>("");
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     async function load() {
@@ -26,7 +29,9 @@ export default function LastTouchPage() {
           router.push("/login");
           return;
         }
+        setUserId(user.id);
         setUsername(user.username);
+        setUserEmail(user.email ?? "");
         setIsDevMode(user.isDevMode ?? false);
         const bal = await getWalletBalance();
         setBalance(bal);
@@ -135,6 +140,9 @@ export default function LastTouchPage() {
           Balance: ${balance.toFixed(2)} • Entry: ${ENTRY_FEE.toFixed(2)}
         </p>
         <LastTouch
+          userId={userId}
+          userEmail={userEmail}
+          devModeRequested={searchParams.get("dev") === "true"}
           username={username}
           entryFee={ENTRY_FEE}
           onJoinRequest={handleJoinRequest}

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createClient } from "@/lib/supabase";
 import {
   createInitialState,
   addRealPlayer,
@@ -20,18 +21,36 @@ import {
   formatHoldTime,
   netPrizePool,
   type LastTouchState,
-  type LastTouchFeedEntry,
 } from "@/lib/games/last-touch-simulation";
 
 const TICK_INTERVAL_MS = 2000;
 const COUNTDOWN_GAME_START_SEC = 5;
-const CHALLENGE_DURATION_SEC = 5;
-const CHALLENGE_MIN_INTERVAL_MS = 30_000;
-const CHALLENGE_MAX_INTERVAL_MS = 90_000;
+const RELEASE_GRACE_MS = 1000;
 const MAX_WARNINGS = 3;
-const STATIONARY_ANTICHEAT_MS = 60_000;
+const DEV_CHALLENGE_INTERVAL_MS = 30_000;
+const CHALLENGE_MIN_INTERVAL_MS = 20 * 60 * 1000;
+const CHALLENGE_MAX_INTERVAL_MS = 30 * 60 * 1000;
+const CHALLENGE_MIN_DURATION_SEC = 15;
+const CHALLENGE_MAX_DURATION_SEC = 30;
+const DEV_CHALLENGE_EMAIL = "aras.axmas@gmail.com";
+
+type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
+
+interface ChallengeState {
+  type: ChallengeType;
+  startedAtMs: number;
+  endsAtMs: number;
+  label: string;
+  position?: { x: number; y: number };
+  sizeScale?: number;
+  shape?: "triangle" | "star" | "l-shape";
+  rapidTarget?: { x: number; y: number; deadlineMs: number; hitsLeft: number };
+}
 
 interface LastTouchProps {
+  userId?: string;
+  userEmail?: string;
+  devModeRequested?: boolean;
   username: string;
   entryFee: number;
   /** Called when user clicks Join. Parent should debit wallet and return true if success. */
@@ -62,12 +81,16 @@ function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string
 }
 
 export default function LastTouch({
+  userId,
+  userEmail,
+  devModeRequested = false,
   username,
   entryFee,
   onJoinRequest,
   onWin,
   onEliminated,
 }: LastTouchProps) {
+  const canUseDevMode = devModeRequested && (userEmail ?? "").toLowerCase() === DEV_CHALLENGE_EMAIL;
   const [state, setState] = useState<LastTouchState>(() =>
     createInitialState({
       initialBotsCount: 300 + Math.floor(Math.random() * 501),
@@ -78,14 +101,24 @@ export default function LastTouch({
   const [countdownNum, setCountdownNum] = useState<number | null>(null);
   const [holdStartMs, setHoldStartMs] = useState<number | null>(null);
   const [isHolding, setIsHolding] = useState(false);
-  const [challengeActive, setChallengeActive] = useState(false);
-  const [challengeSecLeft, setChallengeSecLeft] = useState(0);
+  const [challenge, setChallenge] = useState<ChallengeState | null>(null);
+  const [nextChallengeAtMs, setNextChallengeAtMs] = useState<number | null>(null);
+  const [challengeBanner, setChallengeBanner] = useState<string | null>(null);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
+  const [realtimePlayersJoined, setRealtimePlayersJoined] = useState(0);
+  const [realtimePlayersEliminated, setRealtimePlayersEliminated] = useState(0);
+  const [splitSpacePressed, setSplitSpacePressed] = useState(false);
+  const [activeTouchCount, setActiveTouchCount] = useState(0);
+  const [releaseGraceDeadline, setReleaseGraceDeadline] = useState<number | null>(null);
   const touchZoneRef = useRef<HTMLDivElement>(null);
-  const lastTouchPosRef = useRef<{ x: number; y: number } | null>(null);
-  const stationarySinceRef = useRef<number | null>(null);
+  const activePointersRef = useRef<Set<number>>(new Set());
   const challengeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const releaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const splitFailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastChallengeTypeRef = useRef<ChallengeType | null>(null);
+  const sessionKeyRef = useRef<string>(`${userId || username}-${Math.random().toString(36).slice(2, 8)}`);
+  const channelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>>["channel"]> | null>(null);
 
   const remaining = useMemo(
     () => state.players.filter((p) => p.eliminatedAtMs == null),
@@ -94,6 +127,51 @@ export default function LastTouch({
   const totalPlayers = state.players.length;
   const realPlayer = state.players.find((p) => p.isReal);
   const isEliminated = state.realPlayerEliminated;
+  const playersRemaining = Math.max(remaining.length, remaining.length + realtimePlayersJoined - 1 - realtimePlayersEliminated);
+  const eliminatedThisSession = Math.max(0, totalPlayers - playersRemaining);
+  const gameElapsedMs = state.gameStartMs != null ? Date.now() - state.gameStartMs : 0;
+  const difficulty = Math.min(1, gameElapsedMs / (60 * 60 * 1000));
+  const nextChallengeCountdownSec =
+    nextChallengeAtMs == null ? null : Math.max(0, Math.ceil((nextChallengeAtMs - Date.now()) / 1000));
+  const challengeSecLeft =
+    challenge == null ? 0 : Math.max(0, Math.ceil((challenge.endsAtMs - Date.now()) / 1000));
+  const netPool = netPrizePool(state.prizePool);
+
+  const updateRealtimePresence = useCallback(
+    async (eliminated: boolean) => {
+      const ch = channelRef.current;
+      if (!ch || !joined) return;
+      await ch.track({
+        joined: true,
+        eliminated,
+        username,
+        atMs: Date.now(),
+      }).catch(() => {});
+    },
+    [joined, username]
+  );
+
+  const eliminateMe = useCallback(
+    (reason: "lift" | "challenge" | "visibility") => {
+      if (isEliminated) return;
+      setIsHolding(false);
+      setHoldStartMs(null);
+      setReleaseGraceDeadline(null);
+      if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+      if (splitFailTimeoutRef.current) clearTimeout(splitFailTimeoutRef.current);
+      setState((s) => eliminateRealPlayer(s, reason, Date.now()));
+      updateRealtimePresence(true);
+      channelRef.current
+        ?.send({
+          type: "broadcast",
+          event: "last_touch_elimination",
+          payload: { username, reason, atMs: Date.now() },
+        })
+        .catch(() => {});
+      if (navigator.vibrate) navigator.vibrate(50);
+    },
+    [isEliminated, updateRealtimePresence, username]
+  );
 
   // Lobby: next game countdown
   useEffect(() => {
@@ -201,12 +279,14 @@ export default function LastTouch({
       e.preventDefault();
       if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
       if (isEliminated) return;
+      activePointersRef.current.add(e.pointerId);
+      setActiveTouchCount(activePointersRef.current.size);
       setIsHolding(true);
+      setReleaseGraceDeadline(null);
+      if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       const now = Date.now();
       setHoldStartMs(now);
       setState((s) => setRealPlayerHolding(s, now));
-      lastTouchPosRef.current = { x: e.clientX, y: e.clientY };
-      stationarySinceRef.current = now;
       if (navigator.vibrate) navigator.vibrate(10);
     },
     [state.phase, isEliminated]
@@ -215,15 +295,19 @@ export default function LastTouch({
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
-      if (!isHolding || isEliminated) return;
-      const target = touchZoneRef.current;
-      if (target && !target.contains(e.target as Node)) return; // only eliminate if release inside zone? No - spec says if you lift you're out. So any lift = out.
+      activePointersRef.current.delete(e.pointerId);
+      setActiveTouchCount(activePointersRef.current.size);
+      if (isEliminated) return;
+      if (activePointersRef.current.size > 0) return;
       setIsHolding(false);
-      setHoldStartMs(null);
-      setState((s) => eliminateRealPlayer(s, "lift", Date.now()));
-      if (navigator.vibrate) navigator.vibrate(50);
+      const deadline = Date.now() + RELEASE_GRACE_MS;
+      setReleaseGraceDeadline(deadline);
+      if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+      releaseTimeoutRef.current = setTimeout(() => {
+        eliminateMe("lift");
+      }, RELEASE_GRACE_MS);
     },
-    [isHolding, isEliminated]
+    [isEliminated, eliminateMe]
   );
 
   const handlePointerLeave = useCallback(() => {
@@ -232,8 +316,7 @@ export default function LastTouch({
     setState((s) => {
       const next = addRealPlayerWarning(s);
       const p = next.players.find((x) => x.isReal);
-      if (p && p.warnings >= MAX_WARNINGS)
-        return eliminateRealPlayer(next, "lift", Date.now());
+      if (p && p.warnings >= MAX_WARNINGS) return eliminateRealPlayer(next, "lift", Date.now());
       return next;
     });
   }, [isHolding, isEliminated]);
@@ -241,78 +324,210 @@ export default function LastTouch({
   // Global pointer up (catch release outside element)
   useEffect(() => {
     const up = (e: PointerEvent) => {
-      if (!isHolding || isEliminated) return;
-      const target = touchZoneRef.current;
-      if (target?.contains(e.target as Node)) return;
+      activePointersRef.current.delete(e.pointerId);
+      setActiveTouchCount(activePointersRef.current.size);
       setIsHolding(false);
-      setHoldStartMs(null);
-      setState((s) => eliminateRealPlayer(s, "lift", Date.now()));
+      if (activePointersRef.current.size > 0 || isEliminated) return;
+      const deadline = Date.now() + RELEASE_GRACE_MS;
+      setReleaseGraceDeadline(deadline);
+      if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+      releaseTimeoutRef.current = setTimeout(() => {
+        eliminateMe("lift");
+      }, RELEASE_GRACE_MS);
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [isHolding, isEliminated]);
+  }, [isEliminated, eliminateMe]);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSplitSpacePressed(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === "Space") setSplitSpacePressed(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+    };
+  }, []);
 
   // Visibility: tab hidden = eliminated
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === "hidden" && isHolding && !isEliminated) {
-        setState((s) => eliminateRealPlayer(s, "visibility", Date.now()));
-        setIsHolding(false);
-        setHoldStartMs(null);
+        eliminateMe("visibility");
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [isHolding, isEliminated]);
+  }, [isHolding, isEliminated, eliminateMe]);
 
-  // Anti-cheat: random challenge every 30–90s
+  // realtime live presence + eliminations
   useEffect(() => {
-    if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
-    if (challengeActive || isEliminated) return;
-    const schedule = () => {
-      const delay = CHALLENGE_MIN_INTERVAL_MS + Math.random() * (CHALLENGE_MAX_INTERVAL_MS - CHALLENGE_MIN_INTERVAL_MS);
-      challengeTimerRef.current = setTimeout(() => {
-        setChallengeActive(true);
-        setChallengeSecLeft(CHALLENGE_DURATION_SEC);
-      }, delay);
-    };
-    schedule();
+    const supabase = createClient();
+    if (!supabase) return;
+    const channel = supabase.channel("last-touch:global", {
+      config: { presence: { key: sessionKeyRef.current } },
+    });
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const metas = Object.values(state).flatMap((x) => x as Array<Record<string, unknown>>);
+        const joinedCount = metas.filter((m) => m.joined === true).length;
+        const eliminatedCount = metas.filter((m) => m.joined === true && m.eliminated === true).length;
+        setRealtimePlayersJoined(joinedCount);
+        setRealtimePlayersEliminated(eliminatedCount);
+      })
+      .on("broadcast", { event: "last_touch_elimination" }, () => {
+        // Sync is authoritative; this just nudges UI updates faster.
+      })
+      .subscribe();
+    channelRef.current = channel;
     return () => {
-      if (challengeTimerRef.current) clearTimeout(challengeTimerRef.current);
+      channel.unsubscribe();
+      channelRef.current = null;
     };
-  }, [state.phase, challengeActive, isEliminated]);
-
-  useEffect(() => {
-    if (!challengeActive) return;
-    const t = setInterval(() => {
-      setChallengeSecLeft((n) => {
-        if (n <= 1) {
-          setChallengeActive(false);
-          return 0;
-        }
-        return n - 1;
-      });
-    }, 1000);
-    return () => clearInterval(t);
-  }, [challengeActive]);
-
-  const handleChallengeTap = useCallback(() => {
-    if (!challengeActive) return;
-    setChallengeActive(false);
-    setChallengeSecLeft(0);
   }, []);
 
-  // Challenge timeout = warning
   useEffect(() => {
-    if (!challengeActive || challengeSecLeft > 0) return;
-    setState((s) => {
-      const next = addRealPlayerWarning(s);
-      const p = next.players.find((x) => x.isReal);
-      if (p && p.warnings >= MAX_WARNINGS)
-        return eliminateRealPlayer(next, "challenge", Date.now());
-      return next;
+    updateRealtimePresence(isEliminated);
+  }, [updateRealtimePresence, isEliminated]);
+
+  const randomChallengeDelayMs = useCallback(() => {
+    if (canUseDevMode) return DEV_CHALLENGE_INTERVAL_MS;
+    return CHALLENGE_MIN_INTERVAL_MS + Math.random() * (CHALLENGE_MAX_INTERVAL_MS - CHALLENGE_MIN_INTERVAL_MS);
+  }, [canUseDevMode]);
+
+  const randomChallengeType = useCallback((): ChallengeType => {
+    const all: ChallengeType[] = ["shrink", "split", "shape_shift", "rapid_tap", "squeeze", "maze"];
+    const filtered = all.filter((x) => x !== lastChallengeTypeRef.current);
+    return filtered[Math.floor(Math.random() * filtered.length)];
+  }, []);
+
+  const createChallenge = useCallback((nowMs: number): ChallengeState => {
+    const type = randomChallengeType();
+    lastChallengeTypeRef.current = type;
+    const durationSec =
+      CHALLENGE_MIN_DURATION_SEC + Math.floor(Math.random() * (CHALLENGE_MAX_DURATION_SEC - CHALLENGE_MIN_DURATION_SEC + 1));
+    const durationMs = durationSec * 1000;
+    const base: ChallengeState = {
+      type,
+      startedAtMs: nowMs,
+      endsAtMs: nowMs + durationMs,
+      label:
+        type === "shrink"
+          ? "SHRINK"
+          : type === "split"
+            ? "SPLIT"
+            : type === "shape_shift"
+              ? "SHAPE SHIFT"
+              : type === "rapid_tap"
+                ? "RAPID TAP"
+                : type === "squeeze"
+                  ? "SQUEEZE"
+                  : "MAZE",
+    };
+    if (type === "shrink" || type === "maze" || type === "rapid_tap") {
+      base.position = {
+        x: 15 + Math.random() * 70,
+        y: 25 + Math.random() * 55,
+      };
+    }
+    if (type === "shrink") {
+      base.sizeScale = 0.5 - difficulty * 0.15;
+    }
+    if (type === "shape_shift") {
+      const shapes: Array<"triangle" | "star" | "l-shape"> = ["triangle", "star", "l-shape"];
+      base.shape = shapes[Math.floor(Math.random() * shapes.length)];
+    }
+    if (type === "rapid_tap") {
+      base.rapidTarget = {
+        x: 10 + Math.random() * 80,
+        y: 20 + Math.random() * 70,
+        deadlineMs: nowMs + Math.max(700, 1500 - Math.round(difficulty * 500)),
+        hitsLeft: 4 + Math.round(difficulty * 4),
+      };
+    }
+    if (type === "squeeze") {
+      base.sizeScale = 1;
+    }
+    return base;
+  }, [difficulty, randomChallengeType]);
+
+  // Challenge scheduler
+  useEffect(() => {
+    if (state.phase !== "playing" && state.phase !== "final10" && state.phase !== "final2" && state.phase !== "final3") return;
+    if (isEliminated) return;
+    if (nextChallengeAtMs != null || challenge != null) return;
+    setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
+  }, [state.phase, isEliminated, challenge, nextChallengeAtMs, randomChallengeDelayMs]);
+
+  useEffect(() => {
+    if (nextChallengeAtMs == null || challenge != null) return;
+    const t = setInterval(() => {
+      if (Date.now() < nextChallengeAtMs) return;
+      const next = createChallenge(Date.now());
+      setChallenge(next);
+      setChallengeBanner(`${next.label} CHALLENGE`);
+      setTimeout(() => setChallengeBanner(null), 1800);
+      setNextChallengeAtMs(null);
+    }, 200);
+    return () => clearInterval(t);
+  }, [nextChallengeAtMs, challenge, createChallenge]);
+
+  // Challenge validation and ending
+  useEffect(() => {
+    if (!challenge) return;
+    const t = setInterval(() => {
+      const now = Date.now();
+      if (challenge.type === "split") {
+        const splitOk = activeTouchCount >= 2 || (activeTouchCount >= 1 && splitSpacePressed);
+        if (!splitOk) {
+          if (!splitFailTimeoutRef.current) {
+            splitFailTimeoutRef.current = setTimeout(() => eliminateMe("challenge"), RELEASE_GRACE_MS);
+          }
+        } else if (splitFailTimeoutRef.current) {
+          clearTimeout(splitFailTimeoutRef.current);
+          splitFailTimeoutRef.current = null;
+        }
+      }
+      if (challenge.type === "rapid_tap" && challenge.rapidTarget && now > challenge.rapidTarget.deadlineMs) {
+        eliminateMe("challenge");
+      }
+      if (now >= challenge.endsAtMs) {
+        if (splitFailTimeoutRef.current) {
+          clearTimeout(splitFailTimeoutRef.current);
+          splitFailTimeoutRef.current = null;
+        }
+        setChallenge(null);
+        setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
+      }
+    }, 100);
+    return () => clearInterval(t);
+  }, [challenge, activeTouchCount, splitSpacePressed, eliminateMe, randomChallengeDelayMs]);
+
+  const handleRapidTapHit = useCallback(() => {
+    if (!challenge || challenge.type !== "rapid_tap" || !challenge.rapidTarget) return;
+    const now = Date.now();
+    const hitsLeft = challenge.rapidTarget.hitsLeft - 1;
+    if (hitsLeft <= 0) {
+      setChallenge(null);
+      setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
+      return;
+    }
+    setChallenge({
+      ...challenge,
+      rapidTarget: {
+        x: 10 + Math.random() * 80,
+        y: 20 + Math.random() * 70,
+        deadlineMs: now + Math.max(700, 1500 - Math.round(difficulty * 500)),
+        hitsLeft,
+      },
     });
-  }, [challengeActive, challengeSecLeft]);
+  }, [challenge, difficulty, randomChallengeDelayMs]);
 
   const handleJoin = useCallback(async () => {
     const ok = await onJoinRequest(entryFee);
@@ -334,7 +549,8 @@ export default function LastTouch({
         ...s.feed,
       ].slice(0, 50),
     }));
-  }, [username, entryFee, onJoinRequest]);
+    setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
+  }, [username, entryFee, onJoinRequest, randomChallengeDelayMs]);
 
   const nextTier = state.phase === "lobby" ? getNextTierMinutes(0) : null;
   const currentFee = state.phase === "lobby" ? (getEntryFeeAtMinute(0) ?? 1) : state.lateEntryFee;
@@ -497,8 +713,23 @@ export default function LastTouch({
   }
 
   // ----- Playing / Final 10 / 2 / 3 -----
-  const gameElapsedMs = state.gameStartMs != null ? Date.now() - state.gameStartMs : 0;
   const myHoldMs = holdStartMs != null ? Date.now() - holdStartMs : 0;
+  const baseHoldSizePx = 240;
+  const challengeScale =
+    challenge?.type === "shrink"
+      ? challenge.sizeScale ?? 0.5
+      : challenge?.type === "squeeze"
+        ? Math.max(0.25, 1 - ((Date.now() - challenge.startedAtMs) / Math.max(1, challenge.endsAtMs - challenge.startedAtMs)) * 0.75)
+        : 1;
+  const challengeSizePx = Math.round(baseHoldSizePx * challengeScale);
+  const zoneClipPath =
+    challenge?.type === "shape_shift"
+      ? challenge.shape === "triangle"
+        ? "polygon(50% 0%, 0% 100%, 100% 100%)"
+        : challenge.shape === "star"
+          ? "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)"
+          : "polygon(0% 0%, 70% 0%, 70% 30%, 30% 30%, 30% 100%, 0% 100%)"
+      : "circle(50% at 50% 50%)";
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -513,63 +744,91 @@ export default function LastTouch({
       <div className="rounded-xl border border-teal/30 bg-card/80 p-4 text-center">
         <p className="text-xs text-body-gray">PRIZE POOL</p>
         <p className="text-3xl font-bold text-white tabular-nums">
-          $<AnimatedNumber value={state.prizePool} />
+          $<AnimatedNumber value={netPool} />
         </p>
-        <p className="mt-1 text-xs text-body-gray">Late entry: ${(getEntryFeeAtMinute(gameElapsedMs / 60000) ?? 0).toFixed(2)}</p>
+        <p className="mt-1 text-xs text-body-gray">Gross pool: ${state.prizePool.toFixed(2)} · Platform fee: 5%</p>
       </div>
 
       <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2">
         <span className="text-body-gray">Players Remaining</span>
         <span className="font-mono font-bold text-white tabular-nums">
-          {remaining.length} / {totalPlayers}
+          {playersRemaining} / {Math.max(totalPlayers, playersRemaining)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2 text-sm">
+        <span className="text-body-gray">Eliminated this session</span>
+        <span className="font-mono font-bold text-white tabular-nums">{eliminatedThisSession}</span>
+      </div>
+      <div className="flex items-center justify-between rounded-lg bg-white/5 px-4 py-2 text-sm">
+        <span className="text-body-gray">Next challenge in</span>
+        <span className="font-mono font-bold text-white tabular-nums">
+          {nextChallengeCountdownSec == null ? "—" : `${nextChallengeCountdownSec}s`}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-white/10">
         <div
           className="h-full rounded-full bg-teal/80 transition-all duration-500"
-          style={{ width: `${(remaining.length / totalPlayers) * 100}%` }}
+          style={{ width: `${Math.max(0, Math.min(100, (playersRemaining / Math.max(totalPlayers, 1)) * 100))}%` }}
         />
       </div>
 
-      {challengeActive && (
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={handleChallengeTap}
-          onKeyDown={(e) => e.key === "Enter" && handleChallengeTap()}
-          className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full border-4 border-amber-400 bg-amber-400/20 p-8 text-center"
-        >
-          <p className="font-bold text-amber-400">TAP TARGET</p>
-          <p className="font-mono text-2xl text-white">{challengeSecLeft}s</p>
+      {challengeBanner && (
+        <div className="rounded-lg border border-amber-400/60 bg-amber-400/15 px-4 py-2 text-center text-sm font-semibold text-amber-300">
+          {challengeBanner}
+        </div>
+      )}
+      {challenge && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-2 text-center text-xs text-amber-300">
+          {challenge.label} · {challengeSecLeft}s left
         </div>
       )}
 
       <div className="flex flex-1 flex-col items-center justify-center">
         {!isEliminated ? (
-          <div
-            ref={touchZoneRef}
-            role="button"
-            tabIndex={0}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            onPointerLeave={handlePointerLeave}
-            onContextMenu={(e) => e.preventDefault()}
-            className={`flex min-h-[200px] min-w-[200px] max-w-[min(90vw,320px)] cursor-pointer select-none flex-col items-center justify-center rounded-full border-4 transition-all ${
-              isHolding
-                ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(255,94,0,0.6)]"
-                : "border-white/20 bg-white/5 hover:border-teal/50"
-            }`}
-            style={{ touchAction: "none" }}
-          >
-            {isHolding ? (
-              <>
-                <p className="font-mono text-2xl font-bold text-white tabular-nums">
-                  {formatHoldTime(myHoldMs)}
-                </p>
-                <p className="mt-1 text-xs text-teal">HOLDING</p>
-              </>
+          <div className="relative h-[360px] w-full max-w-[380px] overflow-hidden rounded-2xl border border-white/10 bg-black/20">
+            {challenge?.type === "rapid_tap" && challenge.rapidTarget ? (
+              <button
+                type="button"
+                onClick={handleRapidTapHit}
+                className="absolute z-30 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-amber-300 bg-amber-300/20 text-xs font-bold text-amber-200"
+                style={{ left: `${challenge.rapidTarget.x}%`, top: `${challenge.rapidTarget.y}%` }}
+              >
+                TAP
+              </button>
             ) : (
-              <p className="text-center text-sm text-body-gray">PLACE YOUR FINGER HERE</p>
+              <div
+                ref={touchZoneRef}
+                role="button"
+                tabIndex={0}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerLeave}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`absolute z-20 flex cursor-pointer select-none flex-col items-center justify-center border-4 transition-all ${
+                  isHolding
+                    ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(255,94,0,0.6)]"
+                    : "border-white/20 bg-white/5 hover:border-teal/50"
+                }`}
+                style={{
+                  width: challengeSizePx,
+                  height: challengeSizePx,
+                  left: `${challenge?.position?.x ?? 50}%`,
+                  top: `${challenge?.position?.y ?? 55}%`,
+                  transform: challenge?.type === "maze" ? `translate(-50%, -50%) translate(${Math.sin(Date.now() / 400) * 48}px, ${Math.cos(Date.now() / 460) * 24}px)` : "translate(-50%, -50%)",
+                  touchAction: "none",
+                  clipPath: zoneClipPath,
+                  borderRadius: challenge?.type === "shape_shift" ? "18%" : "999px",
+                }}
+              >
+                {isHolding ? (
+                  <>
+                    <p className="font-mono text-2xl font-bold text-white tabular-nums">{formatHoldTime(myHoldMs)}</p>
+                    <p className="mt-1 text-xs text-teal">HOLDING</p>
+                  </>
+                ) : (
+                  <p className="text-center text-sm text-body-gray">HOLD HERE</p>
+                )}
+              </div>
             )}
           </div>
         ) : (
@@ -602,8 +861,17 @@ export default function LastTouch({
       {realPlayer && !isEliminated && (
         <div className="rounded-lg border border-white/10 bg-card/60 p-3 text-sm">
           <p>Your Hold Time: {formatHoldTime(myHoldMs)}</p>
-          <p>Your Rank: #{remaining.filter((p) => p.entryTimeMs <= realPlayer.entryTimeMs).length} / {totalPlayers}</p>
+          <p>Your Rank: #{Math.max(1, playersRemaining)} / {Math.max(totalPlayers, playersRemaining)}</p>
           <p>Warnings: {realPlayer.warnings} / {MAX_WARNINGS}</p>
+          {releaseGraceDeadline && (
+            <p className="text-amber-300">Reconnect hold within 1s or you are out</p>
+          )}
+          {challenge?.type === "split" && (
+            <p className="text-amber-300">
+              SPLIT: hold two contacts (two fingers, or one finger + SPACE)
+            </p>
+          )}
+          {canUseDevMode && <p className="text-purple-300">Dev mode active: challenges every 30s</p>}
         </div>
       )}
     </div>

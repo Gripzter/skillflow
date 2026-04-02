@@ -36,7 +36,7 @@ export default function MobileTabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 hidden h-[60px] items-stretch border-t pb-[env(safe-area-inset-bottom)] max-lg:flex"
+      className="mobile-tab-bar fixed bottom-0 left-0 right-0 z-40 hidden h-[60px] items-stretch border-t pb-[env(safe-area-inset-bottom)] max-lg:flex lg:hidden"
       aria-label="Primary"
       style={{ background: "#0E0E12", borderColor: "#1a1a2e" }}
     >

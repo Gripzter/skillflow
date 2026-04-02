@@ -152,6 +152,13 @@ main,
   animation: afkRingPulse 500ms ease-in-out infinite;
 }
 
+/* Backup guard: never show mobile tab bar on desktop widths. */
+@media (min-width: 1024px) {
+  .mobile-tab-bar {
+    display: none !important;
+  }
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
