@@ -36,25 +36,22 @@ export default function MobileTabBar() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex h-[60px] items-stretch border-t border-white/10 bg-charcoal/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 flex h-[60px] items-stretch border-t pb-[env(safe-area-inset-bottom)] lg:hidden"
       aria-label="Primary"
+      style={{ background: "#0E0E12", borderColor: "#1a1a2e" }}
     >
       {tabs.map((tab) => {
         const isActive =
           pathname === tab.href ||
           pathname.startsWith(tab.href + "/");
-        const color = isActive
-          ? isPractice
-            ? "text-purple-400"
-            : "text-[#FF5E00]"
-          : "text-body-gray";
+        const color = isActive ? "text-[#FF5E00]" : "text-[#888]";
         return (
           <Link
             key={tab.href}
             href={tab.href}
             className={`pressable relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors ${color}`}
           >
-            <tab.Icon size={20} className="shrink-0" />
+            <tab.Icon size={22} className="shrink-0" />
             <span className="relative text-[10px] font-medium leading-none">
               {tab.label}
               {tab.href === "/play" && isPractice && (
