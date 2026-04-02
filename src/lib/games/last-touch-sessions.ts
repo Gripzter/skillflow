@@ -141,20 +141,3 @@ export async function markSessionCompleted(
     .eq("id", sessionId);
 }
 
-/** Dev only: create a one-off session starting 30 seconds from now */
-export async function createTestSession(
-  supabase: SupabaseClient
-): Promise<LastTouchSession | null> {
-  const { data, error } = await supabase
-    .from("last_touch_sessions")
-    .insert({
-      scheduled_start_at: new Date(Date.now() + 30_000).toISOString(),
-      status: "upcoming",
-      prize_pool: 0,
-      entry_fee: 1,
-    })
-    .select()
-    .single();
-  if (error) return null;
-  return data as LastTouchSession;
-}

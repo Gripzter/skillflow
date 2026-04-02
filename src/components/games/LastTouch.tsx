@@ -33,7 +33,6 @@ const TICK_MS = 2000;
 const START_COUNTDOWN_SEC = 5;
 const RELEASE_GRACE_MS = 1000;
 const MAX_WARNINGS = 3;
-const DEV_CHALLENGE_MS = 30_000;
 const CHALLENGE_MIN_MS = 20 * 60 * 1000;
 const CHALLENGE_MAX_MS = 30 * 60 * 1000;
 const CHALLENGE_MIN_SEC = 15;
@@ -56,9 +55,7 @@ interface ChallengeState {
 interface Props {
   session: LastTouchSession | null;
   userId: string;
-  userEmail: string;
   username: string;
-  isDevUser: boolean;
   onJoinRequest: (fee: number) => Promise<boolean>;
   onWin: (amount: number) => void;
   onEliminated: (rank: number, total: number) => void;
@@ -93,7 +90,6 @@ export default function LastTouch({
   session,
   userId,
   username,
-  isDevUser,
   onJoinRequest,
   onWin,
   onEliminated,
@@ -272,13 +268,13 @@ export default function LastTouch({
         milestonesReached: [],
       });
       setNextChallengeAtMs(
-        Date.now() + (isDevUser ? DEV_CHALLENGE_MS : CHALLENGE_MIN_MS + Math.random() * (CHALLENGE_MAX_MS - CHALLENGE_MIN_MS))
+        Date.now() + (CHALLENGE_MIN_MS + Math.random() * (CHALLENGE_MAX_MS - CHALLENGE_MIN_MS))
       );
       return;
     }
     const t = setTimeout(() => setStartCountdownNum((n) => (n != null ? n - 1 : null)), 1000);
     return () => clearTimeout(t);
-  }, [startCountdownNum, username, isDevUser]);
+  }, [startCountdownNum, username]);
 
   // Derived
   const remaining = useMemo(
@@ -427,11 +423,8 @@ export default function LastTouch({
 
   // Challenge helpers
   const randomChallengeDelayMs = useCallback(
-    () =>
-      isDevUser
-        ? DEV_CHALLENGE_MS
-        : CHALLENGE_MIN_MS + Math.random() * (CHALLENGE_MAX_MS - CHALLENGE_MIN_MS),
-    [isDevUser]
+    () => CHALLENGE_MIN_MS + Math.random() * (CHALLENGE_MAX_MS - CHALLENGE_MIN_MS),
+    []
   );
 
   const randomChallengeType = useCallback((): ChallengeType => {
@@ -861,7 +854,6 @@ export default function LastTouch({
                 SPLIT: hold two contacts (two fingers, or one finger + SPACE)
               </p>
             )}
-            {isDevUser && <p className="text-purple-300">Dev mode: challenges every 30s</p>}
           </div>
         )}
       </div>
@@ -878,12 +870,6 @@ export default function LastTouch({
 
   return (
     <div className="relative flex flex-col gap-6 pb-8">
-      {isDevUser && (
-        <div className="fixed right-4 top-20 z-40 rounded-full border border-purple-400/50 bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-200">
-          DEV
-        </div>
-      )}
-
       <div className="text-center">
         <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
           LAST TOUCH

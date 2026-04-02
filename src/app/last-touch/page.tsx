@@ -10,17 +10,13 @@ import { createClient } from "@/lib/supabase";
 import {
   ensureUpcomingSessions,
   fetchActiveSession,
-  createTestSession,
   type LastTouchSession,
 } from "@/lib/games/last-touch-sessions";
-
-const DEV_EMAIL = "aras.axmas@gmail.com";
 
 function LastTouchPageContent() {
   const router = useRouter();
   const [username, setUsername] = useState("Player");
   const [userId, setUserId] = useState("");
-  const [userEmail, setUserEmail] = useState("");
   const [isDevMode, setIsDevMode] = useState(false);
   const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -28,9 +24,6 @@ function LastTouchPageContent() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [session, setSession] = useState<LastTouchSession | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
-  const [creatingTest, setCreatingTest] = useState(false);
-
-  const isDevUser = userEmail.toLowerCase() === DEV_EMAIL;
 
   // Load user
   useEffect(() => {
@@ -40,7 +33,6 @@ function LastTouchPageContent() {
         if (!user) { router.push("/login"); return; }
         setUserId(user.id);
         setUsername(user.username);
-        setUserEmail(user.email ?? "");
         setIsDevMode(user.isDevMode ?? false);
         const bal = await getWalletBalance();
         setBalance(bal);
@@ -117,15 +109,6 @@ function LastTouchPageContent() {
     setSession(updated);
   }, []);
 
-  const handleCreateTestSession = useCallback(async () => {
-    const supabase = createClient();
-    if (!supabase) return;
-    setCreatingTest(true);
-    const s = await createTestSession(supabase);
-    if (s) setSession(s);
-    setCreatingTest(false);
-  }, []);
-
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -188,23 +171,6 @@ function LastTouchPageContent() {
           </div>
         )}
 
-        {/* Dev-only: create a test session starting in 30s */}
-        {isDevUser && (
-          <div className="mb-4">
-            <button
-              type="button"
-              onClick={handleCreateTestSession}
-              disabled={creatingTest}
-              className="w-full rounded-lg border-2 border-purple-400/60 bg-purple-500/20 py-2 text-sm font-semibold text-purple-200 transition hover:bg-purple-500/30 disabled:opacity-50"
-            >
-              {creatingTest ? "Creating…" : "⚡ Create Test Session (starts in 30s)"}
-            </button>
-            <p className="mt-1 text-center text-xs text-purple-400/60">
-              Balance: ${balance.toFixed(2)}
-            </p>
-          </div>
-        )}
-
         {sessionLoading ? (
           <div className="flex justify-center py-16">
             <svg className="h-8 w-8 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
@@ -216,9 +182,7 @@ function LastTouchPageContent() {
           <LastTouch
             session={session}
             userId={userId}
-            userEmail={userEmail}
             username={username}
-            isDevUser={isDevUser}
             onJoinRequest={handleJoinRequest}
             onWin={handleWin}
             onEliminated={handleEliminated}
