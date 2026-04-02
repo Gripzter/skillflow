@@ -23,21 +23,20 @@ import {
   isUserJoined,
   fetchActiveSession,
   markSessionLive,
-  markSessionCancelled,
   markSessionCompleted,
-  ensureUpcomingSessions,
   type LastTouchSession,
 } from "@/lib/games/last-touch-sessions";
 
 const START_COUNTDOWN_SEC = 3;
 const RELEASE_GRACE_MS = 1000;
 const MAX_WARNINGS = 3;
-const MIN_PLAYERS_TO_START = 2;
 const CHALLENGE_MIN_MS = 20 * 60 * 1000;
 const CHALLENGE_MAX_MS = 30 * 60 * 1000;
 const CHALLENGE_MIN_SEC = 15;
 const CHALLENGE_MAX_SEC = 30;
 const NOTIFICATION_PERMISSION_KEY = "lasttouch:notification-permission";
+const ARENA_HEARTBEAT_MS = 10_000;
+const ARENA_DISCONNECT_GRACE_MS = 60_000;
 
 type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
 
@@ -60,7 +59,12 @@ interface Props {
   onWin: (amount: number) => void;
   onEliminated: (rank: number, total: number) => void;
   onSessionUpdate: (s: LastTouchSession) => void;
-  onSessionCancelled: (sessionId: string, amount: number) => void | Promise<void>;
+}
+
+interface ArenaParticipant {
+  userId: string;
+  username: string;
+  lastSeenMs: number;
 }
 
 function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string }) {
@@ -87,6 +91,16 @@ function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string
   );
 }
 
+function formatReadableCountdown(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) return `${hours} ${hours === 1 ? "hour" : "hours"} ${minutes} ${minutes === 1 ? "minute" : "minutes"} ${secs} ${secs === 1 ? "second" : "seconds"}`;
+  if (minutes > 0) return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ${secs} ${secs === 1 ? "second" : "seconds"}`;
+  return `${secs} ${secs === 1 ? "second" : "seconds"}`;
+}
+
 export default function LastTouch({
   session,
   userId,
@@ -95,13 +109,15 @@ export default function LastTouch({
   onWin,
   onEliminated,
   onSessionUpdate,
-  onSessionCancelled,
 }: Props) {
   // Live session — starts from prop, updated by realtime
   const [liveSession, setLiveSession] = useState<LastTouchSession | null>(session);
   const [dbPlayerCount, setDbPlayerCount] = useState(0);
   const [dbAliveCount, setDbAliveCount] = useState(0);
   const [joined, setJoined] = useState(false);
+  const [inArena, setInArena] = useState(false);
+  const [arenaParticipants, setArenaParticipants] = useState<Record<string, ArenaParticipant>>({});
+  const [lobbyFeed, setLobbyFeed] = useState<Array<{ id: string; message: string }>>([]);
   const [countdownSec, setCountdownSec] = useState(0);
   const [startCountdownNum, setStartCountdownNum] = useState<number | null>(null);
   const [simState, setSimState] = useState<LastTouchState | null>(null);
@@ -115,7 +131,6 @@ export default function LastTouch({
   const [splitSpacePressed, setSplitSpacePressed] = useState(false);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [cancelMessage, setCancelMessage] = useState<string | null>(null);
 
   const activePointersRef = useRef<Set<number>>(new Set());
   const releaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,6 +142,7 @@ export default function LastTouch({
   const dbPlayerCountRef = useRef(0);
   const liveSessionRef = useRef<LastTouchSession | null>(session);
   const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenArenaUsersRef = useRef<Set<string>>(new Set());
 
   // Sync session from parent
   useEffect(() => {
@@ -135,6 +151,11 @@ export default function LastTouch({
     markedLiveRef.current = false; // reset when session changes
     gameStartedRef.current = false;
     onWinCalledRef.current = false;
+    setStartCountdownNum(null);
+    setInArena(false);
+    setArenaParticipants({});
+    setLobbyFeed([]);
+    seenArenaUsersRef.current.clear();
   }, [session?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // If a live session is shown to a non-joined user, immediately move them to the next upcoming session.
@@ -163,25 +184,61 @@ export default function LastTouch({
     });
   }, [session?.id, userId]);
 
-  // Realtime: session updates + player inserts
+  // Realtime: session updates, player status, and arena presence.
   useEffect(() => {
     if (!session?.id) return;
     const supabase = createClient();
     if (!supabase) return;
+    let disposed = false;
 
     const refreshCounts = async () => {
-      const { data } = await supabase
-        .from("last_touch_players")
-        .select("status")
-        .eq("session_id", session.id);
-      if (!Array.isArray(data)) return;
-      const total = data.length;
-      const alive = data.filter((row) => row.status === "alive").length;
-      setDbPlayerCount(total);
-      setDbAliveCount(alive);
-      dbPlayerCountRef.current = total;
+      try {
+        const { data, error } = await supabase
+          .from("last_touch_players")
+          .select("status")
+          .eq("session_id", session.id);
+        if (error) {
+          console.error("LastTouch player count query failed:", error);
+          return;
+        }
+        if (!Array.isArray(data) || disposed) return;
+        const total = data.length;
+        const alive = data.filter((row) => row.status === "alive").length;
+        setDbPlayerCount(total);
+        setDbAliveCount(alive);
+        dbPlayerCountRef.current = total;
+      } catch (error) {
+        console.error("LastTouch player count query failed:", error);
+      }
     };
     void refreshCounts();
+
+    const refreshArena = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("last_touch_lobby_entries")
+          .select("user_id, username, last_seen_at")
+          .eq("session_id", session.id);
+        if (error) {
+          console.error("LastTouch arena presence query failed:", error);
+          return;
+        }
+        if (!Array.isArray(data) || disposed) return;
+        const next: Record<string, ArenaParticipant> = {};
+        for (const row of data) {
+          const id = String(row.user_id ?? "");
+          const name = String(row.username ?? "Player");
+          const ms = new Date(String(row.last_seen_at ?? "")).getTime();
+          if (!id || !Number.isFinite(ms)) continue;
+          if (Date.now() - ms > ARENA_DISCONNECT_GRACE_MS) continue;
+          next[id] = { userId: id, username: name, lastSeenMs: ms };
+        }
+        setArenaParticipants(next);
+      } catch (error) {
+        console.error("LastTouch arena presence query failed:", error);
+      }
+    };
+    void refreshArena();
 
     const ch = supabase
       .channel(`lt-session:${session.id}`)
@@ -200,9 +257,17 @@ export default function LastTouch({
         { event: "*", schema: "public", table: "last_touch_players", filter: `session_id=eq.${session.id}` },
         () => void refreshCounts()
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "last_touch_lobby_entries", filter: `session_id=eq.${session.id}` },
+        () => void refreshArena()
+      )
       .subscribe();
 
-    return () => { ch.unsubscribe(); };
+    return () => {
+      disposed = true;
+      ch.unsubscribe();
+    };
   }, [session?.id, onSessionUpdate]);
 
   // Countdown derived from scheduled_start_at
@@ -218,44 +283,33 @@ export default function LastTouch({
     return () => clearInterval(t);
   }, [liveSession]);
 
-  // When countdown reaches 0, transition session → live (first client wins, idempotent)
+  useEffect(() => {
+    for (const participant of Object.values(arenaParticipants)) {
+      if (seenArenaUsersRef.current.has(participant.userId)) continue;
+      seenArenaUsersRef.current.add(participant.userId);
+      setLobbyFeed((prev) => [
+        { id: `arena-${participant.userId}`, message: `${participant.username} entered the arena` },
+        ...prev,
+      ].slice(0, 30));
+    }
+  }, [arenaParticipants]);
+
+  // When countdown reaches 0, transition session -> live (always).
   useEffect(() => {
     if (!liveSession || liveSession.status !== "upcoming" || countdownSec > 0) return;
     if (markedLiveRef.current) return;
     markedLiveRef.current = true;
     const supabase = createClient();
     if (!supabase) return;
-    void (async () => {
-      if (dbPlayerCountRef.current < MIN_PLAYERS_TO_START) {
-        await markSessionCancelled(supabase, liveSession.id);
-        if (joined) {
-          await onSessionCancelled(liveSession.id, liveSession.entry_fee);
-          setJoined(false);
-          setCancelMessage(
-            `Not enough players — game cancelled. Your $${liveSession.entry_fee.toFixed(2)} has been refunded.`
-          );
-        } else {
-          setCancelMessage("Not enough players — game cancelled.");
-        }
-        await ensureUpcomingSessions(supabase);
-        const next = await fetchActiveSession(supabase);
-        if (next && next.status === "upcoming") {
-          setLiveSession(next);
-          liveSessionRef.current = next;
-          onSessionUpdate(next);
-        }
-        return;
-      }
-      await markSessionLive(supabase, liveSession.id);
-    })();
-  }, [countdownSec, liveSession, joined, onSessionCancelled, onSessionUpdate]);
+    void markSessionLive(supabase, liveSession.id);
+  }, [countdownSec, liveSession]);
 
-  // When session goes live + user joined → start 5s game countdown
+  // When session goes live and player is in arena -> start 3-2-1.
   useEffect(() => {
-    if (!liveSession || liveSession.status !== "live" || !joined || gameStartedRef.current) return;
+    if (!liveSession || liveSession.status !== "live" || !joined || !inArena || gameStartedRef.current) return;
     gameStartedRef.current = true;
     setStartCountdownNum(START_COUNTDOWN_SEC);
-  }, [liveSession?.status, joined]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [liveSession?.status, joined, inArena]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 3, 2, 1 -> init live game state.
   useEffect(() => {
@@ -300,6 +354,14 @@ export default function LastTouch({
   const isGameActive =
     simState != null &&
     ["playing", "final10", "final3", "final2"].includes(simState.phase);
+  const preHoldPhase =
+    Boolean(liveSession) &&
+    liveSession?.status === "upcoming" &&
+    countdownSec > 0 &&
+    countdownSec <= 30 &&
+    joined &&
+    inArena;
+  const canHoldNow = isGameActive || preHoldPhase;
   const gameElapsedMs = simState?.gameStartMs != null ? Date.now() - simState.gameStartMs : 0;
   const difficulty = Math.min(1, gameElapsedMs / (60 * 60 * 1000));
   const myHoldMs = holdStartMs != null ? Date.now() - holdStartMs : 0;
@@ -362,7 +424,7 @@ export default function LastTouch({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault();
-      if (!isGameActive || isEliminated) return;
+      if (!canHoldNow || isEliminated) return;
       activePointersRef.current.add(e.pointerId);
       setActiveTouchCount(activePointersRef.current.size);
       setIsHolding(true);
@@ -373,7 +435,7 @@ export default function LastTouch({
       setSimState((s) => (s ? setRealPlayerHolding(s, now) : s));
       if (navigator.vibrate) navigator.vibrate(10);
     },
-    [isGameActive, isEliminated]
+    [canHoldNow, isEliminated]
   );
 
   const handlePointerUp = useCallback(
@@ -383,12 +445,17 @@ export default function LastTouch({
       setActiveTouchCount(activePointersRef.current.size);
       if (isEliminated || activePointersRef.current.size > 0) return;
       setIsHolding(false);
+      if (!isGameActive) {
+        setReleaseGraceDeadline(null);
+        if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+        return;
+      }
       const deadline = Date.now() + RELEASE_GRACE_MS;
       setReleaseGraceDeadline(deadline);
       if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       releaseTimeoutRef.current = setTimeout(() => eliminateMe("lift"), RELEASE_GRACE_MS);
     },
-    [isEliminated, eliminateMe]
+    [isEliminated, isGameActive, eliminateMe]
   );
 
   const handlePointerLeave = useCallback(() => {
@@ -409,13 +476,18 @@ export default function LastTouch({
       setActiveTouchCount(activePointersRef.current.size);
       setIsHolding(false);
       if (activePointersRef.current.size > 0 || isEliminated) return;
+      if (!isGameActive) {
+        setReleaseGraceDeadline(null);
+        if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
+        return;
+      }
       setReleaseGraceDeadline(Date.now() + RELEASE_GRACE_MS);
       if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       releaseTimeoutRef.current = setTimeout(() => eliminateMe("lift"), RELEASE_GRACE_MS);
     };
     window.addEventListener("pointerup", up);
     return () => window.removeEventListener("pointerup", up);
-  }, [isEliminated, eliminateMe]);
+  }, [isEliminated, isGameActive, eliminateMe]);
 
   // Space key for split challenge
   useEffect(() => {
@@ -429,12 +501,12 @@ export default function LastTouch({
   // Visibility → eliminate
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "hidden" && isHolding && !isEliminated)
+      if (document.visibilityState === "hidden" && isGameActive && isHolding && !isEliminated)
         eliminateMe("visibility");
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [isHolding, isEliminated, eliminateMe]);
+  }, [isGameActive, isHolding, isEliminated, eliminateMe]);
 
   // Challenge helpers
   const randomChallengeDelayMs = useCallback(
@@ -566,9 +638,16 @@ export default function LastTouch({
     if (!ok) return;
     const supabase = createClient();
     if (supabase) {
-      const { error } = await joinSession(supabase, liveSession.id, userId, username);
-      if (error) {
-        setJoinError(error);
+      try {
+        const { error } = await joinSession(supabase, liveSession.id, userId, username);
+        if (error) {
+          console.error("LastTouch ticket join failed:", error);
+          setJoinError("Could not secure your ticket right now. Please try again.");
+          return;
+        }
+      } catch (error) {
+        console.error("LastTouch ticket join failed:", error);
+        setJoinError("Could not secure your ticket right now. Please try again.");
         return;
       }
     }
@@ -587,6 +666,37 @@ export default function LastTouch({
       }
     }
   }, [joined, liveSession, onJoinRequest, userId, username]);
+
+  const handleEnterArena = useCallback(() => {
+    if (!joined) return;
+    setInArena(true);
+  }, [joined]);
+
+  useEffect(() => {
+    if (!liveSession || !inArena || !joined) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const writePresence = async () => {
+      try {
+        await supabase
+          .from("last_touch_lobby_entries")
+          .upsert(
+            {
+              session_id: liveSession.id,
+              user_id: userId,
+              username,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "session_id,user_id" }
+          );
+      } catch (error) {
+        console.error("LastTouch arena heartbeat failed:", error);
+      }
+    };
+    void writePresence();
+    const t = setInterval(() => void writePresence(), ARENA_HEARTBEAT_MS);
+    return () => clearInterval(t);
+  }, [liveSession, inArena, joined, userId, username]);
 
   // 5-minute pre-start browser notification for joined players.
   useEffect(() => {
@@ -641,7 +751,7 @@ export default function LastTouch({
           </span>
         ) : (
           <span className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-5xl font-black text-transparent md:text-7xl">
-            HOLD NOW!
+            GAME LIVE
           </span>
         )}
       </div>
@@ -876,13 +986,62 @@ export default function LastTouch({
     );
   }
 
-  // ─── Lobby ────────────────────────────────────────────────────────────────
-  const mins = Math.floor(countdownSec / 60);
-  const secs = countdownSec % 60;
-
-  // Format next scheduled time for "game in progress" message
+  // ─── Ticket & arena phases ─────────────────────────────────────────────────
   const startDate = new Date(liveSession.scheduled_start_at);
   const timeLabel = startDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  const isArenaOpen = countdownSec <= 10 * 60 || liveSession.status === "live";
+  const readableCountdown = formatReadableCountdown(countdownSec);
+  const arenaCount = Object.keys(arenaParticipants).length;
+
+  if (inArena && joined && liveSession.status !== "live") {
+    return (
+      <div className="flex flex-col gap-4 pb-8">
+        <h2 className="text-center text-3xl font-black text-white">ARENA LOBBY</h2>
+        <p className="text-center text-body-gray">Game starts in {readableCountdown}</p>
+        <div className="rounded-lg bg-white/5 px-4 py-3 text-center">
+          <p className="text-sm text-body-gray">Players in arena</p>
+          <p className="text-2xl font-bold text-white">{arenaCount}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-black/30 p-3">
+          <p className="mb-2 text-xs text-body-gray">Live feed</p>
+          <div className="max-h-32 space-y-1 overflow-y-auto">
+            {lobbyFeed.length === 0 ? (
+              <p className="text-xs text-body-gray">Waiting for players to enter...</p>
+            ) : (
+              lobbyFeed.map((item) => (
+                <p key={item.id} className="text-xs text-white/90">
+                  🎮 {item.message}
+                </p>
+              ))
+            )}
+          </div>
+        </div>
+        {preHoldPhase && (
+          <div className="flex flex-col items-center gap-3 pt-2">
+            <p className="text-center text-sm font-semibold text-amber-300">Place your finger and HOLD</p>
+            <div
+              role="button"
+              tabIndex={0}
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerLeave}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`flex h-56 w-56 items-center justify-center rounded-full border-4 transition-all ${
+                isHolding
+                  ? "animate-pulse border-teal bg-teal/20 shadow-[0_0_60px_rgba(16,185,129,0.5)]"
+                  : "animate-pulse border-orange-400 bg-orange-400/10"
+              }`}
+            >
+              <span className="text-center text-lg font-bold text-white">
+                {isHolding ? "READY" : "Place your finger and HOLD"}
+              </span>
+            </div>
+            <p className="text-xs text-body-gray">No eliminations yet. Competition starts at zero.</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col gap-6 pb-8">
@@ -891,109 +1050,81 @@ export default function LastTouch({
           LAST TOUCH
         </h1>
         <p className="mt-2 text-body-gray">Hold your ground. Win it all.</p>
-        <div className="mt-4 inline-block animate-pulse text-4xl">👆</div>
       </div>
 
-      {/* Prize pool */}
       <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-steel-blue bg-card/90 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)]">
         <p className="text-center text-sm text-body-gray">Current Prize Pool</p>
         <p className="mt-2 text-center text-4xl font-bold text-white tabular-nums">
           $<AnimatedNumber value={liveSession.prize_pool} />
         </p>
-        <p className="mt-1 text-center text-sm text-body-gray">
-          {dbPlayerCount} {dbPlayerCount === 1 ? "Player" : "Players"} Joined
-        </p>
+        <p className="mt-1 text-center text-sm text-body-gray">{dbPlayerCount} players with tickets</p>
       </div>
 
-      <>
-          {/* Entry fee info */}
-          <div className="card-border mx-auto w-full max-w-md rounded-xl bg-card/80 p-5">
-            <p className="text-sm text-body-gray">Entry Fee</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-400">
-              ${liveSession.entry_fee.toFixed(2)}
-            </p>
-            <ul className="mt-4 space-y-1 text-xs text-body-gray">
-              <li>Flat entry fee — no tiers in this format</li>
-              <li>Last player holding wins the entire prize pool</li>
-              <li>5% platform fee deducted from winnings</li>
-            </ul>
-          </div>
+      <div className="text-center">
+        <p className="text-body-gray">Next Game Starts In</p>
+        <p className="mt-2 text-xl font-semibold text-white">{readableCountdown}</p>
+        <p className="mt-1 text-xs text-body-gray">{timeLabel}</p>
+      </div>
 
-          {/* Countdown */}
-          <div className="text-center">
-            {liveSession.status === "upcoming" ? (
-              <>
-                <p className="text-body-gray">Next Game Starts In</p>
-                <p className="mt-2 font-mono text-4xl font-bold text-white tabular-nums">
-                  {mins}:{secs.toString().padStart(2, "0")}
-                </p>
-                <p className="mt-1 text-xs text-body-gray">{timeLabel}</p>
-              </>
-            ) : (
-              <p className="text-lg font-semibold text-[#FF5E00]">Game in progress…</p>
-            )}
-          </div>
-          {cancelMessage && (
-            <p className="text-center text-sm text-amber-300">{cancelMessage}</p>
-          )}
+      {liveSession.status === "live" && (
+        <div className="rounded-lg border border-emerald-400/50 bg-emerald-400/10 px-4 py-3 text-center text-emerald-300">
+          GAME LIVE
+        </div>
+      )}
 
-          {/* Join / Already joined */}
-          {joinError && (
-            <div className="mx-auto w-full max-w-md rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-400">
-              {joinError}
-            </div>
-          )}
+      {joinError && (
+        <div className="mx-auto w-full max-w-md rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm text-red-300">
+          {joinError}
+        </div>
+      )}
 
-          <div className="mx-auto w-full max-w-md">
-            {joined ? (
-              <div className="rounded-xl border border-teal/40 bg-teal/10 py-4 text-center">
-                <p className="font-semibold text-teal">✓ You&apos;re in!</p>
-                <p className="mt-1 text-sm text-body-gray">
-                  {liveSession.status === "upcoming"
-                    ? `Next game starts at ${timeLabel}`
-                    : "Game is in progress…"}
-                </p>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={handleJoin}
-                disabled={liveSession.status !== "upcoming"}
-                className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(255,94,0,0.4)] transition hover:opacity-95 disabled:opacity-50"
-              >
-                JOIN NOW — ${liveSession.entry_fee.toFixed(2)}
-              </button>
-            )}
-            {!joined && (
-              <p className="mt-2 text-center text-sm text-body-gray">
-                {dbPlayerCount} {dbPlayerCount === 1 ? "player" : "players"} already joined
-              </p>
-            )}
-          </div>
+      <div className="mx-auto w-full max-w-md">
+        {!joined ? (
+          <button
+            type="button"
+            onClick={handleJoin}
+            disabled={liveSession.status !== "upcoming"}
+            className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(255,94,0,0.4)] transition hover:opacity-95 disabled:opacity-50"
+          >
+            Get Your Ticket - ${liveSession.entry_fee.toFixed(2)}
+          </button>
+        ) : !isArenaOpen ? (
+          <button
+            type="button"
+            disabled
+            className="w-full cursor-not-allowed rounded-xl border border-white/15 bg-white/5 py-4 text-lg font-semibold text-body-gray"
+          >
+            You&apos;re in - ticket secured
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleEnterArena}
+            disabled={inArena}
+            className="w-full rounded-xl bg-orange-500 py-4 text-lg font-bold text-black shadow-[0_0_30px_rgba(249,115,22,0.45)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            {inArena ? "Inside Arena" : "Enter Arena"}
+          </button>
+        )}
+      </div>
 
-          {/* How it works */}
-          <div className="mx-auto w-full max-w-md">
-            <button
-              type="button"
-              onClick={() => setHowItWorksOpen((o) => !o)}
-              className="w-full rounded-lg border border-white/10 py-2 text-sm text-body-gray"
-            >
-              How it works {howItWorksOpen ? "▲" : "▼"}
-            </button>
-            {howItWorksOpen && (
-              <div className="mt-2 rounded-lg bg-white/5 p-4 text-sm text-body-gray">
-                <p>1. Join by paying the entry fee before the session starts.</p>
-                <p>2. When the game starts, press and HOLD the touch zone.</p>
-                <p>3. Don&apos;t lift your finger — if you do, you&apos;re out!</p>
-                <p>4. Last person holding wins the ENTIRE prize pool.</p>
-                <p className="mt-2">
-                  Sessions run 3× daily at 02:00, 14:00, and 20:00 UTC. All players see the same
-                  countdown — it&apos;s synchronized to the server.
-                </p>
-              </div>
-            )}
+      <div className="mx-auto w-full max-w-md">
+        <button
+          type="button"
+          onClick={() => setHowItWorksOpen((o) => !o)}
+          className="w-full rounded-lg border border-white/10 py-2 text-sm text-body-gray"
+        >
+          How it works {howItWorksOpen ? "▲" : "▼"}
+        </button>
+        {howItWorksOpen && (
+          <div className="mt-2 rounded-lg bg-white/5 p-4 text-sm text-body-gray">
+            <p>1. Get your ticket anytime before the match starts.</p>
+            <p>2. At 10 minutes before start, use Enter Arena.</p>
+            <p>3. At 30 seconds, place your finger and hold to get ready.</p>
+            <p>4. At zero, GAME LIVE starts and lift-for-1-second eliminates you.</p>
           </div>
-      </>
+        )}
+      </div>
     </div>
   );
 }

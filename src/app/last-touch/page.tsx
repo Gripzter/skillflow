@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -24,7 +24,6 @@ function LastTouchPageContent() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [session, setSession] = useState<LastTouchSession | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
-  const refundedSessionsRef = useRef<Set<string>>(new Set());
 
   // Load user
   useEffect(() => {
@@ -110,18 +109,6 @@ function LastTouchPageContent() {
     setSession(updated);
   }, []);
 
-  const handleSessionCancelled = useCallback(async (sessionId: string, amount: number) => {
-    if (refundedSessionsRef.current.has(sessionId)) return;
-    refundedSessionsRef.current.add(sessionId);
-    try {
-      await creditWallet(amount, "Last Touch cancelled – entry refunded", "match_refund");
-      dispatchWalletUpdated();
-      setBalance((b) => b + amount);
-    } catch {
-      dispatchWalletUpdated();
-    }
-  }, []);
-
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -200,7 +187,6 @@ function LastTouchPageContent() {
             onWin={handleWin}
             onEliminated={handleEliminated}
             onSessionUpdate={handleSessionUpdate}
-            onSessionCancelled={handleSessionCancelled}
           />
         )}
       </main>
