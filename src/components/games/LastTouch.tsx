@@ -33,6 +33,8 @@ const CHALLENGE_MAX_INTERVAL_MS = 30 * 60 * 1000;
 const CHALLENGE_MIN_DURATION_SEC = 15;
 const CHALLENGE_MAX_DURATION_SEC = 30;
 const DEV_CHALLENGE_EMAIL = "aras.axmas@gmail.com";
+const NORMAL_LOBBY_COUNTDOWN_SEC = 15 * 60;
+const DEV_LOBBY_COUNTDOWN_SEC = 30;
 
 type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
 
@@ -93,8 +95,8 @@ export default function LastTouch({
   const canUseDevMode = devModeRequested && (userEmail ?? "").toLowerCase() === DEV_CHALLENGE_EMAIL;
   const [state, setState] = useState<LastTouchState>(() =>
     createInitialState({
-      initialBotsCount: 300 + Math.floor(Math.random() * 501),
-      nextGameInSec: 14 * 60 + 32,
+      initialBotsCount: 0,
+      nextGameInSec: canUseDevMode ? DEV_LOBBY_COUNTDOWN_SEC : NORMAL_LOBBY_COUNTDOWN_SEC,
     })
   );
   const [joined, setJoined] = useState(false);
@@ -110,14 +112,16 @@ export default function LastTouch({
   const [splitSpacePressed, setSplitSpacePressed] = useState(false);
   const [activeTouchCount, setActiveTouchCount] = useState(0);
   const [releaseGraceDeadline, setReleaseGraceDeadline] = useState<number | null>(null);
+  const [lobbyFeed, setLobbyFeed] = useState<Array<{ id: string; username: string; message: string; atMs: number }>>([]);
+  const [lobbyJoinedCount, setLobbyJoinedCount] = useState(0);
   const touchZoneRef = useRef<HTMLDivElement>(null);
   const activePointersRef = useRef<Set<number>>(new Set());
-  const challengeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const releaseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const splitFailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastChallengeTypeRef = useRef<ChallengeType | null>(null);
   const sessionKeyRef = useRef<string>(`${userId || username}-${Math.random().toString(36).slice(2, 8)}`);
+  const seenLobbyUsersRef = useRef<Set<string>>(new Set());
   const channelRef = useRef<ReturnType<NonNullable<ReturnType<typeof createClient>>["channel"]> | null>(null);
 
   const remaining = useMemo(
@@ -136,6 +140,7 @@ export default function LastTouch({
   const challengeSecLeft =
     challenge == null ? 0 : Math.max(0, Math.ceil((challenge.endsAtMs - Date.now()) / 1000));
   const netPool = netPrizePool(state.prizePool);
+  const liveLobbyPrizePool = lobbyJoinedCount * entryFee;
 
   const updateRealtimePresence = useCallback(
     async (eliminated: boolean) => {
@@ -185,33 +190,6 @@ export default function LastTouch({
     return () => clearInterval(t);
   }, [state.phase]);
 
-  // Simulated lobby joins (fake feed)
-  useEffect(() => {
-    if (state.phase !== "lobby" || !joined) return;
-    const addJoin = () => {
-      setState((s) => {
-        const fee = getEntryFeeAtMinute(0) ?? 1;
-        const names = ["xKiller99", "ProGamer_Mike", "SnipeElite420", "NoScope360", "ChessMaster"];
-        const name = names[Math.floor(Math.random() * names.length)];
-        const entry = {
-          id: "feed-" + Date.now(),
-          type: "join" as const,
-          username: name,
-          message: `${name} just joined! ($${fee.toFixed(2)})`,
-          atMs: Date.now(),
-          amount: fee,
-        };
-        return {
-          ...s,
-          feed: [entry, ...s.feed].slice(0, 30),
-          prizePool: s.prizePool + fee,
-        };
-      });
-    };
-    const id = setInterval(addJoin, 1500 + Math.random() * 1500);
-    return () => clearInterval(id);
-  }, [state.phase, joined]);
-
   // When lobby countdown hits 0 and joined → start game countdown
   useEffect(() => {
     if (state.phase !== "lobby" || !joined || state.nextGameCountdownSec > 0) return;
@@ -226,8 +204,21 @@ export default function LastTouch({
   // If not joined when lobby countdown hits 0, reset for next session
   useEffect(() => {
     if (state.phase !== "lobby" || joined || state.nextGameCountdownSec !== 0) return;
-    setState((s) => ({ ...s, nextGameCountdownSec: 14 * 60 + 32 }));
-  }, [state.phase, joined, state.nextGameCountdownSec]);
+    setState((s) => ({
+      ...s,
+      nextGameCountdownSec: canUseDevMode ? DEV_LOBBY_COUNTDOWN_SEC : NORMAL_LOBBY_COUNTDOWN_SEC,
+    }));
+  }, [state.phase, joined, state.nextGameCountdownSec, canUseDevMode]);
+
+  // If dev mode toggles on for allowed user while still in lobby, speed up countdown.
+  useEffect(() => {
+    if (!canUseDevMode) return;
+    if (state.phase !== "lobby" || joined) return;
+    setState((s) => ({
+      ...s,
+      nextGameCountdownSec: Math.min(s.nextGameCountdownSec, DEV_LOBBY_COUNTDOWN_SEC),
+    }));
+  }, [canUseDevMode, state.phase, joined]);
 
   // Countdown 5,4,3,2,1 then HOLD NOW
   useEffect(() => {
@@ -352,7 +343,7 @@ export default function LastTouch({
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [entryFee]);
 
   // Visibility: tab hidden = eliminated
   useEffect(() => {
@@ -376,13 +367,61 @@ export default function LastTouch({
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState();
         const metas = Object.values(state).flatMap((x) => x as Array<Record<string, unknown>>);
-        const joinedCount = metas.filter((m) => m.joined === true).length;
-        const eliminatedCount = metas.filter((m) => m.joined === true && m.eliminated === true).length;
+        const joinedMetas = metas.filter((m) => m.joined === true);
+        const eliminatedCount = joinedMetas.filter((m) => m.eliminated === true).length;
+        const activeUsernames = Array.from(
+          new Set(
+            joinedMetas
+              .map((m) => (typeof m.username === "string" ? m.username : ""))
+              .filter(Boolean)
+          )
+        );
+        const joinedCount = activeUsernames.length;
         setRealtimePlayersJoined(joinedCount);
         setRealtimePlayersEliminated(eliminatedCount);
+        setLobbyJoinedCount(joinedCount);
+
+        // Keep the lobby feed real-only from actual realtime users.
+        for (const u of activeUsernames) {
+          if (seenLobbyUsersRef.current.has(u)) continue;
+          seenLobbyUsersRef.current.add(u);
+          setLobbyFeed((prev) => [
+            {
+              id: `join-${u}-${Date.now()}`,
+              username: u,
+              message: `${u} joined Last Touch`,
+              atMs: Date.now(),
+            },
+            ...prev,
+          ].slice(0, 50));
+        }
+
+        // During lobby keep pool derived from real joined players only.
+        setState((s) =>
+          s.phase === "lobby"
+            ? {
+                ...s,
+                prizePool: joinedCount * entryFee,
+              }
+            : s
+        );
       })
       .on("broadcast", { event: "last_touch_elimination" }, () => {
         // Sync is authoritative; this just nudges UI updates faster.
+      })
+      .on("broadcast", { event: "last_touch_join" }, ({ payload }) => {
+        if (!payload || typeof payload !== "object") return;
+        const p = payload as { username?: unknown };
+        if (typeof p.username !== "string") return;
+        setLobbyFeed((prev) => [
+          {
+            id: `join-${p.username}-${Date.now()}`,
+            username: p.username,
+            message: `${p.username} joined Last Touch`,
+            atMs: Date.now(),
+          },
+          ...prev,
+        ].slice(0, 50));
       })
       .subscribe();
     channelRef.current = channel;
@@ -390,7 +429,7 @@ export default function LastTouch({
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, []);
+  }, [entryFee]);
 
   useEffect(() => {
     updateRealtimePresence(isEliminated);
@@ -536,24 +575,34 @@ export default function LastTouch({
     setState((s) => ({
       ...s,
       players: addRealPlayer(s.players, username, entryFee),
-      prizePool: s.prizePool + entryFee,
-      feed: [
-        {
-          id: "join-" + Date.now(),
-          type: "join",
-          username,
-          message: `${username} just joined! ($${entryFee.toFixed(2)})`,
-          atMs: Date.now(),
-          amount: entryFee,
-        },
-        ...s.feed,
-      ].slice(0, 50),
+      prizePool: Math.max(s.prizePool, (lobbyJoinedCount + 1) * entryFee),
+      feed: s.feed,
     }));
+    setLobbyFeed((prev) => [
+      {
+        id: `join-${username}-${Date.now()}`,
+        username,
+        message: `${username} joined Last Touch`,
+        atMs: Date.now(),
+      },
+      ...prev,
+    ].slice(0, 50));
+    seenLobbyUsersRef.current.add(username);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "last_touch_join",
+      payload: { username, atMs: Date.now() },
+    }).catch(() => {});
     setNextChallengeAtMs(Date.now() + randomChallengeDelayMs());
-  }, [username, entryFee, onJoinRequest, randomChallengeDelayMs]);
+  }, [username, entryFee, onJoinRequest, randomChallengeDelayMs, lobbyJoinedCount]);
 
   const nextTier = state.phase === "lobby" ? getNextTierMinutes(0) : null;
   const currentFee = state.phase === "lobby" ? (getEntryFeeAtMinute(0) ?? 1) : state.lateEntryFee;
+  const devBadge = canUseDevMode ? (
+    <div className="fixed right-4 top-20 z-40 rounded-full border border-purple-400/50 bg-purple-500/20 px-3 py-1 text-xs font-semibold text-purple-200">
+      DEV MODE
+    </div>
+  ) : null;
 
   // ----- Lobby -----
   if (state.phase === "lobby") {
@@ -561,6 +610,7 @@ export default function LastTouch({
     const secs = state.nextGameCountdownSec % 60;
     return (
       <div className="flex flex-col gap-6 pb-8">
+        {devBadge}
         <div className="text-center">
           <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
             LAST TOUCH
@@ -572,10 +622,10 @@ export default function LastTouch({
         <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-steel-blue bg-card/90 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)]">
           <p className="text-center text-sm text-body-gray">Current Prize Pool</p>
           <p className="mt-2 text-center text-4xl font-bold text-white tabular-nums">
-            $<AnimatedNumber value={state.prizePool} />
+            $<AnimatedNumber value={liveLobbyPrizePool} />
           </p>
           <p className="mt-1 text-center text-sm text-body-gray">
-            {state.players.length} Players Joined
+            {lobbyJoinedCount} Players Joined
           </p>
         </div>
 
@@ -603,6 +653,9 @@ export default function LastTouch({
           <p className="mt-2 font-mono text-4xl font-bold text-white tabular-nums">
             {mins}:{secs.toString().padStart(2, "0")}
           </p>
+          {canUseDevMode && (
+            <p className="mt-1 text-xs text-purple-300">Dev mode: accelerated lobby + challenge cadence</p>
+          )}
         </div>
 
         {!joined && (
@@ -615,7 +668,7 @@ export default function LastTouch({
               JOIN NOW — ${entryFee.toFixed(2)}
             </button>
             <p className="mt-2 text-center text-sm text-body-gray">
-              {state.players.length} players already joined
+              {lobbyJoinedCount} players already joined
             </p>
           </div>
         )}
@@ -642,9 +695,9 @@ export default function LastTouch({
         <div className="mx-auto w-full max-w-md">
           <p className="mb-2 text-xs text-body-gray">Live feed</p>
           <div className="flex h-32 flex-col gap-1 overflow-y-auto rounded-lg border border-white/10 bg-black/30 p-2">
-            {state.feed.slice(0, 12).map((f) => (
+            {lobbyFeed.slice(0, 12).map((f) => (
               <div key={f.id} className="text-xs text-white/90">
-                {f.type === "join" && "🎮"} {f.message}
+                🎮 {f.message}
               </div>
             ))}
           </div>
@@ -657,6 +710,7 @@ export default function LastTouch({
   if (state.phase === "countdown" && countdownNum != null) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center">
+        {devBadge}
         {countdownNum > 0 ? (
           <span className="animate-pulse font-mono text-9xl font-black text-white">
             {countdownNum}
@@ -680,6 +734,7 @@ export default function LastTouch({
       : 0;
     return (
       <div className="flex flex-col items-center gap-6 py-8">
+        {devBadge}
         <h2 className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-5xl font-black text-transparent">
           WINNER!
         </h2>
@@ -733,6 +788,7 @@ export default function LastTouch({
 
   return (
     <div className="flex flex-col gap-4 pb-6">
+      {devBadge}
       <div className="flex items-center justify-between">
         <span className="font-bold text-white">LAST TOUCH</span>
         <span className="font-mono text-white tabular-nums">{formatHoldTime(gameElapsedMs)}</span>
