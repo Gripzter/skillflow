@@ -52,7 +52,7 @@ export interface GameLayoutProps {
   onLeaveMatch: () => void;
   onReportIssue: () => void;
   realStakeDisplay?: string;
-  afkSecondsLeft?: number | null;
+  afkRemainingMs?: number | null;
   afkActivePlayer?: "player1" | "player2" | null;
 }
 
@@ -89,14 +89,14 @@ function PlayerCard({
   playerKey,
   isActive,
   scoreLabelDefault,
-  afkSecondsLeft,
+  afkRemainingMs,
   afkRingVisible,
 }: {
   player: GameLayoutProps["player1"];
   playerKey: "player1" | "player2";
   isActive: boolean;
   scoreLabelDefault: string;
-  afkSecondsLeft?: number | null;
+  afkRemainingMs?: number | null;
   afkRingVisible?: boolean;
 }) {
   const initial = (player.username || "?").charAt(0).toUpperCase();
@@ -124,11 +124,10 @@ function PlayerCard({
       )}
       <div className="flex min-w-0 flex-1 items-center gap-1.5 md:gap-2.5">
         <div className="relative h-[26px] w-[26px] shrink-0 md:h-[34px] md:w-[34px]">
-          {afkRingVisible && afkSecondsLeft !== null ? (
+          {afkRingVisible && afkRemainingMs !== null ? (
             <AfkCountdownRing
-              secondsLeft={afkSecondsLeft}
-              totalSeconds={60}
-              isDanger={afkSecondsLeft <= 10}
+              remainingMs={afkRemainingMs}
+              totalMs={60_000}
             />
           ) : null}
           {player.avatar ? (
@@ -199,7 +198,7 @@ export default function GameLayout({
   onLeaveMatch,
   onReportIssue,
   realStakeDisplay,
-  afkSecondsLeft = null,
+  afkRemainingMs = null,
   afkActivePlayer = null,
 }: GameLayoutProps) {
   const [chatInput, setChatInput] = useState("");
@@ -298,7 +297,7 @@ export default function GameLayout({
               player={player1}
               isActive={currentTurn === "player1"}
               scoreLabelDefault="Score"
-              afkSecondsLeft={afkSecondsLeft}
+              afkRemainingMs={afkRemainingMs}
               afkRingVisible={mode === "real" && afkActivePlayer === "player1"}
             />
             <PlayerCard
@@ -306,7 +305,7 @@ export default function GameLayout({
               player={player2}
               isActive={currentTurn === "player2"}
               scoreLabelDefault="Score"
-              afkSecondsLeft={afkSecondsLeft}
+              afkRemainingMs={afkRemainingMs}
               afkRingVisible={mode === "real" && afkActivePlayer === "player2"}
             />
           </div>

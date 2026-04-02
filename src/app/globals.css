@@ -149,7 +149,7 @@ main,
 }
 
 .animate-afk-ring-pulse {
-  animation: afkRingPulse 900ms ease-in-out infinite;
+  animation: afkRingPulse 500ms ease-in-out infinite;
 }
 
 @keyframes shimmer {
