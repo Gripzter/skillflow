@@ -36,7 +36,6 @@ const CHALLENGE_MIN_SEC = 15;
 const CHALLENGE_MAX_SEC = 30;
 const NOTIFICATION_PERMISSION_KEY = "lasttouch:notification-permission";
 const ARENA_HEARTBEAT_MS = 10_000;
-const ARENA_DISCONNECT_GRACE_MS = 60_000;
 
 type ChallengeType = "shrink" | "split" | "shape_shift" | "rapid_tap" | "squeeze" | "maze";
 
@@ -64,7 +63,7 @@ interface Props {
 interface ArenaParticipant {
   userId: string;
   username: string;
-  lastSeenMs: number;
+  joinedMs: number;
 }
 
 function AnimatedNumber({ value, prefix = "" }: { value: number; prefix?: string }) {
@@ -216,8 +215,8 @@ export default function LastTouch({
     const refreshArena = async () => {
       try {
         const { data, error } = await supabase
-          .from("last_touch_lobby_entries")
-          .select("user_id, username, last_seen_at")
+          .from("last_touch_players")
+          .select("user_id, username, joined_at")
           .eq("session_id", session.id);
         if (error) {
           console.error("LastTouch arena presence query failed:", error);
@@ -228,10 +227,9 @@ export default function LastTouch({
         for (const row of data) {
           const id = String(row.user_id ?? "");
           const name = String(row.username ?? "Player");
-          const ms = new Date(String(row.last_seen_at ?? "")).getTime();
+          const ms = new Date(String(row.joined_at ?? "")).getTime();
           if (!id || !Number.isFinite(ms)) continue;
-          if (Date.now() - ms > ARENA_DISCONNECT_GRACE_MS) continue;
-          next[id] = { userId: id, username: name, lastSeenMs: ms };
+          next[id] = { userId: id, username: name, joinedMs: ms };
         }
         setArenaParticipants(next);
       } catch (error) {
@@ -259,7 +257,7 @@ export default function LastTouch({
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "last_touch_lobby_entries", filter: `session_id=eq.${session.id}` },
+        { event: "*", schema: "public", table: "last_touch_players", filter: `session_id=eq.${session.id}` },
         () => void refreshArena()
       )
       .subscribe();
@@ -284,7 +282,9 @@ export default function LastTouch({
   }, [liveSession]);
 
   useEffect(() => {
-    for (const participant of Object.values(arenaParticipants)) {
+    const sorted = Object.values(arenaParticipants).sort((a, b) => a.joinedMs - b.joinedMs);
+    if (sorted.length === 0) return;
+    for (const participant of sorted) {
       if (seenArenaUsersRef.current.has(participant.userId)) continue;
       seenArenaUsersRef.current.add(participant.userId);
       setLobbyFeed((prev) => [
@@ -293,6 +293,33 @@ export default function LastTouch({
       ].slice(0, 30));
     }
   }, [arenaParticipants]);
+
+  useEffect(() => {
+    if (!liveSession || !inArena || !joined) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const writePresence = async () => {
+      try {
+        await supabase
+          .from("last_touch_lobby_entries")
+          .upsert(
+            {
+              session_id: liveSession.id,
+              user_id: userId,
+              username,
+              last_seen_at: new Date().toISOString(),
+            },
+            { onConflict: "session_id,user_id" }
+          );
+      } catch (error) {
+        // Presence write is best effort and should not block gameplay.
+        console.error("LastTouch arena heartbeat failed:", error);
+      }
+    };
+    void writePresence();
+    const t = setInterval(() => void writePresence(), ARENA_HEARTBEAT_MS);
+    return () => clearInterval(t);
+  }, [liveSession, inArena, joined, userId, username]);
 
   // When countdown reaches 0, transition session -> live (always).
   useEffect(() => {
@@ -671,32 +698,6 @@ export default function LastTouch({
     if (!joined) return;
     setInArena(true);
   }, [joined]);
-
-  useEffect(() => {
-    if (!liveSession || !inArena || !joined) return;
-    const supabase = createClient();
-    if (!supabase) return;
-    const writePresence = async () => {
-      try {
-        await supabase
-          .from("last_touch_lobby_entries")
-          .upsert(
-            {
-              session_id: liveSession.id,
-              user_id: userId,
-              username,
-              last_seen_at: new Date().toISOString(),
-            },
-            { onConflict: "session_id,user_id" }
-          );
-      } catch (error) {
-        console.error("LastTouch arena heartbeat failed:", error);
-      }
-    };
-    void writePresence();
-    const t = setInterval(() => void writePresence(), ARENA_HEARTBEAT_MS);
-    return () => clearInterval(t);
-  }, [liveSession, inArena, joined, userId, username]);
 
   // 5-minute pre-start browser notification for joined players.
   useEffect(() => {
