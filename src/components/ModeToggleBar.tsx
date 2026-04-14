@@ -8,6 +8,11 @@ interface ModeToggleBarContentProps {
 
 export default function ModeToggleBarContent({ className = "" }: ModeToggleBarContentProps) {
   const { mode, setMode } = usePlayMode();
+  const showModeToggle = process.env.NEXT_PUBLIC_LAUNCH_MODE !== "SWEEPSTAKES";
+
+  if (!showModeToggle) {
+    return null;
+  }
 
   return (
     <div
