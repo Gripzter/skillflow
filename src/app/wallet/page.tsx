@@ -19,6 +19,11 @@ import {
 import type { StoredTransaction } from "@/lib/wallet";
 import { createClient } from "@/lib/supabase";
 import { MIN_WITHDRAWAL } from "@/lib/constants";
+import {
+  IS_SWEEPSTAKES_LAUNCH,
+  SKILL_POINTS_NAME,
+  formatEconomyAmount,
+} from "@/constants/economy";
 
 type TransactionType = StoredTransaction["type"];
 
@@ -57,6 +62,7 @@ export default function WalletPage() {
   const [showDevTopUp, setShowDevTopUp] = useState(false);
   const [showGeoModal, setShowGeoModal] = useState(false);
   const { isRestricted } = useGeo();
+  const balanceDisplay = formatEconomyAmount(balance);
 
   async function refreshFromApi() {
     try {
@@ -223,36 +229,54 @@ export default function WalletPage() {
             }`}
           />
           <div className="relative text-center">
-            <p className="text-body-gray">Your Balance</p>
+            <p className="text-body-gray">
+              {IS_SWEEPSTAKES_LAUNCH ? `Your ${SKILL_POINTS_NAME}` : "Your Balance"}
+            </p>
             <p className="mt-2 text-4xl font-bold text-white sm:text-5xl">
-              ${balance.toFixed(2)}
+              {balanceDisplay}
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              {isRestricted ? (
-                <button
-                  type="button"
-                  onClick={() => setShowGeoModal(true)}
-                  className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
-                    isPractice
-                      ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
-                      : "bg-teal hover:shadow-teal-glow"
-                  }`}
-                >
-                  Deposit
-                </button>
-              ) : (
+              {IS_SWEEPSTAKES_LAUNCH ? (
                 <Link
-                  href="/wallet/deposit"
+                  href="/play"
                   className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
                     isPractice
                       ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
                       : "bg-teal hover:shadow-teal-glow"
                   }`}
                 >
-                  Deposit
+                  Use {SKILL_POINTS_NAME}
                 </Link>
+              ) : (
+                <>
+                  {isRestricted ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowGeoModal(true)}
+                      className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
+                        isPractice
+                          ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                          : "bg-teal hover:shadow-teal-glow"
+                      }`}
+                    >
+                      Deposit
+                    </button>
+                  ) : (
+                    <Link
+                      href="/wallet/deposit"
+                      className={`pressable w-full rounded-lg px-6 py-3 text-center font-semibold text-charcoal transition-all sm:w-auto ${
+                        isPractice
+                          ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
+                          : "bg-teal hover:shadow-teal-glow"
+                      }`}
+                    >
+                      Deposit
+                    </Link>
+                  )}
+                </>
               )}
-              {!isRestricted &&
+              {!IS_SWEEPSTAKES_LAUNCH &&
+                !isRestricted &&
                 (balance < MIN_WITHDRAWAL ? (
                   <span
                     title="Minimum withdrawal: $10"
@@ -270,21 +294,29 @@ export default function WalletPage() {
                 ))}
             </div>
             {showGeoModal && <GeoBlockModal onClose={() => setShowGeoModal(false)} />}
-            <p className="mt-4 text-xs text-body-gray">
-              Minimum deposit: $5.00 • Minimum withdrawal: $10.00
-            </p>
-            <Link
-              href="/settings/responsible-gaming"
-              className={`mt-2 inline-block text-xs hover:underline ${
-                isPractice ? "text-purple-400" : "text-teal"
-              }`}
-            >
-              Set deposit limits
-            </Link>
+            {IS_SWEEPSTAKES_LAUNCH ? (
+              <p className="mt-4 text-xs text-body-gray">
+                Free-entry alpha mode is live. Compete using {SKILL_POINTS_NAME}.
+              </p>
+            ) : (
+              <>
+                <p className="mt-4 text-xs text-body-gray">
+                  Minimum deposit: $5.00 • Minimum withdrawal: $10.00
+                </p>
+                <Link
+                  href="/settings/responsible-gaming"
+                  className={`mt-2 inline-block text-xs hover:underline ${
+                    isPractice ? "text-purple-400" : "text-teal"
+                  }`}
+                >
+                  Set deposit limits
+                </Link>
+              </>
+            )}
           </div>
         </section>
 
-        {showDevTopUp && (
+        {showDevTopUp && !IS_SWEEPSTAKES_LAUNCH && (
           <section className="mt-4">
             <div className="rounded-card border border-amber-400/70 border-dashed bg-amber-500/5 p-4 text-center">
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/80 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">
@@ -311,7 +343,11 @@ export default function WalletPage() {
           <div className="card-border mt-4 overflow-hidden rounded-card bg-card">
             {transactions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-body-gray">
-                <p>No transactions yet. Make your first deposit to get started!</p>
+                <p>
+                  {IS_SWEEPSTAKES_LAUNCH
+                    ? `No transactions yet. Start a match to use your ${SKILL_POINTS_NAME}.`
+                    : "No transactions yet. Make your first deposit to get started!"}
+                </p>
               </div>
             ) : (
               <>
@@ -353,7 +389,8 @@ export default function WalletPage() {
                                 tx.amount >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"
                               }
                             >
-                              {tx.amount >= 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
+                              {tx.amount >= 0 ? "+" : "-"}
+                              {formatEconomyAmount(Math.abs(tx.amount))}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -373,7 +410,7 @@ export default function WalletPage() {
                               "—"
                             )}
                           </td>
-                          <td className="px-4 py-3 text-white">${tx.balance_after.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-white">{formatEconomyAmount(tx.balance_after)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -402,10 +439,11 @@ export default function WalletPage() {
                             tx.amount >= 0 ? "font-medium text-emerald-400" : "font-medium text-red-400"
                           }
                         >
-                          {tx.amount >= 0 ? "+" : ""}${Math.abs(tx.amount).toFixed(2)}
+                          {tx.amount >= 0 ? "+" : "-"}
+                          {formatEconomyAmount(Math.abs(tx.amount))}
                         </span>
                         <p className="text-xs text-body-gray">
-                          {new Date(tx.created_at).toLocaleDateString()} • ${tx.balance_after.toFixed(2)} after
+                          {new Date(tx.created_at).toLocaleDateString()} • {formatEconomyAmount(tx.balance_after)} after
                         </p>
                       </div>
                     </div>

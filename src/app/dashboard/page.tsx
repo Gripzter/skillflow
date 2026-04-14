@@ -8,6 +8,7 @@ import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
@@ -23,6 +24,11 @@ import type { StoredMatch } from "@/lib/matchmaking";
 import type { StoredTransaction } from "@/lib/wallet";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { buildLeaderboard } from "@/lib/leaderboard-seeding";
+import {
+  IS_SWEEPSTAKES_LAUNCH,
+  WAITLIST_UNLOCKED_KEY,
+  formatEconomyAmount,
+} from "@/constants/economy";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -32,7 +38,7 @@ function getGreeting() {
 }
 
 function formatCurrency(value: number) {
-  return value.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+  return formatEconomyAmount(value);
 }
 
 function formatTimeAgo(createdAt: string) {
@@ -81,6 +87,7 @@ export default function DashboardPage() {
   const [quickGameStats, setQuickGameStats] = useState<
     { playersOnline: number }[]
   >([]);
+  const [waitlistUnlocked, setWaitlistUnlocked] = useState(!IS_SWEEPSTAKES_LAUNCH);
 
   useEffect(() => {
     async function load() {
@@ -130,6 +137,12 @@ export default function DashboardPage() {
         playersOnline: 50 + Math.floor(Math.random() * 451),
       }))
     );
+  }, []);
+
+  useEffect(() => {
+    if (!IS_SWEEPSTAKES_LAUNCH) return;
+    const unlocked = window.localStorage.getItem(WAITLIST_UNLOCKED_KEY) === "true";
+    setWaitlistUnlocked(unlocked);
   }, []);
 
   async function handleLogout() {
@@ -182,6 +195,7 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [completedMatchesAll]);
   const greeting = getGreeting();
+  const dashboardLocked = IS_SWEEPSTAKES_LAUNCH && !waitlistUnlocked;
 
   if (loading) {
     return (
@@ -200,6 +214,10 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
+      {dashboardLocked ? (
+        <WaitlistOverlay onUnlock={() => setWaitlistUnlocked(true)} />
+      ) : null}
+      <div className={dashboardLocked ? "pointer-events-none select-none blur-[2px]" : ""}>
       {/* Ambient background effects (match wallet/play/leaderboard) */}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <div
@@ -559,6 +577,7 @@ export default function DashboardPage() {
         <div className="opacity-80">
           <Footer />
         </div>
+      </div>
       </div>
     </div>
   );

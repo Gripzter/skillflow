@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { getWalletBalance, getMyProfile } from "@/lib/api";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import { usePlayMode } from "@/contexts/PlayModeContext";
+import {
+  IS_SWEEPSTAKES_LAUNCH,
+  PRIZE_POOL_BANNER_TEXT,
+  SKILL_POINTS_ICON,
+  SKILL_POINTS_NAME,
+  formatEconomyAmount,
+} from "@/constants/economy";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -62,7 +69,8 @@ export default function AppNavbar({
     };
   }, []);
 
-  const balanceFormatted = balance.toFixed(2);
+  const balanceFormatted = formatEconomyAmount(balance);
+  const walletLabel = IS_SWEEPSTAKES_LAUNCH ? SKILL_POINTS_NAME : "Wallet";
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {
       window.location.href = href;
@@ -71,6 +79,11 @@ export default function AppNavbar({
 
   return (
     <header className="navbar sticky top-0 z-50 border-b border-white/5 bg-charcoal/95 backdrop-blur-sm px-4 py-3 sm:px-6 lg:px-8">
+      {IS_SWEEPSTAKES_LAUNCH ? (
+        <div className="mx-auto mb-2 max-w-[1200px] rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-center text-[11px] font-medium text-amber-100">
+          {PRIZE_POOL_BANNER_TEXT}
+        </div>
+      ) : null}
       <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
         <div className="flex items-center gap-4 sm:gap-6">
           <button
@@ -108,7 +121,7 @@ export default function AppNavbar({
                   : "text-body-gray hover:text-white"
               }`}
             >
-              Wallet
+              {walletLabel}
             </button>
           )}
           <button
@@ -154,7 +167,16 @@ export default function AppNavbar({
             <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/15 bg-card/60 px-3 py-2 shadow-[0_0_16px_rgba(16,185,129,0.35)]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
               <span className="text-sm font-bold text-white">
-                ${balanceFormatted}
+                {IS_SWEEPSTAKES_LAUNCH ? (
+                  <>
+                    <span className="mr-1 inline-flex items-center rounded border border-purple-400/40 bg-purple-500/20 px-1 py-[1px] text-[10px] font-semibold text-purple-200">
+                      {SKILL_POINTS_ICON}
+                    </span>
+                    {balanceFormatted.replace(` ${SKILL_POINTS_ICON}`, "")}
+                  </>
+                ) : (
+                  balanceFormatted
+                )}
               </span>
             </div>
           )}
