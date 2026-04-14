@@ -203,9 +203,12 @@ export default function GameLayout({
 }: GameLayoutProps) {
   const [chatInput, setChatInput] = useState("");
   const [mobileFeedOpen, setMobileFeedOpen] = useState(false);
+  const [boardScale, setBoardScale] = useState(1);
   const mobileFeedRef = useRef<HTMLDivElement>(null);
   const desktopLogRef = useRef<HTMLDivElement>(null);
   const desktopChatRef = useRef<HTMLDivElement>(null);
+  const gameScalingRootRef = useRef<HTMLDivElement>(null);
+  const boardInnerRef = useRef<HTMLDivElement>(null);
 
   const sortedLog = useMemo(
     () => [...logEntries].sort((a, b) => a.timestamp - b.timestamp),
@@ -228,6 +231,41 @@ export default function GameLayout({
     const el = desktopChatRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [chatOnly]);
+
+  useEffect(() => {
+    const root = gameScalingRootRef.current;
+    const board = boardInnerRef.current;
+    if (!root || !board) return;
+
+    const updateScale = () => {
+      const availableWidth = Math.min(window.innerWidth, root.clientWidth);
+      const boardWidth = board.scrollWidth;
+      if (!availableWidth || !boardWidth) {
+        setBoardScale(1);
+        return;
+      }
+      const nextScale = Math.min(1, availableWidth / boardWidth);
+      setBoardScale(nextScale);
+    };
+
+    updateScale();
+    window.addEventListener("resize", updateScale);
+
+    let rootObserver: ResizeObserver | null = null;
+    let boardObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      rootObserver = new ResizeObserver(() => updateScale());
+      boardObserver = new ResizeObserver(() => updateScale());
+      rootObserver.observe(root);
+      boardObserver.observe(board);
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateScale);
+      rootObserver?.disconnect();
+      boardObserver?.disconnect();
+    };
+  }, [children]);
 
   const sendChat = useCallback(() => {
     const t = chatInput.trim();
@@ -313,10 +351,21 @@ export default function GameLayout({
           {/* Board — flex:1 fills all remaining vertical space */}
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-1 py-0 md:px-5 md:py-1">
             <div
+              id="game-scaling-root"
+              ref={gameScalingRootRef}
               className="flex h-full max-h-full w-full items-center justify-center"
-              style={{ minHeight: 0, maxWidth: "min(480px, 100%)" }}
+              style={{ minHeight: 0 }}
             >
-              {children}
+              <div
+                ref={boardInnerRef}
+                className="flex items-center justify-center"
+                style={{
+                  transform: `scale(${boardScale})`,
+                  transformOrigin: "center center",
+                }}
+              >
+                {children}
+              </div>
             </div>
           </div>
 

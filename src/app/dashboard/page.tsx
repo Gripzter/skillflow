@@ -354,10 +354,11 @@ export default function DashboardPage() {
           className="animate-fade-in"
           style={{ animationDelay: "220ms" }}
         >
-          <div className="grid gap-3 sm:grid-cols-4">
+          <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <div className="flex gap-3 sm:grid sm:grid-cols-4">
             {/* Win Rate */}
             <div
-              className={`card-border relative overflow-hidden rounded-card bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)] ${
+              className={`card-border relative min-w-[172px] overflow-hidden rounded-card bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)] sm:min-w-0 ${
                 totalMatches > 0 && winRate >= 50
                   ? "border-emerald-400/40"
                   : totalMatches > 0
@@ -390,7 +391,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Matches Played */}
-            <div className="card-border relative overflow-hidden rounded-card border-white/10 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(148,163,184,0.35)]">
+            <div className="card-border relative min-w-[172px] overflow-hidden rounded-card border-white/10 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(148,163,184,0.35)] sm:min-w-0">
               <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-white/10 via-slate-700/10 to-transparent opacity-30" />
               <div className="pointer-events-none absolute -right-5 -top-5 h-10 w-10 rounded-full bg-slate-400/20 blur-xl" />
               <div className="relative">
@@ -407,7 +408,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Net Earnings */}
-            <div className="card-border relative overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)]">
+            <div className="card-border relative min-w-[172px] overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)] sm:min-w-0">
               <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-teal/30 via-emerald-500/10 to-transparent opacity-40" />
               <div className="pointer-events-none absolute -right-6 -top-6 h-12 w-12 rounded-full bg-emerald-400/25 blur-xl" />
               <div className="relative">
@@ -435,7 +436,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Rank */}
-            <div className="card-border relative overflow-hidden rounded-card border-amber-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(251,191,36,0.35)]">
+            <div className="card-border relative min-w-[172px] overflow-hidden rounded-card border-amber-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(251,191,36,0.35)] sm:min-w-0">
               <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-amber-500/25 via-purple-500/15 to-transparent opacity-40" />
               <div className="pointer-events-none absolute -right-5 -top-5 h-11 w-11 rounded-full bg-amber-300/25 blur-xl" />
               <div className="relative">
@@ -452,6 +453,7 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
+          </div>
           </div>
         </section>
 

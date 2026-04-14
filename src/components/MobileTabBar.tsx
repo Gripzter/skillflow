@@ -1,10 +1,9 @@
 "use client";
 
 import type { ComponentType } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
-import { House, Gamepad2, Wallet, Trophy, User } from "lucide-react";
+import { Ellipsis, Gamepad2, House, Trophy, User, Wallet } from "lucide-react";
 
 const TABS: readonly {
   href: string;
@@ -16,6 +15,7 @@ const TABS: readonly {
   { href: "/wallet", label: "Wallet", Icon: Wallet },
   { href: "/leaderboard", label: "Rank", Icon: Trophy },
   { href: "/profile", label: "Profile", Icon: User },
+  { href: "/settings", label: "More", Icon: Ellipsis },
 ];
 
 export default function MobileTabBar() {
@@ -33,6 +33,11 @@ export default function MobileTabBar() {
   }
 
   const tabs = isPractice ? TABS.filter((t) => t.href !== "/wallet") : TABS;
+  const goTo = (href: string) => {
+    if (typeof window !== "undefined") {
+      window.location.href = href;
+    }
+  };
 
   return (
     <nav
@@ -46,9 +51,10 @@ export default function MobileTabBar() {
           pathname.startsWith(tab.href + "/");
         const color = isActive ? "text-[#FF5E00]" : "text-[#888]";
         return (
-          <Link
+          <button
+            type="button"
             key={tab.href}
-            href={tab.href}
+            onClick={() => goTo(tab.href)}
             className={`pressable relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors ${color}`}
           >
             <tab.Icon size={22} className="shrink-0" />
@@ -58,7 +64,7 @@ export default function MobileTabBar() {
                 <span className="absolute -right-3 top-0 h-2 w-2 rounded-full bg-purple-500" aria-hidden />
               )}
             </span>
-          </Link>
+          </button>
         );
       })}
     </nav>
