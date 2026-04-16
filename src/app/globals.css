@@ -161,32 +161,31 @@ main,
 
 @keyframes shimmer {
   0% {
-    transform: translate3d(-120%, 0, 0) translateZ(0);
+    transform: translateX(-100%) rotate(45deg);
   }
   100% {
-    transform: translate3d(120%, 0, 0) translateZ(0);
+    transform: translateX(100%) rotate(45deg);
   }
 }
 
 .skeleton-shimmer {
   position: relative;
   overflow: hidden;
+  background: #111;
   transform: translateZ(0);
 }
 
 .skeleton-shimmer::after {
   content: "";
   position: absolute;
-  inset: -100%;
-  background: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0),
-    rgba(248, 250, 252, 0.2) 50%,
-    rgba(255, 255, 255, 0)
-  );
-  animation: shimmer 1.8s ease-in-out infinite;
+  top: -60%;
+  left: -30%;
+  width: 60%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.08) 50%, transparent 100%);
+  animation: shimmer 1.5s linear infinite;
   will-change: transform;
-  transform: translate3d(-120%, 0, 0) translateZ(0);
+  transform: translateX(-100%) rotate(45deg);
 }
 
 /* Generic active press state helper */
