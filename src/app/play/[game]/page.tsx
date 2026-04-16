@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { useToast } from "@/components/Toast";
 import { useGeo } from "@/contexts/GeoContext";
@@ -21,8 +22,11 @@ import {
 } from "@/lib/api";
 import { checkCanPlay } from "@/lib/responsible-gaming";
 import { createClient } from "@/lib/supabase";
+import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
+const SWEEPSTAKES_STAKE_MULTIPLIER = 100;
 const MATCHMAKING_TIMEOUT_SEC = 60;
 
 export type BotDifficulty = "rookie" | "gamer" | "professional";
@@ -93,8 +97,10 @@ export default function PlayGamePage() {
 
   const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
   const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
-  const insufficientBalance = !effectivePractice && balance < stakeAmount;
-  const useRealMatchmaking = !isPractice && !isRestricted;
+  const insufficientBalance =
+    !effectivePractice && !IS_SWEEPSTAKES_LAUNCH && balance < stakeAmount;
+  const useRealMatchmaking =
+    !isPractice && !isRestricted && !IS_SWEEPSTAKES_LAUNCH;
   const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
   const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
   const realMatchmakingTimeout = realMatchStatus === "timeout";
@@ -197,7 +203,7 @@ export default function PlayGamePage() {
   }, []);
 
   const handleFindMatch = useCallback(async () => {
-    if (isPractice || isRestricted) {
+    if (isPractice || isRestricted || IS_SWEEPSTAKES_LAUNCH) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
@@ -318,15 +324,14 @@ export default function PlayGamePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg
-          className={`h-10 w-10 animate-spin ${effectivePractice ? "text-purple-400" : "text-teal"}`}
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div className="w-full max-w-xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
+          <Skeleton className="h-5 w-32 rounded-md" />
+          <Skeleton className="h-9 w-52 rounded-lg" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -369,7 +374,7 @@ export default function PlayGamePage() {
           {!effectivePractice && (
             <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="text-sm font-medium text-white">${balance.toFixed(2)}</span>
+              <span className="text-sm font-medium text-white">{formatCurrency(balance)}</span>
             </div>
           )}
         </div>
@@ -413,7 +418,9 @@ export default function PlayGamePage() {
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <p className="mt-1 text-body-gray">
-              Both players put up the same amount. Winner takes all minus 5% platform fee.
+              {IS_SWEEPSTAKES_LAUNCH
+                ? "Both players commit the same SP amount. Winner takes the pot minus 5% platform fee."
+                : "Both players put up the same amount. Winner takes all minus 5% platform fee."}
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {STAKE_PRESETS.map((amt) => (
@@ -430,7 +437,9 @@ export default function PlayGamePage() {
                       : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                   }`}
                 >
-                  ${amt}
+                  {IS_SWEEPSTAKES_LAUNCH
+                    ? `${amt * SWEEPSTAKES_STAKE_MULTIPLIER} SP`
+                    : `$${amt}`}
                 </button>
               ))}
             </div>
@@ -438,7 +447,7 @@ export default function PlayGamePage() {
             <input
               type="number"
               min={1}
-              max={balance}
+              max={IS_SWEEPSTAKES_LAUNCH ? undefined : balance}
               step="0.01"
               placeholder="0.00"
               value={customStake}
@@ -447,16 +456,22 @@ export default function PlayGamePage() {
             />
 
             <div className="card-border mt-6 rounded-card bg-card p-5">
-              <p className="text-body-gray">Your Stake: ${stakeAmount.toFixed(2)}</p>
-              <p className="mt-1 text-body-gray">Opponent&apos;s Stake: ${stakeAmount.toFixed(2)}</p>
-              <p className="mt-1 text-body-gray">Total Pot: ${totalPot.toFixed(2)}</p>
-              <p className="mt-1 text-body-gray">Platform fee (5%): ${platformFee.toFixed(2)}</p>
-              <p className="mt-2 text-lg font-bold text-teal">Winner gets: ${winnerPayout.toFixed(2)}</p>
+              <p className="text-body-gray">Your Stake: {formatCurrency(stakeAmount)}</p>
+              <p className="mt-1 text-body-gray">Opponent&apos;s Stake: {formatCurrency(stakeAmount)}</p>
+              <p className="mt-1 text-body-gray">Total Pot: {formatCurrency(totalPot)}</p>
+              <p className="mt-1 text-body-gray">Platform fee (5%): {formatCurrency(platformFee)}</p>
+              <p className="mt-2 text-lg font-bold text-teal">
+                Winner gets: {formatCurrency(winnerPayout)}
+              </p>
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (
               <p className="mt-3 text-sm text-red-400">
-                Insufficient balance. <Link href="/wallet" className="text-teal underline">Deposit funds</Link> to play.
+                Insufficient balance.{" "}
+                <Link href="/wallet" className="text-teal underline">
+                  Add funds
+                </Link>{" "}
+                to play.
               </p>
             )}
           </section>
@@ -487,7 +502,9 @@ export default function PlayGamePage() {
                 : "bg-teal text-charcoal hover:shadow-teal-glow"
             }`}
           >
-            {effectivePractice ? "Start Practice" : `Find Match — $${stakeAmount.toFixed(2)}`}
+            {effectivePractice
+              ? "Start Practice"
+              : `Find Match — ${formatCurrency(stakeAmount)}`}
           </button>
         </div>
       </main>
@@ -588,7 +605,9 @@ export default function PlayGamePage() {
                     : "Searching for opponent..."}
               </p>
               <p className="mt-2 text-body-gray">
-                {effectivePractice ? `${gameName} • Free play` : `Stake: $${stakeAmount.toFixed(2)} • ${gameName} • Ranked 1v1`}
+                {effectivePractice
+                  ? `${gameName} • Free play`
+                  : `Stake: ${formatCurrency(stakeAmount)} • ${gameName} • Ranked 1v1`}
               </p>
               <p className="mt-2 text-sm text-body-gray">
                 {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}

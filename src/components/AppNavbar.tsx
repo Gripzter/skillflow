@@ -9,8 +9,8 @@ import {
   PRIZE_POOL_BANNER_TEXT,
   SKILL_POINTS_ICON,
   SKILL_POINTS_NAME,
-  formatEconomyAmount,
 } from "@/constants/economy";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -69,7 +69,7 @@ export default function AppNavbar({
     };
   }, []);
 
-  const balanceFormatted = formatEconomyAmount(balance);
+  const balanceFormatted = formatCurrency(balance);
   const walletLabel = IS_SWEEPSTAKES_LAUNCH ? SKILL_POINTS_NAME : "Wallet";
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {

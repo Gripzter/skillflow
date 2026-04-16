@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
+import Skeleton from "@/components/Skeleton";
 import GeoBlockModal from "@/components/GeoBlockModal";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
@@ -22,8 +23,8 @@ import { MIN_WITHDRAWAL } from "@/lib/constants";
 import {
   IS_SWEEPSTAKES_LAUNCH,
   SKILL_POINTS_NAME,
-  formatEconomyAmount,
 } from "@/constants/economy";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 type TransactionType = StoredTransaction["type"];
 
@@ -62,7 +63,7 @@ export default function WalletPage() {
   const [showDevTopUp, setShowDevTopUp] = useState(false);
   const [showGeoModal, setShowGeoModal] = useState(false);
   const { isRestricted } = useGeo();
-  const balanceDisplay = formatEconomyAmount(balance);
+  const balanceDisplay = formatCurrency(balance);
 
   async function refreshFromApi() {
     try {
@@ -192,15 +193,14 @@ export default function WalletPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg
-          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
+          <Skeleton className="h-6 w-40 rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-44 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -390,7 +390,7 @@ export default function WalletPage() {
                               }
                             >
                               {tx.amount >= 0 ? "+" : "-"}
-                              {formatEconomyAmount(Math.abs(tx.amount))}
+                              {formatCurrency(Math.abs(tx.amount))}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -410,7 +410,7 @@ export default function WalletPage() {
                               "—"
                             )}
                           </td>
-                          <td className="px-4 py-3 text-white">{formatEconomyAmount(tx.balance_after)}</td>
+                          <td className="px-4 py-3 text-white">{formatCurrency(tx.balance_after)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -440,10 +440,10 @@ export default function WalletPage() {
                           }
                         >
                           {tx.amount >= 0 ? "+" : "-"}
-                          {formatEconomyAmount(Math.abs(tx.amount))}
+                          {formatCurrency(Math.abs(tx.amount))}
                         </span>
                         <p className="text-xs text-body-gray">
-                          {new Date(tx.created_at).toLocaleDateString()} • {formatEconomyAmount(tx.balance_after)} after
+                          {new Date(tx.created_at).toLocaleDateString()} • {formatCurrency(tx.balance_after)} after
                         </p>
                       </div>
                     </div>

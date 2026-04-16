@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useToast } from "@/components/Toast";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
+import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
@@ -27,18 +28,14 @@ import { buildLeaderboard } from "@/lib/leaderboard-seeding";
 import {
   IS_SWEEPSTAKES_LAUNCH,
   WAITLIST_UNLOCKED_KEY,
-  formatEconomyAmount,
 } from "@/constants/economy";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 function getGreeting() {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
   if (hour < 18) return "Good afternoon";
   return "Good evening";
-}
-
-function formatCurrency(value: number) {
-  return formatEconomyAmount(value);
 }
 
 function formatTimeAgo(createdAt: string) {
@@ -199,15 +196,13 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg
-          className="h-10 w-10 animate-spin text-teal"
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div className="w-full max-w-md space-y-3 rounded-2xl border border-white/10 bg-card/40 p-4">
+          <Skeleton className="h-4 w-24 rounded-md" />
+          <Skeleton className="h-8 w-40 rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <Skeleton className="h-24 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -290,7 +285,9 @@ export default function DashboardPage() {
                   <p className="text-[11px] uppercase tracking-[0.16em] text-body-gray">
                     Current Prize Pool
                   </p>
-                  <p className="mt-1 text-xl font-semibold text-white">$1,247</p>
+                  <p className="mt-1 text-xl font-semibold text-white">
+                    {formatCurrency(1247)}
+                  </p>
                 </div>
                 <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
                   Join Now
@@ -555,9 +552,7 @@ export default function DashboardPage() {
                         </span>
                       <span className="text-[11px] text-body-gray">
                         {resultLabel}
-                        {delta !== 0 && (
-                          <> · {deltaPrefix}${deltaAbs.toFixed(2)}</>
-                        )}
+                        {delta !== 0 && <> · {deltaPrefix}{formatCurrency(deltaAbs)}</>}
                         {" · "}
                         {formatTimeAgo(match.createdAt)}
                       </span>

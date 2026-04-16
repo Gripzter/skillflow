@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import Skeleton from "@/components/Skeleton";
 import {
   getCurrentUser,
   getMatch,
@@ -36,6 +37,7 @@ import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -800,11 +802,17 @@ function MatchPageContent() {
 
   if (loading || !match) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
+          <Skeleton className="h-5 w-32 rounded-md" />
+          <Skeleton className="h-10 w-48 rounded-lg" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+          </div>
+          <Skeleton className="h-[260px] w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -914,7 +922,7 @@ function MatchPageContent() {
     chatPresets: ["gl hf!", "gg", "Nice move!", "Rematch?"],
     onLeaveMatch: () => setForfeitConfirm(true),
     onReportIssue: () => { setReportOpen(true); setReportSubmitted(false); },
-    realStakeDisplay: match.isPractice ? undefined : `$${match.stakeAmount.toFixed(2)}`,
+    realStakeDisplay: match.isPractice ? undefined : formatCurrency(match.stakeAmount),
     afkRemainingMs,
     afkActivePlayer: !match.isPractice && afkRemainingMs !== null ? matchUi?.currentTurn ?? null : null,
   };
@@ -1324,7 +1332,7 @@ function MatchPageContent() {
           <p className="text-sm text-body-gray">
             {match.isPractice
               ? "Practice Match — No stakes"
-              : `Stake: $${match.stakeAmount.toFixed(2)} each • Winner gets: $${match.winnerPayout.toFixed(2)}`}
+              : `Stake: ${formatCurrency(match.stakeAmount)} each • Winner gets: ${formatCurrency(match.winnerPayout)}`}
           </p>
           <div className="flex gap-2">
             <button
@@ -1494,7 +1502,7 @@ function MatchPageContent() {
             <p className="text-center font-medium text-white">
               {match.isPractice
                 ? "Leave this practice match? Your progress will not be saved."
-                : `Are you sure you want to forfeit? You will lose your $${match.stakeAmount.toFixed(2)} stake.`}
+                : `Are you sure you want to forfeit? You will lose your ${formatCurrency(match.stakeAmount)} stake.`}
             </p>
             <div className="mt-6 flex gap-3">
               <button

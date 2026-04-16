@@ -1,3 +1,5 @@
+import { formatCurrency } from "@/lib/formatCurrency";
+
 /**
  * Generates fake leaderboard data for development.
  * Data is deterministic per seed so it stays stable on re-renders.
@@ -146,7 +148,7 @@ export function sortAndRankPlayers(
 export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): string | number {
   switch (tab) {
     case "earnings":
-      return `$${player.totalEarnings.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return formatCurrency(player.totalEarnings);
     case "winRate":
       return formatWinRate(player.winRate);
     case "matches":
@@ -165,7 +167,7 @@ export function getSecondaryStat(player: LeaderboardPlayer, tab: LeaderboardTab)
     case "rating":
       return `${player.totalMatches} matches`;
     case "matches":
-      return `$${player.totalEarnings.toLocaleString("en-US", { maximumFractionDigits: 0 })} earned`;
+      return `${formatCurrency(player.totalEarnings, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} earned`;
     default:
       return "";
   }

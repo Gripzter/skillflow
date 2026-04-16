@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
+import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
@@ -16,6 +17,7 @@ import {
 } from "@/lib/leaderboard-data";
 import { buildLeaderboard, getTopGameEmoji } from "@/lib/leaderboard-seeding";
 import { IS_SWEEPSTAKES_LAUNCH, PRIZE_POOL_BANNER_TEXT } from "@/constants/economy";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const TABS: { id: LeaderboardTab; label: string }[] = [
   { id: "earnings", label: "Top Earners" },
@@ -135,15 +137,18 @@ export default function LeaderboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg
-          className={`h-10 w-10 animate-spin ${isPractice ? "text-purple-400" : "text-teal"}`}
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
+      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
+        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
+          <Skeleton className="h-8 w-52 rounded-lg" />
+          <Skeleton className="h-5 w-72 rounded-md" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+            <Skeleton className="h-28 rounded-xl" />
+          </div>
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -363,12 +368,7 @@ export default function LeaderboardPage() {
                       <td className="px-4 py-3 text-body-gray">
                         {getTopGameEmoji(topGame)} {topGame}
                       </td>
-                      <td className={`px-4 py-3 font-semibold ${earningsClass}`}>
-                        {`$${earnings.toLocaleString("en-US", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}`}
-                      </td>
+                      <td className={`px-4 py-3 font-semibold ${earningsClass}`}>{formatCurrency(earnings)}</td>
                     </tr>
                   );
                 })}

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 const AUTO_REDIRECT_SEC = 30;
 
@@ -97,7 +98,7 @@ export default function GameResultOverlay({
   if (isVictory) {
     headline = "VICTORY";
     headlineColor = "#FF5E00";
-    if (!isPractice) amountLine = `+$${winnerPayout.toFixed(2)}`;
+    if (!isPractice) amountLine = `+ ${formatCurrency(winnerPayout)}`;
     subtext = wonByForfeit
       ? "Opponent forfeited. You win!"
       : isPractice
@@ -106,13 +107,13 @@ export default function GameResultOverlay({
   } else if (isDefeat) {
     headline = "DEFEAT";
     headlineColor = "#6B7280";
-    if (!isPractice) amountLine = `-$${stakeAmount.toFixed(2)}`;
+    if (!isPractice) amountLine = `- ${formatCurrency(stakeAmount)}`;
     subtext = `${opponentUsername} won this one`;
   } else {
     headline = "DRAW";
     headlineColor = "#60A5FA";
     if (!isPractice) amountLine = "Stake returned";
-    subtext = isPractice ? "Even match!" : `$${stakeAmount.toFixed(2)} returned to your wallet`;
+    subtext = isPractice ? "Even match!" : `${formatCurrency(stakeAmount)} returned to your wallet`;
   }
 
   return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/formatCurrency";
+
 export const LAUNCH_MODE = process.env.NEXT_PUBLIC_LAUNCH_MODE?.toUpperCase() ?? "";
 export const IS_SWEEPSTAKES_LAUNCH = LAUNCH_MODE === "SWEEPSTAKES";
 
@@ -14,11 +16,5 @@ export const WAITLIST_EMAIL_KEY = "skillflow_waitlist_email";
 export const WAITLIST_UNLOCKED_KEY = "skillflow_waitlist_unlocked";
 
 export function formatEconomyAmount(amount: number): string {
-  const formatted = amount.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return IS_SWEEPSTAKES_LAUNCH
-    ? `${formatted} ${SKILL_POINTS_ICON}`
-    : `$${formatted}`;
+  return formatCurrency(amount);
 }
