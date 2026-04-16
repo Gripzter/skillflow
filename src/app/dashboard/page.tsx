@@ -193,19 +193,7 @@ export default function DashboardPage() {
   }, [completedMatchesAll]);
   const greeting = getGreeting();
   const dashboardLocked = IS_SWEEPSTAKES_LAUNCH && !waitlistUnlocked;
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
-        <div className="w-full max-w-md space-y-3 rounded-2xl border border-white/10 bg-card/40 p-4">
-          <Skeleton className="h-4 w-24 rounded-md" />
-          <Skeleton className="h-8 w-40 rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-24 w-full rounded-xl" />
-        </div>
-      </div>
-    );
-  }
+  const isLoading = loading;
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
@@ -234,19 +222,25 @@ export default function DashboardPage() {
         {/* 1. Greeting + inline balance chip */}
         <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-              {greeting}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-gray-100 md:text-3xl">
-              {username}
-            </h1>
+            <Skeleton isLoading={isLoading} className="inline-block rounded-md">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                {greeting}
+              </p>
+            </Skeleton>
+            <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-100 md:text-3xl">
+                {username}
+              </h1>
+            </Skeleton>
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex items-center rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-body-gray">
               <span className="mr-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
                 Balance
               </span>
-              <span className="font-medium text-gray-100">{formatCurrency(balance)}</span>
+              <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
+                <span className="font-medium text-gray-100">{formatCurrency(balance)}</span>
+              </Skeleton>
             </div>
           </div>
         </section>
@@ -267,31 +261,43 @@ export default function DashboardPage() {
             <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-200/80">
-                  Featured Event
-                </p>
-                <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-extrabold text-transparent">
-                  LAST TOUCH
-                </h2>
-                <p className="mt-1 text-sm text-body-gray">
-                  Hold your ground. Win the pot.
-                </p>
-                <p className="mt-2 text-xs text-teal">
-                  Massive prize pool • Last finger standing wins
-                </p>
+                <Skeleton isLoading={isLoading} className="inline-block rounded-md">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-200/80">
+                    Featured Event
+                  </p>
+                </Skeleton>
+                <Skeleton isLoading={isLoading} className="inline-block rounded-lg">
+                  <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-extrabold text-transparent">
+                    LAST TOUCH
+                  </h2>
+                </Skeleton>
+                <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-md">
+                  <p className="text-sm text-body-gray">
+                    Hold your ground. Win the pot.
+                  </p>
+                </Skeleton>
+                <Skeleton isLoading={isLoading} className="mt-2 inline-block rounded-md">
+                  <p className="text-xs text-teal">
+                    Massive prize pool • Last finger standing wins
+                  </p>
+                </Skeleton>
               </div>
               <div className="flex items-center gap-5">
                 <div className="text-right">
                   <p className="text-[11px] uppercase tracking-[0.16em] text-body-gray">
                     Current Prize Pool
                   </p>
-                  <p className="mt-1 text-xl font-semibold text-white">
-                    {formatCurrency(1247)}
-                  </p>
+                  <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
+                    <p className="text-xl font-semibold text-white">
+                      {formatCurrency(1247)}
+                    </p>
+                  </Skeleton>
                 </div>
-                <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
-                  Join Now
-                </span>
+                <Skeleton isLoading={isLoading} className="rounded-xl">
+                  <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
+                    Join Now
+                  </span>
+                </Skeleton>
               </div>
             </div>
             <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-teal/25 blur-3xl" />
@@ -324,6 +330,7 @@ export default function DashboardPage() {
                   key={game.slug}
                   type="button"
                   onClick={() => router.push(`/play/${game.slug}`)}
+                  disabled={isLoading}
                   className={`group relative flex h-[120px] flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-card text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
                   style={{ animationDelay: `${160 + index * 60}ms` }}
                 >
@@ -343,19 +350,25 @@ export default function DashboardPage() {
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
                   <div className="relative z-10 flex h-full flex-col justify-between px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">{game.name}</span>
+                      <Skeleton isLoading={isLoading} className="rounded-md">
+                        <span className="font-semibold">{game.name}</span>
+                      </Skeleton>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[11px] text-body-gray">
-                      <span>{playersOnline.toLocaleString()} online</span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                          isPractice
-                            ? "bg-purple-500/25 text-purple-100"
-                            : "bg-teal/25 text-teal"
-                        }`}
-                      >
-                        Play
-                      </span>
+                      <Skeleton isLoading={isLoading} className="rounded-md">
+                        <span>{playersOnline.toLocaleString()} online</span>
+                      </Skeleton>
+                      <Skeleton isLoading={isLoading} className="rounded-full">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                            isPractice
+                              ? "bg-purple-500/25 text-purple-100"
+                              : "bg-teal/25 text-teal"
+                          }`}
+                        >
+                          Play
+                        </span>
+                      </Skeleton>
                     </div>
                   </div>
                 </button>
@@ -399,7 +412,9 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
-                  {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
+                  <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
+                    {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
+                  </Skeleton>
                 </p>
                 <p className="mt-0.5 text-[11px] text-body-gray">Real-money matches</p>
               </div>
@@ -416,7 +431,9 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
-                  {totalMatches.toLocaleString()}
+                  <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
+                    {totalMatches.toLocaleString()}
+                  </Skeleton>
                 </p>
                 <p className="mt-0.5 text-[11px] text-body-gray">Completed games</p>
               </div>
@@ -438,7 +455,9 @@ export default function DashboardPage() {
                       netEarnings >= 0 ? "text-emerald-300" : "text-red-400"
                     }`}
                   >
-                    {formatCurrency(netEarnings)}
+                    <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
+                      {formatCurrency(netEarnings)}
+                    </Skeleton>
                   </span>
                   {netEarnings > 0 && (
                     <span className="text-[10px] text-emerald-300">
@@ -461,7 +480,9 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
-                  {playerRank ? `#${playerRank.toLocaleString()}` : "Unranked"}
+                  <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
+                    {playerRank ? `#${playerRank.toLocaleString()}` : "Unranked"}
+                  </Skeleton>
                 </p>
                 <p className="mt-0.5 text-[11px] text-body-gray">
                   {playerRank ? "Global position" : "Play 10 matches to rank"}
@@ -487,7 +508,16 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {recentActivity.length === 0 ? (
+          {isLoading ? (
+            <div className="divide-y divide-white/5 rounded-lg border border-white/5 bg-black/20">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={`loading-row-${index}`} className="px-4 py-3">
+                  <Skeleton className="h-4 w-1/2 rounded-md" />
+                  <Skeleton className="mt-2 h-3 w-1/3 rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : recentActivity.length === 0 ? (
             <div className="rounded-lg border border-dashed border-white/10 px-4 py-6 text-sm text-body-gray">
               No completed matches yet. Start a match from the Play page to see your history here.
             </div>
