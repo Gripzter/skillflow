@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
@@ -36,10 +36,25 @@ export default function LeaderboardPage() {
 
   const [rawPlayers, setRawPlayers] = useState<LeaderboardPlayer[]>([]);
   const [practicePlayers, setPracticePlayers] = useState<LeaderboardPlayer[]>([]);
+  const [playersByTab, setPlayersByTab] = useState<Partial<Record<LeaderboardTab, LeaderboardPlayer[]>>>({});
+  const playersByTabRef = useRef<Partial<Record<LeaderboardTab, LeaderboardPlayer[]>>>({});
+  const [displayedRealPlayers, setDisplayedRealPlayers] = useState<LeaderboardPlayer[]>([]);
+  const [isTabRevalidating, setIsTabRevalidating] = useState(false);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>("earnings");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { isPractice } = usePlayMode();
+
+  const fetchRankedPlayersForTab = useCallback(async (tab: LeaderboardTab, currentUsername: string) => {
+    const sortBy = tab === "rating" ? "skill_rating" : "total_earnings";
+    const apiPlayers = await getLeaderboard(sortBy);
+    const basePlayers: LeaderboardPlayer[] =
+      apiPlayers?.map((p) => ({
+        ...p,
+        isCurrentUser: p.username === currentUsername,
+      })) ?? [];
+    return sortAndRankPlayers(buildLeaderboard(basePlayers), tab);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -51,13 +66,12 @@ export default function LeaderboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        const apiPlayers = await getLeaderboard("total_earnings");
-        const basePlayers: LeaderboardPlayer[] =
-          apiPlayers?.map((p) => ({
-            ...p,
-            isCurrentUser: p.username === user.username,
-          })) ?? [];
-        setRawPlayers(buildLeaderboard(basePlayers));
+        const ranked = await fetchRankedPlayersForTab("earnings", user.username);
+        setRawPlayers(ranked);
+        setDisplayedRealPlayers(ranked);
+        const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { earnings: ranked };
+        playersByTabRef.current = initialByTab;
+        setPlayersByTab(initialByTab);
         const practice = getPracticeMatches();
         const byUser: Record<string, { wins: number; matches: number }> = {};
         practice.filter((m) => m.status === "completed").forEach((m) => {
@@ -89,24 +103,48 @@ export default function LeaderboardPage() {
       }
     }
     load();
-  }, [router]);
-
-  const sortedPlayers = useMemo(
-    () => sortAndRankPlayers(rawPlayers, activeTab),
-    [rawPlayers, activeTab]
-  );
+  }, [router, fetchRankedPlayersForTab]);
 
   const sortedPractice = useMemo(
     () => [...practicePlayers].sort((a, b) => b.totalMatches - a.totalMatches),
     [practicePlayers]
   );
 
+  useEffect(() => {
+    if (loading || isPractice || !username) return;
+    let cancelled = false;
+    const cached = playersByTabRef.current[activeTab];
+    if (cached && cached.length > 0) {
+      setDisplayedRealPlayers(cached);
+    }
+    setIsTabRevalidating(true);
+    void fetchRankedPlayersForTab(activeTab, username)
+      .then((fresh) => {
+        if (cancelled) return;
+        setRawPlayers(fresh);
+        setDisplayedRealPlayers(fresh);
+        setPlayersByTab((prev) => {
+          const next = { ...prev, [activeTab]: fresh };
+          playersByTabRef.current = next;
+          return next;
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsTabRevalidating(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, fetchRankedPlayersForTab, isPractice, loading, username]);
+
   const filteredPlayers = useMemo(() => {
-    const source = isPractice ? sortedPractice : sortedPlayers;
+    const source = isPractice ? sortedPractice : displayedRealPlayers;
     if (!search.trim()) return source;
     const q = search.trim().toLowerCase();
     return source.filter((p) => p.username.toLowerCase().includes(q));
-  }, [sortedPlayers, sortedPractice, search, isPractice]);
+  }, [displayedRealPlayers, sortedPractice, search, isPractice]);
 
   const podium = filteredPlayers.slice(0, 3);
   const tablePlayers = filteredPlayers.slice(3);
@@ -202,6 +240,11 @@ export default function LeaderboardPage() {
                 {tab.label}
               </button>
             ))}
+            {isTabRevalidating ? (
+              <span className="ml-2 inline-flex items-center text-xs text-body-gray">
+                Updating...
+              </span>
+            ) : null}
           </div>
         )}
 
