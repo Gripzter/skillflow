@@ -7,6 +7,7 @@ import ConnectionMonitor from "@/components/ConnectionMonitor";
 import MobileTabBar from "@/components/MobileTabBar";
 import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import WarpTransitionOverlay from "@/components/WarpTransitionOverlay";
 import "./globals.css";
 
 const inter = Inter({
@@ -68,6 +69,7 @@ if (typeof window !== 'undefined') {
               <ErrorBoundary>
                 <PracticeModeClassToggle />
                 {children}
+                <WarpTransitionOverlay />
                 <MobileTabBar />
               </ErrorBoundary>
             </PlayModeProvider>
