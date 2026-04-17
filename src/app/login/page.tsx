@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
+import VelocityLoader from "@/components/VelocityLoader";
 import { createClient } from "@/lib/supabase";
 
 const DEV_ACCESS_CODE = "6174";
@@ -280,11 +281,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-charcoal">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-        </div>
-      }
+      fallback={<VelocityLoader />}
     >
       <LoginContent />
     </Suspense>

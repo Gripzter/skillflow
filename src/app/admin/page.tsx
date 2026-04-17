@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import StatCard from "@/components/admin/StatCard";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
+import VelocityLoader from "@/components/VelocityLoader";
 
 interface RecentMatch {
   id: string;
@@ -162,14 +163,7 @@ export default function AdminOverviewPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
-          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
-        />
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   const totalChart = revenueData.reduce((s, d) => s + d.amount, 0);

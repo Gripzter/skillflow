@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
+import VelocityLoader from "@/components/VelocityLoader";
 
 interface TxRow {
   type: string;
@@ -202,11 +203,7 @@ export default function AdminTaxPage() {
   );
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }} />
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   const tdCls = "px-4 py-3 text-right text-[#9CA3AF]";

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
+import VelocityLoader from "@/components/VelocityLoader";
 
 const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
 
@@ -50,11 +51,7 @@ export default function InviteCodePage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   if (invalid) {

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
+import VelocityLoader from "@/components/VelocityLoader";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -129,14 +130,7 @@ export default function AdminRevenuePage() {
   const chartData = useMemo(() => buildChartData(matchFees, period), [matchFees, period]);
 
   if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center">
-        <div
-          className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
-          style={{ borderColor: "#FF5E00", borderTopColor: "transparent" }}
-        />
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   const statCards = [

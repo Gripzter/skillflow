@@ -24,6 +24,7 @@ import { ConnectionCheckWarning, ConnectionCheckUnrecommended } from "@/componen
 import MatchSetup from "@/components/external/MatchSetup";
 import ResultReporting from "@/components/external/ResultReporting";
 import DisputePanel from "@/components/external/DisputePanel";
+import VelocityLoader from "@/components/VelocityLoader";
 
 const MODE_DISPLAY: Record<string, string> = {
   "1v1-aim-duel": "1v1 Aim Duel",
@@ -386,14 +387,7 @@ export default function ExternalMatchRoomPage() {
   };
 
   if (loading || !match) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <svg className="h-10 w-10 animate-spin text-teal" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-        </svg>
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   if (!connectionCheckPassed && match.status === "in_progress") {

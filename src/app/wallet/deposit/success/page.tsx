@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
+import VelocityLoader from "@/components/VelocityLoader";
 
 function DepositSuccessContent() {
   const searchParams = useSearchParams();
@@ -33,6 +34,10 @@ function DepositSuccessContent() {
     verify();
   }, [sessionId]);
 
+  if (status === "loading") {
+    return <VelocityLoader />;
+  }
+
   return (
     <div className="min-h-screen bg-charcoal">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
@@ -46,12 +51,6 @@ function DepositSuccessContent() {
 
       <div className="relative flex min-h-[80vh] flex-col items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl border border-white/10 bg-card p-8 text-center">
-          {status === "loading" && (
-            <>
-              <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-teal border-t-transparent" />
-              <p className="text-body-gray">Confirming your deposit…</p>
-            </>
-          )}
           {status === "success" && (
             <>
               <h1 className="text-2xl font-bold text-white">Deposit Successful!</h1>
@@ -89,16 +88,7 @@ function DepositSuccessContent() {
 
 export default function DepositSuccessPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-charcoal">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-teal border-t-transparent" />
-            <p className="text-body-gray">Confirming your deposit…</p>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={<VelocityLoader />}>
       <DepositSuccessContent />
     </Suspense>
   );

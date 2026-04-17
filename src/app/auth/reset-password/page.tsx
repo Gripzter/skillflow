@@ -3,6 +3,7 @@
 import { Suspense, useState, FormEvent, useEffect } from "react";
 import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
+import VelocityLoader from "@/components/VelocityLoader";
 import { createClient } from "@/lib/supabase";
 
 function ResetPasswordContent() {
@@ -118,13 +119,7 @@ function ResetPasswordContent() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-charcoal">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
-        </div>
-      }
-    >
+    <Suspense fallback={<VelocityLoader />}>
       <ResetPasswordContent />
     </Suspense>
   );

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import GeoBlockModal from "@/components/GeoBlockModal";
+import VelocityLoader from "@/components/VelocityLoader";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
@@ -135,15 +136,7 @@ export default function DepositPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal">
-        <div
-          className={`h-10 w-10 animate-spin rounded-full border-2 border-t-transparent ${
-            isPractice ? "border-purple-500" : "border-teal"
-          }`}
-        />
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   return (

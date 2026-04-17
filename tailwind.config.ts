@@ -59,6 +59,8 @@ const config: Config = {
       animation: {
         "fade-in": "fadeIn 0.6s ease-out forwards",
         "fade-in-up": "fadeInUp 0.6s ease-out forwards",
+        "velocity-stripe": "velocity-stripe 0.8s ease-in-out infinite",
+        "velocity-logo-pulse": "velocity-logo-pulse 1.3s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -68,6 +70,22 @@ const config: Config = {
         fadeInUp: {
           "0%": { opacity: "0", transform: "translateY(20px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "velocity-stripe": {
+          "0%": {
+            transform: "rotate(-55deg) translate3d(135vw, 135vh, 0)",
+            opacity: "0",
+          },
+          "16%": { opacity: "1" },
+          "82%": { opacity: "1" },
+          "100%": {
+            transform: "rotate(-55deg) translate3d(-135vw, -135vh, 0)",
+            opacity: "0",
+          },
+        },
+        "velocity-logo-pulse": {
+          "0%, 100%": { opacity: "0.5", transform: "scale(1)" },
+          "50%": { opacity: "0.72", transform: "scale(1.02)" },
         },
       },
     },
