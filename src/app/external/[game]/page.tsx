@@ -15,7 +15,7 @@ import {
   createExternalMatch,
   generateFakeSteamOpponent,
 } from "@/lib/external-matches";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const STAKE_PRESETS = [1, 2, 5, 10, 25, 50, 100];
 const CS2_MAPS = ["Any", "Dust 2", "Mirage", "Inferno", "Nuke", "Anubis", "Ancient", "Overpass"];
@@ -169,7 +169,7 @@ export default function CS2LobbyPage() {
   }, []);
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const formatTime = (sec: number) =>

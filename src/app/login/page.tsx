@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { createClient } from "@/lib/supabase";
 
 const DEV_ACCESS_CODE = "6174";
@@ -281,7 +281,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={<VelocityLoader />}
+      fallback={<LoadingRing />}
     >
       <LoginContent />
     </Suspense>

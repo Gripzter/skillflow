@@ -10,7 +10,7 @@ import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout a
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const RATING_RANKS = [
   { name: "Bronze", min: 0, max: 1199 },
@@ -235,7 +235,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const isPlayer1 = (m: StoredMatch) => m.player1.username === username;

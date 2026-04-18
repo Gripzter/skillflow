@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 interface TxRow {
   type: string;
@@ -203,7 +203,7 @@ export default function AdminTaxPage() {
   );
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const tdCls = "px-4 py-3 text-right text-[#9CA3AF]";

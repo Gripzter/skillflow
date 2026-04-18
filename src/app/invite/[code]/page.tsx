@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
 
@@ -51,7 +51,7 @@ export default function InviteCodePage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   if (invalid) {

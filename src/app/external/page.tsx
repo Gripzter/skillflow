@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import { getCurrentUser } from "@/lib/api";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const EXTERNAL_GAMES = [
   {
@@ -97,7 +97,7 @@ export default function ExternalGamesHubPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
@@ -94,7 +94,7 @@ export default function WithdrawPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   if (success) {

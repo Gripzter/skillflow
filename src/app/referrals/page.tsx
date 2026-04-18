@@ -9,7 +9,7 @@ import { getCurrentUser } from "@/lib/api";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const SHARE_TEXT = "Join me on SkillFlow! Compete in skill games for real money. Use my link and we both get $5: ";
 const MAX_REFERRAL_BONUSES = 50;
@@ -131,7 +131,7 @@ export default function ReferralsPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const isMaxed = stats.completed >= MAX_REFERRAL_BONUSES;

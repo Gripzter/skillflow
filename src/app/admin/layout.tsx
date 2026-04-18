@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkAdminAccess } from "@/lib/admin-auth";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [router]);
 
   if (!checked) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (

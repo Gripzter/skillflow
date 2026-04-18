@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 function DepositSuccessContent() {
   const searchParams = useSearchParams();
@@ -35,7 +35,7 @@ function DepositSuccessContent() {
   }, [sessionId]);
 
   if (status === "loading") {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (
@@ -88,7 +88,7 @@ function DepositSuccessContent() {
 
 export default function DepositSuccessPage() {
   return (
-    <Suspense fallback={<VelocityLoader />}>
+    <Suspense fallback={<LoadingRing />}>
       <DepositSuccessContent />
     </Suspense>
   );

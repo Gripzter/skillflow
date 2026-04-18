@@ -7,7 +7,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useOnlinePlayers } from "@/hooks/useOnlinePlayers";
 import { getCurrentUser } from "@/lib/api";
@@ -377,7 +377,7 @@ export default function PlayPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const username = user?.user_metadata?.username || "Player";

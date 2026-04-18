@@ -24,7 +24,7 @@ import { ConnectionCheckWarning, ConnectionCheckUnrecommended } from "@/componen
 import MatchSetup from "@/components/external/MatchSetup";
 import ResultReporting from "@/components/external/ResultReporting";
 import DisputePanel from "@/components/external/DisputePanel";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const MODE_DISPLAY: Record<string, string> = {
   "1v1-aim-duel": "1v1 Aim Duel",
@@ -387,7 +387,7 @@ export default function ExternalMatchRoomPage() {
   };
 
   if (loading || !match) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   if (!connectionCheckPassed && match.status === "in_progress") {

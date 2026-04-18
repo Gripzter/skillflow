@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { getCurrentUser, getWalletBalance, debitWallet, creditWallet } from "@/lib/api";
 import LastTouch from "@/components/games/LastTouch";
 import { createClient } from "@/lib/supabase";
@@ -123,7 +123,7 @@ function LastTouchPageContent() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (
@@ -166,7 +166,7 @@ function LastTouchPageContent() {
         )}
 
         {sessionLoading ? (
-          <VelocityLoader />
+          <LoadingRing />
         ) : (
           <LastTouch
             session={session}
@@ -186,7 +186,7 @@ function LastTouchPageContent() {
 export default function LastTouchPage() {
   return (
     <Suspense
-      fallback={<VelocityLoader />}
+      fallback={<LoadingRing />}
     >
       <LastTouchPageContent />
     </Suspense>

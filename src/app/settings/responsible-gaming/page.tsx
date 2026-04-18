@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase";
 import { applyPendingLimitChanges, type ResponsibleGamingRow } from "@/lib/responsible-gaming";
@@ -220,7 +220,7 @@ export default function SettingsResponsibleGamingPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const dailyLimit = rg?.daily_deposit_limit != null ? Number(rg.daily_deposit_limit) : null;

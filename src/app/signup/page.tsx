@@ -6,7 +6,7 @@ import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
 
@@ -557,7 +557,7 @@ function SignupContent() {
 export default function SignUpPage() {
   return (
     <Suspense
-      fallback={<VelocityLoader />}
+      fallback={<LoadingRing />}
     >
       <SignupContent />
     </Suspense>

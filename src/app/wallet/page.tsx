@@ -7,7 +7,7 @@ import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import GeoBlockModal from "@/components/GeoBlockModal";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -192,7 +192,7 @@ export default function WalletPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
 

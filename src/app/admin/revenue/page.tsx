@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -130,7 +130,7 @@ export default function AdminRevenuePage() {
   const chartData = useMemo(() => buildChartData(matchFees, period), [matchFees, period]);
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const statCards = [

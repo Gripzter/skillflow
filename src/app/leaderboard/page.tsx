@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
 import {
@@ -174,7 +174,7 @@ export default function LeaderboardPage() {
   }
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (

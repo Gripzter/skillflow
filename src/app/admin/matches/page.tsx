@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import ChessReplayViewer from "@/components/admin/ChessReplayViewer";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 interface MatchRow {
   id: string;
@@ -144,7 +144,7 @@ export default function AdminMatchesPage() {
   const selectCls = "rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FF5E00] focus:outline-none";
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (

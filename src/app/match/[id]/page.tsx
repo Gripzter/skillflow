@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import {
   getCurrentUser,
   getMatch,
@@ -801,7 +801,7 @@ function MatchPageContent() {
   }
 
   if (loading || !match) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const safePlayer1 = match.player1 ?? { username: "Player 1", rating: 1000 };

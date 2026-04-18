@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getCurrentUser } from "@/lib/api";
 import LandingPage from "@/components/landing";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
 
@@ -26,7 +26,7 @@ function HomeContent() {
   }, [router, searchParams]);
 
   if (checking) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return <LandingPage />;
@@ -34,7 +34,7 @@ function HomeContent() {
 
 export default function Home() {
   return (
-    <Suspense fallback={<VelocityLoader />}>
+    <Suspense fallback={<LoadingRing />}>
       <HomeContent />
     </Suspense>
   );

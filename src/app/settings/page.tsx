@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useToast } from "@/components/Toast";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function SettingsPage() {
   }, [router]);
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const username = user?.user_metadata?.username ?? "Player";

@@ -9,7 +9,7 @@ import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -197,7 +197,7 @@ export default function DashboardPage() {
   const isLoading = loading;
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   return (

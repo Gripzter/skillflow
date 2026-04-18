@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase";
 import StatCard from "@/components/admin/StatCard";
 import RevenueChart from "@/components/admin/RevenueChart";
 import type { RevenueDataPoint } from "@/components/admin/RevenueChart";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 interface RecentMatch {
   id: string;
@@ -163,7 +163,7 @@ export default function AdminOverviewPage() {
   }, []);
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   const totalChart = revenueData.reduce((s, d) => s + d.amount, 0);

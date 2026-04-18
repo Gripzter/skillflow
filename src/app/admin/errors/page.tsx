@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import VelocityLoader from "@/components/VelocityLoader";
+import LoadingRing from "@/components/LoadingRing";
 
 type ErrorReport = {
   id: string;
@@ -57,7 +57,7 @@ export default function AdminErrorsPage() {
   const unresolvedCount = reports.filter((r) => !r.resolved).length;
 
   if (loading) {
-    return <VelocityLoader />;
+    return <LoadingRing />;
   }
 
   if (error) {
