@@ -33,7 +33,7 @@ type SpResult =
   | { success: true; amount: number; balanceSp: number; lifetimeSp?: number; rankTier?: RankTier }
   | { success: false; error: string };
 
-type UserSpData = {
+export type UserSpData = {
   lifetimeSp: number;
   balanceSp: number;
   rankTier: RankTier;

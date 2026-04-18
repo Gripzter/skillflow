@@ -10,6 +10,8 @@ import Footer from "@/components/Footer";
 import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
+import RankBadge from "@/components/RankBadge";
+import RankProgressBar from "@/components/RankProgressBar";
 import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -31,6 +33,7 @@ import {
   WAITLIST_UNLOCKED_KEY,
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -86,6 +89,11 @@ export default function DashboardPage() {
     { playersOnline: number }[]
   >([]);
   const [waitlistUnlocked, setWaitlistUnlocked] = useState(!IS_SWEEPSTAKES_LAUNCH);
+  const [spData, setSpData] = useState<UserSpData>({
+    lifetimeSp: 1000,
+    balanceSp: 1000,
+    rankTier: "bronze",
+  });
 
   useEffect(() => {
     async function load() {
@@ -98,15 +106,19 @@ export default function DashboardPage() {
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
 
-        const [bal, matchList, txs, apiLeaderboard] = await Promise.all([
+        const [bal, matchList, txs, apiLeaderboard, userSpData] = await Promise.all([
           getWalletBalance(),
           getMatches(),
           getTransactions(),
           getLeaderboard("total_earnings"),
+          getUserSPData(user.id),
         ]);
         setBalance(bal);
         setMatches(matchList as StoredMatch[]);
         setTransactions(txs);
+        if (userSpData) {
+          setSpData(userSpData);
+        }
 
         const basePlayers: LeaderboardPlayer[] =
           apiLeaderboard?.map((p) => ({
@@ -247,6 +259,23 @@ export default function DashboardPage() {
                 <span className="font-medium text-gray-100">{formatCurrency(balance)}</span>
               </Skeleton>
             </div>
+          </div>
+        </section>
+
+        <section className="animate-fade-in rounded-card border border-white/10 bg-card/70 p-5" style={{ animationDelay: "40ms" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-body-gray">
+                Skill Rank
+              </p>
+              <RankBadge tier={spData.rankTier} size="large" />
+            </div>
+            <p className="text-sm font-medium text-white">
+              SP Balance: <span className="text-teal">{spData.balanceSp.toLocaleString()}</span>
+            </p>
+          </div>
+          <div className="mt-4">
+            <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
           </div>
         </section>
 

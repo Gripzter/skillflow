@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { getWalletBalance, getMyProfile } from "@/lib/api";
 import ConnectionBadge from "@/components/ConnectionBadge";
+import RankBadge from "@/components/RankBadge";
 import { usePlayMode } from "@/contexts/PlayModeContext";
+import { getUserSPData } from "@/lib/skillpoints";
 import {
   IS_SWEEPSTAKES_LAUNCH,
   PRIZE_POOL_BANNER_TEXT,
@@ -38,6 +40,7 @@ export default function AppNavbar({
   const { isPractice } = usePlayMode();
   const [balance, setBalance] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [rankTier, setRankTier] = useState("bronze");
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +54,22 @@ export default function AppNavbar({
     return () => {
       cancelled = true;
       window.removeEventListener(WALLET_UPDATED_EVENT, handleUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRank() {
+      const profile = await getMyProfile();
+      if (!profile || typeof profile.id !== "string") return;
+      const spData = await getUserSPData(profile.id);
+      if (!cancelled && spData) {
+        setRankTier(spData.rankTier);
+      }
+    }
+    loadRank();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -195,6 +214,7 @@ export default function AppNavbar({
               />
             )}
             <span className="text-sm font-medium">{username}</span>
+            <RankBadge tier={rankTier} />
             {isDevMode && (
               <span className="rounded bg-purple/20 px-1.5 py-0.5 text-xs font-medium text-purple">
                 DEV

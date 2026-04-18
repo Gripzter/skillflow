@@ -6,11 +6,14 @@ import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import RankBadge from "@/components/RankBadge";
+import RankProgressBar from "@/components/RankProgressBar";
 import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
 
 const RATING_RANKS = [
   { name: "Bronze", min: 0, max: 1199 },
@@ -137,6 +140,11 @@ export default function ProfilePage() {
   const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
   const [gameTab, setGameTab] = useState<string>("all");
   const [showAllMatches, setShowAllMatches] = useState(false);
+  const [spData, setSpData] = useState<UserSpData>({
+    lifetimeSp: 1000,
+    balanceSp: 1000,
+    rankTier: "bronze",
+  });
 
   useEffect(() => {
     async function load() {
@@ -151,10 +159,17 @@ export default function ProfilePage() {
         if ("created_at" in user && user.created_at) {
           setMemberSince(new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
-        const [matchList, txs] = await Promise.all([getMatches(), getTransactions()]);
+        const [matchList, txs, userSpData] = await Promise.all([
+          getMatches(),
+          getTransactions(),
+          getUserSPData(user.id),
+        ]);
         setMatches(matchList);
         setTransactions(txs);
         setPracticeStats(getPracticeStats(user.username));
+        if (userSpData) {
+          setSpData(userSpData);
+        }
       } catch {
         router.push("/login");
       } finally {
@@ -303,6 +318,9 @@ export default function ProfilePage() {
                   {stats.rating} Rating
                   <span className="rounded bg-white/10 px-2 py-0.5 text-sm font-medium text-body-gray">{rank}</span>
                 </p>
+                <div className="mt-2">
+                  <RankBadge tier={spData.rankTier} size="large" />
+                </div>
               </div>
             </div>
             <Link
@@ -314,13 +332,19 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        <section className="mt-6 animate-fade-in">
+          <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
+        </section>
+
         {/* Section 2: Stats overview */}
-        <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           {[
             { label: "Total Matches", value: stats.matches.length },
             { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
             { label: "Total Earnings", value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}` },
             { label: "Win Streak", value: stats.bestStreak },
+            { label: "Lifetime SP", value: spData.lifetimeSp.toLocaleString() },
+            { label: "SP Balance", value: spData.balanceSp.toLocaleString() },
           ].map((card, i) => (
             <div
               key={card.label}
