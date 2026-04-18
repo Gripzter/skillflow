@@ -4,9 +4,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
-import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { useToast } from "@/components/Toast";
+import VelocityLoader from "@/components/VelocityLoader";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
@@ -270,17 +270,7 @@ export default function PlaySpellingBeePage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
-        <div className="w-full max-w-xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
-          <Skeleton className="h-5 w-32 rounded-md" />
-          <Skeleton className="h-9 w-52 rounded-lg" />
-          <Skeleton className="h-20 w-full rounded-xl" />
-          <Skeleton className="h-16 w-full rounded-xl" />
-          <Skeleton className="h-14 w-full rounded-xl" />
-        </div>
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;

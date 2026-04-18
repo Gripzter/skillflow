@@ -328,15 +328,25 @@ main,
     transform: rotate(-55deg) translate3d(135vw, 135vh, 0);
     opacity: 0;
   }
-  16% {
+  22% {
     opacity: 1;
   }
-  82% {
+  78% {
     opacity: 1;
   }
   100% {
     transform: rotate(-55deg) translate3d(-135vw, -135vh, 0);
     opacity: 0;
+  }
+}
+
+@keyframes velocity-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
   }
 }
 

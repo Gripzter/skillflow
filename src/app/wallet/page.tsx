@@ -6,8 +6,8 @@ import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
-import Skeleton from "@/components/Skeleton";
 import GeoBlockModal from "@/components/GeoBlockModal";
+import VelocityLoader from "@/components/VelocityLoader";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -192,17 +192,7 @@ export default function WalletPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
-        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
-          <Skeleton className="h-6 w-40 rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-xl" />
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-44 w-full rounded-xl" />
-        </div>
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
 

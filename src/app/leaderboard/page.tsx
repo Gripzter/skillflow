@@ -4,8 +4,8 @@ import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
-import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import VelocityLoader from "@/components/VelocityLoader";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
 import {
@@ -174,21 +174,7 @@ export default function LeaderboardPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
-        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
-          <Skeleton className="h-8 w-52 rounded-lg" />
-          <Skeleton className="h-5 w-72 rounded-md" />
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Skeleton className="h-28 rounded-xl" />
-            <Skeleton className="h-28 rounded-xl" />
-            <Skeleton className="h-28 rounded-xl" />
-          </div>
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-40 w-full rounded-xl" />
-        </div>
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   return (

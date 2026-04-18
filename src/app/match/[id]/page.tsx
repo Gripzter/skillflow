@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import Skeleton from "@/components/Skeleton";
+import VelocityLoader from "@/components/VelocityLoader";
 import {
   getCurrentUser,
   getMatch,
@@ -801,20 +801,7 @@ function MatchPageContent() {
   }
 
   if (loading || !match) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-4">
-        <div className="w-full max-w-2xl space-y-4 rounded-2xl border border-white/10 bg-card/40 p-5">
-          <Skeleton className="h-5 w-32 rounded-md" />
-          <Skeleton className="h-10 w-48 rounded-lg" />
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Skeleton className="h-28 rounded-xl" />
-            <Skeleton className="h-28 rounded-xl" />
-            <Skeleton className="h-28 rounded-xl" />
-          </div>
-          <Skeleton className="h-[260px] w-full rounded-xl" />
-        </div>
-      </div>
-    );
+    return <VelocityLoader />;
   }
 
   const safePlayer1 = match.player1 ?? { username: "Player 1", rating: 1000 };

@@ -3,26 +3,26 @@
 import type { CSSProperties } from "react";
 
 const THIN_STRIPES = [
-  { top: "4%", width: 2.2, duration: 0.74, delay: -0.14, tone: "orange" },
-  { top: "11%", width: 1.7, duration: 0.82, delay: -0.41, tone: "red" },
-  { top: "18%", width: 3.1, duration: 0.68, delay: -0.05, tone: "orange" },
-  { top: "25%", width: 2.6, duration: 0.91, delay: -0.58, tone: "red" },
-  { top: "32%", width: 4.1, duration: 0.79, delay: -0.24, tone: "orange" },
-  { top: "39%", width: 2.0, duration: 0.87, delay: -0.66, tone: "red" },
-  { top: "46%", width: 3.4, duration: 0.72, delay: -0.31, tone: "orange" },
-  { top: "53%", width: 1.9, duration: 0.95, delay: -0.52, tone: "red" },
-  { top: "60%", width: 4.4, duration: 0.69, delay: -0.19, tone: "orange" },
-  { top: "67%", width: 2.8, duration: 0.88, delay: -0.47, tone: "red" },
-  { top: "74%", width: 3.7, duration: 0.77, delay: -0.27, tone: "orange" },
-  { top: "82%", width: 2.3, duration: 0.84, delay: -0.62, tone: "red" },
+  { top: "4%", width: 2.2, duration: 2.8, delay: -0.0, tone: "orange" },
+  { top: "11%", width: 1.7, duration: 3.1, delay: -0.28, tone: "red" },
+  { top: "18%", width: 3.1, duration: 2.7, delay: -0.56, tone: "orange" },
+  { top: "25%", width: 2.6, duration: 3.4, delay: -0.84, tone: "red" },
+  { top: "32%", width: 4.1, duration: 2.9, delay: -1.12, tone: "orange" },
+  { top: "39%", width: 2.0, duration: 3.3, delay: -1.4, tone: "red" },
+  { top: "46%", width: 3.4, duration: 2.6, delay: -1.68, tone: "orange" },
+  { top: "53%", width: 1.9, duration: 3.5, delay: -1.96, tone: "red" },
+  { top: "60%", width: 4.4, duration: 2.8, delay: -2.24, tone: "orange" },
+  { top: "67%", width: 2.8, duration: 3.6, delay: -2.52, tone: "red" },
+  { top: "74%", width: 3.7, duration: 3.0, delay: -2.8, tone: "orange" },
+  { top: "82%", width: 2.3, duration: 3.8, delay: -3.08, tone: "red" },
 ] as const;
 
 const GLOW_STRIPES = [
-  { top: "9%", width: 14, duration: 0.98, delay: -0.11, tone: "orange" },
-  { top: "27%", width: 22, duration: 0.92, delay: -0.44, tone: "red" },
-  { top: "45%", width: 10, duration: 0.88, delay: -0.29, tone: "orange" },
-  { top: "63%", width: 30, duration: 0.95, delay: -0.56, tone: "red" },
-  { top: "79%", width: 18, duration: 0.9, delay: -0.36, tone: "orange" },
+  { top: "9%", width: 14, duration: 4.8, delay: -0.0, tone: "orange" },
+  { top: "27%", width: 22, duration: 5.6, delay: -0.6, tone: "red" },
+  { top: "45%", width: 10, duration: 4.4, delay: -1.2, tone: "orange" },
+  { top: "63%", width: 30, duration: 5.9, delay: -1.8, tone: "red" },
+  { top: "79%", width: 18, duration: 5.1, delay: -2.4, tone: "orange" },
 ] as const;
 
 function getStripeColors(tone: "orange" | "red") {
@@ -58,7 +58,7 @@ function toStripeStyle(
 export default function VelocityLoader() {
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-[#0E0E12]">
-      <div className="absolute inset-0">
+      <div className="animate-velocity-breathe absolute inset-0">
         {GLOW_STRIPES.map((stripe, index) => (
           <div
             key={`glow-${index}`}

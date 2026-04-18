@@ -9,6 +9,7 @@ import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import Skeleton from "@/components/Skeleton";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import VelocityLoader from "@/components/VelocityLoader";
 import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -194,6 +195,10 @@ export default function DashboardPage() {
   const greeting = getGreeting();
   const dashboardLocked = IS_SWEEPSTAKES_LAUNCH && !waitlistUnlocked;
   const isLoading = loading;
+
+  if (loading) {
+    return <VelocityLoader />;
+  }
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
