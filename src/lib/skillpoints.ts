@@ -19,6 +19,16 @@ export const SP_REWARDS = {
 
 export type RankTier = "bronze" | "silver" | "gold" | "platinum" | "diamond";
 
+type AwardMatchSpOptions = {
+  matchId?: string;
+  gameType?: string;
+};
+
+type StreakBonusOptions = {
+  matchId?: string;
+  gameType?: string;
+};
+
 type SpResult =
   | { success: true; amount: number; balanceSp: number; lifetimeSp?: number; rankTier?: RankTier }
   | { success: false; error: string };
@@ -63,7 +73,19 @@ export function calculateRankTier(lifetimeSp: number): string {
   return "bronze";
 }
 
-export async function awardMatchSP(userId: string, won: boolean): Promise<SpResult> {
+function buildMatchContextSuffix(options?: { matchId?: string; gameType?: string }): string {
+  const parts: string[] = [];
+  if (options?.matchId) parts.push(`match:${options.matchId}`);
+  if (options?.gameType) parts.push(`game:${options.gameType}`);
+  if (parts.length === 0) return "";
+  return ` [${parts.join(" ")}]`;
+}
+
+export async function awardMatchSP(
+  userId: string,
+  won: boolean,
+  options?: AwardMatchSpOptions
+): Promise<SpResult> {
   const supabase = createClient();
   if (!supabase) {
     return { success: false, error: "Supabase is not configured." };
@@ -77,6 +99,31 @@ export async function awardMatchSP(userId: string, won: boolean): Promise<SpResu
 
   if (profileError || !profile) {
     return { success: false, error: "Failed to load user SP profile." };
+  }
+
+  const matchContext = buildMatchContextSuffix(options);
+  if (options?.matchId) {
+    const { data: existingMatchReward, error: existingMatchRewardError } = await supabase
+      .from("sp_transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .in("type", ["match_win", "match_loss"])
+      .ilike("description", `%match:${options.matchId}%`)
+      .limit(1);
+
+    if (existingMatchRewardError) {
+      return { success: false, error: "Failed to validate existing match SP reward." };
+    }
+
+    if (existingMatchReward && existingMatchReward.length > 0) {
+      return {
+        success: true,
+        amount: 0,
+        balanceSp: Number(profile.balance_sp ?? 0),
+        lifetimeSp: Number(profile.lifetime_sp ?? 0),
+        rankTier: calculateRankTier(Number(profile.lifetime_sp ?? 0)) as RankTier,
+      };
+    }
   }
 
   const baseAmount = won ? SP_REWARDS.MATCH_WIN : SP_REWARDS.MATCH_LOSS;
@@ -123,7 +170,9 @@ export async function awardMatchSP(userId: string, won: boolean): Promise<SpResu
     user_id: userId,
     amount: baseAmount,
     type: matchType,
-    description: won ? "SP reward for match win" : "SP reward for match loss",
+    description:
+      (won ? "SP reward for match win" : "SP reward for match loss") +
+      matchContext,
   });
 
   if (txError) {
@@ -135,7 +184,7 @@ export async function awardMatchSP(userId: string, won: boolean): Promise<SpResu
       user_id: userId,
       amount: dailyBonus,
       type: "daily_bonus",
-      description: "Daily first match bonus",
+      description: `Daily first match bonus${matchContext}`,
     });
 
     if (dailyTxError) {
@@ -146,6 +195,116 @@ export async function awardMatchSP(userId: string, won: boolean): Promise<SpResu
   return {
     success: true,
     amount: totalAward,
+    balanceSp: nextBalance,
+    lifetimeSp: nextLifetime,
+    rankTier: nextTier,
+  };
+}
+
+export async function awardStreakBonusIfEligible(
+  userId: string,
+  options?: StreakBonusOptions
+): Promise<SpResult> {
+  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("lifetime_sp, balance_sp")
+    .eq("id", userId)
+    .single();
+
+  if (profileError || !profile) {
+    return { success: false, error: "Failed to load user SP profile." };
+  }
+
+  if (options?.matchId) {
+    const { data: existingStreakBonus, error: existingStreakBonusError } = await supabase
+      .from("sp_transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("type", "streak_bonus")
+      .ilike("description", `%match:${options.matchId}%`)
+      .limit(1);
+
+    if (existingStreakBonusError) {
+      return { success: false, error: "Failed to validate existing streak bonus." };
+    }
+
+    if (existingStreakBonus && existingStreakBonus.length > 0) {
+      return {
+        success: true,
+        amount: 0,
+        balanceSp: Number(profile.balance_sp ?? 0),
+        lifetimeSp: Number(profile.lifetime_sp ?? 0),
+        rankTier: calculateRankTier(Number(profile.lifetime_sp ?? 0)) as RankTier,
+      };
+    }
+  }
+
+  const { data: recentOutcomes, error: outcomesError } = await supabase
+    .from("sp_transactions")
+    .select("type")
+    .eq("user_id", userId)
+    .in("type", ["match_win", "match_loss"])
+    .order("created_at", { ascending: false })
+    .limit(3);
+
+  if (outcomesError) {
+    return { success: false, error: "Failed to check recent match outcomes for streak bonus." };
+  }
+
+  const streakEligible =
+    !!recentOutcomes &&
+    recentOutcomes.length === 3 &&
+    recentOutcomes.every((row) => row.type === "match_win");
+
+  if (!streakEligible) {
+    return {
+      success: true,
+      amount: 0,
+      balanceSp: Number(profile.balance_sp ?? 0),
+      lifetimeSp: Number(profile.lifetime_sp ?? 0),
+      rankTier: calculateRankTier(Number(profile.lifetime_sp ?? 0)) as RankTier,
+    };
+  }
+
+  const currentLifetime = Number(profile.lifetime_sp ?? 0);
+  const currentBalance = Number(profile.balance_sp ?? 0);
+  const nextLifetime = currentLifetime + SP_REWARDS.STREAK_BONUS;
+  const nextBalance = currentBalance + SP_REWARDS.STREAK_BONUS;
+  const nextTier = calculateRankTier(nextLifetime) as RankTier;
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      lifetime_sp: nextLifetime,
+      balance_sp: nextBalance,
+      rank_tier: nextTier,
+    })
+    .eq("id", userId);
+
+  if (updateError) {
+    return { success: false, error: "Failed to update profile for streak bonus." };
+  }
+
+  const matchContext = buildMatchContextSuffix(options);
+  const { error: txError } = await supabase.from("sp_transactions").insert({
+    user_id: userId,
+    amount: SP_REWARDS.STREAK_BONUS,
+    type: "streak_bonus",
+    description: `3-win streak bonus${matchContext}`,
+  });
+
+  if (txError) {
+    return { success: false, error: "Failed to log streak bonus transaction." };
+  }
+
+  return {
+    success: true,
+    amount: SP_REWARDS.STREAK_BONUS,
     balanceSp: nextBalance,
     lifetimeSp: nextLifetime,
     rankTier: nextTier,

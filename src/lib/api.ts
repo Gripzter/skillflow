@@ -31,6 +31,7 @@ import {
   getPracticeStats,
 } from "@/lib/practice-matches";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
+import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
@@ -41,6 +42,12 @@ const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   checkers: "Checkers",
   "spelling-bee": "Spelling Bee",
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string | null | undefined): value is string {
+  return !!value && UUID_RE.test(value);
+}
 
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false;
@@ -543,14 +550,6 @@ export async function completeMatchAndSettle(
   match: StoredMatch,
   outcome: "player1" | "player2" | "draw"
 ): Promise<void> {
-  if (match.isPractice) {
-    await updateMatch(match.id, {
-      status: "completed",
-      winner: outcome === "draw" ? undefined : outcome,
-    });
-    return;
-  }
-
   const currentUser = await getCurrentUser();
   const currentUserId = currentUser?.id;
 
@@ -561,6 +560,81 @@ export async function completeMatchAndSettle(
       (outcome === "player2" && match.player2Id === currentUserId));
   const didDraw = outcome === "draw";
   const didLoss = !isWinner && !didDraw;
+
+  async function awardSkillPointsForMatchResult() {
+    const awardedIds = new Set<string>();
+    const targets: Array<{ userId: string; won: boolean }> = [];
+
+    const roleOutcome = (role: "player1" | "player2"): boolean =>
+      outcome === "draw" ? false : outcome === role;
+
+    if (isUuid(match.player1Id)) {
+      targets.push({ userId: match.player1Id, won: roleOutcome("player1") });
+      awardedIds.add(match.player1Id);
+    }
+    if (isUuid(match.player2Id) && !awardedIds.has(match.player2Id)) {
+      targets.push({ userId: match.player2Id, won: roleOutcome("player2") });
+      awardedIds.add(match.player2Id);
+    }
+
+    // Practice / bot matches may not carry player IDs on the match object.
+    // In those cases, award only the authenticated human player.
+    if (targets.length === 0 && isUuid(currentUserId)) {
+      targets.push({
+        userId: currentUserId,
+        won: outcome === "draw" ? false : outcome === "player1",
+      });
+    }
+
+    for (const target of targets) {
+      try {
+        const awardResult = await awardMatchSP(target.userId, target.won, {
+          matchId: match.id,
+          gameType: match.gameType,
+        });
+        if (!awardResult.success) {
+          // eslint-disable-next-line no-console
+          console.error("[SP] Match reward failed", {
+            matchId: match.id,
+            userId: target.userId,
+            error: awardResult.error,
+          });
+          continue;
+        }
+
+        if (target.won) {
+          const streakResult = await awardStreakBonusIfEligible(target.userId, {
+            matchId: match.id,
+            gameType: match.gameType,
+          });
+          if (!streakResult.success) {
+            // eslint-disable-next-line no-console
+            console.error("[SP] Streak bonus failed", {
+              matchId: match.id,
+              userId: target.userId,
+              error: streakResult.error,
+            });
+          }
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[SP] Unexpected SP award error", {
+          matchId: match.id,
+          userId: target.userId,
+          error,
+        });
+      }
+    }
+  }
+
+  if (match.isPractice) {
+    await updateMatch(match.id, {
+      status: "completed",
+      winner: outcome === "draw" ? undefined : outcome,
+    });
+    await awardSkillPointsForMatchResult();
+    return;
+  }
 
   async function updateGameStatsForCurrentUser() {
     if (isDevMode()) return;
@@ -607,6 +681,7 @@ export async function completeMatchAndSettle(
     }
     await updateMatch(match.id, { status: "completed", winner: outcome });
     await updateGameStatsForCurrentUser();
+    await awardSkillPointsForMatchResult();
     return;
   }
 
@@ -618,6 +693,7 @@ export async function completeMatchAndSettle(
   );
   await updateMatch(match.id, { status: "completed", winner: "draw" });
   await updateGameStatsForCurrentUser();
+  await awardSkillPointsForMatchResult();
 }
 
 // ============ LEADERBOARD ============
