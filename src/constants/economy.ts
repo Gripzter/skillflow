@@ -10,7 +10,7 @@ export const SKILL_POINTS_ICON = "SP";
 export const WEEKLY_PRIZE_POOL_USD = 100;
 
 export const PRIZE_POOL_BANNER_TEXT =
-  "Weekly Alpha Tournament: $100 Prize Pool. Play for Free. Win for Real.";
+  "Beta Season Live — Earn SkillPoints. Climb Ranks. Unlock Founders Rewards.";
 
 export const WAITLIST_EMAIL_KEY = "skillflow_waitlist_email";
 export const WAITLIST_UNLOCKED_KEY = "skillflow_waitlist_unlocked";

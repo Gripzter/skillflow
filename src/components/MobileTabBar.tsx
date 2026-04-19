@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { Ellipsis, Gamepad2, House, Trophy, User, Wallet } from "lucide-react";
-import { IS_SWEEPSTAKES_LAUNCH, SKILL_POINTS_ICON } from "@/constants/economy";
+import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 
 const TABS: readonly {
   href: string;
@@ -33,11 +33,12 @@ export default function MobileTabBar() {
     return null;
   }
 
-  const tabs = (isPractice ? TABS.filter((t) => t.href !== "/wallet") : TABS).map((tab) =>
-    tab.href === "/wallet" && IS_SWEEPSTAKES_LAUNCH
-      ? { ...tab, label: SKILL_POINTS_ICON }
-      : tab
-  );
+  const tabs = (isPractice ? TABS.filter((t) => t.href !== "/wallet") : TABS).map((tab) => {
+    if (tab.href === "/wallet" && IS_SWEEPSTAKES_LAUNCH) {
+      return { ...tab, href: "/skillpoints", label: "SP" };
+    }
+    return tab;
+  });
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {
       window.location.href = href;

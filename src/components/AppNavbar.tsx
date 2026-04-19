@@ -9,8 +9,6 @@ import { getUserSPData } from "@/lib/skillpoints";
 import {
   IS_SWEEPSTAKES_LAUNCH,
   PRIZE_POOL_BANNER_TEXT,
-  SKILL_POINTS_ICON,
-  SKILL_POINTS_NAME,
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 
@@ -89,7 +87,6 @@ export default function AppNavbar({
   }, []);
 
   const balanceFormatted = formatCurrency(balance);
-  const walletLabel = IS_SWEEPSTAKES_LAUNCH ? SKILL_POINTS_NAME : "Wallet";
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {
       window.location.href = href;
@@ -130,7 +127,7 @@ export default function AppNavbar({
           >
             Dashboard
           </button>
-          {!isPractice && (
+          {!isPractice && !IS_SWEEPSTAKES_LAUNCH && (
             <button
               type="button"
               onClick={() => goTo("/wallet")}
@@ -140,7 +137,7 @@ export default function AppNavbar({
                   : "text-body-gray hover:text-white"
               }`}
             >
-              {walletLabel}
+              Wallet
             </button>
           )}
           <button
@@ -193,21 +190,10 @@ export default function AppNavbar({
 
         <div className="flex items-center gap-2 sm:gap-4">
           <ConnectionBadge />
-          {!isPractice && (
+          {!isPractice && !IS_SWEEPSTAKES_LAUNCH && (
             <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/15 bg-card/60 px-3 py-2 shadow-[0_0_16px_rgba(16,185,129,0.35)]">
               <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-              <span className="text-sm font-bold text-white">
-                {IS_SWEEPSTAKES_LAUNCH ? (
-                  <>
-                    <span className="mr-1 inline-flex items-center rounded border border-purple-400/40 bg-purple-500/20 px-1 py-[1px] text-[10px] font-semibold text-purple-200">
-                      {SKILL_POINTS_ICON}
-                    </span>
-                    {balanceFormatted.replace(` ${SKILL_POINTS_ICON}`, "")}
-                  </>
-                ) : (
-                  balanceFormatted
-                )}
-              </span>
+              <span className="text-sm font-bold text-white">{balanceFormatted}</span>
             </div>
           )}
 

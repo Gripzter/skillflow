@@ -79,6 +79,10 @@ export default function WalletPage() {
   useEffect(() => {
     async function load() {
       try {
+        if (IS_SWEEPSTAKES_LAUNCH) {
+          router.replace("/skillpoints");
+          return;
+        }
         const user = await getCurrentUser();
         if (!user) {
           router.push("/login");
