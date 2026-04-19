@@ -12,6 +12,7 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
+import FoundersReward from "@/components/FoundersReward";
 import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
@@ -277,6 +278,10 @@ export default function DashboardPage() {
           <div className="mt-4">
             <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
           </div>
+        </section>
+
+        <section className="animate-fade-in" style={{ animationDelay: "60ms" }}>
+          <FoundersReward lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
         </section>
 
         {/* 2. Featured game banner – Last Touch */}

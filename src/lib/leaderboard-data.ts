@@ -50,6 +50,8 @@ export interface LeaderboardPlayer {
   totalMatches: number;
   winRate: number;
   totalEarnings: number;
+  lifetimeSp?: number;
+  rankTier?: string;
   trend: "up" | "down";
   wins?: number;
   losses?: number;
@@ -122,7 +124,7 @@ export function formatWinRate(rate: number): string {
   return `${n.toFixed(1)}%`;
 }
 
-export type LeaderboardTab = "earnings" | "winRate" | "matches" | "rating";
+export type LeaderboardTab = "skillpoints" | "earnings" | "winRate" | "matches" | "rating";
 
 export function sortAndRankPlayers(
   players: LeaderboardPlayer[],
@@ -130,6 +132,8 @@ export function sortAndRankPlayers(
 ): LeaderboardPlayer[] {
   const sorted = [...players].sort((a, b) => {
     switch (tab) {
+      case "skillpoints":
+        return (b.lifetimeSp ?? 0) - (a.lifetimeSp ?? 0);
       case "earnings":
         return b.totalEarnings - a.totalEarnings;
       case "winRate":
@@ -147,6 +151,8 @@ export function sortAndRankPlayers(
 
 export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): string | number {
   switch (tab) {
+    case "skillpoints":
+      return `${(player.lifetimeSp ?? 0).toLocaleString()} SP`;
     case "earnings":
       return formatCurrency(player.totalEarnings);
     case "winRate":
@@ -162,6 +168,8 @@ export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): str
 
 export function getSecondaryStat(player: LeaderboardPlayer, tab: LeaderboardTab): string {
   switch (tab) {
+    case "skillpoints":
+      return `${player.rankTier?.toUpperCase() ?? "BRONZE"} tier`;
     case "earnings":
     case "winRate":
     case "rating":

@@ -6,8 +6,10 @@ import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
+import RankBadge from "@/components/RankBadge";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
+import { createClient } from "@/lib/supabase";
 import {
   sortAndRankPlayers,
   getMainStat,
@@ -20,9 +22,10 @@ import { IS_SWEEPSTAKES_LAUNCH, PRIZE_POOL_BANNER_TEXT } from "@/constants/econo
 import { formatCurrency } from "@/lib/formatCurrency";
 
 const TABS: { id: LeaderboardTab; label: string }[] = [
+  { id: "skillpoints", label: "SkillPoints" },
   { id: "earnings", label: "Top Earners" },
-  { id: "winRate", label: "Highest Win Rate" },
   { id: "matches", label: "Most Matches" },
+  { id: "winRate", label: "Highest Win Rate" },
   { id: "rating", label: "Skill Rating" },
 ];
 const PAGE_SIZE = 20;
@@ -33,6 +36,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const [rawPlayers, setRawPlayers] = useState<LeaderboardPlayer[]>([]);
   const [practicePlayers, setPracticePlayers] = useState<LeaderboardPlayer[]>([]);
@@ -40,18 +44,43 @@ export default function LeaderboardPage() {
   const playersByTabRef = useRef<Partial<Record<LeaderboardTab, LeaderboardPlayer[]>>>({});
   const [displayedRealPlayers, setDisplayedRealPlayers] = useState<LeaderboardPlayer[]>([]);
   const [isTabRevalidating, setIsTabRevalidating] = useState(false);
-  const [activeTab, setActiveTab] = useState<LeaderboardTab>("earnings");
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>("skillpoints");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { isPractice } = usePlayMode();
 
-  const fetchRankedPlayersForTab = useCallback(async (tab: LeaderboardTab, currentUsername: string) => {
+  const fetchRankedPlayersForTab = useCallback(async (tab: LeaderboardTab, currentUser: { id: string; username: string }) => {
+    if (tab === "skillpoints") {
+      const supabase = createClient();
+      if (!supabase) return [];
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, username, lifetime_sp, rank_tier")
+        .order("lifetime_sp", { ascending: false })
+        .limit(100);
+
+      const players: LeaderboardPlayer[] = (data ?? []).map((player) => ({
+        id: player.id,
+        username: player.username ?? "Player",
+        avatarGradient: "from-teal/40 to-purple/40",
+        skillRating: 1000,
+        totalMatches: 0,
+        winRate: 0,
+        totalEarnings: 0,
+        lifetimeSp: Number(player.lifetime_sp ?? 0),
+        rankTier: player.rank_tier ?? "bronze",
+        trend: "up",
+        isCurrentUser: player.id === currentUser.id,
+      }));
+      return sortAndRankPlayers(players, tab);
+    }
+
     const sortBy = tab === "rating" ? "skill_rating" : "total_earnings";
     const apiPlayers = await getLeaderboard(sortBy);
     const basePlayers: LeaderboardPlayer[] =
       apiPlayers?.map((p) => ({
         ...p,
-        isCurrentUser: p.username === currentUsername,
+        isCurrentUser: p.id === currentUser.id,
       })) ?? [];
     return sortAndRankPlayers(buildLeaderboard(basePlayers), tab);
   }, []);
@@ -64,12 +93,13 @@ export default function LeaderboardPage() {
           router.push("/login");
           return;
         }
+        setCurrentUserId(user.id);
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        const ranked = await fetchRankedPlayersForTab("earnings", user.username);
+        const ranked = await fetchRankedPlayersForTab("skillpoints", { id: user.id, username: user.username });
         setRawPlayers(ranked);
         setDisplayedRealPlayers(ranked);
-        const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { earnings: ranked };
+        const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { skillpoints: ranked };
         playersByTabRef.current = initialByTab;
         setPlayersByTab(initialByTab);
         const practice = getPracticeMatches();
@@ -118,7 +148,7 @@ export default function LeaderboardPage() {
       setDisplayedRealPlayers(cached);
     }
     setIsTabRevalidating(true);
-    void fetchRankedPlayersForTab(activeTab, username)
+    void fetchRankedPlayersForTab(activeTab, { id: currentUserId, username })
       .then((fresh) => {
         if (cancelled) return;
         setRawPlayers(fresh);
@@ -137,7 +167,7 @@ export default function LeaderboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, fetchRankedPlayersForTab, isPractice, loading, username]);
+  }, [activeTab, currentUserId, fetchRankedPlayersForTab, isPractice, loading, username]);
 
   const filteredPlayers = useMemo(() => {
     const source = isPractice ? sortedPractice : displayedRealPlayers;
@@ -146,8 +176,9 @@ export default function LeaderboardPage() {
     return source.filter((p) => p.username.toLowerCase().includes(q));
   }, [displayedRealPlayers, sortedPractice, search, isPractice]);
 
-  const podium = filteredPlayers.slice(0, 3);
-  const tablePlayers = filteredPlayers.slice(3);
+  const showPodium = isPractice || activeTab !== "skillpoints";
+  const podium = showPodium ? filteredPlayers.slice(0, 3) : [];
+  const tablePlayers = showPodium ? filteredPlayers.slice(3) : filteredPlayers;
   const visibleCount = page * PAGE_SIZE;
   const visiblePlayers = tablePlayers.slice(0, visibleCount);
   const hasMore = visibleCount < tablePlayers.length;
@@ -201,6 +232,8 @@ export default function LeaderboardPage() {
         <p className="mt-1 text-body-gray">
           {isPractice
             ? "Ranked by practice matches played"
+            : activeTab === "skillpoints"
+              ? "Top 100 players ranked by lifetime SkillPoints"
             : IS_SWEEPSTAKES_LAUNCH
               ? "Weekly alpha standings. Top players split the $100 prize pool."
               : "See how you stack up against the competition"}
@@ -235,6 +268,7 @@ export default function LeaderboardPage() {
         )}
 
         {/* Podium - Top 3 */}
+        {showPodium && (
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-6">
           {podium[1] && (
             <div
@@ -292,6 +326,7 @@ export default function LeaderboardPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* Search + Table */}
         <div className="mt-8">
@@ -322,19 +357,33 @@ export default function LeaderboardPage() {
                   <tr className="border-b border-white/5 bg-card">
                     <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
                     <th className="px-4 py-3 font-medium text-body-gray">Player</th>
-                    <th className="px-4 py-3 font-medium text-body-gray">Rating</th>
-                    <th className="px-4 py-3 font-medium text-body-gray">W / L</th>
-                    <th className="px-4 py-3 font-medium text-body-gray">Top Game</th>
-                    <th className="px-4 py-3 font-medium text-body-gray">Earnings</th>
+                    {activeTab === "skillpoints" ? (
+                      <th className="px-4 py-3 font-medium text-body-gray">Lifetime SP</th>
+                    ) : (
+                      <>
+                        <th className="px-4 py-3 font-medium text-body-gray">Rating</th>
+                        <th className="px-4 py-3 font-medium text-body-gray">W / L</th>
+                        <th className="px-4 py-3 font-medium text-body-gray">Top Game</th>
+                        <th className="px-4 py-3 font-medium text-body-gray">Earnings</th>
+                      </>
+                    )}
                   </tr>
                 )}
               </thead>
               <tbody>
                 {visiblePlayers.map((player, i) => {
-                  const rank = i + 4;
+                  const rank = i + (showPodium ? 4 : 1);
                   const rowBaseClasses = `border-b border-white/5 transition-colors ${
                     rank % 2 === 0 ? "bg-card" : "bg-[#1A1A22]"
-                  } ${player.isCurrentUser ? (isPractice ? "bg-purple-500/10" : "bg-teal/10") : ""}`;
+                  } ${
+                    activeTab === "skillpoints" && player.id === currentUserId
+                      ? "bg-[#FF5E00]/8"
+                      : player.isCurrentUser
+                        ? isPractice
+                          ? "bg-purple-500/10"
+                          : "bg-teal/10"
+                        : ""
+                  }`;
 
                   if (isPractice) {
                     return (
@@ -374,30 +423,46 @@ export default function LeaderboardPage() {
                   return (
                     <tr
                       key={player.id}
-                      className={`${rowBaseClasses} hover:border-l-2 hover:border-l-teal`}
+                      className={`${rowBaseClasses} ${
+                        activeTab === "skillpoints" && player.id === currentUserId
+                          ? "border-l-2 border-l-[#FF5E00]"
+                          : "hover:border-l-2 hover:border-l-teal"
+                      }`}
                     >
                       <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
-                          >
-                            {player.username.charAt(0)}
-                          </div>
+                          {activeTab === "skillpoints" ? (
+                            <RankBadge tier={player.rankTier ?? "bronze"} />
+                          ) : (
+                            <div
+                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
+                            >
+                              {player.username.charAt(0)}
+                            </div>
+                          )}
                           <span className="font-medium text-white">{player.username}</span>
                           {player.isCurrentUser && (
                             <span className="rounded px-2 py-0.5 text-xs bg-teal/20 text-teal">You</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-white">{player.skillRating}</td>
-                      <td className="px-4 py-3 text-body-gray">
-                        {wins}W - {losses}L
-                      </td>
-                      <td className="px-4 py-3 text-body-gray">
-                        {getTopGameEmoji(topGame)} {topGame}
-                      </td>
-                      <td className={`px-4 py-3 font-semibold ${earningsClass}`}>{formatCurrency(earnings)}</td>
+                      {activeTab === "skillpoints" ? (
+                        <td className="px-4 py-3 font-semibold text-white">
+                          {(player.lifetimeSp ?? 0).toLocaleString()} SP
+                        </td>
+                      ) : (
+                        <>
+                          <td className="px-4 py-3 font-semibold text-white">{player.skillRating}</td>
+                          <td className="px-4 py-3 text-body-gray">
+                            {wins}W - {losses}L
+                          </td>
+                          <td className="px-4 py-3 text-body-gray">
+                            {getTopGameEmoji(topGame)} {topGame}
+                          </td>
+                          <td className={`px-4 py-3 font-semibold ${earningsClass}`}>{formatCurrency(earnings)}</td>
+                        </>
+                      )}
                     </tr>
                   );
                 })}
@@ -408,21 +473,29 @@ export default function LeaderboardPage() {
           {/* Mobile cards */}
           <div className="space-y-2 md:hidden">
             {visiblePlayers.map((player, i) => {
-              const rank = i + 4;
+              const rank = i + (showPodium ? 4 : 1);
               return (
                 <div
                   key={player.id}
                   className={`card-border flex items-center justify-between gap-3 rounded-card p-4 ${
-                    player.isCurrentUser ? (isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10") : ""
+                    activeTab === "skillpoints" && player.id === currentUserId
+                      ? "border-[#FF5E00]/60 bg-[#FF5E00]/10"
+                      : player.isCurrentUser
+                        ? (isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10")
+                        : ""
                   }`}
                 >
                   <p className="w-8 shrink-0 text-body-gray">#{rank}</p>
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
-                    >
-                      {player.username.charAt(0)}
-                    </div>
+                    {activeTab === "skillpoints" ? (
+                      <RankBadge tier={player.rankTier ?? "bronze"} />
+                    ) : (
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
+                      >
+                        {player.username.charAt(0)}
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <p className="font-medium text-white truncate">{player.username}</p>
                       <p className="text-xs text-body-gray">
@@ -438,7 +511,13 @@ export default function LeaderboardPage() {
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-semibold text-white">{isPractice ? player.totalMatches : getMainStat(player, activeTab)}</p>
+                    <p className="font-semibold text-white">
+                      {activeTab === "skillpoints"
+                        ? `${(player.lifetimeSp ?? 0).toLocaleString()} SP`
+                        : isPractice
+                          ? player.totalMatches
+                          : getMainStat(player, activeTab)}
+                    </p>
                     {!isPractice && (
                       <span className={player.trend === "up" ? "text-emerald-400" : "text-red-400"}>
                         {player.trend === "up" ? "↑" : "↓"}
