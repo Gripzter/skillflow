@@ -17,7 +17,6 @@ import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
-  getWalletBalance,
   getMatches,
   getTransactions,
   getLeaderboard,
@@ -31,6 +30,7 @@ import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { buildLeaderboard } from "@/lib/leaderboard-seeding";
 import {
   IS_SWEEPSTAKES_LAUNCH,
+  LAST_TOUCH_FEATURED_PRIZE_POOL_SP,
   WAITLIST_UNLOCKED_KEY,
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
@@ -52,6 +52,11 @@ function formatTimeAgo(createdAt: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+function formatTierLabel(tier: string): string {
+  if (!tier) return "Bronze";
+  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
 }
 
 const QUICK_GAMES = [
@@ -81,7 +86,6 @@ export default function DashboardPage() {
   const [isDevMode, setIsDevMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [balance, setBalance] = useState(0);
   const [matches, setMatches] = useState<StoredMatch[]>([]);
   const [practiceMatches, setPracticeMatches] = useState<StoredMatch[]>([]);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
@@ -107,14 +111,12 @@ export default function DashboardPage() {
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
 
-        const [bal, matchList, txs, apiLeaderboard, userSpData] = await Promise.all([
-          getWalletBalance(),
+        const [matchList, txs, apiLeaderboard, userSpData] = await Promise.all([
           getMatches(),
           getTransactions(),
           getLeaderboard("total_earnings"),
           getUserSPData(user.id),
         ]);
-        setBalance(bal);
         setMatches(matchList as StoredMatch[]);
         setTransactions(txs);
         if (userSpData) {
@@ -237,8 +239,8 @@ export default function DashboardPage() {
       <ModeToggleBarContent />
 
       <main className="relative mx-auto flex max-w-[1000px] flex-col gap-8 px-4 py-8 pb-24 md:px-6">
-        {/* 1. Greeting + inline balance chip */}
-        <section className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between animate-fade-in">
+        {/* 1. Greeting */}
+        <section className="animate-fade-in">
           <div>
             <Skeleton isLoading={isLoading} className="inline-block rounded-md">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
@@ -250,16 +252,6 @@ export default function DashboardPage() {
                 {username}
               </h1>
             </Skeleton>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="inline-flex items-center rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-body-gray">
-              <span className="mr-1 text-[10px] uppercase tracking-[0.16em] text-gray-500">
-                Balance
-              </span>
-              <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
-                <span className="font-medium text-gray-100">{formatCurrency(balance)}</span>
-              </Skeleton>
-            </div>
           </div>
         </section>
 
@@ -328,7 +320,7 @@ export default function DashboardPage() {
                   </p>
                   <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
                     <p className="text-xl font-semibold text-white">
-                      {formatCurrency(1247)}
+                      {LAST_TOUCH_FEATURED_PRIZE_POOL_SP.toLocaleString()} SP
                     </p>
                   </Skeleton>
                 </div>
@@ -455,7 +447,9 @@ export default function DashboardPage() {
                     {totalMatches > 0 ? `${winRate.toFixed(1)}%` : "0.0%"}
                   </Skeleton>
                 </p>
-                <p className="mt-0.5 text-[11px] text-body-gray">Real-money matches</p>
+                <p className="mt-0.5 text-[11px] text-body-gray">
+                  {IS_SWEEPSTAKES_LAUNCH ? "All matches" : "Real-money matches"}
+                </p>
               </div>
             </div>
 
@@ -478,33 +472,37 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Net Earnings */}
+            {/* Net Earnings / Lifetime SP */}
             <div className="card-border relative min-w-[172px] overflow-hidden rounded-card border-emerald-400/40 bg-card/80 px-3 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(42,58,92,0.5)] sm:min-w-0">
               <div className="pointer-events-none absolute inset-0 rounded-card bg-gradient-to-br from-teal/30 via-emerald-500/10 to-transparent opacity-40" />
               <div className="pointer-events-none absolute -right-6 -top-6 h-12 w-12 rounded-full bg-emerald-400/25 blur-xl" />
               <div className="relative">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">
-                    Net Earnings
+                    {IS_SWEEPSTAKES_LAUNCH ? "Total SP Earned" : "Net Earnings"}
                   </span>
                 </div>
                 <div className="mt-1 flex items-baseline gap-1">
                   <span
                     className={`text-lg font-semibold ${
-                      netEarnings >= 0 ? "text-emerald-300" : "text-red-400"
+                      IS_SWEEPSTAKES_LAUNCH || netEarnings >= 0 ? "text-emerald-300" : "text-red-400"
                     }`}
                   >
                     <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
-                      {formatCurrency(netEarnings)}
+                      {IS_SWEEPSTAKES_LAUNCH
+                        ? `${spData.lifetimeSp.toLocaleString()} SP`
+                        : formatCurrency(netEarnings)}
                     </Skeleton>
                   </span>
-                  {netEarnings > 0 && (
+                  {!IS_SWEEPSTAKES_LAUNCH && netEarnings > 0 && (
                     <span className="text-[10px] text-emerald-300">
                       ↑
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 text-[11px] text-body-gray">Wins minus entries</p>
+                <p className="mt-0.5 text-[11px] text-body-gray">
+                  {IS_SWEEPSTAKES_LAUNCH ? "Lifetime SkillPoints" : "Wins minus entries"}
+                </p>
               </div>
             </div>
 
@@ -520,11 +518,19 @@ export default function DashboardPage() {
                 </div>
                 <p className="mt-1 text-lg font-semibold text-gray-50">
                   <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
-                    {playerRank ? `#${playerRank.toLocaleString()}` : "Unranked"}
+                    {IS_SWEEPSTAKES_LAUNCH
+                      ? formatTierLabel(spData.rankTier)
+                      : playerRank
+                        ? `#${playerRank.toLocaleString()}`
+                        : "Unranked"}
                   </Skeleton>
                 </p>
                 <p className="mt-0.5 text-[11px] text-body-gray">
-                  {playerRank ? "Global position" : "Play 10 matches to rank"}
+                  {IS_SWEEPSTAKES_LAUNCH
+                    ? "Based on lifetime SP"
+                    : playerRank
+                      ? "Global position"
+                      : "Play 10 matches to rank"}
                 </p>
               </div>
             </div>

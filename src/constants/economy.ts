@@ -8,6 +8,7 @@ export const IS_SWEEPSTAKES_LAUNCH = LAUNCH_MODE === "SWEEPSTAKES";
 export const SKILL_POINTS_NAME = "SkillPoints";
 export const SKILL_POINTS_ICON = "SP";
 export const WEEKLY_PRIZE_POOL_USD = 100;
+export const LAST_TOUCH_FEATURED_PRIZE_POOL_SP = 1247;
 
 export const PRIZE_POOL_BANNER_TEXT =
   "Beta Season Live — Earn SkillPoints. Climb Ranks. Unlock Founders Rewards.";

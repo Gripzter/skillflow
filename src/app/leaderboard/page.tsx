@@ -18,7 +18,7 @@ import {
   type LeaderboardTab,
 } from "@/lib/leaderboard-data";
 import { buildLeaderboard, getTopGameEmoji } from "@/lib/leaderboard-seeding";
-import { IS_SWEEPSTAKES_LAUNCH, PRIZE_POOL_BANNER_TEXT } from "@/constants/economy";
+import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 
 const TABS: { id: LeaderboardTab; label: string }[] = [
@@ -221,11 +221,6 @@ export default function LeaderboardPage() {
       <ModeToggleBarContent />
 
       <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
-        {IS_SWEEPSTAKES_LAUNCH ? (
-          <div className="mb-5 rounded-lg border border-amber-300/30 bg-amber-500/10 px-4 py-3 text-sm font-medium text-amber-100">
-            {PRIZE_POOL_BANNER_TEXT}
-          </div>
-        ) : null}
         <h1 className="text-2xl font-bold text-white sm:text-3xl">
           {isPractice ? "Practice Leaderboard" : "Leaderboard"}
         </h1>
