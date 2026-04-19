@@ -25,7 +25,7 @@ interface AppNavbarProps {
   isDevMode: boolean;
   onLogout: () => void;
   loggingOut: boolean;
-  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals" | "skillpoints";
+  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals" | "skillpoints" | "cases";
 }
 
 export default function AppNavbar({
@@ -150,6 +150,17 @@ export default function AppNavbar({
             }`}
           >
             SkillPoints
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo("/cases")}
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPage === "cases"
+                ? "active bg-white/10 text-white"
+                : "text-body-gray hover:text-white"
+            }`}
+          >
+            Cases
           </button>
           <button
             type="button"

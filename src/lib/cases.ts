@@ -40,7 +40,7 @@ export const CASE_TIERS: Record<string, CaseTier> = {
   gold: {
     id: "gold",
     name: "Gold Case",
-    cost_sp: 600,
+    cost_sp: 500,
     loot_table: [
       { item_type: "sp", item_id: "sp_180", item_name: "180 SP", rarity: "common", value: 180, weight: 20 },
       { item_type: "sp", item_id: "sp_320", item_name: "320 SP", rarity: "uncommon", value: 320, weight: 20 },
@@ -56,7 +56,7 @@ export const CASE_TIERS: Record<string, CaseTier> = {
   diamond: {
     id: "diamond",
     name: "Diamond Case",
-    cost_sp: 1400,
+    cost_sp: 1000,
     loot_table: [
       { item_type: "sp", item_id: "sp_500", item_name: "500 SP", rarity: "common", value: 500, weight: 18 },
       { item_type: "sp", item_id: "sp_850", item_name: "850 SP", rarity: "uncommon", value: 850, weight: 18 },
