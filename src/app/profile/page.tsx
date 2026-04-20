@@ -14,6 +14,7 @@ import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import LoadingRing from "@/components/LoadingRing";
 import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
+import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 
 const RATING_RANKS = [
   { name: "Bronze", min: 0, max: 1199 },
@@ -341,7 +342,12 @@ export default function ProfilePage() {
           {[
             { label: "Total Matches", value: stats.matches.length },
             { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
-            { label: "Total Earnings", value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}` },
+            {
+              label: IS_SWEEPSTAKES_LAUNCH ? "Total SP Earned" : "Total Earnings",
+              value: IS_SWEEPSTAKES_LAUNCH
+                ? `${spData.lifetimeSp.toLocaleString()} SP`
+                : `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
+            },
             { label: "Win Streak", value: stats.bestStreak },
             { label: "Lifetime SP", value: spData.lifetimeSp.toLocaleString() },
             { label: "SP Balance", value: spData.balanceSp.toLocaleString() },

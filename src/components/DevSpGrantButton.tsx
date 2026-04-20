@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useToast } from "@/components/Toast";
+import { getCurrentUser } from "@/lib/api";
 
 const DEV_SP_GRANT_AMOUNT = 5000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type DevSpGrantButtonProps = {
   isDevMode: boolean;
@@ -15,6 +17,40 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
   const [granting, setGranting] = useState(false);
 
   if (!isDevMode) return null;
+
+  async function resolveTargetUserId(): Promise<string | null> {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return null;
+
+    if (UUID_RE.test(currentUser.id)) {
+      return currentUser.id;
+    }
+
+    const supabase = createClient();
+    if (!supabase) return null;
+
+    // Prefer the session UID when present.
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (authUser?.id && UUID_RE.test(authUser.id)) {
+      return authUser.id;
+    }
+
+    // Dev mode may use a local user object with a non-UUID ID.
+    // Resolve by username to target the same row the app displays.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("username", currentUser.username)
+      .maybeSingle();
+
+    if (profile?.id && UUID_RE.test(profile.id)) {
+      return profile.id;
+    }
+
+    return null;
+  }
 
   async function handleGrantSp() {
     if (granting) return;
@@ -27,20 +63,16 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
         return;
       }
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !user) {
-        showToast("Developer grant requires an authenticated account.", "error");
+      const targetUserId = await resolveTargetUserId();
+      if (!targetUserId) {
+        showToast("Unable to resolve profile for developer SP grant.", "error");
         return;
       }
 
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("lifetime_sp, balance_sp")
-        .eq("id", user.id)
+        .eq("id", targetUserId)
         .single();
 
       if (profileError || !profile) {
@@ -59,7 +91,7 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
           lifetime_sp: nextLifetime,
           balance_sp: nextBalance,
         })
-        .eq("id", user.id);
+        .eq("id", targetUserId);
 
       if (updateError) {
         showToast("Failed to apply SP grant.", "error");
@@ -67,7 +99,7 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
       }
 
       const { error: txError } = await supabase.from("sp_transactions").insert({
-        user_id: user.id,
+        user_id: targetUserId,
         amount: DEV_SP_GRANT_AMOUNT,
         type: "dev_grant",
         description: "Developer mode SP grant (+5000)",
@@ -80,7 +112,7 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
             lifetime_sp: currentLifetime,
             balance_sp: currentBalance,
           })
-          .eq("id", user.id);
+          .eq("id", targetUserId);
         showToast("Failed to log SP grant transaction.", "error");
         return;
       }
