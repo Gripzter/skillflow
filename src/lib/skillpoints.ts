@@ -428,10 +428,40 @@ export async function getUserSPData(userId: string): Promise<UserSpData | null> 
   const supabase = createClient();
   if (!supabase) return null;
 
+  let resolvedUserId = userId;
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError) {
+      // eslint-disable-next-line no-console
+      console.error("[SP] Failed to resolve authenticated user for SP lookup", {
+        providedUserId: userId,
+        error: authError.message,
+      });
+    } else if (user?.id) {
+      if (user.id !== userId) {
+        // eslint-disable-next-line no-console
+        console.warn("[SP] Using authenticated user ID for SP lookup", {
+          providedUserId: userId,
+          authenticatedUserId: user.id,
+        });
+      }
+      resolvedUserId = user.id;
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[SP] Unexpected error resolving authenticated user for SP lookup", {
+      providedUserId: userId,
+      error,
+    });
+  }
+
   const { data, error } = await supabase
     .from("profiles")
     .select("lifetime_sp, balance_sp, rank_tier")
-    .eq("id", userId)
+    .eq("id", resolvedUserId)
     .single();
 
   if (error || !data) return null;

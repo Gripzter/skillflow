@@ -110,6 +110,45 @@ type PlayerInventoryRow = {
   created_at: string;
 };
 
+async function resolveCaseUserId(
+  userId: string
+): Promise<{ resolvedUserId: string; supabase: ReturnType<typeof createClient> }> {
+  const supabase = createClient();
+  if (!supabase) {
+    return { resolvedUserId: userId, supabase };
+  }
+
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[Cases] Failed to resolve authenticated user", {
+        providedUserId: userId,
+        error: error.message,
+      });
+      return { resolvedUserId: userId, supabase };
+    }
+    if (user?.id && user.id !== userId) {
+      // eslint-disable-next-line no-console
+      console.warn("[Cases] Using authenticated user ID instead of provided user ID", {
+        providedUserId: userId,
+        authenticatedUserId: user.id,
+      });
+    }
+    return { resolvedUserId: user?.id ?? userId, supabase };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[Cases] Unexpected error resolving authenticated user", {
+      providedUserId: userId,
+      error,
+    });
+    return { resolvedUserId: userId, supabase };
+  }
+}
+
 function getCaseTier(caseId: string): CaseTier | null {
   return CASE_TIERS[caseId] ?? null;
 }
@@ -162,13 +201,13 @@ async function openCaseInternal(
   caseId: string,
   options: { skipSpend: boolean }
 ): Promise<OpenCaseResult> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const caseTier = getCaseTier(caseId);
   if (!caseTier) return { success: false, error: "Invalid case selected." };
 
   if (!options.skipSpend && caseTier.cost_sp > 0) {
-    const spend = await spendSP(userId, caseTier.cost_sp, "case_open", `Opened ${caseTier.name}`);
+    const spend = await spendSP(resolvedUserId, caseTier.cost_sp, "case_open", `Opened ${caseTier.name}`);
     if (!spend.success) return { success: false, error: spend.error };
   }
 
@@ -178,20 +217,20 @@ async function openCaseInternal(
   if (winningItem.item_type === "sp") {
     const amount = Number(winningItem.value ?? 0);
     if (amount > 0) {
-      const reward = await awardSpReward(userId, amount, `${caseTier.name} reward: ${winningItem.item_name}`);
+      const reward = await awardSpReward(resolvedUserId, amount, `${caseTier.name} reward: ${winningItem.item_name}`);
       if (!reward.success) return { success: false, error: reward.error };
     }
   } else if (winningItem.item_type === "border" || winningItem.item_type === "badge") {
     // eslint-disable-next-line no-console
     console.log("[Cases] Inserting cosmetic reward", {
-      userId,
+      userId: resolvedUserId,
       itemType: winningItem.item_type,
       itemId: winningItem.item_id,
       itemName: winningItem.item_name,
       rarity: winningItem.rarity,
     });
     const { error } = await supabase.from("player_inventory").insert({
-      user_id: userId,
+      user_id: resolvedUserId,
       item_type: winningItem.item_type,
       item_id: winningItem.item_id,
       item_name: winningItem.item_name,
@@ -201,20 +240,34 @@ async function openCaseInternal(
     if (error) {
       // eslint-disable-next-line no-console
       console.error("[Cases] Failed to insert cosmetic reward", {
-        userId,
+        userId: resolvedUserId,
+        itemType: winningItem.item_type,
+        itemName: winningItem.item_name,
         itemId: winningItem.item_id,
+        code: error.code,
+        details: error.details,
         error: error.message,
       });
       return { success: false, error: "Failed to save cosmetic reward." };
     }
   } else if (winningItem.item_type === "multiplier") {
     const { error } = await supabase.from("active_multipliers").insert({
-      user_id: userId,
+      user_id: resolvedUserId,
       multiplier_id: winningItem.item_id,
       multiplier_name: winningItem.item_name,
       matches_remaining: Number(winningItem.value ?? 0),
     });
-    if (error) return { success: false, error: "Failed to save multiplier reward." };
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[Cases] Failed to insert multiplier reward", {
+        userId: resolvedUserId,
+        itemId: winningItem.item_id,
+        code: error.code,
+        details: error.details,
+        error: error.message,
+      });
+      return { success: false, error: "Failed to save multiplier reward." };
+    }
   }
 
   return {
@@ -231,24 +284,24 @@ export async function openCase(userId: string, caseId: string): Promise<OpenCase
 }
 
 export async function getFreeCrates(userId: string): Promise<FreeCratesResult> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const { data, error } = await supabase
     .from("profiles")
     .select("free_crates_available")
-    .eq("id", userId)
+    .eq("id", resolvedUserId)
     .single();
   if (error || !data) return { success: false, error: "Failed to fetch free crate count." };
   return { success: true, freeCratesAvailable: Number(data.free_crates_available ?? 0) };
 }
 
 export async function claimFreeCrate(userId: string): Promise<OpenCaseResult> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("free_crates_available")
-    .eq("id", userId)
+    .eq("id", resolvedUserId)
     .single();
   if (profileError || !profile) return { success: false, error: "Failed to load free crate count." };
   const available = Number(profile.free_crates_available ?? 0);
@@ -257,19 +310,19 @@ export async function claimFreeCrate(userId: string): Promise<OpenCaseResult> {
   const { error: updateError } = await supabase
     .from("profiles")
     .update({ free_crates_available: available - 1 })
-    .eq("id", userId);
+    .eq("id", resolvedUserId);
   if (updateError) return { success: false, error: "Failed to claim free crate." };
 
-  return openCaseInternal(userId, "drop_crate", { skipSpend: true });
+  return openCaseInternal(resolvedUserId, "drop_crate", { skipSpend: true });
 }
 
 export async function incrementMatchCount(userId: string): Promise<IncrementMatchCountResult> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("matches_since_last_crate, free_crates_available")
-    .eq("id", userId)
+    .eq("id", resolvedUserId)
     .single();
   if (profileError || !profile) return { success: false, error: "Failed to load crate progress." };
 
@@ -286,7 +339,7 @@ export async function incrementMatchCount(userId: string): Promise<IncrementMatc
       matches_since_last_crate: nextMatches,
       free_crates_available: nextFree,
     })
-    .eq("id", userId);
+    .eq("id", resolvedUserId);
   if (updateError) return { success: false, error: "Failed to update crate progress." };
 
   return {
@@ -297,24 +350,24 @@ export async function incrementMatchCount(userId: string): Promise<IncrementMatc
 }
 
 export async function getUserInventory(userId: string): Promise<PlayerInventoryRow[]> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("player_inventory")
     .select("*")
-    .eq("user_id", userId)
+    .eq("user_id", resolvedUserId)
     .order("created_at", { ascending: false });
   if (error) {
     // eslint-disable-next-line no-console
     console.error("[Inventory] Failed to load inventory rows", {
-      userId,
+      userId: resolvedUserId,
       error: error.message,
     });
     return [];
   }
   // eslint-disable-next-line no-console
   console.log("[Inventory] Loaded inventory rows", {
-    userId,
+    userId: resolvedUserId,
     count: (data ?? []).length,
     itemIds: (data ?? []).map((row) => row.item_id),
   });
@@ -325,12 +378,12 @@ export async function equipItem(
   userId: string,
   itemId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const { data: selected, error: selectedError } = await supabase
     .from("player_inventory")
     .select("id, item_type")
-    .eq("user_id", userId)
+    .eq("user_id", resolvedUserId)
     .eq("item_id", itemId)
     .single();
   if (selectedError || !selected) return { success: false, error: "Item not found in inventory." };
@@ -338,14 +391,14 @@ export async function equipItem(
   const { error: clearError } = await supabase
     .from("player_inventory")
     .update({ equipped: false })
-    .eq("user_id", userId)
+    .eq("user_id", resolvedUserId)
     .eq("item_type", selected.item_type);
   if (clearError) return { success: false, error: "Failed to unequip previous item." };
 
   const { error: equipError } = await supabase
     .from("player_inventory")
     .update({ equipped: true })
-    .eq("user_id", userId)
+    .eq("user_id", resolvedUserId)
     .eq("item_id", itemId);
   if (equipError) return { success: false, error: "Failed to equip item." };
 

@@ -55,6 +55,51 @@ function getUtcMidnightTonightIso() {
   return getUtcDayWindow().endIso;
 }
 
+function isChallengeActive(expiresAt: string, now = new Date()): boolean {
+  const expiresAtMs = new Date(expiresAt).getTime();
+  if (!Number.isFinite(expiresAtMs)) return false;
+  return expiresAtMs > now.getTime();
+}
+
+async function resolveSessionUserId(
+  userId: string
+): Promise<{ resolvedUserId: string; supabase: ReturnType<typeof createClient> }> {
+  const supabase = createClient();
+  if (!supabase) {
+    return { resolvedUserId: userId, supabase };
+  }
+
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to resolve authenticated user", {
+        providedUserId: userId,
+        error: error.message,
+      });
+      return { resolvedUserId: userId, supabase };
+    }
+    if (user?.id && user.id !== userId) {
+      // eslint-disable-next-line no-console
+      console.warn("[DailyChallenges] Using authenticated user ID instead of provided user ID", {
+        providedUserId: userId,
+        authenticatedUserId: user.id,
+      });
+    }
+    return { resolvedUserId: user?.id ?? userId, supabase };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Unexpected error resolving authenticated user", {
+      providedUserId: userId,
+      error,
+    });
+    return { resolvedUserId: userId, supabase };
+  }
+}
+
 function pickRandomTemplates(count: number): DailyChallengeTemplate[] {
   const shuffled = [...DAILY_CHALLENGE_TEMPLATES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.max(0, Math.min(count, shuffled.length)));
@@ -111,73 +156,103 @@ async function getCurrentWinStreakToday(userId: string): Promise<number> {
 }
 
 export async function getDailyChallenges(userId: string): Promise<DailyChallengeRow[]> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveSessionUserId(userId);
   if (!supabase) {
     // eslint-disable-next-line no-console
     console.error("[DailyChallenges] Supabase client unavailable");
     return [];
   }
 
-  const nowIso = new Date().toISOString();
-  const { data: existing, error: existingError } = await supabase
-    .from("daily_challenges")
-    .select("*")
-    .eq("user_id", userId)
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: true });
-  if (existingError) {
+  try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const { data: existing, error: existingError } = await supabase
+      .from("daily_challenges")
+      .select("*")
+      .eq("user_id", resolvedUserId)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: true });
+    if (existingError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to fetch active challenges", {
+        userId: resolvedUserId,
+        error: existingError.message,
+      });
+    }
+
+    const activeChallenges = ((existing ?? []) as DailyChallengeRow[]).filter((challenge) =>
+      isChallengeActive(String(challenge.expires_at), now)
+    );
+    if (activeChallenges.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log("[DailyChallenges] Using existing active challenges", {
+        userId: resolvedUserId,
+        count: activeChallenges.length,
+      });
+      return activeChallenges;
+    }
+
+    const candidateExpiry = new Date(getUtcMidnightTonightIso());
+    const expiresAtDate =
+      candidateExpiry.getTime() <= now.getTime()
+        ? new Date(candidateExpiry.getTime() + 24 * 60 * 60 * 1000)
+        : candidateExpiry;
+    const expiresAt = expiresAtDate.toISOString();
+    const templates = pickRandomTemplates(3);
+    const rowsToInsert = templates.map((template) => ({
+      user_id: resolvedUserId,
+      type: template.type,
+      description: template.description,
+      target: template.target,
+      progress: 0,
+      reward_sp: template.rewardSp,
+      completed: false,
+      claimed: false,
+      expires_at: expiresAt,
+    }));
+
     // eslint-disable-next-line no-console
-    console.error("[DailyChallenges] Failed to fetch active challenges", {
-      userId,
-      error: existingError.message,
+    console.log("[DailyChallenges] Generating new daily challenges", {
+      userId: resolvedUserId,
+      challengeTypes: templates.map((t) => t.type),
+      expiresAt,
     });
-  }
 
-  const activeChallenges = (existing ?? []) as DailyChallengeRow[];
-  if (activeChallenges.length > 0) {
+    const { error: insertError } = await supabase.from("daily_challenges").insert(rowsToInsert);
+    if (insertError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to insert generated challenges", {
+        userId: resolvedUserId,
+        error: insertError.message,
+        payload: rowsToInsert,
+      });
+      return [];
+    }
+
+    const { data: insertedRows, error: insertedRowsError } = await supabase
+      .from("daily_challenges")
+      .select("*")
+      .eq("user_id", resolvedUserId)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: true });
+    if (insertedRowsError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Challenges inserted but failed to re-fetch active challenges", {
+        userId: resolvedUserId,
+        error: insertedRowsError.message,
+      });
+      return [];
+    }
+
+    return (insertedRows ?? []) as DailyChallengeRow[];
+  } catch (error) {
     // eslint-disable-next-line no-console
-    console.log("[DailyChallenges] Using existing active challenges", {
-      userId,
-      count: activeChallenges.length,
+    console.error("[DailyChallenges] Unexpected failure while loading daily challenges", {
+      userId: resolvedUserId,
+      error,
     });
-    return activeChallenges;
+    return [];
   }
-
-  const expiresAt = getUtcMidnightTonightIso();
-  const templates = pickRandomTemplates(3);
-  const rowsToInsert = templates.map((template) => ({
-    user_id: userId,
-    type: template.type,
-    description: template.description,
-    target: template.target,
-    progress: 0,
-    reward_sp: template.rewardSp,
-    completed: false,
-    claimed: false,
-    expires_at: expiresAt,
-  }));
-
-  // eslint-disable-next-line no-console
-  console.log("[DailyChallenges] Generating new daily challenges", {
-    userId,
-    challengeTypes: templates.map((t) => t.type),
-    expiresAt,
-  });
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("daily_challenges")
-    .insert(rowsToInsert)
-    .select("*");
-  if (insertError) {
-    // eslint-disable-next-line no-console
-    console.error("[DailyChallenges] Failed to insert generated challenges", {
-      userId,
-      error: insertError.message,
-      payload: rowsToInsert,
-    });
-  }
-
-  return (inserted ?? []) as DailyChallengeRow[];
 }
 
 export async function updateChallengeProgress(
@@ -185,166 +260,242 @@ export async function updateChallengeProgress(
   eventType: string,
   gameType?: string
 ): Promise<DailyChallengeRow[]> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveSessionUserId(userId);
   if (!supabase) return [];
-
-  const nowIso = new Date().toISOString();
-  const { data: active } = await supabase
-    .from("daily_challenges")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("claimed", false)
-    .eq("completed", false)
-    .gt("expires_at", nowIso)
-    .order("created_at", { ascending: true });
-
-  const activeChallenges = (active ?? []) as DailyChallengeRow[];
-  if (activeChallenges.length === 0) return [];
-
-  const isMatchWinEvent = eventType === "match_win";
-  const isMatchCompleteEvent = eventType === "match_complete" || eventType === "match_win";
-  const isMatchPlayEvent =
-    eventType === "match_start" || eventType === "match_complete" || eventType === "match_win";
-
-  const distinctGamesToday = isMatchPlayEvent ? await getDistinctGamesPlayedToday(userId) : [];
-  const winStreakToday =
-    eventType === "match_win" || eventType === "match_complete"
-      ? await getCurrentWinStreakToday(userId)
-      : 0;
-
-  const updates: DailyChallengeRow[] = [];
-
-  for (const challenge of activeChallenges) {
-    let nextProgress = Number(challenge.progress ?? 0);
-    let touched = false;
-
-    if (challenge.type === "win_matches" && isMatchWinEvent) {
-      nextProgress = Math.min(challenge.target, nextProgress + 1);
-      touched = true;
-    }
-
-    if (challenge.type === "complete_matches" && isMatchCompleteEvent) {
-      nextProgress = Math.min(challenge.target, nextProgress + 1);
-      touched = true;
-    }
-
-    if (challenge.type === "win_streak" && (eventType === "match_win" || eventType === "match_complete")) {
-      nextProgress = Math.min(challenge.target, winStreakToday);
-      touched = true;
-    }
-
-    if (challenge.type === "try_new_game" && isMatchPlayEvent && gameType) {
-      const hasPlayedThisGameToday = distinctGamesToday.includes(gameType);
-      nextProgress = hasPlayedThisGameToday ? 1 : nextProgress;
-      touched = true;
-    }
-
-    if (challenge.type === "play_variety" && isMatchPlayEvent) {
-      nextProgress = Math.min(challenge.target, distinctGamesToday.length);
-      touched = true;
-    }
-
-    if (!touched) continue;
-
-    const completed = nextProgress >= challenge.target;
-    const { data: updated } = await supabase
+  try {
+    const nowIso = new Date().toISOString();
+    const { data: active, error: activeError } = await supabase
       .from("daily_challenges")
-      .update({
-        progress: nextProgress,
-        completed,
-      })
-      .eq("id", challenge.id)
-      .eq("user_id", userId)
       .select("*")
-      .single();
+      .eq("user_id", resolvedUserId)
+      .eq("claimed", false)
+      .eq("completed", false)
+      .gt("expires_at", nowIso)
+      .order("created_at", { ascending: true });
 
-    if (updated) {
-      updates.push(updated as DailyChallengeRow);
+    if (activeError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to fetch challenges for progress update", {
+        userId: resolvedUserId,
+        eventType,
+        gameType,
+        error: activeError.message,
+      });
+      return [];
     }
-  }
 
-  return updates;
+    const activeChallenges = (active ?? []) as DailyChallengeRow[];
+    if (activeChallenges.length === 0) return [];
+
+    const isMatchWinEvent = eventType === "match_win";
+    const isMatchCompleteEvent = eventType === "match_complete" || eventType === "match_win";
+    const isMatchPlayEvent =
+      eventType === "match_start" || eventType === "match_complete" || eventType === "match_win";
+
+    const distinctGamesToday = isMatchPlayEvent ? await getDistinctGamesPlayedToday(resolvedUserId) : [];
+    const winStreakToday =
+      eventType === "match_win" || eventType === "match_complete"
+        ? await getCurrentWinStreakToday(resolvedUserId)
+        : 0;
+
+    const updates: DailyChallengeRow[] = [];
+
+    for (const challenge of activeChallenges) {
+      let nextProgress = Number(challenge.progress ?? 0);
+      let touched = false;
+
+      if (challenge.type === "win_matches" && isMatchWinEvent) {
+        nextProgress = Math.min(challenge.target, nextProgress + 1);
+        touched = true;
+      }
+
+      if (challenge.type === "complete_matches" && isMatchCompleteEvent) {
+        nextProgress = Math.min(challenge.target, nextProgress + 1);
+        touched = true;
+      }
+
+      if (challenge.type === "win_streak" && (eventType === "match_win" || eventType === "match_complete")) {
+        nextProgress = Math.min(challenge.target, winStreakToday);
+        touched = true;
+      }
+
+      if (challenge.type === "try_new_game" && isMatchPlayEvent && gameType) {
+        const hasPlayedThisGameToday = distinctGamesToday.includes(gameType);
+        nextProgress = hasPlayedThisGameToday ? 1 : nextProgress;
+        touched = true;
+      }
+
+      if (challenge.type === "play_variety" && isMatchPlayEvent) {
+        nextProgress = Math.min(challenge.target, distinctGamesToday.length);
+        touched = true;
+      }
+
+      if (!touched) continue;
+
+      const completed = nextProgress >= challenge.target;
+      const { data: updated, error: updateError } = await supabase
+        .from("daily_challenges")
+        .update({
+          progress: nextProgress,
+          completed,
+        })
+        .eq("id", challenge.id)
+        .eq("user_id", resolvedUserId)
+        .select("*")
+        .single();
+      if (updateError) {
+        // eslint-disable-next-line no-console
+        console.error("[DailyChallenges] Failed to update challenge progress", {
+          userId: resolvedUserId,
+          challengeId: challenge.id,
+          eventType,
+          error: updateError.message,
+        });
+        continue;
+      }
+
+      if (updated) {
+        updates.push(updated as DailyChallengeRow);
+      }
+    }
+
+    return updates;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Unexpected error while updating challenge progress", {
+      userId: resolvedUserId,
+      eventType,
+      gameType,
+      error,
+    });
+    return [];
+  }
 }
 
 export async function claimChallengeReward(
   userId: string,
   challengeId: string
 ): Promise<{ success: true; rewardSp: number } | { success: false; error: string }> {
-  const supabase = createClient();
+  const { resolvedUserId, supabase } = await resolveSessionUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
+  try {
+    const now = new Date();
+    const { data: challenge, error: challengeError } = await supabase
+      .from("daily_challenges")
+      .select("*")
+      .eq("id", challengeId)
+      .eq("user_id", resolvedUserId)
+      .single();
 
-  const nowIso = new Date().toISOString();
-  const { data: challenge, error: challengeError } = await supabase
-    .from("daily_challenges")
-    .select("*")
-    .eq("id", challengeId)
-    .eq("user_id", userId)
-    .single();
+    if (challengeError || !challenge) {
+      if (challengeError) {
+        // eslint-disable-next-line no-console
+        console.error("[DailyChallenges] Failed to load challenge for reward claim", {
+          userId: resolvedUserId,
+          challengeId,
+          error: challengeError.message,
+        });
+      }
+      return { success: false, error: "Challenge not found." };
+    }
 
-  if (challengeError || !challenge) {
-    return { success: false, error: "Challenge not found." };
+    if (challenge.claimed) {
+      return { success: false, error: "Challenge reward already claimed." };
+    }
+
+    if (!challenge.completed) {
+      return { success: false, error: "Challenge is not complete yet." };
+    }
+
+    if (!isChallengeActive(String(challenge.expires_at), now)) {
+      return { success: false, error: "Challenge has expired." };
+    }
+
+    const rewardSp = Number(challenge.reward_sp ?? 0);
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("lifetime_sp, balance_sp")
+      .eq("id", resolvedUserId)
+      .single();
+
+    if (profileError || !profile) {
+      if (profileError) {
+        // eslint-disable-next-line no-console
+        console.error("[DailyChallenges] Failed to load profile for challenge claim", {
+          userId: resolvedUserId,
+          challengeId,
+          error: profileError.message,
+        });
+      }
+      return { success: false, error: "Failed to load profile." };
+    }
+
+    const currentLifetime = Number(profile.lifetime_sp ?? 0);
+    const currentBalance = Number(profile.balance_sp ?? 0);
+    const nextLifetime = currentLifetime + rewardSp;
+    const nextBalance = currentBalance + rewardSp;
+
+    const { error: updateProfileError } = await supabase
+      .from("profiles")
+      .update({
+        lifetime_sp: nextLifetime,
+        balance_sp: nextBalance,
+      })
+      .eq("id", resolvedUserId);
+
+    if (updateProfileError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to apply challenge reward to profile", {
+        userId: resolvedUserId,
+        challengeId,
+        rewardSp,
+        error: updateProfileError.message,
+      });
+      return { success: false, error: "Failed to apply challenge reward." };
+    }
+
+    const { error: txError } = await supabase.from("sp_transactions").insert({
+      user_id: resolvedUserId,
+      amount: rewardSp,
+      type: "challenge_reward",
+      description: `Daily challenge reward: ${challenge.description}`,
+    });
+
+    if (txError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to insert challenge reward transaction", {
+        userId: resolvedUserId,
+        challengeId,
+        rewardSp,
+        error: txError.message,
+      });
+      return { success: false, error: "Failed to log challenge reward transaction." };
+    }
+
+    const { error: claimError } = await supabase
+      .from("daily_challenges")
+      .update({ claimed: true })
+      .eq("id", challengeId)
+      .eq("user_id", resolvedUserId);
+
+    if (claimError) {
+      // eslint-disable-next-line no-console
+      console.error("[DailyChallenges] Failed to mark challenge as claimed", {
+        userId: resolvedUserId,
+        challengeId,
+        error: claimError.message,
+      });
+      return { success: false, error: "Failed to mark challenge reward as claimed." };
+    }
+
+    return { success: true, rewardSp };
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Unexpected error while claiming challenge reward", {
+      userId: resolvedUserId,
+      challengeId,
+      error,
+    });
+    return { success: false, error: "Unexpected error while claiming challenge reward." };
   }
-
-  if (challenge.claimed) {
-    return { success: false, error: "Challenge reward already claimed." };
-  }
-
-  if (!challenge.completed) {
-    return { success: false, error: "Challenge is not complete yet." };
-  }
-
-  if (String(challenge.expires_at) <= nowIso) {
-    return { success: false, error: "Challenge has expired." };
-  }
-
-  const rewardSp = Number(challenge.reward_sp ?? 0);
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("lifetime_sp, balance_sp")
-    .eq("id", userId)
-    .single();
-
-  if (profileError || !profile) {
-    return { success: false, error: "Failed to load profile." };
-  }
-
-  const currentLifetime = Number(profile.lifetime_sp ?? 0);
-  const currentBalance = Number(profile.balance_sp ?? 0);
-  const nextLifetime = currentLifetime + rewardSp;
-  const nextBalance = currentBalance + rewardSp;
-
-  const { error: updateProfileError } = await supabase
-    .from("profiles")
-    .update({
-      lifetime_sp: nextLifetime,
-      balance_sp: nextBalance,
-    })
-    .eq("id", userId);
-
-  if (updateProfileError) {
-    return { success: false, error: "Failed to apply challenge reward." };
-  }
-
-  const { error: txError } = await supabase.from("sp_transactions").insert({
-    user_id: userId,
-    amount: rewardSp,
-    type: "challenge_reward",
-    description: `Daily challenge reward: ${challenge.description}`,
-  });
-
-  if (txError) {
-    return { success: false, error: "Failed to log challenge reward transaction." };
-  }
-
-  const { error: claimError } = await supabase
-    .from("daily_challenges")
-    .update({ claimed: true })
-    .eq("id", challengeId)
-    .eq("user_id", userId);
-
-  if (claimError) {
-    return { success: false, error: "Failed to mark challenge reward as claimed." };
-  }
-
-  return { success: true, rewardSp };
 }

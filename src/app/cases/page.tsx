@@ -163,6 +163,7 @@ export default function CasesPage() {
     const tier = CASE_TIERS[lastOpenedCaseId];
     return !!tier && spBalance >= tier.cost_sp;
   }, [freeCrates, lastOpenedCaseId, resultItem, spBalance]);
+  const canOpenFreeCrate = freeCrates > 0 && !isOpening;
 
   async function runOpenCase(caseId: CaseKey) {
     if (!userId) return;
@@ -267,14 +268,14 @@ export default function CasesPage() {
             <button
               type="button"
               onClick={() => void runOpenCase("drop_crate")}
-              disabled={freeCrates <= 0 || isOpening}
+              disabled={!canOpenFreeCrate}
               className={`rounded-lg px-4 py-2.5 font-semibold text-white transition-opacity ${
-                freeCrates > 0 && !isOpening
+                canOpenFreeCrate
                   ? "bg-[#FF5E00] hover:opacity-90"
                   : "cursor-not-allowed bg-white/10 text-gray-500"
               }`}
             >
-              Open Free
+              {freeCrates > 0 ? "Open Free" : "No free crates"}
             </button>
           </div>
         </section>
