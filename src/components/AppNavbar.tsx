@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getWalletBalance, getMyProfile } from "@/lib/api";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import RankBadge from "@/components/RankBadge";
+import DevSpGrantButton from "@/components/DevSpGrantButton";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getUserSPData } from "@/lib/skillpoints";
 import {
@@ -282,6 +283,7 @@ export default function AppNavbar({
           </button>
         </div>
       </div>
+      <DevSpGrantButton isDevMode={isDevMode} />
     </header>
   );
 }
