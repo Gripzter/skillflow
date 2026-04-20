@@ -35,11 +35,14 @@ import {
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
+import { createClient } from "@/lib/supabase";
 import {
   claimChallengeReward,
   getDailyChallenges,
   type DailyChallengeRow,
 } from "@/lib/daily-challenges";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -77,6 +80,12 @@ function getUtcResetCountdown() {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
     seconds
   ).padStart(2, "0")}`;
+}
+
+function extractMatchIdFromDescription(description: string | null | undefined): string | null {
+  if (!description) return null;
+  const match = description.match(/\[.*match:([0-9a-f-]{36}).*\]/i);
+  return match?.[1] ?? null;
 }
 
 const QUICK_GAMES = [
@@ -123,6 +132,7 @@ export default function DashboardPage() {
   const [dailyChallenges, setDailyChallenges] = useState<DailyChallengeRow[]>([]);
   const [claimingChallengeId, setClaimingChallengeId] = useState<string | null>(null);
   const [resetCountdown, setResetCountdown] = useState(getUtcResetCountdown());
+  const [spByMatchId, setSpByMatchId] = useState<Record<string, number>>({});
 
   useEffect(() => {
     async function load() {
@@ -134,20 +144,71 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        setUserId(user.id);
+        let effectiveUserId = user.id;
+        if (!UUID_RE.test(effectiveUserId)) {
+          const supabase = createClient();
+          if (supabase) {
+            const { data: profileByName } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("username", user.username)
+              .maybeSingle();
+            if (profileByName?.id) {
+              effectiveUserId = profileByName.id;
+            }
+          }
+        }
+        setUserId(effectiveUserId);
+        // eslint-disable-next-line no-console
+        console.log("[Dashboard] Using user ID for SP/challenges", {
+          originalUserId: user.id,
+          effectiveUserId,
+          username: user.username,
+        });
 
         const [matchList, txs, apiLeaderboard, userSpData, challenges] = await Promise.all([
           getMatches(),
           getTransactions(),
           getLeaderboard("total_earnings"),
-          getUserSPData(user.id),
-          getDailyChallenges(user.id),
+          getUserSPData(effectiveUserId),
+          getDailyChallenges(effectiveUserId),
         ]);
         setMatches(matchList as StoredMatch[]);
         setTransactions(txs);
         setDailyChallenges(challenges);
         if (userSpData) {
           setSpData(userSpData);
+        }
+        if (!challenges.length) {
+          // eslint-disable-next-line no-console
+          console.warn("[Dashboard] No daily challenges returned", {
+            userId: effectiveUserId,
+          });
+        }
+
+        const supabase = createClient();
+        if (supabase) {
+          const { data: spRows, error: spRowsError } = await supabase
+            .from("sp_transactions")
+            .select("amount, type, description, created_at")
+            .eq("user_id", effectiveUserId)
+            .in("type", ["match_win", "match_loss"])
+            .order("created_at", { ascending: false })
+            .limit(300);
+
+          if (spRowsError) {
+            // eslint-disable-next-line no-console
+            console.error("[Dashboard] Failed to load match SP rows", spRowsError.message);
+          } else {
+            const nextMap: Record<string, number> = {};
+            for (const row of spRows ?? []) {
+              const matchId = extractMatchIdFromDescription(row.description as string | null);
+              if (!matchId) continue;
+              if (typeof nextMap[matchId] === "number") continue;
+              nextMap[matchId] = Number(row.amount ?? 0);
+            }
+            setSpByMatchId(nextMap);
+          }
         }
 
         const basePlayers: LeaderboardPlayer[] =
@@ -161,7 +222,9 @@ export default function DashboardPage() {
         const pm = getPracticeMatches();
         setPracticeMatches(pm.map((m) => ({ ...(m as unknown as StoredMatch), isPractice: true })));
         getPracticeStats(user.username);
-      } catch {
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[Dashboard] Failed to load dashboard data", error);
         router.push("/login");
       } finally {
         setLoading(false);
@@ -706,11 +769,14 @@ export default function DashboardPage() {
                   : isWin
                     ? "border-l-emerald-400/70"
                     : "border-l-red-400/70";
-                const stake = match.stakeAmount ?? 0;
-                const delta =
-                  isDraw ? 0 : isWin ? (match.winnerPayout ?? 0) : -stake;
-                const deltaPrefix = delta > 0 ? "+" : delta < 0 ? "-" : "";
-                const deltaAbs = Math.abs(delta);
+                const spDelta = isDraw
+                  ? 0
+                  : typeof spByMatchId[match.id] === "number"
+                    ? spByMatchId[match.id]
+                    : isWin
+                      ? 100
+                      : 25;
+                const spPrefix = spDelta >= 0 ? "+" : "";
 
                 return (
                   <div
@@ -736,7 +802,7 @@ export default function DashboardPage() {
                         </span>
                       <span className="text-[11px] text-body-gray">
                         {resultLabel}
-                        {delta !== 0 && <> · {deltaPrefix}{formatCurrency(deltaAbs)}</>}
+                        {!isDraw && <> · {spPrefix}{Math.abs(spDelta).toLocaleString()} SP</>}
                         {" · "}
                         {formatTimeAgo(match.createdAt)}
                       </span>

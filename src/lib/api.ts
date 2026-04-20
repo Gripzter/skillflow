@@ -759,13 +759,25 @@ export async function getCurrentUser(): Promise<{
   if (isDevMode()) {
     try {
       const devUser = JSON.parse(localStorage.getItem("skillflow_dev_user") || "{}");
+      const supabase = createClient();
+      let resolvedId = "dev-user-id";
+      let emailVerified = true;
+      if (supabase) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user?.id) {
+          resolvedId = user.id;
+          emailVerified = !!user.email_confirmed_at;
+        }
+      }
       return {
-        id: "dev-user-id",
+        id: resolvedId,
         username: devUser.username || "Developer",
         email: devUser.email || "dev@skillflow.com",
         user_metadata: { username: devUser.username },
         isDevMode: true,
-        emailVerified: true,
+        emailVerified,
       };
     } catch {
       return null;

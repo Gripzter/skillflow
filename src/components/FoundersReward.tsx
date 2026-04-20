@@ -9,7 +9,7 @@ const PLATINUM_THRESHOLD = 10000;
 const REWARDS = [
   'Permanent "Founders" badge (never available again)',
   "$10 starting credits at real-money launch",
-  "3 free Lucky Wheel spins",
+  "3 free Case openings",
 ];
 
 function normalizeTier(tier: string): string {

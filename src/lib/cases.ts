@@ -182,6 +182,14 @@ async function openCaseInternal(
       if (!reward.success) return { success: false, error: reward.error };
     }
   } else if (winningItem.item_type === "border" || winningItem.item_type === "badge") {
+    // eslint-disable-next-line no-console
+    console.log("[Cases] Inserting cosmetic reward", {
+      userId,
+      itemType: winningItem.item_type,
+      itemId: winningItem.item_id,
+      itemName: winningItem.item_name,
+      rarity: winningItem.rarity,
+    });
     const { error } = await supabase.from("player_inventory").insert({
       user_id: userId,
       item_type: winningItem.item_type,
@@ -190,7 +198,15 @@ async function openCaseInternal(
       rarity: winningItem.rarity,
       equipped: false,
     });
-    if (error) return { success: false, error: "Failed to save cosmetic reward." };
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[Cases] Failed to insert cosmetic reward", {
+        userId,
+        itemId: winningItem.item_id,
+        error: error.message,
+      });
+      return { success: false, error: "Failed to save cosmetic reward." };
+    }
   } else if (winningItem.item_type === "multiplier") {
     const { error } = await supabase.from("active_multipliers").insert({
       user_id: userId,
@@ -288,7 +304,20 @@ export async function getUserInventory(userId: string): Promise<PlayerInventoryR
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) return [];
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("[Inventory] Failed to load inventory rows", {
+      userId,
+      error: error.message,
+    });
+    return [];
+  }
+  // eslint-disable-next-line no-console
+  console.log("[Inventory] Loaded inventory rows", {
+    userId,
+    count: (data ?? []).length,
+    itemIds: (data ?? []).map((row) => row.item_id),
+  });
   return (data ?? []) as PlayerInventoryRow[];
 }
 

@@ -112,18 +112,34 @@ async function getCurrentWinStreakToday(userId: string): Promise<number> {
 
 export async function getDailyChallenges(userId: string): Promise<DailyChallengeRow[]> {
   const supabase = createClient();
-  if (!supabase) return [];
+  if (!supabase) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Supabase client unavailable");
+    return [];
+  }
 
   const nowIso = new Date().toISOString();
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("daily_challenges")
     .select("*")
     .eq("user_id", userId)
     .gt("expires_at", nowIso)
     .order("created_at", { ascending: true });
+  if (existingError) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Failed to fetch active challenges", {
+      userId,
+      error: existingError.message,
+    });
+  }
 
   const activeChallenges = (existing ?? []) as DailyChallengeRow[];
   if (activeChallenges.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log("[DailyChallenges] Using existing active challenges", {
+      userId,
+      count: activeChallenges.length,
+    });
     return activeChallenges;
   }
 
@@ -141,10 +157,25 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
     expires_at: expiresAt,
   }));
 
-  const { data: inserted } = await supabase
+  // eslint-disable-next-line no-console
+  console.log("[DailyChallenges] Generating new daily challenges", {
+    userId,
+    challengeTypes: templates.map((t) => t.type),
+    expiresAt,
+  });
+
+  const { data: inserted, error: insertError } = await supabase
     .from("daily_challenges")
     .insert(rowsToInsert)
     .select("*");
+  if (insertError) {
+    // eslint-disable-next-line no-console
+    console.error("[DailyChallenges] Failed to insert generated challenges", {
+      userId,
+      error: insertError.message,
+      payload: rowsToInsert,
+    });
+  }
 
   return (inserted ?? []) as DailyChallengeRow[];
 }

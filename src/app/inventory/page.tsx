@@ -11,6 +11,8 @@ import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { equipItem, getUserInventory, type CaseItemRarity } from "@/lib/cases";
 import { createClient } from "@/lib/supabase";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 type InventoryRow = {
   id: string;
   user_id: string;
@@ -60,9 +62,30 @@ export default function InventoryPage() {
 
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        setUserId(user.id);
+        let effectiveUserId = user.id;
+        if (!UUID_RE.test(effectiveUserId)) {
+          const supabase = createClient();
+          if (supabase) {
+            const { data: profileByName } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("username", user.username)
+              .maybeSingle();
+            if (profileByName?.id) {
+              effectiveUserId = profileByName.id;
+            }
+          }
+        }
+        setUserId(effectiveUserId);
+        // eslint-disable-next-line no-console
+        console.log("[InventoryPage] Loading inventory for user", {
+          userId: effectiveUserId,
+          originalUserId: user.id,
+          username: user.username,
+          isDevMode: user.isDevMode,
+        });
 
-        const inventoryRows = await getUserInventory(user.id);
+        const inventoryRows = await getUserInventory(effectiveUserId);
         setInventory(inventoryRows as InventoryRow[]);
 
         const supabase = createClient();
@@ -70,7 +93,7 @@ export default function InventoryPage() {
           const { data: multiplierRows } = await supabase
             .from("active_multipliers")
             .select("id, multiplier_id, multiplier_name, matches_remaining")
-            .eq("user_id", user.id)
+            .eq("user_id", effectiveUserId)
             .gt("matches_remaining", 0)
             .order("created_at", { ascending: true });
           setActiveMultipliers((multiplierRows ?? []) as ActiveMultiplierRow[]);
