@@ -26,7 +26,7 @@ interface AppNavbarProps {
   isDevMode: boolean;
   onLogout: () => void;
   loggingOut: boolean;
-  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals" | "skillpoints" | "cases";
+  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals" | "skillpoints" | "cases" | "inventory";
 }
 
 export default function AppNavbar({
@@ -162,6 +162,17 @@ export default function AppNavbar({
             }`}
           >
             Cases
+          </button>
+          <button
+            type="button"
+            onClick={() => goTo("/inventory")}
+            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+              currentPage === "inventory"
+                ? "active bg-white/10 text-white"
+                : "text-body-gray hover:text-white"
+            }`}
+          >
+            Inventory
           </button>
           <button
             type="button"

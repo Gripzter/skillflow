@@ -39,6 +39,13 @@ export type UserSpData = {
   rankTier: RankTier;
 };
 
+type ActiveMultiplierRow = {
+  id: string;
+  multiplier_id: string;
+  multiplier_name: string | null;
+  matches_remaining: number;
+};
+
 function getTodayWindow() {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -79,6 +86,14 @@ function buildMatchContextSuffix(options?: { matchId?: string; gameType?: string
   if (options?.gameType) parts.push(`game:${options.gameType}`);
   if (parts.length === 0) return "";
   return ` [${parts.join(" ")}]`;
+}
+
+function parseMultiplierValue(multiplierId: string | null | undefined): number {
+  if (!multiplierId) return 1;
+  const match = multiplierId.match(/mult_(\d+)x_/i);
+  if (!match) return 1;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
 }
 
 export async function awardMatchSP(
@@ -128,6 +143,21 @@ export async function awardMatchSP(
 
   const baseAmount = won ? SP_REWARDS.MATCH_WIN : SP_REWARDS.MATCH_LOSS;
   const matchType = won ? "match_win" : "match_loss";
+  let multiplier = 1;
+  let activeMultiplier: ActiveMultiplierRow | null = null;
+
+  const { data: multiplierRows } = await supabase
+    .from("active_multipliers")
+    .select("id, multiplier_id, multiplier_name, matches_remaining")
+    .eq("user_id", userId)
+    .gt("matches_remaining", 0)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (multiplierRows && multiplierRows.length > 0) {
+    activeMultiplier = multiplierRows[0] as ActiveMultiplierRow;
+    multiplier = parseMultiplierValue(activeMultiplier.multiplier_id);
+  }
 
   const { startIso, endIso } = getTodayWindow();
   const { data: todayMatches, error: todayError } = await supabase
@@ -145,7 +175,8 @@ export async function awardMatchSP(
 
   const isFirstMatchToday = !todayMatches || todayMatches.length === 0;
   const dailyBonus = isFirstMatchToday ? SP_REWARDS.DAILY_FIRST_MATCH : 0;
-  const totalAward = baseAmount + dailyBonus;
+  const baseAwardWithMultiplier = baseAmount * multiplier;
+  const totalAward = baseAwardWithMultiplier + dailyBonus;
 
   const currentLifetime = Number(profile.lifetime_sp ?? 0);
   const currentBalance = Number(profile.balance_sp ?? 0);
@@ -168,10 +199,11 @@ export async function awardMatchSP(
 
   const { error: txError } = await supabase.from("sp_transactions").insert({
     user_id: userId,
-    amount: baseAmount,
+    amount: baseAwardWithMultiplier,
     type: matchType,
     description:
       (won ? "SP reward for match win" : "SP reward for match loss") +
+      (multiplier > 1 ? ` (${multiplier}x multiplier)` : "") +
       matchContext,
   });
 
@@ -189,6 +221,29 @@ export async function awardMatchSP(
 
     if (dailyTxError) {
       return { success: false, error: "Failed to log daily match bonus transaction." };
+    }
+  }
+
+  if (activeMultiplier) {
+    const remaining = Number(activeMultiplier.matches_remaining ?? 0) - 1;
+    if (remaining <= 0) {
+      const { error: deleteMultiplierError } = await supabase
+        .from("active_multipliers")
+        .delete()
+        .eq("id", activeMultiplier.id)
+        .eq("user_id", userId);
+      if (deleteMultiplierError) {
+        return { success: false, error: "Failed to consume active multiplier." };
+      }
+    } else {
+      const { error: decrementMultiplierError } = await supabase
+        .from("active_multipliers")
+        .update({ matches_remaining: remaining })
+        .eq("id", activeMultiplier.id)
+        .eq("user_id", userId);
+      if (decrementMultiplierError) {
+        return { success: false, error: "Failed to update active multiplier progress." };
+      }
     }
   }
 

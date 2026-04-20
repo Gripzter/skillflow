@@ -32,6 +32,8 @@ import {
 } from "@/lib/practice-matches";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
+import { incrementMatchCount } from "@/lib/cases";
+import { updateChallengeProgress } from "@/lib/daily-challenges";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
@@ -616,6 +618,19 @@ export async function completeMatchAndSettle(
             });
           }
         }
+
+        const crateProgressResult = await incrementMatchCount(target.userId);
+        if (!crateProgressResult.success) {
+          // eslint-disable-next-line no-console
+          console.error("[Cases] Match count increment failed", {
+            matchId: match.id,
+            userId: target.userId,
+            error: crateProgressResult.error,
+          });
+        }
+
+        const challengeEventType = target.won ? "match_win" : "match_complete";
+        await updateChallengeProgress(target.userId, challengeEventType, match.gameType);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("[SP] Unexpected SP award error", {

@@ -35,6 +35,11 @@ import {
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
+import {
+  claimChallengeReward,
+  getDailyChallenges,
+  type DailyChallengeRow,
+} from "@/lib/daily-challenges";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -57,6 +62,21 @@ function formatTimeAgo(createdAt: string) {
 function formatTierLabel(tier: string): string {
   if (!tier) return "Bronze";
   return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+}
+
+function getUtcResetCountdown() {
+  const now = new Date();
+  const nextUtcMidnight = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  );
+  const diffMs = Math.max(0, nextUtcMidnight.getTime() - now.getTime());
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(
+    seconds
+  ).padStart(2, "0")}`;
 }
 
 const QUICK_GAMES = [
@@ -99,6 +119,10 @@ export default function DashboardPage() {
     balanceSp: 1000,
     rankTier: "bronze",
   });
+  const [userId, setUserId] = useState<string | null>(null);
+  const [dailyChallenges, setDailyChallenges] = useState<DailyChallengeRow[]>([]);
+  const [claimingChallengeId, setClaimingChallengeId] = useState<string | null>(null);
+  const [resetCountdown, setResetCountdown] = useState(getUtcResetCountdown());
 
   useEffect(() => {
     async function load() {
@@ -110,15 +134,18 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
+        setUserId(user.id);
 
-        const [matchList, txs, apiLeaderboard, userSpData] = await Promise.all([
+        const [matchList, txs, apiLeaderboard, userSpData, challenges] = await Promise.all([
           getMatches(),
           getTransactions(),
           getLeaderboard("total_earnings"),
           getUserSPData(user.id),
+          getDailyChallenges(user.id),
         ]);
         setMatches(matchList as StoredMatch[]);
         setTransactions(txs);
+        setDailyChallenges(challenges);
         if (userSpData) {
           setSpData(userSpData);
         }
@@ -153,6 +180,13 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    const interval = window.setInterval(() => {
+      setResetCountdown(getUtcResetCountdown());
+    }, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!IS_SWEEPSTAKES_LAUNCH) return;
     const unlocked = window.localStorage.getItem(WAITLIST_UNLOCKED_KEY) === "true";
     setWaitlistUnlocked(unlocked);
@@ -168,6 +202,30 @@ export default function DashboardPage() {
     } catch {
       showToast("Something went wrong", "error");
       setLoggingOut(false);
+    }
+  }
+
+  async function handleClaimChallenge(challengeId: string) {
+    if (!userId || claimingChallengeId) return;
+    setClaimingChallengeId(challengeId);
+    try {
+      const result = await claimChallengeReward(userId, challengeId);
+      if (!result.success) {
+        showToast(result.error, "error");
+        return;
+      }
+
+      showToast(`Claimed +${result.rewardSp} SP`, "success");
+      const [nextChallenges, nextSpData] = await Promise.all([
+        getDailyChallenges(userId),
+        getUserSPData(userId),
+      ]);
+      setDailyChallenges(nextChallenges);
+      if (nextSpData) {
+        setSpData(nextSpData);
+      }
+    } finally {
+      setClaimingChallengeId(null);
     }
   }
 
@@ -274,6 +332,57 @@ export default function DashboardPage() {
 
         <section className="animate-fade-in" style={{ animationDelay: "60ms" }}>
           <FoundersReward lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
+        </section>
+
+        <section className="animate-fade-in rounded-card border border-white/10 bg-card/80 p-5" style={{ animationDelay: "70ms" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-white">Daily Challenges</h2>
+            <p className="text-xs text-body-gray">Resets in {resetCountdown} (UTC)</p>
+          </div>
+          {dailyChallenges.length === 0 ? (
+            <p className="mt-3 text-sm text-body-gray">No daily challenges available right now.</p>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {dailyChallenges.map((challenge) => {
+                const progress = Number(challenge.progress ?? 0);
+                const target = Number(challenge.target ?? 1);
+                const percent = Math.max(0, Math.min(100, (progress / Math.max(1, target)) * 100));
+                return (
+                  <div key={challenge.id} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                    <p className="text-sm font-semibold text-white">{challenge.description}</p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-teal transition-all"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-body-gray">
+                      {progress}/{target}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-emerald-300">
+                      +{Number(challenge.reward_sp).toLocaleString()} SP
+                    </p>
+                    <div className="mt-3">
+                      {challenge.claimed ? (
+                        <span className="rounded bg-emerald-500/20 px-2 py-1 text-xs font-semibold text-emerald-300">
+                          Claimed
+                        </span>
+                      ) : challenge.completed ? (
+                        <button
+                          type="button"
+                          onClick={() => handleClaimChallenge(challenge.id)}
+                          disabled={claimingChallengeId === challenge.id}
+                          className="rounded bg-teal px-3 py-1.5 text-xs font-semibold text-charcoal disabled:opacity-60"
+                        >
+                          Claim
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </section>
 
         {/* 2. Featured game banner – Last Touch */}
