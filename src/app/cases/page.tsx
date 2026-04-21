@@ -14,13 +14,11 @@ import {
   claimFreeCrate,
   getFreeCrates,
   openCase,
+  resolveCaseUserId,
   type CaseDrop,
 } from "@/lib/cases";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
-import { createClient } from "@/lib/supabase";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type RecentDrop = {
   id: string;
@@ -115,20 +113,7 @@ export default function CasesPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        let effectiveUserId = user.id;
-        if (!UUID_RE.test(effectiveUserId)) {
-          const supabase = createClient();
-          if (supabase) {
-            const { data: profileByName } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("username", user.username)
-              .maybeSingle();
-            if (profileByName?.id) {
-              effectiveUserId = profileByName.id;
-            }
-          }
-        }
+        const { resolvedUserId: effectiveUserId } = await resolveCaseUserId(user.id);
         // eslint-disable-next-line no-console
         console.log("[CasesPage] Using user ID for case operations", {
           originalUserId: user.id,

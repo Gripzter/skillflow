@@ -110,7 +110,7 @@ type PlayerInventoryRow = {
   created_at: string;
 };
 
-async function resolveCaseUserId(
+export async function resolveCaseUserId(
   userId: string
 ): Promise<{ resolvedUserId: string; supabase: ReturnType<typeof createClient> }> {
   const supabase = createClient();
@@ -351,12 +351,16 @@ export async function incrementMatchCount(userId: string): Promise<IncrementMatc
 
 export async function getUserInventory(userId: string): Promise<PlayerInventoryRow[]> {
   const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
+  // eslint-disable-next-line no-console
+  console.log("[getUserInventory] resolvedUserId:", resolvedUserId);
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("player_inventory")
     .select("*")
     .eq("user_id", resolvedUserId)
     .order("created_at", { ascending: false });
+  // eslint-disable-next-line no-console
+  console.log("[getUserInventory] query result:", { data, error });
   if (error) {
     // eslint-disable-next-line no-console
     console.error("[Inventory] Failed to load inventory rows", {

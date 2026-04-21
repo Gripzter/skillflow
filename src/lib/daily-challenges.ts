@@ -61,7 +61,7 @@ function isChallengeActive(expiresAt: string, now = new Date()): boolean {
   return expiresAtMs > now.getTime();
 }
 
-async function resolveSessionUserId(
+export async function resolveSessionUserId(
   userId: string
 ): Promise<{ resolvedUserId: string; supabase: ReturnType<typeof createClient> }> {
   const supabase = createClient();

@@ -8,10 +8,8 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
 import { useToast } from "@/components/Toast";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
-import { equipItem, getUserInventory, type CaseItemRarity } from "@/lib/cases";
+import { equipItem, getUserInventory, resolveCaseUserId, type CaseItemRarity } from "@/lib/cases";
 import { createClient } from "@/lib/supabase";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type InventoryRow = {
   id: string;
@@ -62,20 +60,7 @@ export default function InventoryPage() {
 
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        let effectiveUserId = user.id;
-        if (!UUID_RE.test(effectiveUserId)) {
-          const supabase = createClient();
-          if (supabase) {
-            const { data: profileByName } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("username", user.username)
-              .maybeSingle();
-            if (profileByName?.id) {
-              effectiveUserId = profileByName.id;
-            }
-          }
-        }
+        const { resolvedUserId: effectiveUserId } = await resolveCaseUserId(user.id);
         setUserId(effectiveUserId);
         // eslint-disable-next-line no-console
         console.log("[InventoryPage] Loading inventory for user", {
@@ -85,8 +70,12 @@ export default function InventoryPage() {
           isDevMode: user.isDevMode,
         });
 
-        const inventoryRows = await getUserInventory(effectiveUserId);
-        setInventory(inventoryRows as InventoryRow[]);
+        const inventory = await getUserInventory(effectiveUserId);
+        // eslint-disable-next-line no-console
+        console.log("[Inventory Page] userId:", effectiveUserId);
+        // eslint-disable-next-line no-console
+        console.log("[Inventory Page] raw inventory:", inventory);
+        setInventory(inventory as InventoryRow[]);
 
         const supabase = createClient();
         if (supabase) {

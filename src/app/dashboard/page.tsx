@@ -39,10 +39,9 @@ import { createClient } from "@/lib/supabase";
 import {
   claimChallengeReward,
   getDailyChallenges,
+  resolveSessionUserId,
   type DailyChallengeRow,
 } from "@/lib/daily-challenges";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -144,20 +143,7 @@ export default function DashboardPage() {
         }
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
-        let effectiveUserId = user.id;
-        if (!UUID_RE.test(effectiveUserId)) {
-          const supabase = createClient();
-          if (supabase) {
-            const { data: profileByName } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("username", user.username)
-              .maybeSingle();
-            if (profileByName?.id) {
-              effectiveUserId = profileByName.id;
-            }
-          }
-        }
+        const { resolvedUserId: effectiveUserId } = await resolveSessionUserId(user.id);
         setUserId(effectiveUserId);
         // eslint-disable-next-line no-console
         console.log("[Dashboard] Using user ID for SP/challenges", {
