@@ -28,6 +28,22 @@ export type DailyChallengeRow = {
   created_at: string;
 };
 
+type DailyChallengeDbRow = {
+  id: string;
+  user_id: string;
+  type?: ChallengeType;
+  challenge_type?: ChallengeType;
+  description?: string;
+  challenge_description?: string;
+  target: number;
+  progress: number;
+  reward_sp: number;
+  completed: boolean;
+  claimed: boolean;
+  expires_at: string;
+  created_at: string;
+};
+
 export const DAILY_CHALLENGE_TEMPLATES: DailyChallengeTemplate[] = [
   { type: "win_matches", description: "Win 3 matches", target: 3, rewardSp: 150 },
   { type: "complete_matches", description: "Complete 5 matches", target: 5, rewardSp: 100 },
@@ -59,6 +75,25 @@ function isChallengeActive(expiresAt: string, now = new Date()): boolean {
   const expiresAtMs = new Date(expiresAt).getTime();
   if (!Number.isFinite(expiresAtMs)) return false;
   return expiresAtMs > now.getTime();
+}
+
+function normalizeDailyChallengeRow(row: DailyChallengeDbRow): DailyChallengeRow | null {
+  const resolvedType = row.type ?? row.challenge_type;
+  const resolvedDescription = row.description ?? row.challenge_description;
+  if (!resolvedType || !resolvedDescription) return null;
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    type: resolvedType,
+    description: resolvedDescription,
+    target: Number(row.target ?? 0),
+    progress: Number(row.progress ?? 0),
+    reward_sp: Number(row.reward_sp ?? 0),
+    completed: Boolean(row.completed),
+    claimed: Boolean(row.claimed),
+    expires_at: row.expires_at,
+    created_at: row.created_at,
+  };
 }
 
 export async function resolveSessionUserId(
@@ -180,9 +215,10 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
       });
     }
 
-    const activeChallenges = ((existing ?? []) as DailyChallengeRow[]).filter((challenge) =>
-      isChallengeActive(String(challenge.expires_at), now)
-    );
+    const activeChallenges = ((existing ?? []) as DailyChallengeDbRow[])
+      .map(normalizeDailyChallengeRow)
+      .filter((challenge): challenge is DailyChallengeRow => Boolean(challenge))
+      .filter((challenge) => isChallengeActive(String(challenge.expires_at), now));
     if (activeChallenges.length > 0) {
       // eslint-disable-next-line no-console
       console.log("[DailyChallenges] Using existing active challenges", {
@@ -201,7 +237,8 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
     const templates = pickRandomTemplates(3);
     const rowsToInsert = templates.map((template) => ({
       user_id: resolvedUserId,
-      type: template.type,
+      challenge_type: template.type,
+      challenge_description: template.description,
       description: template.description,
       target: template.target,
       progress: 0,
@@ -218,7 +255,24 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
       expiresAt,
     });
 
-    const { error: insertError } = await supabase.from("daily_challenges").insert(rowsToInsert);
+    let { error: insertError } = await supabase.from("daily_challenges").insert(rowsToInsert);
+    if (insertError) {
+      // Backward-compatible insert for schemas still using `type`.
+      const legacyRowsToInsert = templates.map((template) => ({
+        user_id: resolvedUserId,
+        type: template.type,
+        description: template.description,
+        target: template.target,
+        progress: 0,
+        reward_sp: template.rewardSp,
+        completed: false,
+        claimed: false,
+        expires_at: expiresAt,
+      }));
+      const { error: legacyInsertError } = await supabase.from("daily_challenges").insert(legacyRowsToInsert);
+      insertError = legacyInsertError;
+    }
+
     if (insertError) {
       // eslint-disable-next-line no-console
       console.error("[DailyChallenges] Failed to insert generated challenges", {
@@ -244,7 +298,9 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
       return [];
     }
 
-    return (insertedRows ?? []) as DailyChallengeRow[];
+    return ((insertedRows ?? []) as DailyChallengeDbRow[])
+      .map(normalizeDailyChallengeRow)
+      .filter((challenge): challenge is DailyChallengeRow => Boolean(challenge));
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("[DailyChallenges] Unexpected failure while loading daily challenges", {
@@ -284,7 +340,9 @@ export async function updateChallengeProgress(
       return [];
     }
 
-    const activeChallenges = (active ?? []) as DailyChallengeRow[];
+    const activeChallenges = ((active ?? []) as DailyChallengeDbRow[])
+      .map(normalizeDailyChallengeRow)
+      .filter((challenge): challenge is DailyChallengeRow => Boolean(challenge));
     if (activeChallenges.length === 0) return [];
 
     const isMatchWinEvent = eventType === "match_win";
@@ -355,7 +413,10 @@ export async function updateChallengeProgress(
       }
 
       if (updated) {
-        updates.push(updated as DailyChallengeRow);
+        const normalized = normalizeDailyChallengeRow(updated as DailyChallengeDbRow);
+        if (normalized) {
+          updates.push(normalized);
+        }
       }
     }
 
@@ -387,7 +448,11 @@ export async function claimChallengeReward(
       .eq("user_id", resolvedUserId)
       .single();
 
-    if (challengeError || !challenge) {
+    const normalizedChallenge = challenge
+      ? normalizeDailyChallengeRow(challenge as DailyChallengeDbRow)
+      : null;
+
+    if (challengeError || !normalizedChallenge) {
       if (challengeError) {
         // eslint-disable-next-line no-console
         console.error("[DailyChallenges] Failed to load challenge for reward claim", {
@@ -399,19 +464,19 @@ export async function claimChallengeReward(
       return { success: false, error: "Challenge not found." };
     }
 
-    if (challenge.claimed) {
+    if (normalizedChallenge.claimed) {
       return { success: false, error: "Challenge reward already claimed." };
     }
 
-    if (!challenge.completed) {
+    if (!normalizedChallenge.completed) {
       return { success: false, error: "Challenge is not complete yet." };
     }
 
-    if (!isChallengeActive(String(challenge.expires_at), now)) {
+    if (!isChallengeActive(String(normalizedChallenge.expires_at), now)) {
       return { success: false, error: "Challenge has expired." };
     }
 
-    const rewardSp = Number(challenge.reward_sp ?? 0);
+    const rewardSp = Number(normalizedChallenge.reward_sp ?? 0);
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("lifetime_sp, balance_sp")
@@ -458,7 +523,7 @@ export async function claimChallengeReward(
       user_id: resolvedUserId,
       amount: rewardSp,
       type: "challenge_reward",
-      description: `Daily challenge reward: ${challenge.description}`,
+      description: `Daily challenge reward: ${normalizedChallenge.description}`,
     });
 
     if (txError) {

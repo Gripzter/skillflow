@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
+import { updateMarketingOptIn } from "@/lib/founders-program";
 
 const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
 
@@ -57,6 +58,7 @@ function SignupContent() {
   const [day, setDay] = useState<number | "">("");
   const [year, setYear] = useState<number | "">("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(true);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [formDisabled, setFormDisabled] = useState(() => {
@@ -232,6 +234,11 @@ function SignupContent() {
             age_verified_at: new Date().toISOString(),
           })
           .eq("id", newUserId);
+        await supabase
+          .from("profiles")
+          .update({ founders_prompt_shown: false })
+          .eq("id", newUserId);
+        await updateMarketingOptIn(newUserId, marketingOptIn);
         await ensureReferralCode(supabase, newUserId, username.trim());
         const { data: existingProfile } = await supabase
           .from("profiles")
@@ -393,6 +400,22 @@ function SignupContent() {
           {errors.confirmPassword && (
             <p className="mt-1.5 text-sm text-red-400">{errors.confirmPassword}</p>
           )}
+        </div>
+
+        {/* Marketing Opt-In */}
+        <div>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={marketingOptIn}
+              onChange={(e) => setMarketingOptIn(e.target.checked)}
+              disabled={formDisabled}
+              className="mt-1 h-4 w-4 shrink-0 appearance-none rounded border border-white/20 bg-[#1A1D27] checked:border-teal checked:bg-teal transition-colors focus:ring-1 focus:ring-teal focus:ring-offset-0 disabled:opacity-60"
+            />
+            <span className="text-sm text-body-gray">
+              Keep me updated with news, events, and exclusive offers from SkillFlow
+            </span>
+          </label>
         </div>
 
         {/* Date of Birth */}

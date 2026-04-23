@@ -13,7 +13,6 @@ import LoadingRing from "@/components/LoadingRing";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
-import WaitlistOverlay from "@/components/launch/WaitlistOverlay";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
@@ -29,9 +28,8 @@ import type { StoredTransaction } from "@/lib/wallet";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { buildLeaderboard } from "@/lib/leaderboard-seeding";
 import {
-  IS_SWEEPSTAKES_LAUNCH,
   LAST_TOUCH_FEATURED_PRIZE_POOL_SP,
-  WAITLIST_UNLOCKED_KEY,
+  IS_SWEEPSTAKES_LAUNCH,
 } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
@@ -42,6 +40,10 @@ import {
   resolveSessionUserId,
   type DailyChallengeRow,
 } from "@/lib/daily-challenges";
+import {
+  markFoundersPromptShown,
+  submitFoundersProgramSignup,
+} from "@/lib/founders-program";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -121,7 +123,6 @@ export default function DashboardPage() {
   const [quickGameStats, setQuickGameStats] = useState<
     { playersOnline: number }[]
   >([]);
-  const [waitlistUnlocked, setWaitlistUnlocked] = useState(!IS_SWEEPSTAKES_LAUNCH);
   const [spData, setSpData] = useState<UserSpData>({
     lifetimeSp: 1000,
     balanceSp: 1000,
@@ -132,6 +133,15 @@ export default function DashboardPage() {
   const [claimingChallengeId, setClaimingChallengeId] = useState<string | null>(null);
   const [resetCountdown, setResetCountdown] = useState(getUtcResetCountdown());
   const [spByMatchId, setSpByMatchId] = useState<Record<string, number>>({});
+  const [showFoundersPrompt, setShowFoundersPrompt] = useState(false);
+  const [foundersEmail, setFoundersEmail] = useState("");
+  const [foundersEmailError, setFoundersEmailError] = useState("");
+  const [foundersSaving, setFoundersSaving] = useState(false);
+
+  const foundersPromptStorageKey = useMemo(
+    () => (userId ? `skillflow_founders_prompt_seen_${userId}` : null),
+    [userId]
+  );
 
   useEffect(() => {
     async function load() {
@@ -145,6 +155,7 @@ export default function DashboardPage() {
         setIsDevMode(user.isDevMode ?? false);
         const { resolvedUserId: effectiveUserId } = await resolveSessionUserId(user.id);
         setUserId(effectiveUserId);
+        setFoundersEmail(user.email ?? "");
         // eslint-disable-next-line no-console
         console.log("[Dashboard] Using user ID for SP/challenges", {
           originalUserId: user.id,
@@ -174,6 +185,23 @@ export default function DashboardPage() {
 
         const supabase = createClient();
         if (supabase) {
+          const { data: foundersPromptData } = await supabase
+            .from("profiles")
+            .select("founders_prompt_shown")
+            .eq("id", effectiveUserId)
+            .maybeSingle();
+
+          const promptShownFromDb = Boolean(
+            (foundersPromptData as { founders_prompt_shown?: boolean } | null)?.founders_prompt_shown
+          );
+          const promptShownLocally =
+            typeof window !== "undefined" &&
+            window.localStorage.getItem(`skillflow_founders_prompt_seen_${effectiveUserId}`) === "true";
+
+          if (!promptShownFromDb && !promptShownLocally) {
+            setShowFoundersPrompt(true);
+          }
+
           const { data: spRows, error: spRowsError } = await supabase
             .from("sp_transactions")
             .select("amount, type, description, created_at")
@@ -235,12 +263,6 @@ export default function DashboardPage() {
     return () => window.clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!IS_SWEEPSTAKES_LAUNCH) return;
-    const unlocked = window.localStorage.getItem(WAITLIST_UNLOCKED_KEY) === "true";
-    setWaitlistUnlocked(unlocked);
-  }, []);
-
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -276,6 +298,47 @@ export default function DashboardPage() {
     } finally {
       setClaimingChallengeId(null);
     }
+  }
+
+  async function dismissFoundersPrompt() {
+    if (!userId) return;
+    setFoundersSaving(true);
+    await markFoundersPromptShown(userId);
+    if (foundersPromptStorageKey) {
+      window.localStorage.setItem(foundersPromptStorageKey, "true");
+    }
+    setShowFoundersPrompt(false);
+    setFoundersSaving(false);
+  }
+
+  async function handleFoundersJoin() {
+    if (!userId || foundersSaving) return;
+    const normalizedEmail = foundersEmail.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      setFoundersEmailError("Enter a valid email address.");
+      return;
+    }
+
+    setFoundersSaving(true);
+    setFoundersEmailError("");
+    const result = await submitFoundersProgramSignup({
+      email: normalizedEmail,
+      userId,
+    });
+    if (!result.success) {
+      setFoundersSaving(false);
+      setFoundersEmailError(result.message);
+      return;
+    }
+
+    await markFoundersPromptShown(userId);
+    if (foundersPromptStorageKey) {
+      window.localStorage.setItem(foundersPromptStorageKey, "true");
+    }
+    setShowFoundersPrompt(false);
+    showToast(result.message, "success");
+    setFoundersSaving(false);
   }
 
   const completedMatchesAll = useMemo(() => {
@@ -315,7 +378,6 @@ export default function DashboardPage() {
       .slice(0, 5);
   }, [completedMatchesAll]);
   const greeting = getGreeting();
-  const dashboardLocked = IS_SWEEPSTAKES_LAUNCH && !waitlistUnlocked;
   const isLoading = loading;
 
   if (loading) {
@@ -324,10 +386,63 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
-      {dashboardLocked ? (
-        <WaitlistOverlay onUnlock={() => setWaitlistUnlocked(true)} />
+      {showFoundersPrompt ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-charcoal/95 px-4">
+          <div className="w-full max-w-xl rounded-card border border-white/10 bg-card p-6 shadow-[0_0_32px_rgba(0,0,0,0.45)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal">
+              FOUNDERS PROGRAM
+            </p>
+            <h2 className="mt-2 text-2xl font-extrabold text-white">FOUNDERS PROGRAM</h2>
+            <p className="mt-3 text-sm text-body-gray">
+              Join the SkillFlow Founders Program and earn exclusive rewards during our beta. Founders get permanent badges, starting credits, and early access to new features.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push("/founders")}
+              className="mt-4 text-sm font-medium text-teal hover:underline"
+            >
+              Learn more about the Founders Program
+            </button>
+
+            <div className="mt-5">
+              <p className="text-sm text-body-gray">Get Founders Program updates at:</p>
+              <input
+                type="email"
+                value={foundersEmail}
+                onChange={(event) => {
+                  setFoundersEmail(event.target.value);
+                  if (foundersEmailError) setFoundersEmailError("");
+                }}
+                placeholder="you@example.com"
+                className="mt-2 w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white placeholder:text-body-gray focus:border-teal focus:outline-none"
+                autoComplete="email"
+                disabled={foundersSaving}
+              />
+              {foundersEmailError ? (
+                <p className="mt-2 text-xs text-red-400">{foundersEmailError}</p>
+              ) : null}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleFoundersJoin}
+              disabled={foundersSaving}
+              className="mt-5 w-full rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {foundersSaving ? "Saving..." : "Join Founders Program"}
+            </button>
+            <button
+              type="button"
+              onClick={dismissFoundersPrompt}
+              disabled={foundersSaving}
+              className="mt-4 w-full text-center text-sm text-body-gray underline-offset-2 hover:text-white hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              I don&apos;t want to be a founder
+            </button>
+          </div>
+        </div>
       ) : null}
-      <div className={dashboardLocked ? "pointer-events-none select-none blur-[2px]" : ""}>
+      <div>
       {/* Ambient background effects (match wallet/play/leaderboard) */}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <div

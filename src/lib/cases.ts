@@ -107,7 +107,8 @@ type PlayerInventoryRow = {
   item_name: string;
   rarity: CaseItemRarity;
   equipped: boolean;
-  created_at: string;
+  created_at?: string;
+  acquired_at?: string;
 };
 
 export async function resolveCaseUserId(
@@ -354,28 +355,115 @@ export async function getUserInventory(userId: string): Promise<PlayerInventoryR
   // eslint-disable-next-line no-console
   console.log("[getUserInventory] resolvedUserId:", resolvedUserId);
   if (!supabase) return [];
-  const { data, error } = await supabase
+
+  const normalizeRows = (rows: unknown[]): PlayerInventoryRow[] => {
+    const normalized = rows.map((row) => {
+      const inventoryRow = row as PlayerInventoryRow;
+      return {
+        ...inventoryRow,
+        created_at: inventoryRow.created_at ?? inventoryRow.acquired_at,
+      };
+    });
+    return normalized.sort((a, b) => {
+      const aTime = new Date(a.created_at ?? "").getTime();
+      const bTime = new Date(b.created_at ?? "").getTime();
+      return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+    });
+  };
+
+  const { data: typedData, error: typedError } = await supabase
     .from("player_inventory")
     .select("*")
-    .eq("user_id", resolvedUserId)
-    .order("created_at", { ascending: false });
+    .eq("user_id", resolvedUserId);
+
   // eslint-disable-next-line no-console
-  console.log("[getUserInventory] query result:", { data, error });
-  if (error) {
+  console.log("[getUserInventory] typed query result:", { data: typedData, error: typedError });
+  if (!typedError) {
+    const rows = normalizeRows((typedData ?? []) as unknown[]);
     // eslint-disable-next-line no-console
-    console.error("[Inventory] Failed to load inventory rows", {
+    console.log("[Inventory] Loaded inventory rows via typed query", {
       userId: resolvedUserId,
-      error: error.message,
+      count: rows.length,
+      itemIds: rows.map((row) => row.item_id),
+    });
+    return rows;
+  }
+
+  // eslint-disable-next-line no-console
+  console.warn("[Inventory] Typed query failed, trying minimal column fallback", {
+    userId: resolvedUserId,
+    error: typedError.message,
+  });
+
+  const { data: fallbackData, error: fallbackError } = await supabase
+    .from("player_inventory")
+    .select("id, user_id, item_type, item_id, item_name, rarity, equipped, acquired_at")
+    .eq("user_id", resolvedUserId);
+
+  // eslint-disable-next-line no-console
+  console.log("[getUserInventory] minimal fallback query result:", { data: fallbackData, error: fallbackError });
+  if (!fallbackError) {
+    const rows = normalizeRows((fallbackData ?? []) as unknown[]);
+    // eslint-disable-next-line no-console
+    console.log("[Inventory] Loaded inventory rows via minimal fallback query", {
+      userId: resolvedUserId,
+      count: rows.length,
+      itemIds: rows.map((row) => row.item_id),
+    });
+    return rows;
+  }
+
+  // eslint-disable-next-line no-console
+  console.warn("[Inventory] Minimal fallback query failed, trying REST API fallback", {
+    userId: resolvedUserId,
+    error: fallbackError.message,
+  });
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    // eslint-disable-next-line no-console
+    console.error("[Inventory] Supabase REST fallback unavailable: missing env vars", {
+      userId: resolvedUserId,
     });
     return [];
   }
-  // eslint-disable-next-line no-console
-  console.log("[Inventory] Loaded inventory rows", {
-    userId: resolvedUserId,
-    count: (data ?? []).length,
-    itemIds: (data ?? []).map((row) => row.item_id),
-  });
-  return (data ?? []) as PlayerInventoryRow[];
+
+  try {
+    const restUrl = `${supabaseUrl}/rest/v1/player_inventory?user_id=eq.${encodeURIComponent(
+      resolvedUserId
+    )}&select=*`;
+    const response = await fetch(restUrl, {
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+      },
+    });
+    if (!response.ok) {
+      // eslint-disable-next-line no-console
+      console.error("[Inventory] REST fallback request failed", {
+        userId: resolvedUserId,
+        status: response.status,
+      });
+      return [];
+    }
+    const restRows = (await response.json()) as unknown[];
+    const rows = normalizeRows(restRows ?? []);
+    // eslint-disable-next-line no-console
+    console.log("[Inventory] Loaded inventory rows via REST fallback", {
+      userId: resolvedUserId,
+      count: rows.length,
+      itemIds: rows.map((row) => row.item_id),
+    });
+    return rows;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("[Inventory] REST fallback threw unexpected error", {
+      userId: resolvedUserId,
+      error,
+    });
+    return [];
+  }
 }
 
 export async function equipItem(
