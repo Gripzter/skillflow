@@ -18,7 +18,18 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "SkillFlow — Bet On Yourself",
   description:
-    "Skill-based wagering platform. Compete head-to-head in skill-based games. No luck. No house edge. Just you vs your opponent.",
+    "Compete in skill-based games. Earn SkillPoints. Climb ranks. Open cases. Join the Founders Program during beta and earn exclusive rewards.",
+  keywords:
+    "skill gaming, competitive gaming, esports, chess, connect 4, reaction games, earn rewards",
+  openGraph: {
+    title: "SkillFlow — Bet On Yourself",
+    description:
+      "Compete in skill-based games. Earn SkillPoints. Climb ranks. Open cases. Join the Founders Program during beta and earn exclusive rewards.",
+    url: "https://skillflow.gg",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({
