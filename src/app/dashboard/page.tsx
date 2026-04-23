@@ -13,6 +13,7 @@ import LoadingRing from "@/components/LoadingRing";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
+import OnboardingFlow from "@/components/OnboardingFlow";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
@@ -134,6 +135,7 @@ export default function DashboardPage() {
   const [resetCountdown, setResetCountdown] = useState(getUtcResetCountdown());
   const [spByMatchId, setSpByMatchId] = useState<Record<string, number>>({});
   const [showFoundersPrompt, setShowFoundersPrompt] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [foundersEmail, setFoundersEmail] = useState("");
   const [foundersEmailError, setFoundersEmailError] = useState("");
   const [foundersSaving, setFoundersSaving] = useState(false);
@@ -185,20 +187,45 @@ export default function DashboardPage() {
 
         const supabase = createClient();
         if (supabase) {
-          const { data: foundersPromptData } = await supabase
+          const { data: onboardingData, error: onboardingError } = await supabase
             .from("profiles")
-            .select("founders_prompt_shown")
+            .select("onboarding_completed, founders_prompt_shown")
             .eq("id", effectiveUserId)
             .maybeSingle();
 
-          const promptShownFromDb = Boolean(
-            (foundersPromptData as { founders_prompt_shown?: boolean } | null)?.founders_prompt_shown
-          );
           const promptShownLocally =
             typeof window !== "undefined" &&
             window.localStorage.getItem(`skillflow_founders_prompt_seen_${effectiveUserId}`) === "true";
 
-          if (!promptShownFromDb && !promptShownLocally) {
+          let shouldShowOnboarding = false;
+          let shouldShowFounders = false;
+
+          if (onboardingError?.code === "42703") {
+            const { data: foundersPromptData } = await supabase
+              .from("profiles")
+              .select("founders_prompt_shown")
+              .eq("id", effectiveUserId)
+              .maybeSingle();
+
+            const promptShownFromDb = Boolean(
+              (foundersPromptData as { founders_prompt_shown?: boolean } | null)?.founders_prompt_shown
+            );
+            shouldShowOnboarding = !promptShownFromDb;
+            shouldShowFounders = false;
+          } else {
+            const profileRow = onboardingData as
+              | { onboarding_completed?: boolean | null; founders_prompt_shown?: boolean | null }
+              | null;
+            const onboardingCompleted = profileRow?.onboarding_completed === true;
+            const promptShownFromDb = Boolean(profileRow?.founders_prompt_shown);
+            shouldShowOnboarding = !onboardingCompleted;
+            shouldShowFounders = !shouldShowOnboarding && !promptShownFromDb && !promptShownLocally;
+          }
+
+          if (shouldShowOnboarding) {
+            setShowOnboarding(true);
+          }
+          if (shouldShowFounders && !promptShownLocally) {
             setShowFoundersPrompt(true);
           }
 
@@ -386,7 +413,19 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
-      {showFoundersPrompt ? (
+      {showOnboarding && userId ? (
+        <OnboardingFlow
+          userId={userId}
+          onComplete={() => {
+            setShowOnboarding(false);
+            setShowFoundersPrompt(false);
+            if (foundersPromptStorageKey) {
+              window.localStorage.setItem(foundersPromptStorageKey, "true");
+            }
+          }}
+        />
+      ) : null}
+      {showFoundersPrompt && !showOnboarding ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-charcoal/95 px-4">
           <div className="w-full max-w-xl rounded-card border border-white/10 bg-card p-6 shadow-[0_0_32px_rgba(0,0,0,0.45)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal">

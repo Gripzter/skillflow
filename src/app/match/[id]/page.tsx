@@ -33,11 +33,13 @@ import TypingRace from "@/components/games/TypingRace";
 import { type ChatMessage } from "@/components/GameChat";
 import GameLayout, { type GameLayoutLogEntry } from "@/components/game/GameLayout";
 import GameResultOverlay from "@/components/game/GameResultOverlay";
+import FirstMatchCelebration from "@/components/FirstMatchCelebration";
 import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getUserSPData, type RankTier } from "@/lib/skillpoints";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -153,8 +155,14 @@ function MatchPageContent() {
   const [moveLog, setMoveLog] = useState<MoveLogEntry[]>([]);
   /** Set to true when we receive an afk_forfeit event from the opponent. */
   const [afkForfeitPending, setAfkForfeitPending] = useState(false);
+  const [preMatchTotalMatches, setPreMatchTotalMatches] = useState<number | null>(null);
+  const [showFirstMatchCelebration, setShowFirstMatchCelebration] = useState(false);
+  const [celebrationEarnedSp, setCelebrationEarnedSp] = useState(100);
+  const [celebrationLifetimeSp, setCelebrationLifetimeSp] = useState(1000);
+  const [celebrationRankTier, setCelebrationRankTier] = useState<RankTier>("bronze");
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
+  const firstCelebrationTriggeredRef = useRef(false);
   const matchRef = useRef<StoredMatch | null>(null);
   const matchStartMsRef = useRef<number>(Date.now());
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -257,6 +265,15 @@ function MatchPageContent() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
+        const supabase = createClient();
+        if (supabase) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("total_matches")
+            .eq("id", user.id)
+            .maybeSingle();
+          setPreMatchTotalMatches(Number((profileData as { total_matches?: number } | null)?.total_matches ?? 0));
+        }
         const m = await getMatch(matchId);
         if (!m) {
           setLoadError("Match not found. It may have been cancelled or the link is invalid.");
@@ -742,6 +759,22 @@ function MatchPageContent() {
       if (persistTimeoutRef.current) clearTimeout(persistTimeoutRef.current);
     };
   }, [match, moveLog]);
+
+  useEffect(() => {
+    if (!outcome || preMatchTotalMatches !== 0 || firstCelebrationTriggeredRef.current) return;
+    firstCelebrationTriggeredRef.current = true;
+    setCelebrationEarnedSp(outcome === "victory" ? 100 : 25);
+    setShowFirstMatchCelebration(true);
+
+    if (!userId) return;
+    getUserSPData(userId)
+      .then((spData) => {
+        if (!spData) return;
+        setCelebrationLifetimeSp(spData.lifetimeSp);
+        setCelebrationRankTier(spData.rankTier);
+      })
+      .catch(() => {});
+  }, [outcome, preMatchTotalMatches, userId]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -1389,6 +1422,16 @@ function MatchPageContent() {
           onLeave={() => { window.location.href = "/play"; }}
         />
       )}
+
+      {showFirstMatchCelebration ? (
+        <FirstMatchCelebration
+          earnedSp={celebrationEarnedSp}
+          lifetimeSp={celebrationLifetimeSp}
+          rankTier={celebrationRankTier}
+          gameSlug={match.gameType}
+          onClose={() => setShowFirstMatchCelebration(false)}
+        />
+      ) : null}
 
       {/* Report Issue modal */}
       {reportOpen && (

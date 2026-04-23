@@ -238,6 +238,10 @@ function SignupContent() {
           .from("profiles")
           .update({ founders_prompt_shown: false })
           .eq("id", newUserId);
+        await supabase
+          .from("profiles")
+          .update({ onboarding_completed: false })
+          .eq("id", newUserId);
         await updateMarketingOptIn(newUserId, marketingOptIn);
         await ensureReferralCode(supabase, newUserId, username.trim());
         const { data: existingProfile } = await supabase
