@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { createClient } from "@/lib/supabase";
 
 type OnboardingStep = 0 | 1 | 2 | 3;
@@ -59,7 +60,12 @@ const FIRST_GAMES: GameCard[] = [
 export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowProps) {
   const [step, setStep] = useState<OnboardingStep>(0);
   const [saving, setSaving] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const founderProgress = 10;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function markOnboardingComplete() {
     if (saving) return;
@@ -96,8 +102,10 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
     await markOnboardingComplete();
   }
 
-  return (
-    <div className="fixed inset-0 z-50 min-h-screen w-full overflow-hidden bg-[#0E0E12] text-white">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] bg-[#0E0E12] text-white">
       {step < 3 ? (
         <button
           type="button"
@@ -109,33 +117,36 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
         </button>
       ) : null}
 
-      <div className="relative flex h-screen flex-col px-4 pb-8 pt-8 md:px-10 md:pt-10">
-        <div className="z-10 text-center">
+      <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-6 md:px-10">
+        <div className="w-full max-w-5xl">
+          <div className="z-10 text-center">
           <p className="inline-flex rounded-full border border-[#2A2A3A] bg-[#1A1A24] px-4 py-1.5 text-base font-semibold tracking-wide text-white">
             SkillFlow
           </p>
         </div>
 
-        <div className="relative mt-5 flex-1 overflow-hidden">
+        <div className="relative mt-5 overflow-hidden">
           <div
-            className="flex h-full w-[400%] transition-transform duration-300 ease-out"
+            className="flex w-[400%] transition-transform duration-300 ease-out"
             style={{ transform: `translateX(-${step * 25}%)` }}
           >
-            <section className="flex h-full w-full shrink-0 flex-col items-center justify-center text-center">
-              <h2 className="welcome-fade text-4xl font-black tracking-tight text-white md:text-6xl">
+            <section className="flex w-full shrink-0 flex-col items-center justify-center text-center">
+              <div className="max-w-md mx-auto text-center">
+                <h2 className="welcome-fade text-3xl font-black tracking-tight text-white md:text-5xl">
                 Welcome to SkillFlow
-              </h2>
-              <p className="mt-4 max-w-2xl text-base text-gray-400 md:text-lg">
+                </h2>
+                <p className="mt-4 text-base text-gray-400 md:text-lg">
                 You just joined the beta. This is your chance to earn rewards that will never be
                 available again.
-              </p>
-              <div className="sp-gift-glow mt-8 w-full max-w-sm rounded-2xl border border-[#2A2A3A] bg-[#1A1A24] p-6 md:mt-10">
+                </p>
+                <div className="sp-gift-glow mt-8 w-full max-w-xs mx-auto rounded-2xl border border-[#2A2A3A] bg-[#1A1A24] p-6 md:mt-10">
                 <p className="text-4xl font-black text-white md:text-5xl">+1,000 SP</p>
                 <p className="mt-2 text-sm text-gray-400">Your starting SkillPoints</p>
+                </div>
               </div>
             </section>
 
-            <section className="flex h-full w-full shrink-0 flex-col items-center justify-center">
+            <section className="flex w-full shrink-0 flex-col items-center justify-center">
               <h2 className="text-center text-4xl font-black text-white md:text-5xl">How It Works</h2>
               <div className="mt-7 grid w-full max-w-5xl gap-4 md:grid-cols-3">
                 <article className="rounded-xl border border-[#2A2A3A] bg-[#1A1A24] p-6 text-center">
@@ -165,7 +176,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
               </div>
             </section>
 
-            <section className="flex h-full w-full shrink-0 items-center justify-center">
+            <section className="flex w-full shrink-0 items-center justify-center">
               <div className="w-full max-w-3xl rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
                 <div className="rounded-2xl bg-[#1A1A24] p-6 md:p-8">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#FF5E00]">
@@ -195,7 +206,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
               </div>
             </section>
 
-            <section className="flex h-full w-full shrink-0 flex-col items-center justify-center">
+            <section className="flex w-full shrink-0 flex-col items-center justify-center">
               <h2 className="text-center text-4xl font-black text-white md:text-5xl">
                 Choose your first game
               </h2>
@@ -229,6 +240,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             </button>
           ) : null}
         </div>
+        </div>
       </div>
 
       <style jsx>{`
@@ -258,6 +270,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
