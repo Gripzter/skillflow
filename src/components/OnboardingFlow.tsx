@@ -105,7 +105,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] bg-[#0E0E12] text-white">
+    <div className="fixed inset-0 z-[9999] overflow-y-auto bg-[#0E0E12] text-white">
       {step < 3 ? (
         <button
           type="button"
@@ -117,38 +117,34 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
         </button>
       ) : null}
 
-      <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-6 md:px-10">
-        <div className="w-full max-w-5xl">
-          <div className="z-10 text-center">
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12">
+        <div className="w-full text-center">
           <p className="inline-flex rounded-full border border-[#2A2A3A] bg-[#1A1A24] px-4 py-1.5 text-base font-semibold tracking-wide text-white">
             SkillFlow
           </p>
         </div>
 
-        <div className="relative mt-5 overflow-hidden">
-          <div
-            className="flex w-[400%] transition-transform duration-300 ease-out"
-            style={{ transform: `translateX(-${step * 25}%)` }}
-          >
-            <section className="flex w-full shrink-0 flex-col items-center justify-center text-center">
-              <div className="max-w-md mx-auto text-center">
-                <h2 className="welcome-fade text-3xl font-black tracking-tight text-white md:text-5xl">
+        <div className="mt-8 w-full">
+          {step === 0 && (
+            <div className="mx-auto w-full max-w-lg space-y-8 text-center">
+              <h2 className="text-3xl font-black tracking-tight text-white md:text-5xl">
                 Welcome to SkillFlow
-                </h2>
-                <p className="mt-4 text-base text-gray-400 md:text-lg">
+              </h2>
+              <p className="text-base text-gray-400 md:text-lg">
                 You just joined the beta. This is your chance to earn rewards that will never be
                 available again.
-                </p>
-                <div className="sp-gift-glow mt-8 w-full max-w-xs mx-auto rounded-2xl border border-[#2A2A3A] bg-[#1A1A24] p-6 md:mt-10">
+              </p>
+              <div className="mx-auto w-full max-w-xs rounded-2xl border border-[#2A2A3A] bg-[#1A1A24] p-6">
                 <p className="text-4xl font-black text-white md:text-5xl">+1,000 SP</p>
                 <p className="mt-2 text-sm text-gray-400">Your starting SkillPoints</p>
-                </div>
               </div>
-            </section>
+            </div>
+          )}
 
-            <section className="flex w-full shrink-0 flex-col items-center justify-center">
-              <h2 className="text-center text-4xl font-black text-white md:text-5xl">How It Works</h2>
-              <div className="mt-7 grid w-full max-w-5xl gap-4 md:grid-cols-3">
+          {step === 1 && (
+            <div className="mx-auto w-full max-w-lg space-y-8 text-center">
+              <h2 className="text-3xl font-black text-white md:text-5xl">How It Works</h2>
+              <div className="grid gap-4 md:grid-cols-3">
                 <article className="rounded-xl border border-[#2A2A3A] bg-[#1A1A24] p-6 text-center">
                   <p className="text-3xl">🎮</p>
                   <p className="mt-3 text-sm font-bold uppercase tracking-wider text-white">PLAY</p>
@@ -174,10 +170,12 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   </p>
                 </article>
               </div>
-            </section>
+            </div>
+          )}
 
-            <section className="flex w-full shrink-0 items-center justify-center">
-              <div className="w-full max-w-3xl rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
+          {step === 2 && (
+            <div className="mx-auto w-full max-w-lg space-y-8 text-center">
+              <div className="w-full rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
                 <div className="rounded-2xl bg-[#1A1A24] p-6 md:p-8">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#FF5E00]">
                     BETA FOUNDERS PROGRAM
@@ -204,13 +202,15 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
+          )}
 
-            <section className="flex w-full shrink-0 flex-col items-center justify-center">
-              <h2 className="text-center text-4xl font-black text-white md:text-5xl">
+          {step === 3 && (
+            <div className="mx-auto w-full max-w-lg space-y-8 text-center">
+              <h2 className="text-3xl font-black text-white md:text-5xl">
                 Choose your first game
               </h2>
-              <div className="mt-6 grid w-full max-w-5xl grid-cols-2 gap-3 md:grid-cols-3">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {FIRST_GAMES.map((game) => (
                   <button
                     key={game.slug}
@@ -225,11 +225,11 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   </button>
                 ))}
               </div>
-            </section>
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="z-10 mt-4 flex justify-center">
+        <div className="mt-8 flex justify-center">
           {step < 3 ? (
             <button
               type="button"
@@ -240,36 +240,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             </button>
           ) : null}
         </div>
-        </div>
       </div>
-
-      <style jsx>{`
-        .welcome-fade {
-          animation: fadeIn 0.6s ease-out;
-        }
-        .sp-gift-glow {
-          animation: pulseGlow 2.2s ease-in-out infinite;
-        }
-        @keyframes pulseGlow {
-          0%,
-          100% {
-            box-shadow: 0 0 24px rgba(255, 94, 0, 0.28);
-          }
-          50% {
-            box-shadow: 0 0 34px rgba(255, 94, 0, 0.46);
-          }
-        }
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(6px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>,
     document.body
   );
