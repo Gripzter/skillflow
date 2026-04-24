@@ -39,7 +39,6 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { getUserSPData, type RankTier } from "@/lib/skillpoints";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -155,11 +154,9 @@ function MatchPageContent() {
   const [moveLog, setMoveLog] = useState<MoveLogEntry[]>([]);
   /** Set to true when we receive an afk_forfeit event from the opponent. */
   const [afkForfeitPending, setAfkForfeitPending] = useState(false);
-  const [preMatchTotalMatches, setPreMatchTotalMatches] = useState<number | null>(null);
+  const [preMatchCompletedCount, setPreMatchCompletedCount] = useState<number | null>(null);
   const [showFirstMatchCelebration, setShowFirstMatchCelebration] = useState(false);
   const [celebrationEarnedSp, setCelebrationEarnedSp] = useState(100);
-  const [celebrationLifetimeSp, setCelebrationLifetimeSp] = useState(1000);
-  const [celebrationRankTier, setCelebrationRankTier] = useState<RankTier>("bronze");
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const firstCelebrationTriggeredRef = useRef(false);
@@ -267,12 +264,12 @@ function MatchPageContent() {
         setIsDevMode(user.isDevMode ?? false);
         const supabase = createClient();
         if (supabase) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("total_matches")
-            .eq("id", user.id)
-            .maybeSingle();
-          setPreMatchTotalMatches(Number((profileData as { total_matches?: number } | null)?.total_matches ?? 0));
+          const { count: completedCount } = await supabase
+            .from("matches")
+            .select("id", { count: "exact", head: true })
+            .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+            .eq("status", "completed");
+          setPreMatchCompletedCount(completedCount ?? 0);
         }
         const m = await getMatch(matchId);
         if (!m) {
@@ -761,20 +758,52 @@ function MatchPageContent() {
   }, [match, moveLog]);
 
   useEffect(() => {
-    if (!outcome || preMatchTotalMatches !== 0 || firstCelebrationTriggeredRef.current) return;
-    firstCelebrationTriggeredRef.current = true;
-    setCelebrationEarnedSp(outcome === "victory" ? 100 : 25);
-    setShowFirstMatchCelebration(true);
+    if (!outcome || !userId || !match) return;
+    if (preMatchCompletedCount !== 0 || firstCelebrationTriggeredRef.current) return;
 
-    if (!userId) return;
-    getUserSPData(userId)
-      .then((spData) => {
-        if (!spData) return;
-        setCelebrationLifetimeSp(spData.lifetimeSp);
-        setCelebrationRankTier(spData.rankTier);
-      })
-      .catch(() => {});
-  }, [outcome, preMatchTotalMatches, userId]);
+    let cancelled = false;
+
+    async function maybeShowFirstMatchCelebration() {
+      const supabase = createClient();
+      if (!supabase) return;
+
+      const { count: completedCount, error: countError } = await supabase
+        .from("matches")
+        .select("id", { count: "exact", head: true })
+        .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+        .eq("status", "completed");
+
+      if (countError || cancelled || completedCount !== 1) return;
+
+      const fallbackEarned = outcome === "victory" ? 100 : 25;
+      let earnedSp = fallbackEarned;
+
+      const { data: spRows } = await supabase
+        .from("sp_transactions")
+        .select("amount")
+        .eq("user_id", userId)
+        .in("type", ["match_win", "match_loss", "daily_bonus", "streak_bonus"])
+        .ilike("description", `%match:${match.id}%`);
+
+      if (spRows && spRows.length > 0) {
+        const total = spRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+        if (Number.isFinite(total) && total > 0) {
+          earnedSp = total;
+        }
+      }
+
+      if (cancelled) return;
+      firstCelebrationTriggeredRef.current = true;
+      setCelebrationEarnedSp(earnedSp);
+      setShowFirstMatchCelebration(true);
+    }
+
+    void maybeShowFirstMatchCelebration();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [outcome, preMatchCompletedCount, userId, match]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -1426,8 +1455,6 @@ function MatchPageContent() {
       {showFirstMatchCelebration ? (
         <FirstMatchCelebration
           earnedSp={celebrationEarnedSp}
-          lifetimeSp={celebrationLifetimeSp}
-          rankTier={celebrationRankTier}
           gameSlug={match.gameType}
           onClose={() => setShowFirstMatchCelebration(false)}
         />

@@ -1,24 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import RankProgressBar from "@/components/RankProgressBar";
 import type { RankTier } from "@/lib/skillpoints";
 
 interface FirstMatchCelebrationProps {
   earnedSp: number;
-  lifetimeSp: number;
-  rankTier: RankTier;
+  lifetimeSp?: number;
+  rankTier?: RankTier;
   gameSlug: string;
   onClose: () => void;
 }
 
-const AUTO_CLOSE_MS = 5000;
+const AUTO_CLOSE_MS = 8000;
 const CONFETTI_DOTS = 28;
 
 export default function FirstMatchCelebration({
   earnedSp,
-  lifetimeSp,
-  rankTier,
   gameSlug,
   onClose,
 }: FirstMatchCelebrationProps) {
@@ -61,7 +58,7 @@ export default function FirstMatchCelebration({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#06070D]/92 px-4">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-orange-300/35 bg-[#0E111B] p-6 shadow-[0_0_60px_rgba(255,94,0,0.22)] md:p-8">
+      <div className="first-match-pop relative w-full max-w-2xl overflow-hidden rounded-2xl border border-orange-300/35 bg-[#0E111B] p-6 shadow-[0_0_60px_rgba(255,94,0,0.22)] md:p-8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,94,0,0.14),transparent_60%)]" />
 
         <div className="confetti-burst pointer-events-none absolute left-1/2 top-1/2">
@@ -83,22 +80,17 @@ export default function FirstMatchCelebration({
         </div>
 
         <div className="relative text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-200/90">
-            First Match Complete!
-          </p>
-          <h2 className="mt-3 text-3xl font-black tracking-tight text-white md:text-5xl">
-            FIRST MATCH COMPLETE!
+          <h2 className="mt-1 text-3xl font-black tracking-tight text-white md:text-5xl">
+            FIRST MATCH COMPLETE! 🎉
           </h2>
+          <p className="mt-3 text-sm text-gray-300 md:text-base">
+            You just earned your first SkillPoints. Keep playing to climb the ranks.
+          </p>
           <p className="mt-5 text-4xl font-black text-orange-300 md:text-6xl">
             +{displaySp.toLocaleString()} SP
           </p>
-          <p className="mt-2 text-sm text-gray-300">Your Founders journey has begun.</p>
 
-          <div className="mt-7 rounded-xl border border-white/10 bg-black/20 p-4">
-            <RankProgressBar lifetimeSp={lifetimeSp} currentTier={rankTier} />
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-7 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => {
@@ -124,6 +116,10 @@ export default function FirstMatchCelebration({
       </div>
 
       <style jsx>{`
+        .first-match-pop {
+          animation: popIn 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+          transform-origin: center;
+        }
         .dot {
           position: absolute;
           left: 0;
@@ -159,6 +155,16 @@ export default function FirstMatchCelebration({
           100% {
             opacity: 0;
             transform: translate3d(var(--dx), var(--dy), 0) scale(1.05);
+          }
+        }
+        @keyframes popIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
           }
         }
       `}</style>
