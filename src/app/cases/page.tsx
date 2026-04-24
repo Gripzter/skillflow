@@ -8,6 +8,7 @@ import LoadingRing from "@/components/LoadingRing";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import CaseOpeningReel from "@/components/CaseOpeningReel";
 import CaseResultModal from "@/components/CaseResultModal";
+import SPIcon from "@/components/SPIcon";
 import { useToast } from "@/components/Toast";
 import {
   CASE_TIERS,
@@ -40,6 +41,17 @@ function parseRewardDescription(description: string | null): string {
   const parts = description.split(":");
   if (parts.length < 2) return description;
   return parts.slice(1).join(":").trim();
+}
+
+function renderDropName(itemName: string, source: "sp" | "inventory") {
+  if (source !== "sp") return itemName;
+  const match = itemName.match(/([+-]?\d[\d,]*)\s*SP/i);
+  if (!match) return itemName;
+  return (
+    <span className="inline-flex items-center gap-1">
+      {match[1]} <SPIcon size={14} />
+    </span>
+  );
 }
 
 export default function CasesPage() {
@@ -194,11 +206,17 @@ export default function CasesPage() {
         <section className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-white">Cases</h1>
-            <p className="mt-1 text-body-gray">Spend SP. Open cases. Win rewards.</p>
+            <p className="mt-1 text-body-gray">
+              Spend <SPIcon size={14} />. Open cases. Win rewards.
+            </p>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/30 px-4 py-2 text-sm">
-            <span className="text-body-gray">SP Balance: </span>
-            <span className="font-semibold text-teal">{spBalance.toLocaleString()} SP</span>
+            <span className="text-body-gray inline-flex items-center gap-1">
+              <SPIcon size={14} /> Balance:
+            </span>{" "}
+            <span className="font-semibold text-teal inline-flex items-center gap-1">
+              {spBalance.toLocaleString()} <SPIcon size={14} />
+            </span>
           </div>
         </section>
 
@@ -211,7 +229,9 @@ export default function CasesPage() {
               <article key={caseId} className="rounded-card border border-white/10 bg-card/80 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-white">{tier.name}</h2>
-                  <span className="text-sm font-medium text-body-gray">{tier.cost_sp.toLocaleString()} SP</span>
+                  <span className="text-sm font-medium text-body-gray inline-flex items-center gap-1">
+                    {tier.cost_sp.toLocaleString()} <SPIcon size={14} />
+                  </span>
                 </div>
                 <div
                   className="mt-4 flex h-28 items-center justify-center rounded-xl border text-sm font-semibold"
@@ -234,7 +254,7 @@ export default function CasesPage() {
                       : "cursor-not-allowed bg-white/10 text-gray-500"
                   }`}
                 >
-                  {canAfford ? "Open" : "Not enough SP"}
+                  {canAfford ? "Open" : "Not enough"}
                 </button>
               </article>
             );
@@ -277,9 +297,17 @@ export default function CasesPage() {
                   className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-4 py-3"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{drop.itemName}</p>
+                    <p className="text-sm font-medium text-white">
+                      {renderDropName(drop.itemName, drop.source)}
+                    </p>
                     <p className="text-xs text-body-gray">
-                      {drop.source === "sp" ? "SP reward" : "Inventory item"}
+                      {drop.source === "sp" ? (
+                        <span className="inline-flex items-center gap-1">
+                          <SPIcon size={12} /> reward
+                        </span>
+                      ) : (
+                        "Inventory item"
+                      )}
                     </p>
                   </div>
                   <p className="text-xs text-body-gray">{new Date(drop.createdAt).toLocaleString()}</p>

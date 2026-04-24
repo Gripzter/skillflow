@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
+import SPIcon from "@/components/SPIcon";
 
 const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
 const SWEEPSTAKES_STAKE_MULTIPLIER = 100;
@@ -363,7 +364,7 @@ export default function PlaySpellingBeePage() {
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <p className="mt-1 text-body-gray">
               {IS_SWEEPSTAKES_LAUNCH
-                ? "Both players commit the same SP amount. Winner takes the pot minus 5% platform fee."
+                ? "Both players commit the same amount. Winner takes the pot minus 5% platform fee."
                 : "Both players put up the same amount. Winner takes all minus 5% platform fee."}
             </p>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -381,7 +382,13 @@ export default function PlaySpellingBeePage() {
                       : "border-amber-500/50 bg-[#1A1D27] text-white hover:border-amber-500"
                   }`}
                 >
-                  {IS_SWEEPSTAKES_LAUNCH ? `${amt * SWEEPSTAKES_STAKE_MULTIPLIER} SP` : `$${amt}`}
+                  {IS_SWEEPSTAKES_LAUNCH ? (
+                    <span className="inline-flex items-center gap-1">
+                      {amt * SWEEPSTAKES_STAKE_MULTIPLIER} <SPIcon size={14} />
+                    </span>
+                  ) : (
+                    `$${amt}`
+                  )}
                 </button>
               ))}
             </div>

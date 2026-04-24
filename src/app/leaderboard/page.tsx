@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
 import RankBadge from "@/components/RankBadge";
+import SPIcon from "@/components/SPIcon";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
@@ -280,7 +281,17 @@ export default function LeaderboardPage() {
               {podium[1].isCurrentUser && (
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-lg font-bold text-white">{isPractice ? `${podium[1].totalMatches} matches` : getMainStat(podium[1], activeTab)}</p>
+              <p className="mt-2 text-lg font-bold text-white">
+                {isPractice ? (
+                  `${podium[1].totalMatches} matches`
+                ) : activeTab === "skillpoints" ? (
+                  <span className="inline-flex items-center gap-1">
+                    {(podium[1].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
+                  </span>
+                ) : (
+                  getMainStat(podium[1], activeTab)
+                )}
+              </p>
             </div>
           )}
           {podium[0] && (
@@ -299,7 +310,17 @@ export default function LeaderboardPage() {
               {podium[0].isCurrentUser && (
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-xl font-bold text-[#FFD700]">{isPractice ? `${podium[0].totalMatches} matches` : getMainStat(podium[0], activeTab)}</p>
+              <p className="mt-2 text-xl font-bold text-[#FFD700]">
+                {isPractice ? (
+                  `${podium[0].totalMatches} matches`
+                ) : activeTab === "skillpoints" ? (
+                  <span className="inline-flex items-center gap-1">
+                    {(podium[0].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={18} />
+                  </span>
+                ) : (
+                  getMainStat(podium[0], activeTab)
+                )}
+              </p>
             </div>
           )}
           {podium[2] && (
@@ -317,7 +338,17 @@ export default function LeaderboardPage() {
               {podium[2].isCurrentUser && (
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
-              <p className="mt-2 text-lg font-bold text-white">{isPractice ? `${podium[2].totalMatches} matches` : getMainStat(podium[2], activeTab)}</p>
+              <p className="mt-2 text-lg font-bold text-white">
+                {isPractice ? (
+                  `${podium[2].totalMatches} matches`
+                ) : activeTab === "skillpoints" ? (
+                  <span className="inline-flex items-center gap-1">
+                    {(podium[2].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
+                  </span>
+                ) : (
+                  getMainStat(podium[2], activeTab)
+                )}
+              </p>
             </div>
           )}
         </div>
@@ -444,7 +475,9 @@ export default function LeaderboardPage() {
                       </td>
                       {activeTab === "skillpoints" ? (
                         <td className="px-4 py-3 font-semibold text-white">
-                          {(player.lifetimeSp ?? 0).toLocaleString()} SP
+                          <span className="inline-flex items-center gap-1">
+                            {(player.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
+                          </span>
                         </td>
                       ) : (
                         <>
@@ -508,7 +541,11 @@ export default function LeaderboardPage() {
                   <div className="text-right shrink-0">
                     <p className="font-semibold text-white">
                       {activeTab === "skillpoints"
-                        ? `${(player.lifetimeSp ?? 0).toLocaleString()} SP`
+                        ? (
+                            <span className="inline-flex items-center gap-1">
+                              {(player.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={14} />
+                            </span>
+                          )
                         : isPractice
                           ? player.totalMatches
                           : getMainStat(player, activeTab)}
@@ -556,7 +593,17 @@ export default function LeaderboardPage() {
               </div>
               <span className="font-medium text-white">{currentUserPlayer.username}</span>
             </div>
-            <span className="font-semibold text-white">{isPractice ? `${currentUserPlayer.totalMatches} matches` : getMainStat(currentUserPlayer, activeTab)}</span>
+            <span className="font-semibold text-white">
+              {isPractice ? (
+                `${currentUserPlayer.totalMatches} matches`
+              ) : activeTab === "skillpoints" ? (
+                <span className="inline-flex items-center gap-1">
+                  {(currentUserPlayer.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={14} />
+                </span>
+              ) : (
+                getMainStat(currentUserPlayer, activeTab)
+              )}
+            </span>
           </div>
         </div>
       )}

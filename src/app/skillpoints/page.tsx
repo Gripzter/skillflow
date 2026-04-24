@@ -9,6 +9,7 @@ import LoadingRing from "@/components/LoadingRing";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
+import SPIcon from "@/components/SPIcon";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { getUserSPData, SP_REWARDS, type UserSpData } from "@/lib/skillpoints";
@@ -108,7 +109,10 @@ export default function SkillPointsPage() {
             <RankBadge tier={spData.rankTier} size="large" />
           </div>
           <p className="mt-2 text-sm text-body-gray">
-            Spendable balance: <span className="font-semibold text-teal">{spData.balanceSp.toLocaleString()} SP</span>
+            Spendable balance:{" "}
+            <span className="font-semibold text-teal inline-flex items-center gap-1">
+              {spData.balanceSp.toLocaleString()} <SPIcon size={16} />
+            </span>
           </p>
           <div className="mt-4">
             <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
@@ -121,15 +125,17 @@ export default function SkillPointsPage() {
           <h2 className="text-lg font-semibold text-white">How to Earn SP</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {[
-              { label: "Win a match", value: `+${SP_REWARDS.MATCH_WIN} SP` },
-              { label: "Complete a match", value: `+${SP_REWARDS.MATCH_LOSS} SP` },
-              { label: "Daily first match", value: `+${SP_REWARDS.DAILY_FIRST_MATCH} SP` },
-              { label: "3-win streak", value: `+${SP_REWARDS.STREAK_BONUS} SP` },
-              { label: "Refer a friend", value: `+${SP_REWARDS.REFERRAL_BONUS} SP` },
+              { label: "Win a match", value: `+${SP_REWARDS.MATCH_WIN}` },
+              { label: "Complete a match", value: `+${SP_REWARDS.MATCH_LOSS}` },
+              { label: "Daily first match", value: `+${SP_REWARDS.DAILY_FIRST_MATCH}` },
+              { label: "3-win streak", value: `+${SP_REWARDS.STREAK_BONUS}` },
+              { label: "Refer a friend", value: `+${SP_REWARDS.REFERRAL_BONUS}` },
             ].map((item) => (
               <div key={item.label} className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
                 <p className="text-sm text-body-gray">{item.label}</p>
-                <p className="mt-1 text-base font-semibold text-emerald-300">{item.value}</p>
+                <p className="mt-1 inline-flex items-center gap-1 text-base font-semibold text-emerald-300">
+                  {item.value} <SPIcon size={16} />
+                </p>
               </div>
             ))}
           </div>
@@ -156,8 +162,10 @@ export default function SkillPointsPage() {
                     </p>
                   </div>
                   <span className={`shrink-0 text-sm font-semibold ${tx.amount >= 0 ? "text-emerald-300" : "text-red-400"}`}>
-                    {tx.amount >= 0 ? "+" : ""}
-                    {tx.amount.toLocaleString()} SP
+                    <span className="inline-flex items-center gap-1">
+                      {tx.amount >= 0 ? "+" : ""}
+                      {tx.amount.toLocaleString()} <SPIcon size={14} />
+                    </span>
                   </span>
                 </div>
               ))}

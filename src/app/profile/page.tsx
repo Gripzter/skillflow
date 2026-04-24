@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
+import SPIcon from "@/components/SPIcon";
 import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
@@ -345,12 +346,30 @@ export default function ProfilePage() {
             {
               label: IS_SWEEPSTAKES_LAUNCH ? "Total SP Earned" : "Total Earnings",
               value: IS_SWEEPSTAKES_LAUNCH
-                ? `${spData.lifetimeSp.toLocaleString()} SP`
+                ? (
+                    <span className="inline-flex items-center gap-1">
+                      {spData.lifetimeSp.toLocaleString()} <SPIcon size={18} />
+                    </span>
+                  )
                 : `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
             },
             { label: "Win Streak", value: stats.bestStreak },
-            { label: "Lifetime SP", value: spData.lifetimeSp.toLocaleString() },
-            { label: "SP Balance", value: spData.balanceSp.toLocaleString() },
+            {
+              label: "Lifetime SP",
+              value: (
+                <span className="inline-flex items-center gap-1">
+                  {spData.lifetimeSp.toLocaleString()} <SPIcon size={18} />
+                </span>
+              ),
+            },
+            {
+              label: "SP Balance",
+              value: (
+                <span className="inline-flex items-center gap-1">
+                  {spData.balanceSp.toLocaleString()} <SPIcon size={18} />
+                </span>
+              ),
+            },
           ].map((card, i) => (
             <div
               key={card.label}

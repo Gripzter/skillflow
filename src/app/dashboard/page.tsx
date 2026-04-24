@@ -14,6 +14,7 @@ import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
 import OnboardingFlow from "@/components/OnboardingFlow";
+import SPIcon from "@/components/SPIcon";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
@@ -313,7 +314,7 @@ export default function DashboardPage() {
         return;
       }
 
-      showToast(`Claimed +${result.rewardSp} SP`, "success");
+      showToast(`Claimed +${result.rewardSp}`, "success");
       const [nextChallenges, nextSpData] = await Promise.all([
         getDailyChallenges(userId),
         getUserSPData(userId),
@@ -525,7 +526,10 @@ export default function DashboardPage() {
               <RankBadge tier={spData.rankTier} size="large" />
             </div>
             <p className="text-sm font-medium text-white">
-              SP Balance: <span className="text-teal">{spData.balanceSp.toLocaleString()}</span>
+              <span className="inline-flex items-center gap-1">
+                <SPIcon size={16} /> Balance:
+              </span>{" "}
+              <span className="text-teal">{spData.balanceSp.toLocaleString()}</span>
             </p>
           </div>
           <div className="mt-4">
@@ -563,7 +567,9 @@ export default function DashboardPage() {
                       {progress}/{target}
                     </p>
                     <p className="mt-2 text-sm font-semibold text-emerald-300">
-                      +{Number(challenge.reward_sp).toLocaleString()} SP
+                      <span className="inline-flex items-center gap-1">
+                        +{Number(challenge.reward_sp).toLocaleString()} <SPIcon size={16} />
+                      </span>
                     </p>
                     <div className="mt-3">
                       {challenge.claimed ? (
@@ -632,7 +638,9 @@ export default function DashboardPage() {
                   </p>
                   <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
                     <p className="text-xl font-semibold text-white">
-                      {LAST_TOUCH_FEATURED_PRIZE_POOL_SP.toLocaleString()} SP
+                      <span className="inline-flex items-center gap-1">
+                        {LAST_TOUCH_FEATURED_PRIZE_POOL_SP.toLocaleString()} <SPIcon size={18} />
+                      </span>
                     </p>
                   </Skeleton>
                 </div>
@@ -802,9 +810,10 @@ export default function DashboardPage() {
                   >
                     <Skeleton as="span" isLoading={isLoading} className="inline-block rounded-md">
                       {IS_SWEEPSTAKES_LAUNCH
-                        ? `${spData.lifetimeSp.toLocaleString()} SP`
+                        ? `${spData.lifetimeSp.toLocaleString()}`
                         : formatCurrency(netEarnings)}
                     </Skeleton>
+                    {IS_SWEEPSTAKES_LAUNCH ? <SPIcon size={16} className="ml-1" /> : null}
                   </span>
                   {!IS_SWEEPSTAKES_LAUNCH && netEarnings > 0 && (
                     <span className="text-[10px] text-emerald-300">
@@ -942,7 +951,16 @@ export default function DashboardPage() {
                         </span>
                       <span className="text-[11px] text-body-gray">
                         {resultLabel}
-                        {!isDraw && <> · {spPrefix}{Math.abs(spDelta).toLocaleString()} SP</>}
+                        {!isDraw && (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <span className="inline-flex items-center gap-1">
+                              {spPrefix}
+                              {Math.abs(spDelta).toLocaleString()} <SPIcon size={12} />
+                            </span>
+                          </>
+                        )}
                         {" · "}
                         {formatTimeAgo(match.createdAt)}
                       </span>

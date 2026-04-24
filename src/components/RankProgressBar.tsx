@@ -1,5 +1,7 @@
 "use client";
 
+import SPIcon from "@/components/SPIcon";
+
 type RankTier = "bronze" | "silver" | "gold" | "platinum" | "diamond";
 
 interface RankProgressBarProps {
@@ -77,9 +79,24 @@ export default function RankProgressBar({ lifetimeSp, currentTier }: RankProgres
         />
       </div>
       <p className="mt-2 text-xs text-body-gray">
-        {isMaxTier
-          ? `${lifetimeFormatted} SP / MAX RANK`
-          : `${lifetimeFormatted} / ${maxFormatted} SP`}
+        {isMaxTier ? (
+          <>
+            <span className="inline-flex items-center gap-1">
+              {lifetimeFormatted} <SPIcon size={12} />
+            </span>{" "}
+            / MAX RANK
+          </>
+        ) : (
+          <>
+            <span className="inline-flex items-center gap-1">
+              {lifetimeFormatted} <SPIcon size={12} />
+            </span>{" "}
+            /{" "}
+            <span className="inline-flex items-center gap-1">
+              {maxFormatted} <SPIcon size={12} />
+            </span>
+          </>
+        )}
       </p>
     </div>
   );

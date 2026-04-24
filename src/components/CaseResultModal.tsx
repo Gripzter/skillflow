@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CaseDrop, CaseItemRarity } from "@/lib/cases";
+import SPIcon from "@/components/SPIcon";
 
 type CaseResultModalProps = {
   item: CaseDrop;
@@ -61,8 +62,8 @@ export default function CaseResultModal({
   }, [isSp, item.value]);
 
   const valueLabel = useMemo(() => {
-    if (isSp) return `+${displayValue.toLocaleString()} SP`;
-    if (isMultiplier) return `2x SP for next ${(item.value ?? 0).toLocaleString()} matches!`;
+    if (isSp) return `+${displayValue.toLocaleString()}`;
+    if (isMultiplier) return `2x for next ${(item.value ?? 0).toLocaleString()} matches!`;
     return item.item_name;
   }, [displayValue, isMultiplier, isSp, item.item_name, item.value]);
 
@@ -80,7 +81,17 @@ export default function CaseResultModal({
 
         <div className="mt-4 rounded-xl border border-white/10 bg-black/30 px-4 py-3">
           <p className={`text-lg font-semibold ${isSp ? "text-emerald-300" : "text-white"}`}>
-            {valueLabel}
+            {isSp ? (
+              <span className="inline-flex items-center gap-1">
+                {valueLabel} <SPIcon size={18} />
+              </span>
+            ) : isMultiplier ? (
+              <span className="inline-flex items-center gap-1">
+                2x <SPIcon size={16} /> for next {(item.value ?? 0).toLocaleString()} matches!
+              </span>
+            ) : (
+              valueLabel
+            )}
           </p>
         </div>
 

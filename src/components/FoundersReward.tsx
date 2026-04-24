@@ -1,5 +1,7 @@
 "use client";
 
+import SPIcon from "@/components/SPIcon";
+
 interface FoundersRewardProps {
   lifetimeSp: number;
   currentTier: string;
@@ -69,7 +71,13 @@ export default function FoundersReward({ lifetimeSp, currentTier }: FoundersRewa
             <div className="h-full rounded-full bg-gradient-to-r from-[#FF5E00] to-[#FFB347]" style={{ width: `${progressPercent}%` }} />
           </div>
           <p className="mt-2 text-xs text-body-gray">
-            {lifetimeSp.toLocaleString()} / {PLATINUM_THRESHOLD.toLocaleString()} lifetime SP
+            <span className="inline-flex items-center gap-1">
+              {lifetimeSp.toLocaleString()} <SPIcon size={12} />
+            </span>{" "}
+            /{" "}
+            <span className="inline-flex items-center gap-1">
+              {PLATINUM_THRESHOLD.toLocaleString()} <SPIcon size={12} />
+            </span>
           </p>
         </div>
       ) : null}
@@ -93,7 +101,8 @@ export default function FoundersReward({ lifetimeSp, currentTier }: FoundersRewa
       <p className={`mt-4 text-sm ${unlocked ? "text-[#FFD700]" : "text-body-gray"}`}>
         {unlocked
           ? "Founders rewards secured. This beta-only bundle is permanently exclusive and can never be earned again."
-          : `Reach Platinum to unlock. ${spRemaining.toLocaleString()} SP to go before this limited-time beta window closes.`}
+          : `Reach Platinum to unlock. ${spRemaining.toLocaleString()} to go before this limited-time beta window closes.`}
+        {!unlocked ? <SPIcon size={14} className="ml-1" /> : null}
       </p>
     </section>
   );
