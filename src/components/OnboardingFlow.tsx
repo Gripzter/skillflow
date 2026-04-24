@@ -186,7 +186,14 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
         </button>
       ) : null}
 
-      <div className="h-screen flex flex-col items-center justify-center px-6 py-12">
+      <div className="relative h-screen flex flex-col items-center justify-center px-6 py-12">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 40%, rgba(255,94,0,0.08) 0%, transparent 60%)",
+          }}
+        />
         <div className="w-full text-center">
           <p className="inline-flex rounded-full border border-[#2A2A3A] bg-[#1A1A24] px-4 py-1.5 text-base font-semibold tracking-wide text-white">
             SkillFlow
@@ -207,12 +214,12 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                 {sparkles.map((sparkle) => (
                   <span
                     key={sparkle}
-                    className="sparkle-dot absolute rounded-full bg-[#FF5E00]/70"
+                    className="sparkle-dot absolute rounded-full bg-[#FF5E00]/40"
                     style={{
                       left: `${8 + sparkle * 12}%`,
                       bottom: `${10 + (sparkle % 3) * 6}%`,
-                      width: `${4 + (sparkle % 3)}px`,
-                      height: `${4 + (sparkle % 3)}px`,
+                      width: `${2 + (sparkle % 3)}px`,
+                      height: `${2 + (sparkle % 3)}px`,
                       animationDelay: `${sparkle * 0.2}s`,
                     }}
                   />
@@ -269,8 +276,8 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
 
           {step === 2 && (
             <div className="mx-auto w-full max-w-lg space-y-8 text-center">
-              <div className="founders-border relative w-full rounded-2xl p-px">
-                <div className="relative rounded-2xl bg-[#1A1A24] p-6 md:p-8">
+              <div className="w-full rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
+                <div className="rounded-2xl bg-[#1A1A24] p-6 md:p-8">
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#FF5E00]">
                     BETA FOUNDERS PROGRAM
                   </p>
@@ -365,18 +372,6 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           transform: translateY(16px);
           animation: slideUpFade 0.45s ease forwards;
         }
-        .founders-border::before {
-          content: "";
-          position: absolute;
-          inset: 0;
-          border-radius: inherit;
-          background: linear-gradient(0deg, #ff5e00, #ff8c00, #ff5e00);
-          animation: rotating 3s linear infinite;
-          z-index: 0;
-        }
-        .founders-border > :global(*) {
-          z-index: 1;
-        }
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -410,7 +405,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             transform: translateY(8px);
           }
           30% {
-            opacity: 0.8;
+            opacity: 0.45;
           }
           100% {
             opacity: 0;
@@ -425,14 +420,6 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           to {
             opacity: 1;
             transform: translateY(0);
-          }
-        }
-        @keyframes rotating {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
           }
         }
       `}</style>
