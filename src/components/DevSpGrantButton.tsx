@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useToast } from "@/components/Toast";
 import { getCurrentUser } from "@/lib/api";
-import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 
 const DEV_SP_GRANT_AMOUNT = 5000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -136,7 +136,7 @@ export default function DevSpGrantButton({ isDevMode }: DevSpGrantButtonProps) {
       aria-label="Grant 5000 SkillPoints"
       title="Grant 5,000 token balance"
     >
-      {granting ? "..." : <span className="inline-flex items-center gap-0.5">+<SPIcon size={14} /></span>}
+      {granting ? "..." : <span className="inline-flex items-center gap-0.5">+<SkilliesIcon size={14} /></span>}
     </button>
   );
 }

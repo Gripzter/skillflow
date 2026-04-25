@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import { formatCurrency } from "@/lib/formatCurrency";
+import SkilliesIcon from "@/components/SkilliesIcon";
 
 const AUTO_REDIRECT_SEC = 30;
 
@@ -92,13 +92,13 @@ export default function GameResultOverlay({
 
   let headline: string;
   let headlineColor: string;
-  let amountLine: string | null = null;
+  let amountValue: number | null = null;
   let subtext: string;
 
   if (isVictory) {
     headline = "VICTORY";
     headlineColor = "#FF5E00";
-    if (!isPractice) amountLine = `+ ${formatCurrency(winnerPayout)}`;
+    if (!isPractice) amountValue = winnerPayout;
     subtext = wonByForfeit
       ? "Opponent forfeited. You win!"
       : isPractice
@@ -107,13 +107,13 @@ export default function GameResultOverlay({
   } else if (isDefeat) {
     headline = "DEFEAT";
     headlineColor = "#6B7280";
-    if (!isPractice) amountLine = `- ${formatCurrency(stakeAmount)}`;
+    if (!isPractice) amountValue = -stakeAmount;
     subtext = `${opponentUsername} won this one`;
   } else {
     headline = "DRAW";
     headlineColor = "#60A5FA";
-    if (!isPractice) amountLine = "Stake returned";
-    subtext = isPractice ? "Even match!" : `${formatCurrency(stakeAmount)} returned to your wallet`;
+    if (!isPractice) amountValue = 0;
+    subtext = isPractice ? "Even match!" : `${stakeAmount.toLocaleString()} Skillies returned to your wallet`;
   }
 
   return (
@@ -141,14 +141,20 @@ export default function GameResultOverlay({
         </h1>
 
         {/* Amount */}
-        {amountLine && (
+        {amountValue !== null && (
           <p
             className="mt-4 text-4xl font-bold tabular-nums sm:text-5xl"
             style={{
               color: isVictory ? "#FF5E00" : isDraw ? "#60A5FA" : "#6B7280",
             }}
           >
-            {amountLine}
+            {isDraw ? (
+              "Stake returned"
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                {amountValue >= 0 ? "+" : "-"} {Math.abs(amountValue).toLocaleString()} Skillies <SkilliesIcon size={24} />
+              </span>
+            )}
           </p>
         )}
 

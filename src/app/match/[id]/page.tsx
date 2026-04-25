@@ -38,7 +38,6 @@ import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
-import { formatCurrency } from "@/lib/formatCurrency";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -877,6 +876,7 @@ function MatchPageContent() {
   const safePlayer2 = match.player2 ?? { username: "Opponent", rating: 1000 };
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+  const formatSkillies = (amount: number) => `${amount.toLocaleString()} Skillies`;
   const shortId = match.id.slice(0, 8);
   const myRole = myRoleComputed;
   const matchStartMs =
@@ -978,7 +978,7 @@ function MatchPageContent() {
     chatPresets: ["gl hf!", "gg", "Nice move!", "Rematch?"],
     onLeaveMatch: () => setForfeitConfirm(true),
     onReportIssue: () => { setReportOpen(true); setReportSubmitted(false); },
-    realStakeDisplay: match.isPractice ? undefined : formatCurrency(match.stakeAmount),
+    realStakeDisplay: match.isPractice ? undefined : formatSkillies(match.stakeAmount),
     afkRemainingMs,
     afkActivePlayer: !match.isPractice && afkRemainingMs !== null ? matchUi?.currentTurn ?? null : null,
   };
@@ -1394,7 +1394,7 @@ function MatchPageContent() {
           <p className="text-sm text-body-gray">
             {match.isPractice
               ? "Practice Match — No stakes"
-              : `Stake: ${formatCurrency(match.stakeAmount)} each • Winner gets: ${formatCurrency(match.winnerPayout)}`}
+                : `Stake: ${formatSkillies(match.stakeAmount)} each • Winner gets: ${formatSkillies(match.winnerPayout)}`}
           </p>
           <div className="flex gap-2">
             <button
@@ -1572,7 +1572,7 @@ function MatchPageContent() {
             <p className="text-center font-medium text-white">
               {match.isPractice
                 ? "Leave this practice match? Your progress will not be saved."
-                : `Are you sure you want to forfeit? You will lose your ${formatCurrency(match.stakeAmount)} stake.`}
+                : `Are you sure you want to forfeit? You will lose your ${formatSkillies(match.stakeAmount)} stake.`}
             </p>
             <div className="mt-6 flex gap-3">
               <button

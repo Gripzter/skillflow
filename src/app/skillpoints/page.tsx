@@ -147,7 +147,7 @@ export default function SkillPointsPage() {
         <FoundersReward lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
 
         <section className="rounded-card border border-white/10 bg-card/80 p-5">
-          <h2 className="text-lg font-semibold text-white">How to Earn SP</h2>
+          <h2 className="text-lg font-semibold text-white">How to Earn Skillies</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {[
               { label: "Win a match", value: `+${SP_REWARDS.MATCH_WIN}` },
@@ -159,7 +159,7 @@ export default function SkillPointsPage() {
               <div key={item.label} className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
                 <p className="text-sm text-body-gray">{item.label}</p>
                 <p className="mt-1 inline-flex items-center gap-1 text-base font-semibold text-emerald-300">
-                  {item.value} <SPIcon size={16} />
+                  {item.value} Skillies <SkilliesIcon size={16} />
                 </p>
               </div>
             ))}
@@ -167,9 +167,9 @@ export default function SkillPointsPage() {
         </section>
 
         <section className="rounded-card border border-white/10 bg-card/80 p-5">
-          <h2 className="text-lg font-semibold text-white">Recent SP Activity</h2>
+          <h2 className="text-lg font-semibold text-white">Recent Skillies Activity</h2>
           {transactions.length === 0 ? (
-            <p className="mt-3 text-sm text-body-gray">No SP transactions yet.</p>
+            <p className="mt-3 text-sm text-body-gray">No Skillies transactions yet.</p>
           ) : (
             <div className="mt-4 space-y-2">
               {transactions.map((tx) => (
@@ -180,7 +180,7 @@ export default function SkillPointsPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-white">{formatTypeLabel(tx.type)}</p>
                     <p className="truncate text-xs text-body-gray">
-                      {tx.description || "SkillPoints transaction"}
+                      {tx.description || "Skillies transaction"}
                     </p>
                     <p className="mt-0.5 text-[11px] text-body-gray">
                       {new Date(tx.created_at).toLocaleString()}
@@ -189,7 +189,7 @@ export default function SkillPointsPage() {
                   <span className={`shrink-0 text-sm font-semibold ${tx.amount >= 0 ? "text-emerald-300" : "text-red-400"}`}>
                     <span className="inline-flex items-center gap-1">
                       {tx.amount >= 0 ? "+" : ""}
-                      {tx.amount.toLocaleString()} <SPIcon size={14} />
+                      {tx.amount.toLocaleString()} <SkilliesIcon size={14} />
                     </span>
                   </span>
                 </div>

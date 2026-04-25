@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import type { RankTier } from "@/lib/skillpoints";
 
 interface FirstMatchCelebrationProps {
@@ -85,10 +85,10 @@ export default function FirstMatchCelebration({
             FIRST MATCH COMPLETE! 🎉
           </h2>
           <p className="mt-3 text-sm text-gray-300 md:text-base">
-            You just earned your first SkillPoints. Keep playing to climb the ranks.
+            You just earned your first Skillies. Keep playing to win more.
           </p>
           <p className="mt-5 text-4xl font-black text-orange-300 md:text-6xl">
-            +{displaySp.toLocaleString()} <SPIcon size={28} />
+            +{displaySp.toLocaleString()} Skillies <SkilliesIcon size={28} />
           </p>
 
           <div className="mt-7 grid grid-cols-2 gap-3">

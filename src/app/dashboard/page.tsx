@@ -633,14 +633,9 @@ export default function DashboardPage() {
         {/* 1. Greeting */}
         <section className="animate-fade-in">
           <div>
-            <Skeleton isLoading={isLoading} className="inline-block rounded-md">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                {greeting}
-              </p>
-            </Skeleton>
-            <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-100 md:text-3xl">
-                {username}
+            <Skeleton isLoading={isLoading} className="inline-block rounded-lg">
+              <h1 className="text-2xl font-semibold tracking-tight text-gray-100">
+                {`${greeting}, ${username}`}
               </h1>
             </Skeleton>
           </div>
@@ -768,7 +763,7 @@ export default function DashboardPage() {
                   <Skeleton isLoading={isLoading} className="mt-1 inline-block rounded-lg">
                     <p className="text-xl font-semibold text-white">
                       <span className="inline-flex items-center gap-1">
-                        {LAST_TOUCH_FEATURED_PRIZE_POOL_SP.toLocaleString()} <SPIcon size={18} />
+                        {LAST_TOUCH_FEATURED_PRIZE_POOL_SP.toLocaleString()} <SkilliesIcon size={18} />
                       </span>
                     </p>
                   </Skeleton>
@@ -1086,7 +1081,7 @@ export default function DashboardPage() {
                             ·{" "}
                             <span className="inline-flex items-center gap-1">
                               {spPrefix}
-                              {Math.abs(spDelta).toLocaleString()} <SPIcon size={12} />
+                              {Math.abs(spDelta).toLocaleString()} <SkilliesIcon size={12} />
                             </span>
                           </>
                         )}

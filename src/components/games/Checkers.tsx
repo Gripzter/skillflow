@@ -591,7 +591,6 @@ export default function Checkers({
   const mandatoryGlow = isPractice ? "rgba(168,85,247,0.25)" : "rgba(255,94,0,0.25)";
   const mandatoryGlow2 = isPractice ? "rgba(168,85,247,0.18)" : "rgba(255,94,0,0.18)";
   const lastMoveGlow = "rgba(42,58,92,0.18)";
-  const boardSideBackground = "#1A1A22";
 
   const myName = myRole === "player1" ? player1.username : player2.username;
   const opponentName = myRole === "player1" ? player2.username : player1.username;
@@ -603,14 +602,6 @@ export default function Checkers({
   const mandatoryCaptureKeySet = useMemo(() => new Set(piecesWithCaptures.map((p) => `${p.r},${p.c}`)), [piecesWithCaptures]);
   const lastFromKey = lastMove ? `${lastMove.from.r},${lastMove.from.c}` : null;
   const lastToKey = lastMove ? `${lastMove.to.r},${lastMove.to.c}` : null;
-
-  // UI helpers.
-  const activeText = currentTurn === 1 ? "Your Turn" : "Opponent's Turn";
-  const showTurnText = isMyTurn ? "Your Turn" : "Opponent's Turn";
-
-  // Board sizing.
-  const selectedPieceCode = selected ? board[selected.r][selected.c] : 0;
-  const selectedIsKing = selected ? Math.abs(selectedPieceCode) === 2 : false;
 
   const gameStartRef = useRef(Date.now());
   useEffect(() => {
@@ -645,17 +636,20 @@ export default function Checkers({
   ]);
 
   return (
-    <div className="flex h-full max-h-full min-h-0 w-full flex-col items-center justify-center overflow-hidden">
+    <div className="flex w-full flex-col items-center justify-center">
         {/* Board */}
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center px-0 pb-0">
+        <div className="flex w-full items-center justify-center px-0 pb-0">
           <div
-            className="relative grid w-full max-w-[400px] rounded-lg"
+            className="relative grid rounded-lg"
             style={{
+              width: "min(480px, 90vw)",
               aspectRatio: "1",
               gridTemplateColumns: "repeat(8, 1fr)",
               gridTemplateRows: "repeat(8, 1fr)",
               border: `2px solid ${BOARD_BORDER}`,
               background: BOARD_LIGHT,
+              transition: "none",
+              transform: "none",
             }}
           >
             {Array.from({ length: 64 }).map((_, idx) => {
@@ -686,6 +680,10 @@ export default function Checkers({
                     boxShadow: isSelected ? `inset 0 0 0 2px ${accent}` : undefined,
                     padding: 0,
                     cursor: "pointer",
+                    width: "100%",
+                    height: "100%",
+                    transition: "none",
+                    transform: "none",
                   }}
                   aria-label={`Square ${key}`}
                 >

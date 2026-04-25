@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { createMatch, getCurrentUser } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 
@@ -254,7 +255,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   <p className="mt-3 text-sm font-bold uppercase tracking-wider text-white">EARN</p>
                   <p className="mt-2 text-sm leading-relaxed text-gray-400">
                     Win matches to earn SkillPoints. Complete daily challenges for bonus{" "}
-                    <SPIcon size={14} />. Every
+                    <SkilliesIcon size={14} />. Every
                     match counts.
                   </p>
                 </article>
@@ -265,7 +266,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   <p className="text-3xl">🎁</p>
                   <p className="mt-3 text-sm font-bold uppercase tracking-wider text-white">OPEN</p>
                   <p className="mt-2 text-sm leading-relaxed text-gray-400">
-                    Spend <SPIcon size={14} /> on Cases to win cosmetics, badges, and multipliers.
+                    Spend <SkilliesIcon size={14} /> on Cases to win cosmetics, badges, and multipliers.
                     The rarer the
                     drop, the bigger the flex.
                   </p>
