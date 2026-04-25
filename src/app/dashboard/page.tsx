@@ -608,7 +608,7 @@ export default function DashboardPage() {
               loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative pr-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Skeleton isLoading={isLoading} className="inline-block rounded-md">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal-200/80">
@@ -645,7 +645,7 @@ export default function DashboardPage() {
                   </Skeleton>
                 </div>
                 <Skeleton isLoading={isLoading} className="rounded-xl">
-                  <span className="rounded-xl bg-teal px-5 py-2.5 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
+                  <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
                     Join Now
                   </span>
                 </Skeleton>

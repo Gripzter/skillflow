@@ -20,6 +20,7 @@ import {
 } from "@/lib/cases";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
+import { createClient } from "@/lib/supabase";
 
 type RecentDrop = {
   id: string;
@@ -70,6 +71,20 @@ export default function CasesPage() {
   const [reelData, setReelData] = useState<{ lootTable: CaseDrop[]; winningItem: CaseDrop } | null>(null);
   const [resultItem, setResultItem] = useState<CaseDrop | null>(null);
 
+  const getStableUser = useCallback(async () => {
+    const firstUser = await getCurrentUser();
+    if (firstUser) return firstUser;
+
+    const supabase = createClient();
+    if (!supabase) return null;
+
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.user) return null;
+
+    return getCurrentUser();
+  }, []);
+
   const loadDashboard = useCallback(async (uid: string) => {
     const [spData, freeCrateResult] = await Promise.all([
       getUserSPData(uid),
@@ -118,7 +133,7 @@ export default function CasesPage() {
   useEffect(() => {
     async function load() {
       try {
-        const user = await getCurrentUser();
+        const user = await getStableUser();
         if (!user) {
           router.push("/login");
           return;
@@ -141,7 +156,7 @@ export default function CasesPage() {
       }
     }
     void load();
-  }, [loadDashboard, router]);
+  }, [getStableUser, loadDashboard, router]);
 
   async function handleLogout() {
     setLoggingOut(true);

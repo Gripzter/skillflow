@@ -410,7 +410,7 @@ export default function PlayPage() {
               loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative pr-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="bg-gradient-to-r from-teal to-purple-500 bg-clip-text text-2xl font-black text-transparent">
                   LAST TOUCH
@@ -426,7 +426,7 @@ export default function PlayPage() {
                     Starts in {ltCountdownSec == null ? "—:—" : `${ltMins}:${ltSecs.toString().padStart(2, "0")}`}
                   </p>
                 </div>
-                <span className="rounded-xl bg-teal px-5 py-2.5 font-semibold text-charcoal shadow-[0_0_20px_rgba(255,94,0,0.5)]">
+                <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_20px_rgba(255,94,0,0.5)]">
                   Join Now
                 </span>
               </div>
