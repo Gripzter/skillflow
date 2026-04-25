@@ -45,6 +45,12 @@ interface ReactionDuelProps extends GameMultiplayerProps {
 type Phase = "countdown" | "get_ready" | "target" | "tapped" | "round_result" | "match_over";
 type Reaction = number | "false_start" | "timeout";
 
+function getBotFalseStartChance(difficulty: BotDifficulty): number {
+  if (difficulty === "rookie") return 0.1;
+  if (difficulty === "professional") return 0.02;
+  return 0.05;
+}
+
 export default function ReactionDuel({
   player1,
   player2,
@@ -89,8 +95,18 @@ export default function ReactionDuel({
   const roundStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
+  const p1ReactionRef = useRef<Reaction | null>(null);
+  const p2ReactionRef = useRef<Reaction | null>(null);
 
   const baseTargetSize = isMobile ? TARGET_BASE_MOBILE : TARGET_BASE;
+
+  useEffect(() => {
+    p1ReactionRef.current = p1Reaction;
+  }, [p1Reaction]);
+
+  useEffect(() => {
+    p2ReactionRef.current = p2Reaction;
+  }, [p2Reaction]);
 
   const clearAllTimeouts = useCallback(() => {
     if (readyTimeoutRef.current) clearTimeout(readyTimeoutRef.current);
@@ -234,6 +250,21 @@ export default function ReactionDuel({
     }
 
     const duration = getReadyDurationMs();
+    if (isPlayer2Bot) {
+      const falseStartChance = getBotFalseStartChance(botDifficulty);
+      if (Math.random() < falseStartChance) {
+        const falseStartDelay = Math.max(
+          50,
+          Math.floor(Math.random() * Math.max(80, duration - 120))
+        );
+        botTimeoutRef.current = setTimeout(() => {
+          botTimeoutRef.current = null;
+          setP2Reaction((prev) => (prev === null ? "false_start" : prev));
+          setShowTooEarly(true);
+        }, falseStartDelay);
+      }
+    }
+
     readyTimeoutRef.current = setTimeout(() => {
       readyTimeoutRef.current = null;
       const area = areaSizeRef.current;
@@ -247,7 +278,10 @@ export default function ReactionDuel({
         const botMs = getReactionBotResponseMs(botDifficulty);
         botTimeoutRef.current = setTimeout(() => {
           botTimeoutRef.current = null;
-          setP2Reaction(botMs);
+          setP2Reaction((prev) => (prev === null ? botMs : prev));
+          if (p1ReactionRef.current !== null) {
+            setPhase("tapped");
+          }
         }, botMs);
       }
       tapTimeoutRef.current = setTimeout(() => {
@@ -305,18 +339,6 @@ export default function ReactionDuel({
         if (isMultiplayer && sendGameEvent) {
           sendGameEvent({ type: "reaction_result", round, reactionTime: -1 }).catch(() => {});
         }
-        if (botTimeoutRef.current) {
-          clearTimeout(botTimeoutRef.current);
-          botTimeoutRef.current = null;
-        }
-        if (!isMultiplayer && isPlayer2Bot) {
-          const botMs = getReactionBotResponseMs(botDifficulty);
-          setP2Reaction(botMs);
-          setTimeout(() => {
-            setPhase("round_result");
-            roundResultTimeoutRef.current = setTimeout(() => advanceRound("false_start", botMs), ROUND_RESULT_DURATION);
-          }, 800);
-        }
         return;
       }
       const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
@@ -362,7 +384,7 @@ export default function ReactionDuel({
   }
 
   useEffect(() => {
-    if (phase !== "tapped") return;
+    if (phase !== "tapped" && phase !== "target") return;
     if (isMultiplayer && opponentReactionForRound?.round === round) {
       const myReaction = myRole === "player1" ? p1Reaction : p2Reaction;
       if (myReaction === null) return;
@@ -381,6 +403,9 @@ export default function ReactionDuel({
     if (!isMultiplayer) {
       const p2 = p2Reaction;
       if (p2 !== null && p1Reaction !== null) {
+        if (phase !== "tapped") {
+          setPhase("tapped");
+        }
         setPhase("round_result");
         roundResultTimeoutRef.current = setTimeout(() => advanceRound(p1Reaction!, p2), ROUND_RESULT_DURATION);
       }

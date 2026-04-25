@@ -354,18 +354,18 @@ export function getConnect4BotDelayMs(difficulty: BotDifficulty = DEFAULT_DIFFIC
 
 /**
  * Bot's simulated reaction time in ms.
- * Rookie: 400–700ms; Gamer: 250–400ms; Professional: 150–250ms.
+ * Rookie: 400–800ms; Gamer: 250–500ms; Professional: 150–350ms.
  */
 export function getReactionBotResponseMs(
   difficulty: BotDifficulty = DEFAULT_DIFFICULTY
 ): number {
   if (difficulty === "rookie") {
-    return 400 + Math.floor(Math.random() * 301); // 400–700
+    return 400 + Math.floor(Math.random() * 401); // 400–800
   }
   if (difficulty === "professional") {
-    return 150 + Math.floor(Math.random() * 101); // 150–250
+    return 150 + Math.floor(Math.random() * 201); // 150–350
   }
-  return 250 + Math.floor(Math.random() * 151); // 250–400
+  return 250 + Math.floor(Math.random() * 251); // 250–500
 }
 
 // --- Memory Match bot ---
