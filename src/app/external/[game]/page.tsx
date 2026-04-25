@@ -9,15 +9,15 @@ import {
   getWalletBalance,
   debitWallet,
   creditWallet,
-  computePayout,
 } from "@/lib/api";
 import {
   createExternalMatch,
   generateFakeSteamOpponent,
 } from "@/lib/external-matches";
 import LoadingRing from "@/components/LoadingRing";
+import SPIcon from "@/components/SPIcon";
 
-const STAKE_PRESETS = [1, 2, 5, 10, 25, 50, 100];
+const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const CS2_MAPS = ["Any", "Dust 2", "Mirage", "Inferno", "Nuke", "Anubis", "Ancient", "Overpass"];
 const MODES = [
   {
@@ -58,8 +58,7 @@ export default function CS2LobbyPage() {
   const [balance, setBalance] = useState(0);
 
   const [selectedMode, setSelectedMode] = useState("1v1-aim-duel");
-  const [stake, setStake] = useState(10);
-  const [customStake, setCustomStake] = useState("");
+  const [stake, setStake] = useState(500);
   const [selectedMap, setSelectedMap] = useState("Any");
   const [matchmaking, setMatchmaking] = useState(false);
   const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
@@ -68,8 +67,7 @@ export default function CS2LobbyPage() {
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const stakeAmount = customStake ? parseFloat(customStake) || 0 : stake;
-  const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
+  const stakeAmount = stake;
   const insufficientBalance = balance < stakeAmount;
 
   useEffect(() => {
@@ -117,7 +115,7 @@ export default function CS2LobbyPage() {
     }, 1000);
     elapsedTimerRef.current = timer;
 
-    const delay = 3000 + Math.floor(Math.random() * 5000);
+    const delay = 5000;
     findMatchTimeoutRef.current = setTimeout(async () => {
       if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       elapsedTimerRef.current = null;
@@ -252,45 +250,23 @@ export default function CS2LobbyPage() {
 
         <section className="mt-8">
           <h2 className="text-xl font-bold text-white">Stake Selection</h2>
-          <p className="mt-1 text-body-gray">
-            Both players put up the same amount. Winner takes all minus 5% platform fee.
-          </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {STAKE_PRESETS.map((amt) => (
               <button
                 key={amt}
                 type="button"
-                onClick={() => {
-                  setStake(amt);
-                  setCustomStake("");
-                }}
+                onClick={() => setStake(amt)}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                  !customStake && stake === amt
+                  stake === amt
                     ? "border-teal bg-teal text-charcoal shadow-teal-glow/30"
                     : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                 }`}
               >
-                ${amt}
+                <span className="inline-flex items-center gap-1">
+                  {amt.toLocaleString()} <SPIcon size={14} />
+                </span>
               </button>
             ))}
-          </div>
-          <p className="mt-3 text-sm text-body-gray">Custom amount</p>
-          <input
-            type="number"
-            min={1}
-            max={balance}
-            step="0.01"
-            placeholder="0.00"
-            value={customStake}
-            onChange={(e) => setCustomStake(e.target.value)}
-            className="mt-1 w-full max-w-[200px] rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
-          />
-          <div className="card-border mt-6 rounded-card bg-card p-5">
-            <p className="text-body-gray">Your Stake: ${stakeAmount.toFixed(2)}</p>
-            <p className="mt-1 text-body-gray">Opponent&apos;s Stake: ${stakeAmount.toFixed(2)}</p>
-            <p className="mt-1 text-body-gray">Total Pot: ${totalPot.toFixed(2)}</p>
-            <p className="mt-1 text-body-gray">Platform fee (5%): ${platformFee.toFixed(2)}</p>
-            <p className="mt-2 text-lg font-bold text-teal">Winner gets: ${winnerPayout.toFixed(2)}</p>
           </div>
         </section>
 
@@ -344,7 +320,9 @@ export default function CS2LobbyPage() {
             disabled={insufficientBalance || stakeAmount < 1}
             className="h-14 w-full rounded-lg bg-teal text-lg font-bold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Find Match — ${stakeAmount.toFixed(2)}
+            <span className="inline-flex items-center gap-2">
+              Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+            </span>
           </button>
         </div>
       </main>
@@ -358,9 +336,9 @@ export default function CS2LobbyPage() {
                 <div className="absolute h-16 w-16 animate-pulse rounded-full border-2 border-teal" />
                 <div className="h-3 w-3 rounded-full bg-teal" />
               </div>
-              <p className="mt-6 text-xl font-semibold text-white">Finding your opponent...</p>
+              <p className="mt-6 text-xl font-semibold text-white">Looking for opponent...</p>
               <p className="mt-2 text-body-gray">
-                Stake: ${stakeAmount.toFixed(2)} • CS2 • {MODES.find((m) => m.id === selectedMode)?.title}
+                CS2 • {MODES.find((m) => m.id === selectedMode)?.title}
               </p>
               <p className="mt-2 text-sm text-body-gray">Searching... {formatTime(matchmakingElapsed)}</p>
               <button

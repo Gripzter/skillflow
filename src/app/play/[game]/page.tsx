@@ -16,19 +16,16 @@ import {
   debitWallet,
   creditWallet,
   createMatch,
-  computePayout,
+  generateFakeOpponent,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
 import { checkCanPlay } from "@/lib/responsible-gaming";
 import { createClient } from "@/lib/supabase";
-import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 import SPIcon from "@/components/SPIcon";
 
-const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
-const SWEEPSTAKES_STAKE_MULTIPLIER = 100;
-const MATCHMAKING_TIMEOUT_SEC = 60;
+const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 
 export type BotDifficulty = "rookie" | "gamer" | "professional";
 
@@ -37,7 +34,6 @@ const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; description: st
   { value: "gamer", label: "Gamer", description: "A solid opponent. Bring your A-game." },
   { value: "professional", label: "Professional", description: "Near-perfect play. Only the best can win." },
 ];
-const MATCHMAKING_SLOW_SEC = 30;
 const GAME_SLUG_TO_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
   chess: "Chess",
@@ -72,8 +68,7 @@ export default function PlayGamePage() {
   const [balance, setBalance] = useState(0);
   const [myGameRating, setMyGameRating] = useState(1000);
 
-  const [stake, setStake] = useState(5);
-  const [customStake, setCustomStake] = useState("");
+  const [stake, setStake] = useState(500);
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("gamer");
   const [matchmaking, setMatchmaking] = useState(false);
   const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
@@ -82,6 +77,7 @@ export default function PlayGamePage() {
   const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [navigateToMatchId, setNavigateToMatchId] = useState<string | null>(null);
+  const botFallbackStartedRef = useRef(false);
 
   const { isPractice } = usePlayMode();
   const { isRestricted } = useGeo();
@@ -96,15 +92,10 @@ export default function PlayGamePage() {
     cancelSearching,
   } = useMatchmaking();
 
-  const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
-  const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
-  const insufficientBalance =
-    !effectivePractice && !IS_SWEEPSTAKES_LAUNCH && balance < stakeAmount;
+  const stakeAmount = stake;
+  const insufficientBalance = !effectivePractice && balance < stakeAmount;
   const useRealMatchmaking =
-    !isPractice && !isRestricted && !IS_SWEEPSTAKES_LAUNCH;
-  const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
-  const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
-  const realMatchmakingTimeout = realMatchStatus === "timeout";
+    !isPractice && !isRestricted;
 
   useEffect(() => {
     async function load() {
@@ -159,12 +150,59 @@ export default function PlayGamePage() {
   const player1 = useMemo<PlayerInfo>(
     () => ({
       username,
-      rating: 1000,
+      rating: myGameRating,
       winRate: 50,
       matchesPlayed: 0,
     }),
-    [username]
+    [myGameRating, username]
   );
+
+  const getBotDifficultyForRating = useCallback((rating: number): BotDifficulty => {
+    if (rating < 1000) return "rookie";
+    if (rating <= 1500) return "gamer";
+    return "professional";
+  }, []);
+
+  const runBotFallbackMatch = useCallback(async () => {
+    if (botFallbackStartedRef.current) return;
+    botFallbackStartedRef.current = true;
+    await cancelSearching();
+    const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
+    const opponent = generateFakeOpponent(myGameRating);
+    setOpponentFound(opponent);
+    try {
+      const newMatch = await createMatch({
+        gameType: gameSlug,
+        gameDisplayName: gameName,
+        stakeAmount,
+        player1,
+        player2: opponent,
+        botDifficulty: resolvedBotDifficulty,
+      });
+      setMatch(newMatch);
+      setTimeout(() => router.push(`/match/${newMatch.id}`), 1200);
+    } catch {
+      try {
+        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
+      }
+      setMatchmaking(false);
+      setOpponentFound(null);
+      setMatch(null);
+      botFallbackStartedRef.current = false;
+    }
+  }, [
+    cancelSearching,
+    gameName,
+    gameSlug,
+    getBotDifficultyForRating,
+    myGameRating,
+    player1,
+    router,
+    stakeAmount,
+  ]);
 
   const handleCancelMatchmaking = useCallback(async () => {
     if (elapsedTimer) clearInterval(elapsedTimer);
@@ -173,6 +211,7 @@ export default function PlayGamePage() {
       clearTimeout(findMatchTimeoutRef.current);
       findMatchTimeoutRef.current = null;
     }
+    botFallbackStartedRef.current = false;
     setNavigateToMatchId(null);
     if (useRealMatchmaking) {
       await cancelSearching();
@@ -204,7 +243,7 @@ export default function PlayGamePage() {
   }, []);
 
   const handleFindMatch = useCallback(async () => {
-    if (isPractice || isRestricted || IS_SWEEPSTAKES_LAUNCH) {
+    if (isPractice || isRestricted) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
@@ -265,6 +304,7 @@ export default function PlayGamePage() {
       }
       setMatchmaking(true);
       setMatchmakingElapsed(0);
+      botFallbackStartedRef.current = false;
       try {
         await startMatchmaking({
           gameType: gameSlug,
@@ -283,8 +323,6 @@ export default function PlayGamePage() {
       return;
     }
   }, [
-    balance,
-    stakeAmount,
     gameName,
     gameSlug,
     insufficientBalance,
@@ -298,24 +336,22 @@ export default function PlayGamePage() {
     startMatchmaking,
     handleMatchReady,
     botDifficulty,
+    emailVerified,
+    myGameRating,
+    showToast,
   ]);
 
-  const handleSwitchToPractice = useCallback(async () => {
-    await cancelSearching();
-    setMatchmaking(false);
-    setMatchmakingElapsed(0);
-    setOpponentFound(null);
-    setMatch(null);
-    try {
-      await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch {
-      dispatchWalletUpdated();
-    }
-    router.push(`/play/${gameSlug}`);
-    showToast("Switched to lobby. Toggle Practice mode to play vs bot for free.", "success");
-  }, [cancelSearching, stakeAmount, gameSlug, router, showToast]);
+  useEffect(() => {
+    if (!useRealMatchmaking || !matchmaking || realMatchStatus !== "timeout" || match || opponentFound) return;
+    void runBotFallbackMatch();
+  }, [
+    matchmaking,
+    match,
+    opponentFound,
+    realMatchStatus,
+    runBotFallbackMatch,
+    useRealMatchmaking,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -408,56 +444,23 @@ export default function PlayGamePage() {
         {!effectivePractice && (
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
-            <p className="mt-1 text-body-gray">
-              {IS_SWEEPSTAKES_LAUNCH
-                ? "Both players commit the same amount. Winner takes the pot minus 5% platform fee."
-                : "Both players put up the same amount. Winner takes all minus 5% platform fee."}
-            </p>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {STAKE_PRESETS.map((amt) => (
                 <button
                   key={amt}
                   type="button"
-                  onClick={() => {
-                    setStake(amt);
-                    setCustomStake("");
-                  }}
+                  onClick={() => setStake(amt)}
                   className={`pressable rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                    !customStake && stake === amt
+                    stake === amt
                       ? "border-teal bg-teal text-charcoal shadow-teal-glow/30"
                       : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                   }`}
                 >
-                  {IS_SWEEPSTAKES_LAUNCH ? (
-                    <span className="inline-flex items-center gap-1">
-                      {amt * SWEEPSTAKES_STAKE_MULTIPLIER} <SPIcon size={14} />
-                    </span>
-                  ) : (
-                    `$${amt}`
-                  )}
+                  <span className="inline-flex items-center gap-1">
+                    {amt.toLocaleString()} <SPIcon size={14} />
+                  </span>
                 </button>
               ))}
-            </div>
-            <p className="mt-3 text-sm text-body-gray">Custom amount</p>
-            <input
-              type="number"
-              min={1}
-              max={IS_SWEEPSTAKES_LAUNCH ? undefined : balance}
-              step="0.01"
-              placeholder="0.00"
-              value={customStake}
-              onChange={(e) => setCustomStake(e.target.value)}
-              className="mt-1 w-full max-w-[200px] rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-white placeholder:text-body-gray focus:border-teal focus:outline-none focus:ring-1 focus:ring-teal"
-            />
-
-            <div className="card-border mt-6 rounded-card bg-card p-5">
-              <p className="text-body-gray">Your Stake: {formatCurrency(stakeAmount)}</p>
-              <p className="mt-1 text-body-gray">Opponent&apos;s Stake: {formatCurrency(stakeAmount)}</p>
-              <p className="mt-1 text-body-gray">Total Pot: {formatCurrency(totalPot)}</p>
-              <p className="mt-1 text-body-gray">Platform fee (5%): {formatCurrency(platformFee)}</p>
-              <p className="mt-2 text-lg font-bold text-teal">
-                Winner gets: {formatCurrency(winnerPayout)}
-              </p>
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (
@@ -499,7 +502,11 @@ export default function PlayGamePage() {
           >
             {effectivePractice
               ? "Start Practice"
-              : `Find Match — ${formatCurrency(stakeAmount)}`}
+              : (
+                <span className="inline-flex items-center gap-2">
+                  Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+                </span>
+              )}
           </button>
         </div>
       </main>
@@ -547,45 +554,7 @@ export default function PlayGamePage() {
               <p className="mt-6 text-body-gray">Starting match...</p>
             </>
           )}
-          {realMatchmakingTimeout && useRealMatchmaking && (
-            <>
-              <p className="text-xl font-semibold text-white">No opponent found</p>
-              <p className="mt-2 text-body-gray">Keep waiting, play a bot, or cancel and get a refund.</p>
-              <div className="mt-6 flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    startMatchmaking({
-                      gameType: gameSlug,
-                      stakeAmount,
-                      userId,
-                      username,
-                      rating: 1000,
-                      onMatchReady: handleMatchReady,
-                    });
-                  }}
-                  className="rounded-lg bg-teal px-6 py-2.5 font-semibold text-charcoal hover:shadow-teal-glow"
-                >
-                  Keep Waiting
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSwitchToPractice}
-                  className="rounded-lg border border-teal/50 bg-teal/10 px-6 py-2.5 font-semibold text-teal hover:bg-teal/20"
-                >
-                  Switch to Practice Mode
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancelMatchmaking}
-                  className="rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
-                >
-                  Cancel (refund)
-                </button>
-              </div>
-            </>
-          )}
-          {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && !realMatchmakingTimeout && (
+          {!opponentFound && !match && realMatchStatus !== "matched" && realMatchStatus !== "error" && (
             <>
               <div className="relative flex h-24 w-24 items-center justify-center">
                 <div className={`absolute h-20 w-20 animate-ping rounded-full border-2 ${effectivePractice ? "border-purple-500/40" : "border-teal/40"}`} />
@@ -597,19 +566,16 @@ export default function PlayGamePage() {
                   ? "Waiting for opponent..."
                   : effectivePractice
                     ? "Finding practice opponent..."
-                    : "Searching for opponent..."}
+                    : "Looking for opponent..."}
               </p>
               <p className="mt-2 text-body-gray">
                 {effectivePractice
                   ? `${gameName} • Free play`
-                  : `Stake: ${formatCurrency(stakeAmount)} • ${gameName} • Ranked 1v1`}
+                  : `${gameName} • Ranked 1v1`}
               </p>
               <p className="mt-2 text-sm text-body-gray">
                 {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}
               </p>
-              {slowMessage && !timeoutReached && realMatchStatus === "searching" && (
-                <p className="mt-2 text-sm text-amber-400">Taking longer than usual...</p>
-              )}
               <button
                 type="button"
                 onClick={handleCancelMatchmaking}

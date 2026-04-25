@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
@@ -16,18 +15,13 @@ import {
   creditWallet,
   createMatch,
   generateFakeOpponent,
-  computePayout,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 import SPIcon from "@/components/SPIcon";
 
-const STAKE_PRESETS = [1, 2, 5, 10, 25, 50];
-const SWEEPSTAKES_STAKE_MULTIPLIER = 100;
-const MATCHMAKING_TIMEOUT_SEC = 60;
-const MATCHMAKING_SLOW_SEC = 30;
+const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const GAME_SLUG = "spelling-bee";
 const GAME_NAME = "Spelling Bee";
 
@@ -47,9 +41,9 @@ export default function PlaySpellingBeePage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [myGameRating, setMyGameRating] = useState(1000);
 
-  const [stake, setStake] = useState(5);
-  const [customStake, setCustomStake] = useState("");
+  const [stake, setStake] = useState(500);
   const [botDifficulty, setBotDifficulty] = useState<BotDifficulty>("gamer");
   const [matchmaking, setMatchmaking] = useState(false);
   const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
@@ -58,9 +52,9 @@ export default function PlaySpellingBeePage() {
   const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const realMatchNavRef = useRef<string | null>(null);
+  const botFallbackStartedRef = useRef(false);
 
   const { isPractice } = usePlayMode();
-  const { showToast } = useToast();
   const {
     status: realMatchStatus,
     match: realMatch,
@@ -70,12 +64,9 @@ export default function PlaySpellingBeePage() {
     cancelSearching,
   } = useMatchmaking();
 
-  const stakeAmount = customStake ? (parseFloat(customStake) || 0) : stake;
-  const { totalPot, platformFee, winnerPayout } = computePayout(stakeAmount);
-  const insufficientBalance = !isPractice && !IS_SWEEPSTAKES_LAUNCH && balance < stakeAmount;
-  const useRealMatchmaking = !isPractice && !IS_SWEEPSTAKES_LAUNCH;
-  const timeoutReached = matchmakingElapsed >= MATCHMAKING_TIMEOUT_SEC;
-  const slowMessage = matchmakingElapsed >= MATCHMAKING_SLOW_SEC;
+  const stakeAmount = stake;
+  const insufficientBalance = !isPractice && balance < stakeAmount;
+  const useRealMatchmaking = !isPractice;
 
   useEffect(() => {
     async function load() {
@@ -90,6 +81,15 @@ export default function PlaySpellingBeePage() {
         setIsDevMode(user.isDevMode ?? false);
         const bal = await getWalletBalance();
         setBalance(bal);
+        if (user.id) {
+          try {
+            const { getPlayerGameRating } = await import("@/lib/ranking/updateRating");
+            const ratingData = await getPlayerGameRating(user.id, GAME_SLUG);
+            setMyGameRating(ratingData.rating);
+          } catch {
+            // non-fatal — defaults to 1000
+          }
+        }
       } catch {
         router.push("/login");
       } finally {
@@ -127,12 +127,57 @@ export default function PlaySpellingBeePage() {
   const player1 = useMemo<PlayerInfo>(
     () => ({
       username,
-      rating: 1000,
+      rating: myGameRating,
       winRate: 50,
       matchesPlayed: 0,
     }),
-    [username]
+    [myGameRating, username]
   );
+
+  const getBotDifficultyForRating = useCallback((rating: number): BotDifficulty => {
+    if (rating < 1000) return "rookie";
+    if (rating <= 1500) return "gamer";
+    return "professional";
+  }, []);
+
+  const runBotFallbackMatch = useCallback(async () => {
+    if (botFallbackStartedRef.current) return;
+    botFallbackStartedRef.current = true;
+    await cancelSearching();
+    const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
+    const opponent = generateFakeOpponent(myGameRating);
+    setOpponentFound(opponent);
+    try {
+      const newMatch = await createMatch({
+        gameType: GAME_SLUG,
+        gameDisplayName: GAME_NAME,
+        stakeAmount,
+        player1,
+        player2: opponent,
+        botDifficulty: resolvedBotDifficulty,
+      });
+      setMatch(newMatch);
+      setTimeout(() => router.push(`/match/${newMatch.id}`), 1200);
+    } catch {
+      try {
+        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
+        dispatchWalletUpdated();
+      } catch {
+        dispatchWalletUpdated();
+      }
+      setMatchmaking(false);
+      setOpponentFound(null);
+      setMatch(null);
+      botFallbackStartedRef.current = false;
+    }
+  }, [
+    cancelSearching,
+    getBotDifficultyForRating,
+    myGameRating,
+    player1,
+    router,
+    stakeAmount,
+  ]);
 
   const handleCancelMatchmaking = useCallback(async () => {
     if (elapsedTimer) clearInterval(elapsedTimer);
@@ -141,6 +186,7 @@ export default function PlaySpellingBeePage() {
       clearTimeout(findMatchTimeoutRef.current);
       findMatchTimeoutRef.current = null;
     }
+    botFallbackStartedRef.current = false;
     if (useRealMatchmaking) {
       await cancelSearching();
     }
@@ -160,7 +206,7 @@ export default function PlaySpellingBeePage() {
   }, [elapsedTimer, stakeAmount, isPractice, useRealMatchmaking, cancelSearching]);
 
   const handleFindMatch = useCallback(async () => {
-    if (isPractice || IS_SWEEPSTAKES_LAUNCH) {
+    if (isPractice) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
@@ -207,13 +253,15 @@ export default function PlaySpellingBeePage() {
       }
       setMatchmaking(true);
       setMatchmakingElapsed(0);
+      botFallbackStartedRef.current = false;
       try {
         await startMatchmaking({
           gameType: GAME_SLUG,
           stakeAmount,
           userId,
           username,
-          rating: 1000,
+          rating: myGameRating,
+          isRealMoney: true,
           onMatchReady: handleMatchReady,
         });
       } catch {
@@ -224,16 +272,7 @@ export default function PlaySpellingBeePage() {
       return;
     }
 
-    if (insufficientBalance || stakeAmount < 1) return;
-    try {
-      await debitWallet(stakeAmount, `Match entry – ${GAME_NAME}`);
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch {
-      return;
-    }
   }, [
-    balance,
     stakeAmount,
     insufficientBalance,
     isPractice,
@@ -245,24 +284,20 @@ export default function PlaySpellingBeePage() {
     startMatchmaking,
     handleMatchReady,
     botDifficulty,
+    myGameRating,
   ]);
 
-  const handleSwitchToPractice = useCallback(async () => {
-    await cancelSearching();
-    setMatchmaking(false);
-    setMatchmakingElapsed(0);
-    setOpponentFound(null);
-    setMatch(null);
-    try {
-      await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
-      setBalance(await getWalletBalance());
-      dispatchWalletUpdated();
-    } catch {
-      dispatchWalletUpdated();
-    }
-    router.push("/play/spelling-bee");
-    showToast("Switched to lobby. Toggle Practice mode to play vs bot for free.", "success");
-  }, [cancelSearching, stakeAmount, router, showToast]);
+  useEffect(() => {
+    if (!useRealMatchmaking || !matchmaking || realMatchStatus !== "timeout" || match || opponentFound) return;
+    void runBotFallbackMatch();
+  }, [
+    matchmaking,
+    match,
+    opponentFound,
+    realMatchStatus,
+    runBotFallbackMatch,
+    useRealMatchmaking,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -362,54 +397,23 @@ export default function PlaySpellingBeePage() {
         {!isPractice && (
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
-            <p className="mt-1 text-body-gray">
-              {IS_SWEEPSTAKES_LAUNCH
-                ? "Both players commit the same amount. Winner takes the pot minus 5% platform fee."
-                : "Both players put up the same amount. Winner takes all minus 5% platform fee."}
-            </p>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {STAKE_PRESETS.map((amt) => (
                 <button
                   key={amt}
                   type="button"
-                  onClick={() => {
-                    setStake(amt);
-                    setCustomStake("");
-                  }}
+                  onClick={() => setStake(amt)}
                   className={`pressable rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                    !customStake && stake === amt
+                    stake === amt
                       ? "border-amber-500 bg-amber-500 text-charcoal shadow-lg shadow-amber-500/30"
                       : "border-amber-500/50 bg-[#1A1D27] text-white hover:border-amber-500"
                   }`}
                 >
-                  {IS_SWEEPSTAKES_LAUNCH ? (
-                    <span className="inline-flex items-center gap-1">
-                      {amt * SWEEPSTAKES_STAKE_MULTIPLIER} <SPIcon size={14} />
-                    </span>
-                  ) : (
-                    `$${amt}`
-                  )}
+                  <span className="inline-flex items-center gap-1">
+                    {amt.toLocaleString()} <SPIcon size={14} />
+                  </span>
                 </button>
               ))}
-            </div>
-            <p className="mt-3 text-sm text-body-gray">Custom amount</p>
-            <input
-              type="number"
-              min={1}
-              max={IS_SWEEPSTAKES_LAUNCH ? undefined : balance}
-              step="0.01"
-              placeholder="0.00"
-              value={customStake}
-              onChange={(e) => setCustomStake(e.target.value)}
-              className="mt-1 w-full max-w-[200px] rounded-lg border border-white/10 bg-[#1A1D27] px-4 py-2 text-white placeholder:text-body-gray focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-
-            <div className="card-border mt-6 rounded-card bg-card p-5">
-              <p className="text-body-gray">Your Stake: {formatCurrency(stakeAmount)}</p>
-              <p className="mt-1 text-body-gray">Opponent&apos;s Stake: {formatCurrency(stakeAmount)}</p>
-              <p className="mt-1 text-body-gray">Total Pot: {formatCurrency(totalPot)}</p>
-              <p className="mt-1 text-body-gray">Platform fee (5%): {formatCurrency(platformFee)}</p>
-              <p className="mt-2 text-lg font-bold text-amber-400">Winner gets: {formatCurrency(winnerPayout)}</p>
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (
@@ -445,7 +449,11 @@ export default function PlaySpellingBeePage() {
                 : "bg-amber-500 text-charcoal hover:shadow-[0_0_24px_rgba(245,158,11,0.4)]"
             }`}
           >
-            {isPractice ? "Start Practice" : `Find Match — ${formatCurrency(stakeAmount)}`}
+            {isPractice ? "Start Practice" : (
+              <span className="inline-flex items-center gap-2">
+                Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+              </span>
+            )}
           </button>
         </div>
       </main>
@@ -500,41 +508,19 @@ export default function PlaySpellingBeePage() {
                 <div className="h-3 w-3 rounded-full bg-amber-500" />
               </div>
               <p className="mt-6 text-xl font-semibold text-white">
-                {isPractice ? "Finding practice opponent..." : "Finding your opponent..."}
+                {isPractice ? "Finding practice opponent..." : "Looking for opponent..."}
               </p>
               <p className="mt-2 text-body-gray">
-                {isPractice ? "Spelling Bee • Free play" : `Stake: ${formatCurrency(stakeAmount)} • Spelling Bee • Ranked 1v1`}
+                {isPractice ? "Spelling Bee • Free play" : "Spelling Bee • Ranked 1v1"}
               </p>
               <p className="mt-2 text-sm text-body-gray">Searching... {formatTime(matchmakingElapsed)}</p>
-              {slowMessage && !timeoutReached && (
-                <p className="mt-2 text-sm text-amber-400">Taking longer than usual...</p>
-              )}
-              {timeoutReached && useRealMatchmaking ? (
-                <div className="mt-6 flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSwitchToPractice}
-                    className="rounded-lg bg-amber-500 px-6 py-2.5 font-semibold text-charcoal hover:shadow-lg hover:shadow-amber-500/30"
-                  >
-                    Switch to Practice Mode
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelMatchmaking}
-                    className="rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
-                  >
-                    Cancel (refund)
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleCancelMatchmaking}
-                  className="mt-8 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleCancelMatchmaking}
+                className="mt-8 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
             </>
           )}
           {opponentFound && match && (

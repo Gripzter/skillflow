@@ -444,6 +444,7 @@ export async function createMatch(params: {
       platform_fee: platformFee,
       total_pot: totalPot,
       winner_payout: winnerPayout,
+      bot_difficulty: params.botDifficulty ?? null,
       status: "in_progress",
       player1_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
       player2_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,

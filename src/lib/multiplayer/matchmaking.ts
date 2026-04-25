@@ -3,14 +3,11 @@
  * Polling-only — no Supabase Realtime for matchmaking.
  * Realtime is only used inside the match room for game events.
  *
- * Rating-based matching (real-money only):
- *   0–30 s  → opponent within ±150 rating points
- *   30–60 s → opponent within ±300 rating points
- *   60 s+   → match with anyone
+ * Rating-based matching window (ranked play):
+ *   first 5 s → opponent within ±200 rating points
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
 
 export interface DbMatch {
   id: string;
@@ -32,12 +29,9 @@ export interface DbMatch {
   completed_at: string | null;
 }
 
-const POLL_INTERVAL_MS = 2000;
-const MATCHMAKING_TIMEOUT_MS = 60000;
-const RATING_NARROW_MS = 30000;   // first 30 s: ±150
-const RATING_WIDE_MS = 60000;     // 30–60 s: ±300
-const RATING_NARROW_RANGE = 150;
-const RATING_WIDE_RANGE = 300;
+const POLL_INTERVAL_MS = 1000;
+const MATCHMAKING_TIMEOUT_MS = 5000;
+const RATING_MATCH_RANGE = 200;
 
 export type MatchmakingStatus = "searching" | "waiting" | "matched" | "timeout";
 
@@ -88,19 +82,8 @@ export async function startMatchmaking(
       console.log("[matchmaking] Starting matchmaking...", { gameType: normalizedGameType, stake, isRealMoney, rating });
     }
 
-    /** Return the rating filter range for the current elapsed time (null = no filter) */
-    function getRatingFilter(): number | null {
-      if (!isRealMoney) return null;
-      const elapsed = Date.now() - searchStart;
-      if (elapsed < RATING_NARROW_MS) return RATING_NARROW_RANGE;
-      if (elapsed < RATING_WIDE_MS) return RATING_WIDE_RANGE;
-      return null;
-    }
-
     /** Search for a waiting match respecting the current rating filter */
     async function findWaitingMatch(): Promise<DbMatch | null> {
-      const filter = getRatingFilter();
-
       let query = supabase
         .from("matches")
         .select("*")
@@ -111,10 +94,10 @@ export async function startMatchmaking(
         .order("created_at", { ascending: true })
         .limit(1);
 
-      if (filter !== null) {
+      if (isRealMoney) {
         query = query
-          .gte("player1_rating", rating - filter)
-          .lte("player1_rating", rating + filter);
+          .gte("player1_rating", rating - RATING_MATCH_RANGE)
+          .lte("player1_rating", rating + RATING_MATCH_RANGE);
       }
 
       const { data, error } = await query;
@@ -125,8 +108,8 @@ export async function startMatchmaking(
     /** Attempt to join a waiting match as player 2 */
     async function joinMatch(match: DbMatch): Promise<DbMatch | null> {
       const totalPot = match.stake_amount * 2;
-      const platformFee = Math.round(totalPot * PLATFORM_FEE_PERCENT * 100) / 100;
-      const winnerPayout = Math.round((totalPot - platformFee) * 100) / 100;
+      const platformFee = 0;
+      const winnerPayout = totalPot;
 
       const { data: updated, error: joinError } = await supabase
         .from("matches")
@@ -252,9 +235,8 @@ export async function startMatchmaking(
           }
         }
 
-        // 2. With widening filter, also look for OTHER waiting matches to join
-        //    (only active after 30 s — narrow window preserves rating integrity)
-        if (isRealMoney && Date.now() - searchStart >= RATING_NARROW_MS && myMatchActive) {
+        // 2. Also look for OTHER waiting matches to join during the search window
+        if (myMatchActive) {
           const otherMatch = await findWaitingMatch();
           if (otherMatch) {
             const joined = await joinMatch(otherMatch);

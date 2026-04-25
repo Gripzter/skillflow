@@ -282,11 +282,6 @@ function MatchPageContent() {
           setLoading(false);
           return;
         }
-        if (!m.isRealMultiplayer && !m.isPractice && (m.stakeAmount ?? 0) > 0) {
-          setLoadError("Invalid match — real money matches require a real opponent. Please start a new match.");
-          setLoading(false);
-          return;
-        }
         setMatch(m);
         setMoveLog(Array.isArray(m.moveLog) ? m.moveLog : []);
         const matchStartMs = m.matchStartTime ? new Date(m.matchStartTime).getTime() : NaN;
