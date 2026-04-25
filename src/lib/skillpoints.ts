@@ -424,6 +424,60 @@ export async function spendSP(
   };
 }
 
+export async function creditSP(
+  userId: string,
+  amount: number,
+  type: string,
+  description: string
+): Promise<SpResult> {
+  if (amount <= 0) {
+    return { success: false, error: "Amount must be greater than zero." };
+  }
+
+  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("balance_sp")
+    .eq("id", userId)
+    .single();
+
+  if (profileError || !profile) {
+    return { success: false, error: "Failed to load user SP balance." };
+  }
+
+  const currentBalance = Number(profile.balance_sp ?? 0);
+  const nextBalance = currentBalance + amount;
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ balance_sp: nextBalance })
+    .eq("id", userId);
+
+  if (updateError) {
+    return { success: false, error: "Failed to update SkillPoints balance." };
+  }
+
+  const { error: txError } = await supabase.from("sp_transactions").insert({
+    user_id: userId,
+    amount,
+    type,
+    description,
+  });
+
+  if (txError) {
+    return { success: false, error: "Failed to log SP credit transaction." };
+  }
+
+  return {
+    success: true,
+    amount,
+    balanceSp: nextBalance,
+  };
+}
+
 export async function getUserSPData(userId: string): Promise<UserSpData | null> {
   const supabase = createClient();
   if (!supabase) return null;

@@ -28,6 +28,7 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -60,6 +61,16 @@ export default function SettingsPage() {
         return;
       }
       setUser(u);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", u.id)
+        .maybeSingle();
+      if (profile?.avatar_url) {
+        setAvatarUrl(profile.avatar_url as string);
+      } else {
+        setAvatarUrl((u.user_metadata?.avatar_url as string | undefined) ?? undefined);
+      }
       setLoading(false);
     }
     load();
@@ -72,7 +83,6 @@ export default function SettingsPage() {
   const username = user?.user_metadata?.username ?? "Player";
   const email = user?.email ?? "Not set";
   const dateOfBirth = user?.user_metadata?.date_of_birth ?? "Not set";
-  const avatarUrl: string | undefined = user?.user_metadata?.avatar_url;
   const lastUsernameChangeAt = user?.user_metadata?.last_username_change_at as string | undefined;
   const lastChangeDate = lastUsernameChangeAt ? new Date(lastUsernameChangeAt) : null;
   const now = new Date();
@@ -110,14 +120,26 @@ export default function SettingsPage() {
       if (!supabase) return;
 
       const userId = user.id as string;
-      const path = `${userId}.${ext}`;
+      const path = `${userId}/avatar.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(path, file, { upsert: true, contentType: file.type });
 
       if (uploadError) {
-        showToast("Failed to upload avatar. Please try again.", "error");
+        const message = (uploadError.message || "").toLowerCase();
+        if (message.includes("bucket") && message.includes("not")) {
+          showToast("Avatar bucket is missing. Create a public 'avatars' bucket first.", "error");
+        } else if (
+          message.includes("row-level security") ||
+          message.includes("permission") ||
+          message.includes("not allowed") ||
+          message.includes("unauthorized")
+        ) {
+          showToast("Avatar upload blocked by Storage policy. Allow uploads to avatars/{user_id}/*.", "error");
+        } else {
+          showToast("Failed to upload avatar. Please try again.", "error");
+        }
         return;
       }
 
@@ -127,12 +149,20 @@ export default function SettingsPage() {
         showToast("Failed to get avatar URL.", "error");
         return;
       }
+      const avatarWithBust = `${publicUrl}?v=${Date.now()}`;
 
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId);
+      const { error: profileUpdateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: avatarWithBust })
+        .eq("id", userId);
+      if (profileUpdateError) {
+        showToast("Avatar uploaded, but failed to save profile URL.", "error");
+        return;
+      }
       const { data, error } = await supabase.auth.updateUser({
         data: {
           ...(user.user_metadata ?? {}),
-          avatar_url: publicUrl,
+          avatar_url: avatarWithBust,
         },
       });
       if (error) {
@@ -141,6 +171,7 @@ export default function SettingsPage() {
       if (data?.user) {
         setUser(data.user);
       }
+      setAvatarUrl(avatarWithBust);
       showToast("Avatar updated.", "success");
     } catch {
       showToast("Failed to upload avatar. Please try again.", "error");

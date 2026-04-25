@@ -6,8 +6,6 @@ import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import {
   getCurrentUser,
-  debitWallet,
-  creditWallet,
 } from "@/lib/api";
 import {
   createExternalMatch,
@@ -15,7 +13,7 @@ import {
 } from "@/lib/external-matches";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { getUserSPData } from "@/lib/skillpoints";
+import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const CS2_MAPS = ["Any", "Dust 2", "Mirage", "Inferno", "Nuke", "Anubis", "Ancient", "Overpass"];
@@ -105,7 +103,13 @@ export default function CS2LobbyPage() {
     if (!activeMode?.active) return;
 
     try {
-      await debitWallet(stakeAmount, `CS2 match – ${activeMode.title}`);
+      const spendResult = await spendSP(
+        userId,
+        stakeAmount,
+        "match_entry",
+        `CS2 match – ${activeMode.title}`
+      );
+      if (!spendResult.success) return;
       const spData = await getUserSPData(userId);
       setBalance(Number(spData?.balanceSp ?? 0));
       dispatchWalletUpdated();
@@ -158,7 +162,7 @@ export default function CS2LobbyPage() {
     setMatchId(null);
     setMatchmakingElapsed(0);
     try {
-      await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+      await creditSP(userId, stakeAmount, "match_refund", "Match cancelled – stake refunded");
       const spData = await getUserSPData(userId);
       setBalance(Number(spData?.balanceSp ?? 0));
       dispatchWalletUpdated();

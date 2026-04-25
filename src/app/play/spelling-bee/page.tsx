@@ -7,18 +7,17 @@ import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
+import { useToast } from "@/components/Toast";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
   getCurrentUser,
-  debitWallet,
-  creditWallet,
   createMatch,
   generateFakeOpponent,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { getUserSPData } from "@/lib/skillpoints";
+import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const GAME_SLUG = "spelling-bee";
@@ -34,6 +33,7 @@ const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; description: st
 
 export default function PlaySpellingBeePage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -162,7 +162,7 @@ export default function PlaySpellingBeePage() {
       setTimeout(() => router.push(`/match/${newMatch.id}`), 1200);
     } catch {
       try {
-        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
+        await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
         dispatchWalletUpdated();
       } catch {
         dispatchWalletUpdated();
@@ -198,7 +198,7 @@ export default function PlaySpellingBeePage() {
     setMatchmakingElapsed(0);
     if (!isPractice) {
       try {
-        await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+        await creditSP(userId, stakeAmount, "match_refund", "Match cancelled – stake refunded");
         const spData = await getUserSPData(userId);
         setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
@@ -209,6 +209,11 @@ export default function PlaySpellingBeePage() {
   }, [elapsedTimer, stakeAmount, isPractice, useRealMatchmaking, cancelSearching]);
 
   const handleFindMatch = useCallback(async () => {
+    if (!userId) {
+      showToast("Still loading your profile. Please try again in a moment.", "error");
+      return;
+    }
+
     if (isPractice) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
@@ -248,11 +253,21 @@ export default function PlaySpellingBeePage() {
     if (useRealMatchmaking) {
       if (insufficientBalance || stakeAmount < 1) return;
       try {
-        await debitWallet(stakeAmount, `Match entry – ${GAME_NAME}`);
+        const spendResult = await spendSP(
+          userId,
+          stakeAmount,
+          "match_entry",
+          `Match entry – ${GAME_NAME}`
+        );
+        if (!spendResult.success) {
+          showToast(spendResult.error, "error");
+          return;
+        }
         const spData = await getUserSPData(userId);
         setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
+        showToast("Unable to start match right now. Please try again.", "error");
         return;
       }
       setMatchmaking(true);
@@ -269,9 +284,7 @@ export default function PlaySpellingBeePage() {
           onMatchReady: handleMatchReady,
         });
       } catch {
-        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
-        dispatchWalletUpdated();
-        setMatchmaking(false);
+        void runBotFallbackMatch();
       }
       return;
     }
@@ -289,10 +302,12 @@ export default function PlaySpellingBeePage() {
     handleMatchReady,
     botDifficulty,
     myGameRating,
+    showToast,
   ]);
 
   useEffect(() => {
-    if (!useRealMatchmaking || !matchmaking || realMatchStatus !== "timeout" || match || opponentFound) return;
+    if (!useRealMatchmaking || !matchmaking || match || opponentFound) return;
+    if (realMatchStatus !== "timeout" && realMatchStatus !== "error") return;
     void runBotFallbackMatch();
   }, [
     matchmaking,

@@ -13,16 +13,12 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
   getCurrentUser,
-  debitWallet,
-  creditWallet,
   createMatch,
   generateFakeOpponent,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { checkCanPlay } from "@/lib/responsible-gaming";
-import { createClient } from "@/lib/supabase";
-import { getUserSPData } from "@/lib/skillpoints";
+import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 
@@ -60,7 +56,6 @@ export default function PlayGamePage() {
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
-  const [emailVerified, setEmailVerified] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -107,7 +102,6 @@ export default function PlayGamePage() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        setEmailVerified(user.emailVerified ?? true);
         const spData = await getUserSPData(user.id);
         setBalance(Number(spData?.balanceSp ?? 0));
         // Fetch player's Glicko-2 rating for this game
@@ -185,7 +179,7 @@ export default function PlayGamePage() {
       setTimeout(() => router.push(`/match/${newMatch.id}`), 1200);
     } catch {
       try {
-        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
+        await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
         dispatchWalletUpdated();
       } catch {
         dispatchWalletUpdated();
@@ -224,7 +218,7 @@ export default function PlayGamePage() {
     setMatchmakingElapsed(0);
     if (!isPractice && !isRestricted) {
       try {
-        await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+        await creditSP(userId, stakeAmount, "match_refund", "Match cancelled – stake refunded");
         const spData = await getUserSPData(userId);
         setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
@@ -246,6 +240,11 @@ export default function PlayGamePage() {
   }, []);
 
   const handleFindMatch = useCallback(async () => {
+    if (!userId) {
+      showToast("Still loading your profile. Please try again in a moment.", "error");
+      return;
+    }
+
     if (isPractice || isRestricted) {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
@@ -282,28 +281,24 @@ export default function PlayGamePage() {
       return;
     }
 
-    if (!emailVerified) {
-      showToast("Please verify your email before playing for real money. Practice mode is available.", "error");
-      return;
-    }
-
-    const supabase = createClient();
-    if (supabase && userId) {
-      const canPlay = await checkCanPlay(supabase, userId);
-      if (!canPlay.allowed) {
-        showToast(canPlay.reason ?? "Real money play is not allowed.", "error");
-        return;
-      }
-    }
-
     if (useRealMatchmaking) {
       if (insufficientBalance || stakeAmount < 1) return;
       try {
-        await debitWallet(stakeAmount, `Match entry – ${gameName}`);
+        const spendResult = await spendSP(
+          userId,
+          stakeAmount,
+          "match_entry",
+          `Match entry – ${gameName}`
+        );
+        if (!spendResult.success) {
+          showToast(spendResult.error, "error");
+          return;
+        }
         const spData = await getUserSPData(userId);
         setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
+        showToast("Unable to start match right now. Please try again.", "error");
         return;
       }
       setMatchmaking(true);
@@ -320,9 +315,7 @@ export default function PlayGamePage() {
           onMatchReady: handleMatchReady,
         });
       } catch {
-        await creditWallet(stakeAmount, "Matchmaking failed – stake refunded", "match_refund");
-        dispatchWalletUpdated();
-        setMatchmaking(false);
+        void runBotFallbackMatch();
       }
       return;
     }
@@ -340,13 +333,14 @@ export default function PlayGamePage() {
     startMatchmaking,
     handleMatchReady,
     botDifficulty,
-    emailVerified,
     myGameRating,
     showToast,
+    runBotFallbackMatch,
   ]);
 
   useEffect(() => {
-    if (!useRealMatchmaking || !matchmaking || realMatchStatus !== "timeout" || match || opponentFound) return;
+    if (!useRealMatchmaking || !matchmaking || match || opponentFound) return;
+    if (realMatchStatus !== "timeout" && realMatchStatus !== "error") return;
     void runBotFallbackMatch();
   }, [
     matchmaking,
