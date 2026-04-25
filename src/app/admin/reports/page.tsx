@@ -117,7 +117,7 @@ function MatchDetail({ matchId }: { matchId: string }) {
     { label: "Status", value: match.status },
     { label: "Result", value: resultLabel },
     { label: "Player 1", value: match.player1_username ?? match.player1_id?.slice(0, 8) ?? "—" },
-    { label: "Player 2", value: match.player2_username ?? (match.player2_id ? match.player2_id.slice(0, 8) : "Bot") },
+    { label: "Player 2", value: match.player2_username ?? (match.player2_id ? match.player2_id.slice(0, 8) : "Opponent") },
     { label: "Stake", value: match.stake_amount != null ? `$${Number(match.stake_amount).toFixed(2)}` : "—" },
     { label: "Pot", value: match.total_pot != null ? `$${Number(match.total_pot).toFixed(2)}` : "—" },
     { label: "Platform Fee", value: match.platform_fee != null ? `$${Number(match.platform_fee).toFixed(2)}` : "—" },

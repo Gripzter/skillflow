@@ -135,7 +135,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
         matchesPlayed: 0,
       };
       const rookieBot = {
-        username: "Rookie Bot",
+        username: "Noctis",
         rating: 850,
         winRate: 35,
         matchesPlayed: 0,

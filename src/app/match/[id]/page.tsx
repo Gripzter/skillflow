@@ -1374,11 +1374,6 @@ function MatchPageContent() {
             </div>
             <p className="mt-2 font-medium text-white">
               {safePlayer2.username}
-              {!isRealMultiplayer && (
-                <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                  BOT
-                </span>
-              )}
             </p>
             <p className="text-xs text-body-gray">Rating {safePlayer2.rating}</p>
             <p className="mt-4 text-3xl font-bold text-white">0</p>

@@ -21,6 +21,13 @@ import {
 import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
+const OPPONENT_AVATAR_GRADIENTS = [
+  "from-purple/40 to-rose-500/40",
+  "from-cyan-500/40 to-blue-500/40",
+  "from-emerald-500/40 to-teal-500/40",
+  "from-fuchsia-500/40 to-violet-500/40",
+  "from-amber-500/40 to-orange-500/40",
+];
 
 export type BotDifficulty = "rookie" | "gamer" | "professional";
 
@@ -67,6 +74,7 @@ export default function PlayGamePage() {
   const [matchmaking, setMatchmaking] = useState(false);
   const [matchmakingElapsed, setMatchmakingElapsed] = useState(0);
   const [opponentFound, setOpponentFound] = useState<PlayerInfo | null>(null);
+  const [opponentAvatarGradient, setOpponentAvatarGradient] = useState(OPPONENT_AVATAR_GRADIENTS[0]);
   const [match, setMatch] = useState<StoredMatch | null>(null);
   const [elapsedTimer, setElapsedTimer] = useState<ReturnType<typeof setInterval> | null>(null);
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -159,6 +167,10 @@ export default function PlayGamePage() {
     return "professional";
   }, []);
 
+  const pickRandomOpponentGradient = useCallback(() => {
+    return OPPONENT_AVATAR_GRADIENTS[Math.floor(Math.random() * OPPONENT_AVATAR_GRADIENTS.length)];
+  }, []);
+
   const runBotFallbackMatch = useCallback(async () => {
     if (botFallbackStartedRef.current) return;
     botFallbackStartedRef.current = true;
@@ -166,6 +178,7 @@ export default function PlayGamePage() {
     const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
     const opponent = generateFakeOpponent(myGameRating);
     setOpponentFound(opponent);
+    setOpponentAvatarGradient(pickRandomOpponentGradient());
     try {
       const newMatch = await createMatch({
         gameType: gameSlug,
@@ -176,7 +189,9 @@ export default function PlayGamePage() {
         botDifficulty: resolvedBotDifficulty,
       });
       setMatch(newMatch);
-      setTimeout(() => router.push(`/match/${newMatch.id}`), 1200);
+      setTimeout(() => {
+        window.location.href = `/match/${newMatch.id}`;
+      }, 1200);
     } catch {
       try {
         await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
@@ -195,9 +210,10 @@ export default function PlayGamePage() {
     gameSlug,
     getBotDifficultyForRating,
     myGameRating,
+    pickRandomOpponentGradient,
     player1,
-    router,
     stakeAmount,
+    userId,
   ]);
 
   const handleCancelMatchmaking = useCallback(async () => {
@@ -254,13 +270,9 @@ export default function PlayGamePage() {
       findMatchTimeoutRef.current = setTimeout(async () => {
         clearInterval(timer);
         setElapsedTimer(null);
-        const opponent: PlayerInfo = {
-          username: "Bot",
-          rating: 1000,
-          winRate: 50,
-          matchesPlayed: 0,
-        };
+        const opponent = generateFakeOpponent(myGameRating);
         setOpponentFound(opponent);
+        setOpponentAvatarGradient(pickRandomOpponentGradient());
         try {
           const newMatch = await createMatch({
             gameType: gameSlug,
@@ -272,7 +284,9 @@ export default function PlayGamePage() {
             botDifficulty,
           });
           setMatch(newMatch);
-          setTimeout(() => router.push(`/match/${newMatch.id}`), 1500);
+          setTimeout(() => {
+            window.location.href = `/match/${newMatch.id}`;
+          }, 1200);
         } catch {
           setMatchmaking(false);
           setOpponentFound(null);
@@ -325,8 +339,8 @@ export default function PlayGamePage() {
     insufficientBalance,
     isPractice,
     isRestricted,
+    pickRandomOpponentGradient,
     player1,
-    router,
     useRealMatchmaking,
     userId,
     username,
@@ -538,7 +552,7 @@ export default function PlayGamePage() {
                 onClick={handleCancelMatchmaking}
                 className="mt-6 rounded-lg border border-white/30 px-6 py-2 text-white hover:bg-white/10"
               >
-                Refund &amp; go back
+                Go back
               </button>
             </>
           )}
@@ -617,7 +631,7 @@ export default function PlayGamePage() {
                 </div>
                 <span className={`text-2xl font-bold drop-shadow-lg ${effectivePractice ? "text-purple-400" : "text-teal"}`}>VS</span>
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-lg font-bold text-white">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${opponentAvatarGradient} text-lg font-bold text-white`}>
                     {opponentFound.username.charAt(0)}
                   </div>
                   <p className="mt-2 font-medium text-white">{opponentFound.username}</p>

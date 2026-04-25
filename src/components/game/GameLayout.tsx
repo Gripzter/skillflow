@@ -148,9 +148,6 @@ function PlayerCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-medium text-white md:text-[13px]">
             {player.username}
-            {player.isBot ? (
-              <span className="ml-1 text-[9px] text-[#888] md:text-[10px]">BOT</span>
-            ) : null}
           </p>
           <div className="flex items-center gap-2">
             <p className="text-[10px] text-[#555] md:text-[11px]">{player.rating}</p>

@@ -7,14 +7,58 @@ import { generateId } from "./wallet";
 export const MATCHES_STORAGE_KEY = "skillflow_matches";
 
 const OPPONENT_NAMES = [
-  "xKiller99",
-  "PoolShark",
-  "ChessMaster",
-  "SniperElite",
-  "NoScope360",
-  "EzWin",
-  "TryHard_1",
-  "CasualPro",
+  "xKira",
+  "Noctis",
+  "ZeroDay",
+  "Mellowz",
+  "Clutchh",
+  "Sova99",
+  "Jinxed",
+  "Phantom",
+  "Ace_High",
+  "Koda",
+  "NovaByte",
+  "RiftRunner",
+  "Vanta",
+  "MiraQ",
+  "Skylark",
+  "Nexu",
+  "Cinder",
+  "AriaX",
+  "Luma",
+  "EchoNine",
+  "Warden",
+  "Astra",
+  "Ghostline",
+  "RogueMint",
+  "PixelRush",
+  "Zenith",
+  "Pulse",
+  "Drift",
+  "Blitz",
+  "Hexa",
+  "Kairo",
+  "Nori",
+  "Vex",
+  "Frosty",
+  "Nebula",
+  "Rune",
+  "Axiom",
+  "Flare",
+  "Orbit",
+  "Havoc",
+  "Raven",
+  "Volt",
+  "Solace",
+  "Cipher",
+  "Mako",
+  "Lyric",
+  "Raze",
+  "Basilisk",
+  "Onyx",
+  "Prism",
+  "Tundra",
+  "EchoFox",
 ];
 
 export interface PlayerInfo {
@@ -83,7 +127,7 @@ export function generateMatchId(): string {
 }
 
 export function generateFakeOpponent(baseRating: number = 1000): PlayerInfo {
-  const ratingOffset = Math.floor(Math.random() * 401) - 200;
+  const ratingOffset = Math.floor(Math.random() * 301) - 150;
   const rating = Math.max(100, Math.min(2000, baseRating + ratingOffset));
   const winRate = 0.4 + Math.random() * 0.35;
   const matchesPlayed = 10 + Math.floor(Math.random() * 491);

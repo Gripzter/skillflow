@@ -145,7 +145,7 @@ export default function AdminOverviewPage() {
         enrichedMatches = recentRaw.map((m) => ({
           ...m,
           player1Name: profileMap.get(m.player1_id) ?? "Player 1",
-          player2Name: profileMap.get(m.player2_id) ?? "Bot",
+          player2Name: profileMap.get(m.player2_id) ?? "Opponent",
         }));
       }
 

@@ -819,11 +819,6 @@ export default function EightBallPool({ player1, player2, onGameEnd, isPlayer2Bo
         >
           <span className="text-sm font-medium text-white">
             {player2.username}
-            {isPlayer2Bot && (
-              <span className="ml-1.5 inline-flex items-center rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-body-gray">
-                🤖 BOT
-              </span>
-            )}
             {botThinking && <span className="ml-1 inline-flex animate-pulse text-body-gray">...</span>}
           </span>
           <div className="flex items-center gap-1.5">
