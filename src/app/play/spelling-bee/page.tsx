@@ -6,11 +6,11 @@ import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
   getCurrentUser,
-  getWalletBalance,
   debitWallet,
   creditWallet,
   createMatch,
@@ -18,8 +18,7 @@ import {
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { formatCurrency } from "@/lib/formatCurrency";
-import SPIcon from "@/components/SPIcon";
+import { getUserSPData } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const GAME_SLUG = "spelling-bee";
@@ -79,8 +78,8 @@ export default function PlaySpellingBeePage() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        const bal = await getWalletBalance();
-        setBalance(bal);
+        const spData = await getUserSPData(user.id);
+        setBalance(Number(spData?.balanceSp ?? 0));
         if (user.id) {
           try {
             const { getPlayerGameRating } = await import("@/lib/ranking/updateRating");
@@ -97,10 +96,13 @@ export default function PlaySpellingBeePage() {
       }
     }
     load();
-    const handleUpdate = () => void getWalletBalance().then(setBalance);
+    const handleUpdate = () =>
+      void (userId
+        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
-  }, [router]);
+  }, [router, userId]);
 
   useEffect(() => {
     if (!matchmaking || !useRealMatchmaking) return;
@@ -197,7 +199,8 @@ export default function PlaySpellingBeePage() {
     if (!isPractice) {
       try {
         await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
-        setBalance(await getWalletBalance());
+        const spData = await getUserSPData(userId);
+        setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
         dispatchWalletUpdated();
@@ -246,7 +249,8 @@ export default function PlaySpellingBeePage() {
       if (insufficientBalance || stakeAmount < 1) return;
       try {
         await debitWallet(stakeAmount, `Match entry – ${GAME_NAME}`);
-        setBalance(await getWalletBalance());
+        const spData = await getUserSPData(userId);
+        setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
         return;
@@ -300,6 +304,15 @@ export default function PlaySpellingBeePage() {
   ]);
 
   useEffect(() => {
+    if (isPractice) return;
+    if (stake <= balance) return;
+    const highestAffordable = [...STAKE_PRESETS].reverse().find((amt) => amt <= balance);
+    if (highestAffordable) {
+      setStake(highestAffordable);
+    }
+  }, [balance, isPractice, stake]);
+
+  useEffect(() => {
     return () => {
       if (findMatchTimeoutRef.current) clearTimeout(findMatchTimeoutRef.current);
     };
@@ -347,7 +360,9 @@ export default function PlaySpellingBeePage() {
           {!isPractice && (
             <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="text-sm font-medium text-white">{formatCurrency(balance)}</span>
+              <span className="text-sm font-medium text-white inline-flex items-center gap-1">
+                {Math.floor(balance).toLocaleString()} Skillies <SkilliesIcon size={14} />
+              </span>
             </div>
           )}
         </div>
@@ -398,27 +413,33 @@ export default function PlaySpellingBeePage() {
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-              {STAKE_PRESETS.map((amt) => (
+              {STAKE_PRESETS.map((amt) => {
+                const affordable = amt <= balance;
+                return (
                 <button
                   key={amt}
                   type="button"
                   onClick={() => setStake(amt)}
+                  disabled={!affordable}
                   className={`pressable rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                    stake === amt
+                    !affordable
+                      ? "cursor-not-allowed border-white/10 bg-white/5 text-body-gray opacity-60"
+                      : stake === amt
                       ? "border-amber-500 bg-amber-500 text-charcoal shadow-lg shadow-amber-500/30"
                       : "border-amber-500/50 bg-[#1A1D27] text-white hover:border-amber-500"
                   }`}
                 >
                   <span className="inline-flex items-center gap-1">
-                    {amt.toLocaleString()} <SPIcon size={14} />
+                    {amt.toLocaleString()} Skillies <SkilliesIcon size={14} />
                   </span>
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (
               <p className="mt-3 text-sm text-red-400">
-                Insufficient balance. <Link href="/wallet" className="text-amber-400 underline">Deposit funds</Link> to play.
+                Insufficient balance. <Link href="/dashboard" className="text-amber-400 underline">Earn more</Link> to play.
               </p>
             )}
           </section>
@@ -451,7 +472,7 @@ export default function PlaySpellingBeePage() {
           >
             {isPractice ? "Start Practice" : (
               <span className="inline-flex items-center gap-2">
-                Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+                Play - {stakeAmount.toLocaleString()} Skillies <SkilliesIcon size={18} />
               </span>
             )}
           </button>

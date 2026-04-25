@@ -10,6 +10,7 @@ import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
 import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { getUserSPData, SP_REWARDS, type UserSpData } from "@/lib/skillpoints";
@@ -108,14 +109,38 @@ export default function SkillPointsPage() {
             <h1 className="text-xl font-bold text-white sm:text-2xl">SkillPoints</h1>
             <RankBadge tier={spData.rankTier} size="large" />
           </div>
-          <p className="mt-2 text-sm text-body-gray">
-            Spendable balance:{" "}
-            <span className="font-semibold text-teal inline-flex items-center gap-1">
-              {spData.balanceSp.toLocaleString()} <SPIcon size={16} />
-            </span>
-          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-body-gray">SkillPoints</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-lg font-semibold text-white">
+                {spData.lifetimeSp.toLocaleString()} <SPIcon size={18} />
+              </p>
+              <p className="mt-1 text-xs text-body-gray">Lifetime total, rank progression, never decreases.</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.12em] text-body-gray">Skillies</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-lg font-semibold text-teal">
+                {spData.balanceSp.toLocaleString()} Skillies <SkilliesIcon size={18} />
+              </p>
+              <p className="mt-1 text-xs text-body-gray">Spendable balance for wagers, cases, and rewards.</p>
+            </div>
+          </div>
           <div className="mt-4">
             <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
+          </div>
+        </section>
+
+        <section className="rounded-card border border-white/10 bg-card/80 p-5">
+          <h2 className="text-lg font-semibold text-white">SkillPoints vs Skillies</h2>
+          <div className="mt-3 space-y-3 text-sm text-body-gray">
+            <p>
+              <span className="font-semibold text-white">SkillPoints</span> - Your career score. Earned from every
+              match and challenge. Determines your rank. Never decreases.
+            </p>
+            <p>
+              <span className="font-semibold text-white">Skillies</span> - Your spending currency. Use them to wager in
+              matches and open cases. Win more by playing.
+            </p>
           </div>
         </section>
 

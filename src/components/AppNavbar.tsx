@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getWalletBalance, getMyProfile } from "@/lib/api";
+import { getMyProfile } from "@/lib/api";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import RankBadge from "@/components/RankBadge";
 import DevSpGrantButton from "@/components/DevSpGrantButton";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getUserSPData } from "@/lib/skillpoints";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import {
   IS_SWEEPSTAKES_LAUNCH,
   PRIZE_POOL_BANNER_TEXT,
 } from "@/constants/economy";
-import { formatCurrency } from "@/lib/formatCurrency";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -44,8 +44,12 @@ export default function AppNavbar({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const bal = await getWalletBalance();
-      if (!cancelled) setBalance(bal);
+      const profile = await getMyProfile();
+      if (!profile || typeof profile.id !== "string") return;
+      const spData = await getUserSPData(profile.id);
+      if (!cancelled && spData) {
+        setBalance(Number(spData.balanceSp ?? 0));
+      }
     }
     load();
     const handleUpdate = () => void load();
@@ -87,7 +91,6 @@ export default function AppNavbar({
     };
   }, []);
 
-  const balanceFormatted = formatCurrency(balance);
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {
       window.location.href = href;
@@ -215,8 +218,8 @@ export default function AppNavbar({
           <ConnectionBadge />
           {!isPractice && !IS_SWEEPSTAKES_LAUNCH && (
             <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/15 bg-card/60 px-3 py-2 shadow-[0_0_16px_rgba(16,185,129,0.35)]">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400" aria-hidden />
-              <span className="text-sm font-bold text-white">{balanceFormatted}</span>
+              <SkilliesIcon size={14} />
+              <span className="text-sm font-bold text-white">{Math.floor(balance).toLocaleString()} Skillies</span>
             </div>
           )}
 

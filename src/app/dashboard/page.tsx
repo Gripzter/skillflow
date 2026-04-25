@@ -15,6 +15,8 @@ import RankProgressBar from "@/components/RankProgressBar";
 import FoundersReward from "@/components/FoundersReward";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
+import DailyLoginReward from "@/components/DailyLoginReward";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   getCurrentUser,
@@ -91,6 +93,34 @@ function extractMatchIdFromDescription(description: string | null | undefined): 
   return match?.[1] ?? null;
 }
 
+const DAILY_REWARD_SCHEDULE = [50, 75, 100, 150, 200, 300, 500] as const;
+
+function dateOnlyString(input: Date): string {
+  const year = input.getFullYear();
+  const month = String(input.getMonth() + 1).padStart(2, "0");
+  const day = String(input.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateOnly(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
+function getNextDailyStreak(lastRewardDate: string | null, currentStreak: number, today: Date): number | null {
+  const todayStr = dateOnlyString(today);
+  if (lastRewardDate === todayStr) return null;
+  if (!lastRewardDate) return 1;
+
+  const lastDate = parseDateOnly(lastRewardDate);
+  const todayDate = parseDateOnly(todayStr);
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const dayDiff = Math.floor((todayDate.getTime() - lastDate.getTime()) / msPerDay);
+  if (dayDiff <= 0) return null;
+  if (dayDiff === 1) return currentStreak >= 1 ? (currentStreak % 7) + 1 : 1;
+  return 1;
+}
+
 const QUICK_GAMES = [
   {
     slug: "chess",
@@ -140,6 +170,10 @@ export default function DashboardPage() {
   const [foundersEmail, setFoundersEmail] = useState("");
   const [foundersEmailError, setFoundersEmailError] = useState("");
   const [foundersSaving, setFoundersSaving] = useState(false);
+  const [showDailyReward, setShowDailyReward] = useState(false);
+  const [dailyRewardDay, setDailyRewardDay] = useState(1);
+  const [dailyRewardAmount, setDailyRewardAmount] = useState(DAILY_REWARD_SCHEDULE[0]);
+  const [claimingDailyReward, setClaimingDailyReward] = useState(false);
 
   const foundersPromptStorageKey = useMemo(
     () => (userId ? `skillflow_founders_prompt_seen_${userId}` : null),
@@ -188,6 +222,26 @@ export default function DashboardPage() {
 
         const supabase = createClient();
         if (supabase) {
+          const { data: dailyProfile, error: dailyProfileError } = await supabase
+            .from("profiles")
+            .select("daily_login_streak, last_login_reward_date")
+            .eq("id", effectiveUserId)
+            .maybeSingle();
+
+          if (!dailyProfileError && dailyProfile) {
+            const nextStreak = getNextDailyStreak(
+              (dailyProfile as { last_login_reward_date?: string | null }).last_login_reward_date ?? null,
+              Number((dailyProfile as { daily_login_streak?: number | null }).daily_login_streak ?? 0),
+              new Date()
+            );
+            if (nextStreak) {
+              const rewardAmount = DAILY_REWARD_SCHEDULE[nextStreak - 1];
+              setDailyRewardDay(nextStreak);
+              setDailyRewardAmount(rewardAmount);
+              setShowDailyReward(true);
+            }
+          }
+
           const { data: onboardingData, error: onboardingError } = await supabase
             .from("profiles")
             .select("onboarding_completed, founders_prompt_shown")
@@ -325,6 +379,74 @@ export default function DashboardPage() {
       }
     } finally {
       setClaimingChallengeId(null);
+    }
+  }
+
+  async function handleClaimDailyReward() {
+    if (!userId || claimingDailyReward) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    setClaimingDailyReward(true);
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("balance_sp, lifetime_sp, daily_login_streak, last_login_reward_date")
+        .eq("id", userId)
+        .single();
+
+      if (profileError || !profile) {
+        showToast("Could not claim daily reward right now.", "error");
+        return;
+      }
+
+      const todayStr = dateOnlyString(new Date());
+      const lastRewardDate = (profile as { last_login_reward_date?: string | null }).last_login_reward_date ?? null;
+      if (lastRewardDate === todayStr) {
+        setShowDailyReward(false);
+        return;
+      }
+
+      const nextStreak =
+        getNextDailyStreak(
+          lastRewardDate,
+          Number((profile as { daily_login_streak?: number | null }).daily_login_streak ?? 0),
+          new Date()
+        ) ?? dailyRewardDay;
+      const rewardAmount = DAILY_REWARD_SCHEDULE[nextStreak - 1];
+      const nextBalance = Number((profile as { balance_sp?: number | null }).balance_sp ?? 0) + rewardAmount;
+      const nextLifetime = Number((profile as { lifetime_sp?: number | null }).lifetime_sp ?? 0) + rewardAmount;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          balance_sp: nextBalance,
+          lifetime_sp: nextLifetime,
+          daily_login_streak: nextStreak,
+          last_login_reward_date: todayStr,
+        })
+        .eq("id", userId);
+
+      if (updateError) {
+        showToast("Failed to save daily reward.", "error");
+        return;
+      }
+
+      await supabase.from("sp_transactions").insert({
+        user_id: userId,
+        amount: rewardAmount,
+        type: "daily_bonus",
+        description: `Daily login reward (Day ${nextStreak})`,
+      });
+
+      setSpData((prev) => ({
+        ...prev,
+        balanceSp: nextBalance,
+        lifetimeSp: nextLifetime,
+      }));
+      setShowDailyReward(false);
+      showToast(`Daily reward claimed: +${rewardAmount} Skillies`, "success");
+    } finally {
+      setClaimingDailyReward(false);
     }
   }
 
@@ -482,6 +604,13 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : null}
+      <DailyLoginReward
+        isOpen={showDailyReward && !showOnboarding}
+        streakDay={dailyRewardDay}
+        rewardAmount={dailyRewardAmount}
+        claiming={claimingDailyReward}
+        onClaim={handleClaimDailyReward}
+      />
       <div>
       {/* Ambient background effects (match wallet/play/leaderboard) */}
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
@@ -527,7 +656,7 @@ export default function DashboardPage() {
             </div>
             <p className="text-sm font-medium text-white">
               <span className="inline-flex items-center gap-1">
-                <SPIcon size={16} /> Balance:
+                <SkilliesIcon size={16} /> Skillies:
               </span>{" "}
               <span className="text-teal">{spData.balanceSp.toLocaleString()}</span>
             </p>
@@ -568,7 +697,7 @@ export default function DashboardPage() {
                     </p>
                     <p className="mt-2 text-sm font-semibold text-emerald-300">
                       <span className="inline-flex items-center gap-1">
-                        +{Number(challenge.reward_sp).toLocaleString()} <SPIcon size={16} />
+                        +{Number(challenge.reward_sp).toLocaleString()} <SkilliesIcon size={16} />
                       </span>
                     </p>
                     <div className="mt-3">

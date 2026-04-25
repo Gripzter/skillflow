@@ -8,7 +8,7 @@ import LoadingRing from "@/components/LoadingRing";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import CaseOpeningReel from "@/components/CaseOpeningReel";
 import CaseResultModal from "@/components/CaseResultModal";
-import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { useToast } from "@/components/Toast";
 import {
   CASE_TIERS,
@@ -38,7 +38,7 @@ const CASE_CARD_META: Record<Exclude<CaseKey, "drop_crate">, { accent: string }>
 };
 
 function parseRewardDescription(description: string | null): string {
-  if (!description) return "SP Reward";
+  if (!description) return "Skillies Reward";
   const parts = description.split(":");
   if (parts.length < 2) return description;
   return parts.slice(1).join(":").trim();
@@ -46,13 +46,9 @@ function parseRewardDescription(description: string | null): string {
 
 function renderDropName(itemName: string, source: "sp" | "inventory") {
   if (source !== "sp") return itemName;
-  const match = itemName.match(/([+-]?\d[\d,]*)\s*SP/i);
+  const match = itemName.match(/([+-]?\d[\d,]*)\s*(SP|Skillies)/i);
   if (!match) return itemName;
-  return (
-    <span className="inline-flex items-center gap-1">
-      {match[1]} <SPIcon size={14} />
-    </span>
-  );
+  return `${match[1]} Skillies`;
 }
 
 export default function CasesPage() {
@@ -222,15 +218,13 @@ export default function CasesPage() {
           <div>
             <h1 className="text-3xl font-bold text-white">Cases</h1>
             <p className="mt-1 text-body-gray">
-              Spend <SPIcon size={14} />. Open cases. Win rewards.
+              Spend Skillies <SkilliesIcon size={14} />. Open cases. Win rewards.
             </p>
           </div>
           <div className="rounded-lg border border-white/10 bg-black/30 px-4 py-2 text-sm">
-            <span className="text-body-gray inline-flex items-center gap-1">
-              <SPIcon size={14} /> Balance:
-            </span>{" "}
+            <span className="text-body-gray">Balance: </span>
             <span className="font-semibold text-teal inline-flex items-center gap-1">
-              {spBalance.toLocaleString()} <SPIcon size={14} />
+              {spBalance.toLocaleString()} Skillies <SkilliesIcon size={14} />
             </span>
           </div>
         </section>
@@ -245,7 +239,7 @@ export default function CasesPage() {
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-semibold text-white">{tier.name}</h2>
                   <span className="text-sm font-medium text-body-gray inline-flex items-center gap-1">
-                    {tier.cost_sp.toLocaleString()} <SPIcon size={14} />
+                    {tier.cost_sp.toLocaleString()} Skillies <SkilliesIcon size={14} />
                   </span>
                 </div>
                 <div
@@ -317,9 +311,7 @@ export default function CasesPage() {
                     </p>
                     <p className="text-xs text-body-gray">
                       {drop.source === "sp" ? (
-                        <span className="inline-flex items-center gap-1">
-                          <SPIcon size={12} /> reward
-                        </span>
+                        "Skillies reward"
                       ) : (
                         "Inventory item"
                       )}

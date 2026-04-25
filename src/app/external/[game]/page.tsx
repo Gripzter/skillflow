@@ -6,7 +6,6 @@ import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import {
   getCurrentUser,
-  getWalletBalance,
   debitWallet,
   creditWallet,
 } from "@/lib/api";
@@ -15,7 +14,8 @@ import {
   generateFakeSteamOpponent,
 } from "@/lib/external-matches";
 import LoadingRing from "@/components/LoadingRing";
-import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
+import { getUserSPData } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const CS2_MAPS = ["Any", "Dust 2", "Mirage", "Inferno", "Nuke", "Anubis", "Ancient", "Overpass"];
@@ -52,6 +52,7 @@ export default function CS2LobbyPage() {
   const gameSlug = (params?.game as string) || "cs2";
 
   const [username, setUsername] = useState<string>("Player");
+  const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -79,9 +80,10 @@ export default function CS2LobbyPage() {
           return;
         }
         setUsername(user.username);
+        setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        const bal = await getWalletBalance();
-        setBalance(bal);
+        const spData = await getUserSPData(user.id);
+        setBalance(Number(spData?.balanceSp ?? 0));
       } catch {
         router.push("/login");
       } finally {
@@ -89,10 +91,13 @@ export default function CS2LobbyPage() {
       }
     }
     load();
-    const handleUpdate = () => void getWalletBalance().then(setBalance);
+    const handleUpdate = () =>
+      void (userId
+        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
-  }, [router]);
+  }, [router, userId]);
 
   const handleFindMatch = useCallback(async () => {
     if (insufficientBalance || stakeAmount < 1) return;
@@ -101,7 +106,8 @@ export default function CS2LobbyPage() {
 
     try {
       await debitWallet(stakeAmount, `CS2 match – ${activeMode.title}`);
-      setBalance(await getWalletBalance());
+      const spData = await getUserSPData(userId);
+      setBalance(Number(spData?.balanceSp ?? 0));
       dispatchWalletUpdated();
     } catch {
       return;
@@ -153,7 +159,8 @@ export default function CS2LobbyPage() {
     setMatchmakingElapsed(0);
     try {
       await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
-      setBalance(await getWalletBalance());
+      const spData = await getUserSPData(userId);
+      setBalance(Number(spData?.balanceSp ?? 0));
       dispatchWalletUpdated();
     } catch {
       dispatchWalletUpdated();
@@ -165,6 +172,14 @@ export default function CS2LobbyPage() {
       if (findMatchTimeoutRef.current) clearTimeout(findMatchTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (stake <= balance) return;
+    const highestAffordable = [...STAKE_PRESETS].reverse().find((amt) => amt <= balance);
+    if (highestAffordable) {
+      setStake(highestAffordable);
+    }
+  }, [balance, stake]);
 
   if (loading) {
     return <LoadingRing />;
@@ -208,7 +223,9 @@ export default function CS2LobbyPage() {
           </Link>
           <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            <span className="text-sm font-medium text-white">${balance.toFixed(2)}</span>
+            <span className="text-sm font-medium text-white inline-flex items-center gap-1">
+              {Math.floor(balance).toLocaleString()} Skillies <SkilliesIcon size={14} />
+            </span>
           </div>
         </div>
 
@@ -251,22 +268,28 @@ export default function CS2LobbyPage() {
         <section className="mt-8">
           <h2 className="text-xl font-bold text-white">Stake Selection</h2>
           <div className="mt-4 flex flex-wrap gap-2">
-            {STAKE_PRESETS.map((amt) => (
+            {STAKE_PRESETS.map((amt) => {
+              const affordable = amt <= balance;
+              return (
               <button
                 key={amt}
                 type="button"
                 onClick={() => setStake(amt)}
+                disabled={!affordable}
                 className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                  stake === amt
+                  !affordable
+                    ? "cursor-not-allowed border-white/10 bg-white/5 text-body-gray opacity-60"
+                    : stake === amt
                     ? "border-teal bg-teal text-charcoal shadow-teal-glow/30"
                     : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                 }`}
               >
                 <span className="inline-flex items-center gap-1">
-                  {amt.toLocaleString()} <SPIcon size={14} />
+                  {amt.toLocaleString()} Skillies <SkilliesIcon size={14} />
                 </span>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
 
@@ -321,7 +344,7 @@ export default function CS2LobbyPage() {
             className="h-14 w-full rounded-lg bg-teal text-lg font-bold text-charcoal transition-all hover:shadow-teal-glow disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="inline-flex items-center gap-2">
-              Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+              Play - {stakeAmount.toLocaleString()} Skillies <SkilliesIcon size={18} />
             </span>
           </button>
         </div>

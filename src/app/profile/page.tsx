@@ -9,6 +9,7 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
@@ -363,10 +364,10 @@ export default function ProfilePage() {
               ),
             },
             {
-              label: "SP Balance",
+              label: "Skillies Balance",
               value: (
                 <span className="inline-flex items-center gap-1">
-                  {spData.balanceSp.toLocaleString()} <SPIcon size={18} />
+                  {spData.balanceSp.toLocaleString()} Skillies <SkilliesIcon size={18} />
                 </span>
               ),
             },

@@ -7,12 +7,12 @@ import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
+import SkilliesIcon from "@/components/SkilliesIcon";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useMatchmaking } from "@/hooks/useMatchmaking";
 import {
   getCurrentUser,
-  getWalletBalance,
   debitWallet,
   creditWallet,
   createMatch,
@@ -22,8 +22,7 @@ import {
 } from "@/lib/api";
 import { checkCanPlay } from "@/lib/responsible-gaming";
 import { createClient } from "@/lib/supabase";
-import { formatCurrency } from "@/lib/formatCurrency";
-import SPIcon from "@/components/SPIcon";
+import { getUserSPData } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 
@@ -109,8 +108,8 @@ export default function PlayGamePage() {
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
         setEmailVerified(user.emailVerified ?? true);
-        const bal = await getWalletBalance();
-        setBalance(bal);
+        const spData = await getUserSPData(user.id);
+        setBalance(Number(spData?.balanceSp ?? 0));
         // Fetch player's Glicko-2 rating for this game
         if (user.id && gameSlug) {
           try {
@@ -128,10 +127,13 @@ export default function PlayGamePage() {
       }
     }
     load();
-    const handleUpdate = () => void getWalletBalance().then(setBalance);
+    const handleUpdate = () =>
+      void (userId
+        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
-  }, [router]);
+  }, [router, userId]);
 
   // Elapsed timer for real matchmaking (and bot fallback timeout)
   useEffect(() => {
@@ -223,7 +225,8 @@ export default function PlayGamePage() {
     if (!isPractice && !isRestricted) {
       try {
         await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
-        setBalance(await getWalletBalance());
+        const spData = await getUserSPData(userId);
+        setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
         dispatchWalletUpdated();
@@ -297,7 +300,8 @@ export default function PlayGamePage() {
       if (insufficientBalance || stakeAmount < 1) return;
       try {
         await debitWallet(stakeAmount, `Match entry – ${gameName}`);
-        setBalance(await getWalletBalance());
+        const spData = await getUserSPData(userId);
+        setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
       } catch {
         return;
@@ -354,6 +358,15 @@ export default function PlayGamePage() {
   ]);
 
   useEffect(() => {
+    if (effectivePractice) return;
+    if (stake <= balance) return;
+    const highestAffordable = [...STAKE_PRESETS].reverse().find((amt) => amt <= balance);
+    if (highestAffordable) {
+      setStake(highestAffordable);
+    }
+  }, [balance, effectivePractice, stake]);
+
+  useEffect(() => {
     return () => {
       if (findMatchTimeoutRef.current) clearTimeout(findMatchTimeoutRef.current);
     };
@@ -401,7 +414,9 @@ export default function PlayGamePage() {
           {!effectivePractice && (
             <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-card/50 px-3 py-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="text-sm font-medium text-white">{formatCurrency(balance)}</span>
+              <span className="text-sm font-medium text-white inline-flex items-center gap-1">
+                {Math.floor(balance).toLocaleString()} Skillies <SkilliesIcon size={14} />
+              </span>
             </div>
           )}
         </div>
@@ -445,29 +460,35 @@ export default function PlayGamePage() {
           <section className="mt-8">
             <h2 className="text-xl font-bold text-white">Set Your Stake</h2>
             <div className="mt-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
-              {STAKE_PRESETS.map((amt) => (
+              {STAKE_PRESETS.map((amt) => {
+                const affordable = amt <= balance;
+                return (
                 <button
                   key={amt}
                   type="button"
                   onClick={() => setStake(amt)}
+                  disabled={!affordable}
                   className={`pressable rounded-full border px-4 py-2 text-sm font-medium transition-all ${
-                    stake === amt
+                    !affordable
+                      ? "cursor-not-allowed border-white/10 bg-white/5 text-body-gray opacity-60"
+                      : stake === amt
                       ? "border-teal bg-teal text-charcoal shadow-teal-glow/30"
                       : "border-teal/50 bg-[#1A1D27] text-white hover:border-teal"
                   }`}
                 >
                   <span className="inline-flex items-center gap-1">
-                    {amt.toLocaleString()} <SPIcon size={14} />
+                    {amt.toLocaleString()} Skillies <SkilliesIcon size={14} />
                   </span>
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {insufficientBalance && stakeAmount > 0 && (
               <p className="mt-3 text-sm text-red-400">
                 Insufficient balance.{" "}
-                <Link href="/wallet" className="text-teal underline">
-                  Add funds
+                <Link href="/dashboard" className="text-teal underline">
+                  Earn more
                 </Link>{" "}
                 to play.
               </p>
@@ -504,7 +525,7 @@ export default function PlayGamePage() {
               ? "Start Practice"
               : (
                 <span className="inline-flex items-center gap-2">
-                  Play - {stakeAmount.toLocaleString()} <SPIcon size={18} />
+                  Play - {stakeAmount.toLocaleString()} Skillies <SkilliesIcon size={18} />
                 </span>
               )}
           </button>
