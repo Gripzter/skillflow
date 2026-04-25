@@ -47,6 +47,7 @@ export default function ConnectFour({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   onMatchUi,
@@ -114,6 +115,7 @@ export default function ConnectFour({
       if (!isMyTurn) return;
       const result = dropDisc(board, col, turn);
       if (!result) return;
+      onPlayerAction?.();
       const playerName = turn === 1 ? player1.username : player2.username;
       setDropping({ col, row: result.row, player: turn });
       setBoard(result.board);
@@ -141,7 +143,7 @@ export default function ConnectFour({
         sendGameEvent({ type: "connect4_move", column: col, byRole: myRole }).catch(() => {});
       }
     },
-    [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent]
+    [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent, onPlayerAction]
   );
 
   // Incoming multiplayer events: apply opponent move or handle resign
@@ -311,6 +313,7 @@ export default function ConnectFour({
       scores: { player1: 0, player2: 0 },
       scoreLabel: "Score",
       currentTurn: turn === 1 ? "player1" : "player2",
+      requiresAction: !winResult && !isDraw,
       turnText,
       systemLogEntries,
     });

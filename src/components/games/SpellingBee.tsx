@@ -74,6 +74,7 @@ export default function SpellingBee({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   onMatchUi,
@@ -336,6 +337,7 @@ export default function SpellingBee({
 
   const handleSubmit = useCallback(() => {
     if (submitted || !isRoundActive) return;
+    onPlayerAction?.();
     const raw = inputValue.trim();
     const timeMs = Math.round(Date.now() - roundStartTimeRef.current);
     setSubmitted(true);
@@ -362,7 +364,7 @@ export default function SpellingBee({
         }).catch(() => {});
       }
     }
-  }, [submitted, isRoundActive, inputValue, myRole, isTiebreaker, tiebreakerRound, round, isMultiplayer, sendGameEvent]);
+  }, [submitted, isRoundActive, inputValue, myRole, isTiebreaker, tiebreakerRound, round, isMultiplayer, sendGameEvent, onPlayerAction]);
 
   // When both answers are in (or time expired), show result and advance
   useEffect(() => {
@@ -535,33 +537,37 @@ export default function SpellingBee({
 
   const handleHearWord = useCallback(() => {
     if (!effectiveWord || !isSpeechSupported()) return;
+    onPlayerAction?.();
     setAudioPlaying(true);
     doPronounceWord(effectiveWord.word, () => {
       setAudioPlaying(false);
       setWordHeard(true);
     });
-  }, [effectiveWord]);
+  }, [effectiveWord, onPlayerAction]);
 
   const handleRepeatWord = useCallback(() => {
     if (!effectiveWord || !isSpeechSupported() || repeatCount >= 3 || audioPlaying) return;
+    onPlayerAction?.();
     setAudioPlaying(true);
     setRepeatCount((c) => c + 1);
     doPronounceWord(effectiveWord.word, () => setAudioPlaying(false));
-  }, [effectiveWord, repeatCount, audioPlaying]);
+  }, [effectiveWord, repeatCount, audioPlaying, onPlayerAction]);
 
   const handleReadDefinition = useCallback(() => {
     if (!effectiveWord || !isSpeechSupported() || audioPlaying) return;
+    onPlayerAction?.();
     setAudioPlaying(true);
     speakText(effectiveWord.definition, () => setAudioPlaying(false));
-  }, [effectiveWord, audioPlaying]);
+  }, [effectiveWord, audioPlaying, onPlayerAction]);
 
   const handleUseInSentence = useCallback(() => {
     if (!effectiveWord || !isSpeechSupported() || audioPlaying) return;
+    onPlayerAction?.();
     const sentence = effectiveWord.sentence ?? `The word is "${effectiveWord.word}."`;
     setShowSentenceLine(true);
     setAudioPlaying(true);
     speakText(sentence, () => setAudioPlaying(false));
-  }, [effectiveWord, audioPlaying]);
+  }, [effectiveWord, audioPlaying, onPlayerAction]);
 
   const roundResultScore = (() => {
     if (phase !== "round_result" && phase !== "tiebreaker_result") return null;
@@ -605,6 +611,7 @@ export default function SpellingBee({
       scores: { player1: p1Score, player2: p2Score },
       scoreLabel: "Pts",
       currentTurn: p1RowActive ? "player1" : p2RowActive ? "player2" : myRole,
+      requiresAction: p1RowActive || p2RowActive,
       turnText,
       turnTimerDisplay:
         phase === "round_active" || phase === "tiebreaker_active"
@@ -858,7 +865,10 @@ export default function SpellingBee({
                     ref={inputRef}
                     type="text"
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={(e) => {
+                      onPlayerAction?.();
+                      setInputValue(e.target.value);
+                    }}
                     onKeyDown={handleKeyDown}
                     disabled={submitted}
                     autoComplete="off"
@@ -1047,7 +1057,10 @@ export default function SpellingBee({
                         ref={inputRef}
                         type="text"
                         value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
+                        onChange={(e) => {
+                          onPlayerAction?.();
+                          setInputValue(e.target.value);
+                        }}
                         onKeyDown={handleKeyDown}
                         disabled={submitted}
                         autoComplete="off"

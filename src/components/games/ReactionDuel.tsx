@@ -55,6 +55,7 @@ export default function ReactionDuel({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   isPractice: isPracticeProp,
@@ -295,6 +296,7 @@ export default function ReactionDuel({
   const handleGameAreaTap = useCallback(
     (clientX: number, clientY: number) => {
       if (phase === "countdown") return;
+      onPlayerAction?.();
       if (phase === "get_ready") {
         setShowTooEarly(true);
         const myReaction: Reaction = "false_start";
@@ -350,7 +352,7 @@ export default function ReactionDuel({
         sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
       }
     },
-    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound]
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound, onPlayerAction]
   );
 
   function toReaction(t: number): Reaction {
@@ -460,6 +462,7 @@ export default function ReactionDuel({
       scores: { player1: p1Wins, player2: p2Wins },
       scoreLabel: "Rounds",
       currentTurn: p1RowActive ? "player1" : "player2",
+      requiresAction: p1RowActive || p2RowActive,
       turnText,
       systemLogEntries,
     });

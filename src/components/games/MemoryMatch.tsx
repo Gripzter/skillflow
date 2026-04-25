@@ -57,6 +57,7 @@ export default function MemoryMatch({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   onMatchUi,
@@ -364,6 +365,7 @@ export default function MemoryMatch({
       if (selected.length >= 2) return;
       const card = cards[index];
       if (!card || card.state !== "hidden") return;
+      onPlayerAction?.();
       // In multiplayer, the local human may be player 1 or player 2.
       const localPlayer: MemoryMatchPlayer = isMultiplayer && myRole === "player2" ? 2 : 1;
       flipCardAt(index, localPlayer);
@@ -371,7 +373,7 @@ export default function MemoryMatch({
         sendGameEvent({ type: "memory_flip", cardIndex: index }).catch(() => {});
       }
     },
-    [cards, isMyTurn, gameOver, flipCardAt, selected.length, isMultiplayer, myRole, sendGameEvent]
+    [cards, isMyTurn, gameOver, flipCardAt, selected.length, isMultiplayer, myRole, sendGameEvent, onPlayerAction]
   );
 
   const activeColor =
@@ -396,6 +398,7 @@ export default function MemoryMatch({
       scores: { player1: scores[1], player2: scores[2] },
       scoreLabel: "Pairs",
       currentTurn: currentPlayer === 1 ? "player1" : "player2",
+      requiresAction: !gameOver && !isProcessing && !resolvingRef.current,
       turnText: turnMessage,
       systemLogEntries,
     });

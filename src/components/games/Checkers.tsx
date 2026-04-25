@@ -63,6 +63,7 @@ export default function Checkers({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   isPractice = false,
@@ -80,11 +81,6 @@ export default function Checkers({
   const gameOverRef = useRef(false);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   const lastSentMoveIdRef = useRef<string | null>(null);
-
-  // Timer for active player (humans only; practice bot doesn't need it).
-  const [timerSec, setTimerSec] = useState(30);
-  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutHandledRef = useRef(false);
 
   // Accumulate meta across a whole turn (multi-jumps).
   const turnMetaRef = useRef<{ didCapture: boolean; didKing: boolean; capturedCount: number; finalTo: Pos | null }>(
@@ -141,46 +137,7 @@ export default function Checkers({
     setSelected(null);
     setChainActive(false);
     setLastMove((prev) => prev); // keep as-is
-    timeoutHandledRef.current = false;
   }, [currentTurn]);
-
-  // Start timer when it's this client's turn (real multiplayer: humans only).
-  useEffect(() => {
-    if (gameOverRef.current) return;
-    if (!isMyTurn) return;
-    if (!isMultiplayer && isPlayer2Bot && currentTurn === 2) return; // bot's turn in practice
-
-    // Reset timer.
-    setTimerSec(30);
-
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    timerIntervalRef.current = setInterval(() => {
-      setTimerSec((s) => s - 1);
-    }, 1000);
-
-    return () => {
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    };
-  }, [currentTurn, isMyTurn, isMultiplayer, isPlayer2Bot]);
-
-  useEffect(() => {
-    if (!isMyTurn) return;
-    if (gameOverRef.current) return;
-    if (!timeoutHandledRef.current && timerSec <= 0) {
-      timeoutHandledRef.current = true;
-      const winner: "player1" | "player2" = myRole === "player1" ? "player2" : "player1";
-      // Notify opponent so they end too.
-      if (isMultiplayer && sendGameEvent) {
-        const eventId = crypto.randomUUID();
-        lastSentMoveIdRef.current = eventId;
-        sendGameEvent({ type: "checkers_timeout", moveId: eventId, byRole: myRole }).catch(() => {});
-      }
-      gameOverRef.current = true;
-      setWinnerP1OrP2(winner === "player1" ? "player1" : "player2");
-      onGameEnd(winner);
-    }
-  }, [timerSec, isMyTurn, gameOverRef, myRole, isMultiplayer, sendGameEvent, onGameEnd]);
 
   const applyTurnEnd = useCallback(
     async (nextBoard: Board, nextTurn: Player, lastStepFrom: Pos, lastStepTo: Pos, moveMeta: { didCapture: boolean; didKing: boolean; capturedCount: number }, turnLogText: string, moveId?: string, nextNoProgress?: number) => {
@@ -343,11 +300,6 @@ export default function Checkers({
     if (!isPlayer2Bot) return;
     if (currentTurn !== 2) return;
     if (gameOverRef.current) return;
-    if (timerIntervalRef.current) {
-      // Bot doesn't use the timer; stop any stray interval.
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
 
     let cancelled = false;
     const delay = getCheckersBotDelayMs(botDifficulty);
@@ -518,6 +470,7 @@ export default function Checkers({
       if (!selected) {
         if (!isOwnPiece) return;
         if (mustCapture && getCaptureStepsFrom(board, pos, currentTurn).length === 0) return;
+        onPlayerAction?.();
         setSelected(pos);
         return;
       }
@@ -528,6 +481,7 @@ export default function Checkers({
           const caps = getCaptureStepsFrom(board, pos, currentTurn);
           if (caps.length === 0) return;
         }
+        onPlayerAction?.();
         setSelected(pos);
         return;
       }
@@ -538,6 +492,7 @@ export default function Checkers({
 
       const step = legalStepsFromSelected.find((s) => s.to.r === pos.r && s.to.c === pos.c);
       if (!step) return;
+      onPlayerAction?.();
 
       if (step.type === "regular") {
         const applied = applyStep(board, step, currentTurn);
@@ -627,6 +582,7 @@ export default function Checkers({
       player1.username,
       player2.username,
       applyTurnEnd,
+      onPlayerAction,
     ]
   );
 
@@ -673,8 +629,8 @@ export default function Checkers({
       scores: { player1: p1Captured, player2: p2Captured },
       scoreLabel: "Captured",
       currentTurn: currentTurn === 1 ? "player1" : "player2",
+      requiresAction: !gameOverRef.current,
       turnText,
-      turnTimerDisplay: isMyTurn ? `${timerSec}s` : undefined,
       systemLogEntries,
     });
   }, [
@@ -684,7 +640,6 @@ export default function Checkers({
     currentTurn,
     isMyTurn,
     log,
-    timerSec,
     mustCapture,
     chainActive,
   ]);

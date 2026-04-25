@@ -20,7 +20,7 @@ import { CHESS_INITIAL_CLOCK_MS, getMatchTimeLimitMs } from "@/lib/games/match-t
 import { startConnectionLogging, stopConnectionLogging } from "@/lib/connection-logger";
 import type { ConnectionSnapshot } from "@/lib/connection-logger";
 import { useMultiplayer } from "@/hooks/useMultiplayer";
-import { useAfkTimer } from "@/hooks/useAfkTimer";
+import { AFK_TIMEOUT_SEC, useAfkTimer } from "@/hooks/useAfkTimer";
 import EightBallPool from "@/components/games/EightBallPool";
 import Chess from "@/components/games/Chess";
 import ConnectFour from "@/components/games/ConnectFour";
@@ -656,7 +656,13 @@ function MatchPageContent() {
       // Notify opponent so they get the victory screen instantly.
       sendGameEvent({ type: "afk_forfeit" }).catch(() => {});
     }
-    handleGameEnd(opponentRole);
+    handleGameEnd(opponentRole)
+      .finally(() => {
+        window.location.href = `/play/${match.gameType}`;
+      })
+      .catch(() => {
+        window.location.href = `/play/${match.gameType}`;
+      });
   }, [match, myRoleComputed, sendGameEvent, handleGameEnd]);
 
   // ── AFK forfeit triggered BY OPPONENT (we receive their afk_forfeit) ─────
@@ -671,7 +677,9 @@ function MatchPageContent() {
   // ── AFK timer ─────────────────────────────────────────────────────────────
   const afkTimerEnabled =
     (match?.status === "in_progress") === true && !outcome;
-  const isMyTurnNow = matchUi?.currentTurn === myRoleComputed;
+  const isMyTurnNow =
+    matchUi?.requiresAction === true &&
+    matchUi?.currentTurn === myRoleComputed;
 
   const { secondsLeft: afkSecondsLeft, showWarning: afkShowWarning, resetTimer: afkResetTimer } =
     useAfkTimer({
@@ -699,7 +707,7 @@ function MatchPageContent() {
 
   const afkRemainingMs =
     afkTimerEnabled && afkTurnStartedAtMsRef.current !== null && matchUi?.currentTurn
-      ? Math.max(0, 60_000 - Math.max(0, afkNowMs - afkTurnStartedAtMsRef.current))
+      ? Math.max(0, AFK_TIMEOUT_SEC * 1000 - Math.max(0, afkNowMs - afkTurnStartedAtMsRef.current))
       : null;
 
   const handleTurnClockUpdate = useCallback(
@@ -726,7 +734,11 @@ function MatchPageContent() {
     [match]
   );
 
-  // Wrap sendGameEvent so any move the local player makes resets the AFK timer.
+  const handlePlayerAction = useCallback(() => {
+    afkResetTimer();
+  }, [afkResetTimer]);
+
+  // Wrap sendGameEvent so any outbound move event also resets the AFK timer.
   const sendGameEventWithAfkReset = useCallback(
     async (event: Record<string, unknown>) => {
       afkResetTimer();
@@ -1137,6 +1149,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -1165,6 +1178,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -1186,6 +1200,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -1210,6 +1225,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 onMatchUi={setMatchUi}
@@ -1231,6 +1247,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -1253,6 +1270,7 @@ function MatchPageContent() {
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
                 onEventProcessed={() => setIncomingEvent(null)}
                 isPractice={match.isPractice}
@@ -1404,7 +1422,7 @@ function MatchPageContent() {
       )}
       </div>
 
-      {/* AFK warning banner — shown when ≤30 s remain on the local player's turn */}
+      {/* AFK warning banner — shown after 20s inactivity */}
       {afkShowWarning && !outcome && match.status === "in_progress" && (
         <div
           className="fixed bottom-0 left-0 right-0 z-40 border-t px-4 py-3 backdrop-blur-sm"
@@ -1415,13 +1433,13 @@ function MatchPageContent() {
         >
           <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
             <p className="font-semibold text-white">
-              ⚠ Make a move or you&apos;ll forfeit in {afkSecondsLeft}s
+              ⚠ Make a move or you&apos;ll be kicked in {afkSecondsLeft}s
             </p>
             <div className="flex items-center gap-3">
               <div className="h-2 w-28 overflow-hidden rounded-full bg-red-950">
                 <div
                   className="h-full bg-white/70 transition-all duration-1000 ease-linear"
-                  style={{ width: `${((afkSecondsLeft ?? 0) / 60) * 100}%` }}
+                  style={{ width: `${((afkSecondsLeft ?? 0) / AFK_TIMEOUT_SEC) * 100}%` }}
                 />
               </div>
               <span className="min-w-[2.5rem] font-mono text-sm font-bold text-white">

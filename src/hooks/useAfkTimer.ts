@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const AFK_TIMEOUT_SEC = 60;
-const AFK_WARN_SEC = 30;
+export const AFK_TIMEOUT_SEC = 30;
+export const AFK_WARNING_AT_INACTIVITY_SEC = 20;
+const AFK_WARN_SEC = AFK_TIMEOUT_SEC - AFK_WARNING_AT_INACTIVITY_SEC;
 
 interface UseAfkTimerOptions {
   /**
@@ -22,13 +23,9 @@ interface UseAfkTimerOptions {
 interface UseAfkTimerResult {
   /** Current seconds remaining, or null when the timer is not running. */
   secondsLeft: number | null;
-  /** True when the warning banner should be shown (≤30 s left). */
+  /** True when the warning banner should be shown (20s inactivity reached). */
   showWarning: boolean;
-  /**
-   * Reset the countdown back to 60 s.
-   * Call this whenever the local player performs a valid action
-   * (e.g. wrapping sendGameEvent).  No-op when the timer is not active.
-   */
+  /** Reset the countdown back to 30 s after a valid in-game action. */
   resetTimer: () => void;
 }
 
@@ -77,7 +74,7 @@ export function useAfkTimer({
     }, 1000);
   }, []);
 
-  /** Restart the countdown from 60 — only if the timer is already active. */
+  /** Restart the countdown from 30 — only if the timer is already active. */
   const resetTimer = useCallback(() => {
     if (!enabled || !runningRef.current) return;
     startTimer();

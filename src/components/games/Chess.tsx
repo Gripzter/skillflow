@@ -18,6 +18,7 @@ export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
   myRole?: "player1" | "player2";
   sendGameEvent?: (event: Record<string, unknown>) => Promise<void>;
+  onPlayerAction?: () => void;
   incomingEvent?: Record<string, unknown> | null;
   onEventProcessed?: () => void;
   onMatchUi?: (state: MatchUiState) => void;
@@ -76,6 +77,7 @@ export default function Chess({
   isMultiplayer = false,
   myRole = "player1",
   sendGameEvent,
+  onPlayerAction,
   incomingEvent,
   onEventProcessed,
   onMatchUi,
@@ -177,6 +179,7 @@ export default function Chess({
       try {
         const result = next.move(moveOpt);
         if (result) {
+          onPlayerAction?.();
           if (result.captured) {
             if (result.color === "w") setCapturedBlack((prev) => [...prev, result.captured as PieceType]);
             else setCapturedWhite((prev) => [...prev, result.captured as PieceType]);
@@ -236,7 +239,7 @@ export default function Chess({
         console.log("[Chess] move", { from, to, success: false, error: e, fen: game.fen() });
       }
     },
-    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole, onTurnClockUpdate]
+    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole, onTurnClockUpdate, onPlayerAction]
   );
 
   const handleSquareClick = useCallback(
@@ -538,6 +541,7 @@ export default function Chess({
         player2: blackTimeLeft,
       },
       currentTurn: turn === "w" ? "player1" : "player2",
+      requiresAction: !inCheckmate && !inStalemate && !inDraw,
       turnText,
       turnTimerDisplay:
         clockState.activeTurn === "player1"
@@ -612,6 +616,7 @@ export default function Chess({
                 type="button"
                 onClick={() => {
                   if (sendGameEvent && !drawOfferSent) {
+                    onPlayerAction?.();
                     setDrawOfferSent(true);
                     sendGameEvent({ type: "draw_offer" }).catch(() => {});
                   }
@@ -634,6 +639,7 @@ export default function Chess({
               <button
                 type="button"
                 onClick={() => {
+                  onPlayerAction?.();
                   setDrawOfferReceived(false);
                   sendGameEvent({ type: "draw_response", accepted: false }).catch(() => {});
                 }}
@@ -644,6 +650,7 @@ export default function Chess({
               <button
                 type="button"
                 onClick={() => {
+                  onPlayerAction?.();
                   setDrawOfferReceived(false);
                   gameOverRef.current = true;
                   sendGameEvent({ type: "draw_response", accepted: true }).catch(() => {});
