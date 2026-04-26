@@ -176,13 +176,24 @@ export default function PlaySpellingBeePage() {
       setTimeout(() => {
         window.location.href = `/match/${newMatch.id}`;
       }, 1200);
-    } catch {
-      try {
-        await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
-        dispatchWalletUpdated();
-      } catch {
-        dispatchWalletUpdated();
-      }
+    } catch (error) {
+      const supabaseError = error as {
+        message?: string;
+        details?: string;
+        hint?: string;
+        code?: string;
+      };
+      // eslint-disable-next-line no-console
+      console.error("[SpellingBee] createBotMatch fallback failed:", error);
+      // eslint-disable-next-line no-console
+      console.error(
+        "Bot match creation failed:",
+        supabaseError?.message,
+        supabaseError?.details,
+        supabaseError?.hint,
+        supabaseError?.code
+      );
+      showToast("Could not create a bot match. Please try again.", "error");
       setMatchmaking(false);
       setOpponentFound(null);
       setMatch(null);
@@ -194,8 +205,8 @@ export default function PlaySpellingBeePage() {
     myGameRating,
     pickRandomOpponentGradient,
     player1,
+    showToast,
     stakeAmount,
-    userId,
   ]);
 
   const handleCancelMatchmaking = useCallback(async () => {

@@ -52,6 +52,25 @@ function isUuid(value: string | null | undefined): value is string {
   return !!value && UUID_RE.test(value);
 }
 
+function logBotInsertError(error: unknown, payload: Record<string, unknown>) {
+  const err = error as {
+    message?: string;
+    details?: string;
+    hint?: string;
+    code?: string;
+  } | null;
+  // eslint-disable-next-line no-console
+  console.error(
+    "Bot match creation failed:",
+    err?.message,
+    err?.details,
+    err?.hint,
+    err?.code
+  );
+  // eslint-disable-next-line no-console
+  console.error("[createMatch] Bot match payload", payload);
+}
+
 function isDevMode(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem("skillflow_dev_mode") === "true";
@@ -453,9 +472,27 @@ export async function createMatch(params: {
 
   const insertAttempts: Array<Record<string, unknown>> = isBotMatch
     ? [
-        { ...baseInsert, status: "active", is_bot: true, player2_id: null },
-        { ...baseInsert, status: "in_progress", is_bot: true, player2_id: null },
-        { ...baseInsert, status: "in_progress", is_bot: true, player2_id: BOT_PLAYER_UUID },
+        {
+          ...baseInsert,
+          status: "active",
+          is_bot: true,
+          bot_name: params.player2.username,
+          player2_id: null,
+        },
+        {
+          ...baseInsert,
+          status: "in_progress",
+          is_bot: true,
+          bot_name: params.player2.username,
+          player2_id: null,
+        },
+        {
+          ...baseInsert,
+          status: "in_progress",
+          is_bot: true,
+          bot_name: params.player2.username,
+          player2_id: BOT_PLAYER_UUID,
+        },
         { ...baseInsert, status: "in_progress", player2_id: null },
         { ...baseInsert, status: "in_progress", player2_id: BOT_PLAYER_UUID },
       ]
@@ -470,8 +507,12 @@ export async function createMatch(params: {
       break;
     }
     lastError = error;
-    // eslint-disable-next-line no-console
-    console.error("[createMatch] Match insert attempt failed", { payload, error });
+    if (isBotMatch) {
+      logBotInsertError(error, payload);
+    } else {
+      // eslint-disable-next-line no-console
+      console.error("[createMatch] Match insert attempt failed", { payload, error });
+    }
   }
 
   if (!created) {

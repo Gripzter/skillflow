@@ -203,19 +203,23 @@ export default function PlayGamePage() {
         window.location.href = `/play/match/${botMatchId}`;
       }, 1200);
     } catch (error) {
+      const supabaseError = error as {
+        message?: string;
+        details?: string;
+        hint?: string;
+        code?: string;
+      };
       // eslint-disable-next-line no-console
       console.error("[PlayGamePage] createBotMatch fallback failed:", error);
-      try {
-        await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
-        const spData = await getUserSPData(userId);
-        setBalance(Number(spData?.balanceSp ?? 0));
-        dispatchWalletUpdated();
-      } catch (refundError) {
-        // eslint-disable-next-line no-console
-        console.error("[PlayGamePage] stake refund failed after bot fallback error:", refundError);
-        dispatchWalletUpdated();
-      }
-      showToast("Could not create a bot match. Your Skillies were refunded.", "error");
+      // eslint-disable-next-line no-console
+      console.error(
+        "Bot match creation failed:",
+        supabaseError?.message,
+        supabaseError?.details,
+        supabaseError?.hint,
+        supabaseError?.code
+      );
+      showToast("Could not create a bot match. Please try again.", "error");
       setMatchmaking(false);
       setOpponentFound(null);
       setMatch(null);
@@ -231,7 +235,6 @@ export default function PlayGamePage() {
     player1,
     showToast,
     stakeAmount,
-    userId,
   ]);
 
   const handleCancelMatchmaking = useCallback(async () => {
