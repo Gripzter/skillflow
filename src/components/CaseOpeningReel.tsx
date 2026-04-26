@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CaseDrop, CaseItemRarity } from "@/lib/cases";
+import SkilliesIcon from "@/components/SkilliesIcon";
 
 type CaseOpeningReelProps = {
   lootTable: CaseDrop[];
@@ -31,8 +32,8 @@ function rarityClasses(rarity: CaseItemRarity): string {
   }
 }
 
-function iconForType(itemType: CaseDrop["item_type"]): string {
-  if (itemType === "sp") return "💠";
+function iconForType(itemType: CaseDrop["item_type"]): ReactNode {
+  if (itemType === "sp") return <SkilliesIcon size={20} />;
   if (itemType === "badge") return "🏅";
   if (itemType === "border") return "🖼️";
   return "⚡";
@@ -46,6 +47,15 @@ function weightedRandom(lootTable: CaseDrop[]): CaseDrop {
     if (roll <= 0) return item;
   }
   return lootTable[lootTable.length - 1];
+}
+
+function isHighValueDrop(item: CaseDrop): boolean {
+  if (item.item_type === "multiplier") return true;
+  if (item.item_type === "sp") {
+    const topValue = Number(item.max_value ?? item.value ?? 0);
+    return topValue >= 1000;
+  }
+  return item.rarity === "epic" || item.rarity === "legendary";
 }
 
 export default function CaseOpeningReel({
@@ -66,9 +76,10 @@ export default function CaseOpeningReel({
     for (let i = 0; i < TOTAL_ITEMS; i += 1) {
       items.push(weightedRandom(lootTable));
     }
-    const nearMiss = lootTable.find((item) => item.rarity === "epic")
-      ?? lootTable.find((item) => item.rarity === "rare")
-      ?? lootTable[0];
+    const highValuePool = lootTable.filter(isHighValueDrop);
+    const nearMiss = highValuePool.length > 0
+      ? weightedRandom(highValuePool)
+      : weightedRandom(lootTable);
     items[WIN_INDEX - 1] = nearMiss;
     items[WIN_INDEX] = winningItem;
     return items;

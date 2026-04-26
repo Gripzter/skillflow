@@ -3,7 +3,7 @@
 import type { ComponentType } from "react";
 import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
-import { Ellipsis, Gamepad2, House, Trophy, User, Wallet } from "lucide-react";
+import { Gamepad2, Gift, House, Trophy, Wallet } from "lucide-react";
 import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 
 const TABS: readonly {
@@ -15,8 +15,7 @@ const TABS: readonly {
   { href: "/play", label: "Play", Icon: Gamepad2 },
   { href: "/wallet", label: "Wallet", Icon: Wallet },
   { href: "/leaderboard", label: "Rank", Icon: Trophy },
-  { href: "/profile", label: "Profile", Icon: User },
-  { href: "/settings", label: "More", Icon: Ellipsis },
+  { href: "/cases", label: "Cases", Icon: Gift },
 ];
 
 export default function MobileTabBar() {

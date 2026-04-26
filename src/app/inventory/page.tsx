@@ -27,6 +27,7 @@ type ActiveMultiplierRow = {
   multiplier_id: string;
   multiplier_name: string | null;
   matches_remaining: number;
+  created_at: string;
 };
 
 const RARITY_STYLES: Record<CaseItemRarity, string> = {
@@ -47,6 +48,19 @@ export default function InventoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [activeMultipliers, setActiveMultipliers] = useState<ActiveMultiplierRow[]>([]);
+  function getMultiplierStatusLabel(multiplier: ActiveMultiplierRow): string {
+    const hourMatch = multiplier.multiplier_id.match(/_(\d+)h$/i);
+    if (hourMatch) {
+      const totalHours = Number(hourMatch[1]);
+      const createdAtMs = new Date(multiplier.created_at).getTime();
+      const expiresAtMs = createdAtMs + totalHours * 60 * 60 * 1000;
+      const remainingMs = expiresAtMs - Date.now();
+      const remainingHours = Math.max(0, Math.ceil(remainingMs / (60 * 60 * 1000)));
+      return remainingHours > 0 ? `${remainingHours}h remaining` : "Expired";
+    }
+    return `${Number(multiplier.matches_remaining)} matches remaining`;
+  }
+
   const [equippingItemId, setEquippingItemId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -81,11 +95,20 @@ export default function InventoryPage() {
         if (supabase) {
           const { data: multiplierRows } = await supabase
             .from("active_multipliers")
-            .select("id, multiplier_id, multiplier_name, matches_remaining")
+            .select("id, multiplier_id, multiplier_name, matches_remaining, created_at")
             .eq("user_id", effectiveUserId)
-            .gt("matches_remaining", 0)
             .order("created_at", { ascending: true });
-          setActiveMultipliers((multiplierRows ?? []) as ActiveMultiplierRow[]);
+          const filtered = ((multiplierRows ?? []) as ActiveMultiplierRow[]).filter((row) => {
+            const hourMatch = row.multiplier_id.match(/_(\d+)h$/i);
+            if (hourMatch) {
+              const totalHours = Number(hourMatch[1]);
+              const createdAtMs = new Date(row.created_at).getTime();
+              const expiresAtMs = createdAtMs + totalHours * 60 * 60 * 1000;
+              return Number.isFinite(createdAtMs) && Date.now() < expiresAtMs;
+            }
+            return Number(row.matches_remaining ?? 0) > 0;
+          });
+          setActiveMultipliers(filtered);
         }
       } catch {
         router.push("/login");
@@ -245,7 +268,7 @@ export default function InventoryPage() {
                     {multiplier.multiplier_name || multiplier.multiplier_id}
                   </p>
                   <p className="mt-2 text-xs text-purple-200">
-                    {Number(multiplier.matches_remaining)} matches remaining
+                    {getMultiplierStatusLabel(multiplier)}
                   </p>
                 </div>
               ))}

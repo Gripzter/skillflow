@@ -307,7 +307,13 @@ export default function CasesPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-white">
-                      {renderDropName(drop.itemName, drop.source)}
+                      {drop.source === "sp" ? (
+                        <span className="inline-flex items-center gap-1">
+                          {renderDropName(drop.itemName, drop.source)} <SkilliesIcon size={14} />
+                        </span>
+                      ) : (
+                        renderDropName(drop.itemName, drop.source)
+                      )}
                     </p>
                     <p className="text-xs text-body-gray">
                       {drop.source === "sp" ? (

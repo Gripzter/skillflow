@@ -10,6 +10,8 @@ export type CaseDrop = {
   item_name: string;
   rarity: CaseItemRarity;
   value: number | null;
+  min_value?: number;
+  max_value?: number;
   weight: number;
 };
 
@@ -27,14 +29,13 @@ export const CASE_TIERS: Record<string, CaseTier> = {
     name: "Bronze Case",
     cost_sp: 200,
     loot_table: [
-      { item_type: "sp", item_id: "sp_40", item_name: "40 SP", rarity: "common", value: 40, weight: 30 },
-      { item_type: "sp", item_id: "sp_80", item_name: "80 SP", rarity: "common", value: 80, weight: 25 },
-      { item_type: "sp", item_id: "sp_140", item_name: "140 SP", rarity: "uncommon", value: 140, weight: 15 },
-      { item_type: "sp", item_id: "sp_250", item_name: "250 SP", rarity: "rare", value: 250, weight: 8 },
-      { item_type: "border", item_id: "border_bronze_glow", item_name: "Bronze Glow Border", rarity: "uncommon", value: null, weight: 8 },
-      { item_type: "badge", item_id: "badge_rookie_crest", item_name: "Rookie Crest Badge", rarity: "uncommon", value: null, weight: 6 },
-      { item_type: "multiplier", item_id: "mult_2x_3", item_name: "2x SP (3 matches)", rarity: "rare", value: 3, weight: 6 },
-      { item_type: "badge", item_id: "badge_beta_flare", item_name: "Beta Flare Badge", rarity: "epic", value: null, weight: 2 },
+      { item_type: "sp", item_id: "bronze_sp_50_150", item_name: "50-150 Skillies", rarity: "common", value: null, min_value: 50, max_value: 150, weight: 40 },
+      { item_type: "sp", item_id: "bronze_sp_200_400", item_name: "200-400 Skillies", rarity: "uncommon", value: null, min_value: 200, max_value: 400, weight: 25 },
+      { item_type: "border", item_id: "border_bronze_glow", item_name: "Bronze Glow Border", rarity: "common", value: null, weight: 10 },
+      { item_type: "badge", item_id: "badge_rookie_crest", item_name: "Rookie Crest Badge", rarity: "common", value: null, weight: 10 },
+      { item_type: "sp", item_id: "bronze_sp_500_800", item_name: "500-800 Skillies", rarity: "rare", value: null, min_value: 500, max_value: 800, weight: 10 },
+      { item_type: "border", item_id: "border_ruby_arc", item_name: "Ruby Arc Border", rarity: "rare", value: null, weight: 3 },
+      { item_type: "badge", item_id: "badge_nova_crest", item_name: "Nova Crest Badge", rarity: "rare", value: null, weight: 2 },
     ],
   },
   gold: {
@@ -42,15 +43,14 @@ export const CASE_TIERS: Record<string, CaseTier> = {
     name: "Gold Case",
     cost_sp: 500,
     loot_table: [
-      { item_type: "sp", item_id: "sp_180", item_name: "180 SP", rarity: "common", value: 180, weight: 20 },
-      { item_type: "sp", item_id: "sp_320", item_name: "320 SP", rarity: "uncommon", value: 320, weight: 20 },
-      { item_type: "sp", item_id: "sp_550", item_name: "550 SP", rarity: "rare", value: 550, weight: 14 },
-      { item_type: "sp", item_id: "sp_900", item_name: "900 SP", rarity: "epic", value: 900, weight: 6 },
-      { item_type: "border", item_id: "border_gold_aura", item_name: "Gold Aura Border", rarity: "rare", value: null, weight: 12 },
+      { item_type: "sp", item_id: "gold_sp_100_400", item_name: "100-400 Skillies", rarity: "common", value: null, min_value: 100, max_value: 400, weight: 35 },
+      { item_type: "sp", item_id: "gold_sp_500_900", item_name: "500-900 Skillies", rarity: "uncommon", value: null, min_value: 500, max_value: 900, weight: 25 },
+      { item_type: "border", item_id: "border_gold_aura", item_name: "Gold Aura Border", rarity: "rare", value: null, weight: 10 },
       { item_type: "badge", item_id: "badge_victory_mark", item_name: "Victory Mark Badge", rarity: "rare", value: null, weight: 10 },
-      { item_type: "multiplier", item_id: "mult_2x_5", item_name: "2x SP (5 matches)", rarity: "epic", value: 5, weight: 10 },
-      { item_type: "border", item_id: "border_ember_crown", item_name: "Ember Crown Border", rarity: "legendary", value: null, weight: 2 },
-      { item_type: "badge", item_id: "badge_founders_star", item_name: "Founders Star Badge", rarity: "legendary", value: null, weight: 1 },
+      { item_type: "sp", item_id: "gold_sp_1000_2000", item_name: "1,000-2,000 Skillies", rarity: "epic", value: null, min_value: 1000, max_value: 2000, weight: 12 },
+      { item_type: "border", item_id: "border_ember_crown", item_name: "Ember Crown Border", rarity: "epic", value: null, weight: 3 },
+      { item_type: "badge", item_id: "badge_founders_star", item_name: "Founders Star Badge", rarity: "epic", value: null, weight: 2 },
+      { item_type: "multiplier", item_id: "mult_2x_24h", item_name: "2x Skillies Multiplier (24h)", rarity: "legendary", value: 24, weight: 3 },
     ],
   },
   diamond: {
@@ -58,16 +58,14 @@ export const CASE_TIERS: Record<string, CaseTier> = {
     name: "Diamond Case",
     cost_sp: 1000,
     loot_table: [
-      { item_type: "sp", item_id: "sp_500", item_name: "500 SP", rarity: "common", value: 500, weight: 18 },
-      { item_type: "sp", item_id: "sp_850", item_name: "850 SP", rarity: "uncommon", value: 850, weight: 18 },
-      { item_type: "sp", item_id: "sp_1300", item_name: "1,300 SP", rarity: "rare", value: 1300, weight: 16 },
-      { item_type: "sp", item_id: "sp_2400", item_name: "2,400 SP", rarity: "epic", value: 2400, weight: 8 },
+      { item_type: "sp", item_id: "diamond_sp_200_800", item_name: "200-800 Skillies", rarity: "common", value: null, min_value: 200, max_value: 800, weight: 30 },
+      { item_type: "sp", item_id: "diamond_sp_1000_1500", item_name: "1,000-1,500 Skillies", rarity: "uncommon", value: null, min_value: 1000, max_value: 1500, weight: 25 },
       { item_type: "border", item_id: "border_diamond_prism", item_name: "Diamond Prism Border", rarity: "epic", value: null, weight: 10 },
       { item_type: "badge", item_id: "badge_elite_core", item_name: "Elite Core Badge", rarity: "epic", value: null, weight: 10 },
-      { item_type: "multiplier", item_id: "mult_3x_5", item_name: "3x SP (5 matches)", rarity: "legendary", value: 5, weight: 8 },
-      { item_type: "multiplier", item_id: "mult_2x_10", item_name: "2x SP (10 matches)", rarity: "legendary", value: 10, weight: 6 },
-      { item_type: "badge", item_id: "badge_omega_founder", item_name: "Omega Founder Badge", rarity: "legendary", value: null, weight: 2 },
-      { item_type: "border", item_id: "border_void_royal", item_name: "Void Royal Border", rarity: "legendary", value: null, weight: 2 },
+      { item_type: "sp", item_id: "diamond_sp_2000_5000", item_name: "2,000-5,000 Skillies", rarity: "legendary", value: null, min_value: 2000, max_value: 5000, weight: 13 },
+      { item_type: "badge", item_id: "badge_omega_founder", item_name: "Omega Founder Badge", rarity: "legendary", value: null, weight: 4 },
+      { item_type: "border", item_id: "border_void_royal", item_name: "Void Royal Border", rarity: "legendary", value: null, weight: 3 },
+      { item_type: "multiplier", item_id: "mult_3x_24h", item_name: "3x Skillies Multiplier (24h)", rarity: "legendary", value: 24, weight: 5 },
     ],
   },
   drop_crate: {
@@ -75,13 +73,13 @@ export const CASE_TIERS: Record<string, CaseTier> = {
     name: "Drop Crate",
     cost_sp: 0,
     loot_table: [
-      { item_type: "sp", item_id: "drop_sp_35", item_name: "35 SP", rarity: "common", value: 35, weight: 30 },
-      { item_type: "sp", item_id: "drop_sp_70", item_name: "70 SP", rarity: "common", value: 70, weight: 24 },
-      { item_type: "sp", item_id: "drop_sp_130", item_name: "130 SP", rarity: "uncommon", value: 130, weight: 16 },
-      { item_type: "sp", item_id: "drop_sp_220", item_name: "220 SP", rarity: "rare", value: 220, weight: 8 },
+      { item_type: "sp", item_id: "drop_sp_35", item_name: "35 Skillies", rarity: "common", value: 35, weight: 30 },
+      { item_type: "sp", item_id: "drop_sp_70", item_name: "70 Skillies", rarity: "common", value: 70, weight: 24 },
+      { item_type: "sp", item_id: "drop_sp_130", item_name: "130 Skillies", rarity: "uncommon", value: 130, weight: 16 },
+      { item_type: "sp", item_id: "drop_sp_220", item_name: "220 Skillies", rarity: "rare", value: 220, weight: 8 },
       { item_type: "border", item_id: "drop_border_brushed", item_name: "Brushed Border", rarity: "uncommon", value: null, weight: 8 },
       { item_type: "badge", item_id: "drop_badge_contender", item_name: "Contender Badge", rarity: "uncommon", value: null, weight: 6 },
-      { item_type: "multiplier", item_id: "drop_mult_2x_2", item_name: "2x SP (2 matches)", rarity: "rare", value: 2, weight: 6 },
+      { item_type: "multiplier", item_id: "drop_mult_2x_2", item_name: "2x Skillies (2 matches)", rarity: "rare", value: 2, weight: 6 },
       { item_type: "badge", item_id: "drop_badge_lucky", item_name: "Lucky Badge", rarity: "epic", value: null, weight: 2 },
     ],
   },
@@ -165,6 +163,24 @@ function pickWeightedItem(lootTable: CaseDrop[]): CaseDrop | null {
   return lootTable[lootTable.length - 1] ?? null;
 }
 
+function randomIntInRange(min: number, max: number): number {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return min;
+  if (max <= min) return min;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function resolveDropReward(drop: CaseDrop): CaseDrop {
+  if (drop.item_type !== "sp") return drop;
+  const min = Number(drop.min_value ?? drop.value ?? 0);
+  const max = Number(drop.max_value ?? drop.value ?? min);
+  const amount = randomIntInRange(min, max);
+  return {
+    ...drop,
+    value: amount,
+    item_name: `${amount.toLocaleString()} Skillies`,
+  };
+}
+
 async function awardSpReward(
   userId: string,
   amount: number,
@@ -174,18 +190,17 @@ async function awardSpReward(
   if (!supabase) return { success: false, error: "Supabase is not configured." };
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("lifetime_sp, balance_sp")
+    .select("balance_sp")
     .eq("id", userId)
     .single();
   if (profileError || !profile) return { success: false, error: "Failed to load user profile." };
 
-  const nextLifetime = Number(profile.lifetime_sp ?? 0) + amount;
   const nextBalance = Number(profile.balance_sp ?? 0) + amount;
   const { error: updateError } = await supabase
     .from("profiles")
-    .update({ lifetime_sp: nextLifetime, balance_sp: nextBalance })
+    .update({ balance_sp: nextBalance })
     .eq("id", userId);
-  if (updateError) return { success: false, error: "Failed to update SP balances for case reward." };
+  if (updateError) return { success: false, error: "Failed to update Skillies balance for case reward." };
 
   const { error: txError } = await supabase.from("sp_transactions").insert({
     user_id: userId,
@@ -212,8 +227,9 @@ async function openCaseInternal(
     if (!spend.success) return { success: false, error: spend.error };
   }
 
-  const winningItem = pickWeightedItem(caseTier.loot_table);
-  if (!winningItem) return { success: false, error: "Case has no valid rewards configured." };
+  const winningItemBase = pickWeightedItem(caseTier.loot_table);
+  if (!winningItemBase) return { success: false, error: "Case has no valid rewards configured." };
+  const winningItem = resolveDropReward(winningItemBase);
 
   if (winningItem.item_type === "sp") {
     const amount = Number(winningItem.value ?? 0);
@@ -252,11 +268,12 @@ async function openCaseInternal(
       return { success: false, error: "Failed to save cosmetic reward." };
     }
   } else if (winningItem.item_type === "multiplier") {
+    const isTimeBasedMultiplier = /_(\d+)h$/i.test(winningItem.item_id);
     const { error } = await supabase.from("active_multipliers").insert({
       user_id: resolvedUserId,
       multiplier_id: winningItem.item_id,
       multiplier_name: winningItem.item_name,
-      matches_remaining: Number(winningItem.value ?? 0),
+      matches_remaining: isTimeBasedMultiplier ? 1 : Number(winningItem.value ?? 0),
     });
     if (error) {
       // eslint-disable-next-line no-console

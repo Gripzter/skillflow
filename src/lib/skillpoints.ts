@@ -44,6 +44,7 @@ type ActiveMultiplierRow = {
   multiplier_id: string;
   multiplier_name: string | null;
   matches_remaining: number;
+  created_at: string;
 };
 
 function getTodayWindow() {
@@ -94,6 +95,14 @@ function parseMultiplierValue(multiplierId: string | null | undefined): number {
   if (!match) return 1;
   const parsed = Number(match[1]);
   return Number.isFinite(parsed) && parsed > 1 ? parsed : 1;
+}
+
+function parseMultiplierDurationHours(multiplierId: string | null | undefined): number | null {
+  if (!multiplierId) return null;
+  const match = multiplierId.match(/_(\d+)h$/i);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 export async function awardMatchSP(
@@ -148,15 +157,36 @@ export async function awardMatchSP(
 
   const { data: multiplierRows } = await supabase
     .from("active_multipliers")
-    .select("id, multiplier_id, multiplier_name, matches_remaining")
+    .select("id, multiplier_id, multiplier_name, matches_remaining, created_at")
     .eq("user_id", userId)
-    .gt("matches_remaining", 0)
     .order("created_at", { ascending: true })
-    .limit(1);
+    .limit(20);
 
   if (multiplierRows && multiplierRows.length > 0) {
-    activeMultiplier = multiplierRows[0] as ActiveMultiplierRow;
-    multiplier = parseMultiplierValue(activeMultiplier.multiplier_id);
+    const nowMs = Date.now();
+    for (const row of multiplierRows as ActiveMultiplierRow[]) {
+      const durationHours = parseMultiplierDurationHours(row.multiplier_id);
+      if (durationHours !== null) {
+        const createdAtMs = new Date(row.created_at).getTime();
+        const expiresAtMs = createdAtMs + durationHours * 60 * 60 * 1000;
+        if (Number.isFinite(createdAtMs) && nowMs < expiresAtMs) {
+          activeMultiplier = row;
+          multiplier = parseMultiplierValue(row.multiplier_id);
+          break;
+        }
+        await supabase
+          .from("active_multipliers")
+          .delete()
+          .eq("id", row.id)
+          .eq("user_id", userId);
+        continue;
+      }
+      if (Number(row.matches_remaining ?? 0) > 0) {
+        activeMultiplier = row;
+        multiplier = parseMultiplierValue(row.multiplier_id);
+        break;
+      }
+    }
   }
 
   const { startIso, endIso } = getTodayWindow();
@@ -225,24 +255,27 @@ export async function awardMatchSP(
   }
 
   if (activeMultiplier) {
-    const remaining = Number(activeMultiplier.matches_remaining ?? 0) - 1;
-    if (remaining <= 0) {
-      const { error: deleteMultiplierError } = await supabase
-        .from("active_multipliers")
-        .delete()
-        .eq("id", activeMultiplier.id)
-        .eq("user_id", userId);
-      if (deleteMultiplierError) {
-        return { success: false, error: "Failed to consume active multiplier." };
-      }
-    } else {
-      const { error: decrementMultiplierError } = await supabase
-        .from("active_multipliers")
-        .update({ matches_remaining: remaining })
-        .eq("id", activeMultiplier.id)
-        .eq("user_id", userId);
-      if (decrementMultiplierError) {
-        return { success: false, error: "Failed to update active multiplier progress." };
+    const durationHours = parseMultiplierDurationHours(activeMultiplier.multiplier_id);
+    if (durationHours === null) {
+      const remaining = Number(activeMultiplier.matches_remaining ?? 0) - 1;
+      if (remaining <= 0) {
+        const { error: deleteMultiplierError } = await supabase
+          .from("active_multipliers")
+          .delete()
+          .eq("id", activeMultiplier.id)
+          .eq("user_id", userId);
+        if (deleteMultiplierError) {
+          return { success: false, error: "Failed to consume active multiplier." };
+        }
+      } else {
+        const { error: decrementMultiplierError } = await supabase
+          .from("active_multipliers")
+          .update({ matches_remaining: remaining })
+          .eq("id", activeMultiplier.id)
+          .eq("user_id", userId);
+        if (decrementMultiplierError) {
+          return { success: false, error: "Failed to update active multiplier progress." };
+        }
       }
     }
   }

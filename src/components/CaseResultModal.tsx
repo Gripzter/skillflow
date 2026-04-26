@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CaseDrop, CaseItemRarity } from "@/lib/cases";
 import SkilliesIcon from "@/components/SkilliesIcon";
 
@@ -27,8 +27,8 @@ function rarityGlow(rarity: CaseItemRarity): string {
   }
 }
 
-function iconForType(itemType: CaseDrop["item_type"]): string {
-  if (itemType === "sp") return "💠";
+function iconForType(itemType: CaseDrop["item_type"]): ReactNode {
+  if (itemType === "sp") return <SkilliesIcon size={44} />;
   if (itemType === "badge") return "🏅";
   if (itemType === "border") return "🖼️";
   return "⚡";
@@ -63,9 +63,9 @@ export default function CaseResultModal({
 
   const valueLabel = useMemo(() => {
     if (isSp) return `+${displayValue.toLocaleString()} Skillies`;
-    if (isMultiplier) return `2x for next ${(item.value ?? 0).toLocaleString()} matches!`;
+    if (isMultiplier) return item.item_name;
     return item.item_name;
-  }, [displayValue, isMultiplier, isSp, item.item_name, item.value]);
+  }, [displayValue, isMultiplier, isSp, item.item_name]);
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
@@ -87,7 +87,7 @@ export default function CaseResultModal({
               </span>
             ) : isMultiplier ? (
               <span className="inline-flex items-center gap-1">
-                2x SkillPoints for next {(item.value ?? 0).toLocaleString()} matches!
+                {item.item_name}
               </span>
             ) : (
               valueLabel
