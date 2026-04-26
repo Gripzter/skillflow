@@ -20,6 +20,7 @@ import {
 import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
+const SEARCH_TIMEOUT_SECONDS = 10;
 const GAME_SLUG = "spelling-bee";
 const GAME_NAME = "Spelling Bee";
 const OPPONENT_AVATAR_GRADIENTS = [
@@ -563,7 +564,9 @@ export default function PlaySpellingBeePage() {
               <p className="mt-2 text-body-gray">
                 {isPractice ? "Spelling Bee • Free play" : "Spelling Bee • Ranked 1v1"}
               </p>
-              <p className="mt-2 text-sm text-body-gray">Searching... {formatTime(matchmakingElapsed)}</p>
+              <p className="mt-2 text-sm text-body-gray">
+                Searching... {formatTime(matchmakingElapsed)} / {formatTime(SEARCH_TIMEOUT_SECONDS)}
+              </p>
               <button
                 type="button"
                 onClick={handleCancelMatchmaking}

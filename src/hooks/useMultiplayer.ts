@@ -16,6 +16,8 @@ export function useMultiplayer({ matchId, userId, onGameEvent }: UseMultiplayerP
   const [playersOnline, setPlayersOnline] = useState<string[]>([]);
   const eventHandlerRef = useRef(onGameEvent);
   eventHandlerRef.current = onGameEvent;
+  const playersOnlineRef = useRef<string[]>([]);
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!matchId || !userId) return;
@@ -23,13 +25,31 @@ export function useMultiplayer({ matchId, userId, onGameEvent }: UseMultiplayerP
     const handleEvent = (event: GameEventPayload & { type: string }) => {
       if (event.type === "presence_sync") {
         const players = (event as { players: string[] }).players ?? [];
+        playersOnlineRef.current = players;
         setPlayersOnline(players);
         setOpponentConnected(players.length >= 2);
       } else if (event.type === "player_joined") {
-        setOpponentConnected(true);
+        const joinedUserId = (event as { userId?: string }).userId;
+        if (joinedUserId && joinedUserId !== userId) {
+          setOpponentConnected(true);
+        }
       } else if (event.type === "player_left") {
-        setOpponentConnected(false);
-        eventHandlerRef.current({ type: "opponent_disconnected" });
+        const leftUserId = (event as { userId?: string }).userId;
+        if (!leftUserId || leftUserId === userId) {
+          return;
+        }
+        // Presence leave can be transient during reconnect. Wait for sync to settle.
+        if (disconnectTimerRef.current) {
+          clearTimeout(disconnectTimerRef.current);
+        }
+        disconnectTimerRef.current = setTimeout(() => {
+          disconnectTimerRef.current = null;
+          const stillOnlyMeOnline = playersOnlineRef.current.length < 2;
+          if (stillOnlyMeOnline) {
+            setOpponentConnected(false);
+            eventHandlerRef.current({ type: "opponent_disconnected" });
+          }
+        }, 1200);
       } else {
         eventHandlerRef.current(event);
       }
@@ -40,10 +60,15 @@ export function useMultiplayer({ matchId, userId, onGameEvent }: UseMultiplayerP
     });
 
     return () => {
+      if (disconnectTimerRef.current) {
+        clearTimeout(disconnectTimerRef.current);
+        disconnectTimerRef.current = null;
+      }
       realtimeManager.leaveChannel();
       setConnected(false);
       setOpponentConnected(false);
       setPlayersOnline([]);
+      playersOnlineRef.current = [];
     };
   }, [matchId, userId]);
 

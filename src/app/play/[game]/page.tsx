@@ -21,6 +21,7 @@ import {
 import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
+const SEARCH_TIMEOUT_SECONDS = 10;
 const OPPONENT_AVATAR_GRADIENTS = [
   "from-purple/40 to-rose-500/40",
   "from-cyan-500/40 to-blue-500/40",
@@ -385,7 +386,7 @@ export default function PlayGamePage() {
 
   useEffect(() => {
     if (!useRealMatchmaking || !matchmaking || match || opponentFound) return;
-    if (matchmakingElapsed < 5) return;
+    if (matchmakingElapsed < SEARCH_TIMEOUT_SECONDS) return;
     void runBotFallbackMatch();
   }, [
     matchmaking,
@@ -634,7 +635,9 @@ export default function PlayGamePage() {
                   : `${gameName} • Ranked 1v1`}
               </p>
               <p className="mt-2 text-sm text-body-gray">
-                {realMatchStatus === "waiting" ? "Someone will join soon..." : `Searching... ${formatTime(matchmakingElapsed)}`}
+                {realMatchStatus === "waiting"
+                  ? "Someone will join soon..."
+                  : `Searching... ${formatTime(matchmakingElapsed)} / ${formatTime(SEARCH_TIMEOUT_SECONDS)}`}
               </p>
               <button
                 type="button"

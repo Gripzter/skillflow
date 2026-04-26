@@ -15,7 +15,7 @@ import { getReactionBotResponseMs, type BotDifficulty } from "@/lib/games/bot-en
 const GAME_AREA_MIN = { w: 600, h: 400 };
 const TARGET_BASE = 70;
 const TARGET_BASE_MOBILE = 80;
-const ROUND_RESULT_DURATION = 2000;
+const ROUND_RESULT_DURATION = 3000;
 const TAP_TIMEOUT_MS = 5000;
 const MISS_PENALTY_MS = 500;
 const ROUND_START_DELAY_MIN = 2000;
@@ -44,6 +44,12 @@ interface ReactionDuelProps extends GameMultiplayerProps {
 
 type Phase = "countdown" | "get_ready" | "target" | "tapped" | "round_result" | "match_over";
 type Reaction = number | "false_start" | "timeout";
+
+function encodeReactionValue(value: Reaction): number {
+  if (value === "false_start") return -1;
+  if (value === "timeout") return -2;
+  return value;
+}
 
 function getBotFalseStartChance(difficulty: BotDifficulty): number {
   if (difficulty === "rookie") return 0.1;
@@ -80,6 +86,7 @@ export default function ReactionDuel({
   const [targetColor, setTargetColor] = useState("#FF5E00");
   const [p1Reaction, setP1Reaction] = useState<Reaction | null>(null);
   const [p2Reaction, setP2Reaction] = useState<Reaction | null>(null);
+  const [roundResult, setRoundResult] = useState<{ p1: Reaction; p2: Reaction; winner: "player1" | "player2" | "draw" } | null>(null);
   const [opponentReactionForRound, setOpponentReactionForRound] = useState<{ round: number; reactionTime: number } | null>(null);
   const [tapPos, setTapPos] = useState<{ x: number; y: number } | null>(null);
   const [showTooEarly, setShowTooEarly] = useState(false);
@@ -214,6 +221,7 @@ export default function ReactionDuel({
     if (phase !== "get_ready") return;
     setP1Reaction(null);
     setP2Reaction(null);
+    setRoundResult(null);
     setOpponentReactionForRound(null);
     setShowTooEarly(false);
     setShowMiss(false);
@@ -354,14 +362,12 @@ export default function ReactionDuel({
       const hit = dist <= radius;
       const reactionMs = Math.round(performance.now() - targetAppearTimeRef.current);
       const value: Reaction = hit ? reactionMs : reactionMs + MISS_PENALTY_MS;
-      const sendValue = typeof value === "number" ? value : -1;
+      const sendValue = encodeReactionValue(value);
       if (myRole === "player1") {
         setP1Reaction(value);
         setLastP1Time(typeof value === "number" ? value : null);
-        if (typeof value === "number") setP1TotalMs((t) => t + value);
       } else {
         setP2Reaction(value);
-        if (typeof value === "number") setP2TotalMs((t) => t + value);
       }
       if (tapTimeoutRef.current) {
         clearTimeout(tapTimeoutRef.current);
@@ -374,7 +380,7 @@ export default function ReactionDuel({
         sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
       }
     },
-    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, isPlayer2Bot, botDifficulty, advanceRound, onPlayerAction]
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, onPlayerAction]
   );
 
   function toReaction(t: number): Reaction {
@@ -391,6 +397,7 @@ export default function ReactionDuel({
       const p1: Reaction = myRole === "player1" ? myReaction : toReaction(opponentReactionForRound.reactionTime);
       const p2: Reaction = myRole === "player1" ? toReaction(opponentReactionForRound.reactionTime) : myReaction;
       setPhase("round_result");
+      setRoundResult({ p1, p2, winner: getRoundWinner(p1, p2) });
       setOpponentReactionForRound(null);
       roundResultTimeoutRef.current = setTimeout(() => {
         roundResultTimeoutRef.current = null;
@@ -407,6 +414,7 @@ export default function ReactionDuel({
           setPhase("tapped");
         }
         setPhase("round_result");
+        setRoundResult({ p1: p1Reaction, p2, winner: getRoundWinner(p1Reaction, p2) });
         roundResultTimeoutRef.current = setTimeout(() => advanceRound(p1Reaction!, p2), ROUND_RESULT_DURATION);
       }
       return () => {
@@ -414,6 +422,19 @@ export default function ReactionDuel({
       };
     }
   }, [phase, p1Reaction, p2Reaction, advanceRound, isMultiplayer, myRole, round, opponentReactionForRound]);
+
+  // Multiplayer safety: if my reaction is recorded but opponent payload never arrives, force a timeout resolution.
+  useEffect(() => {
+    if (!isMultiplayer) return;
+    if (phase !== "tapped" && phase !== "target") return;
+    if (opponentReactionForRound?.round === round) return;
+    const myReaction = myRole === "player1" ? p1Reaction : p2Reaction;
+    if (myReaction === null) return;
+    const fallback = setTimeout(() => {
+      setOpponentReactionForRound((prev) => (prev?.round === round ? prev : { round, reactionTime: -2 }));
+    }, 4500);
+    return () => clearTimeout(fallback);
+  }, [isMultiplayer, myRole, opponentReactionForRound, p1Reaction, p2Reaction, phase, round]);
 
   useEffect(() => {
     return () => clearAllTimeouts();
@@ -607,6 +628,33 @@ export default function ReactionDuel({
               >
                 MISS!
               </p>
+            )}
+
+            {phase === "round_result" && roundResult && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0E0E12]/80 px-4 text-center">
+                <p className="text-2xl font-bold text-white">Round Result</p>
+                <div className="mt-3 grid w-full max-w-[320px] grid-cols-2 gap-3">
+                  <div className={`rounded-lg border p-3 ${roundResult.winner === "player1" ? "border-teal bg-teal/20" : "border-white/15 bg-black/20"}`}>
+                    <p className="text-xs uppercase text-body-gray">{player1.username}</p>
+                    <p className="mt-1 text-lg font-semibold text-white">
+                      {typeof roundResult.p1 === "number" ? `${roundResult.p1}ms` : roundResult.p1.replace("_", " ")}
+                    </p>
+                  </div>
+                  <div className={`rounded-lg border p-3 ${roundResult.winner === "player2" ? "border-purple-400 bg-purple-500/20" : "border-white/15 bg-black/20"}`}>
+                    <p className="text-xs uppercase text-body-gray">{player2.username}</p>
+                    <p className="mt-1 text-lg font-semibold text-white">
+                      {typeof roundResult.p2 === "number" ? `${roundResult.p2}ms` : roundResult.p2.replace("_", " ")}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-body-gray">
+                  {roundResult.winner === "draw"
+                    ? "Round draw"
+                    : roundResult.winner === "player1"
+                      ? `${player1.username} wins the round`
+                      : `${player2.username} wins the round`}
+                </p>
+              </div>
             )}
           </div>
       </div>

@@ -4,7 +4,7 @@
  * Realtime is only used inside the match room for game events.
  *
  * Rating-based matching window (ranked play):
- *   first 5 s → opponent within ±200 rating points
+ *   first 10 s → opponent within ±200 rating points
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -30,7 +30,7 @@ export interface DbMatch {
 }
 
 const POLL_INTERVAL_MS = 1000;
-const MATCHMAKING_TIMEOUT_MS = 5000;
+const MATCHMAKING_TIMEOUT_MS = 10000;
 const RATING_MATCH_RANGE = 200;
 
 export type MatchmakingStatus = "searching" | "waiting" | "matched" | "timeout";

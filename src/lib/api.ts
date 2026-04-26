@@ -46,6 +46,7 @@ const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BOT_PLAYER_UUID = "00000000-0000-0000-0000-000000000001";
 
 function isUuid(value: string | null | undefined): value is string {
   return !!value && UUID_RE.test(value);
@@ -72,6 +73,7 @@ function mapDbMatchToStoredMatch(row: {
   created_at: string;
   player2_id?: string | null;
   player1_id?: string | null;
+  is_bot?: boolean | null;
   bot_difficulty?: string | null;
   move_log?: Array<{
     player_id: string;
@@ -117,7 +119,7 @@ function mapDbMatchToStoredMatch(row: {
     status,
     winner,
     createdAt: row.created_at,
-    isRealMultiplayer: !!row.player2_id,
+    isRealMultiplayer: !!row.player2_id && !row.is_bot,
     player1Id: row.player1_id ?? undefined,
     player2Id: row.player2_id ?? undefined,
     botDifficulty:
@@ -431,29 +433,52 @@ export async function createMatch(params: {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   const { totalPot, platformFee, winnerPayout } = computePayout(params.stakeAmount);
-  const { data, error } = await supabase
-    .from("matches")
-    .insert({
-      game_type: params.gameType,
-      player1_id: user.id,
-      player1_username: params.player1.username,
-      player2_username: params.player2.username,
-      player1_rating: params.player1.rating,
-      player2_rating: params.player2.rating,
-      stake_amount: params.stakeAmount,
-      platform_fee: platformFee,
-      total_pot: totalPot,
-      winner_payout: winnerPayout,
-      bot_difficulty: params.botDifficulty ?? null,
-      status: "in_progress",
-      player1_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
-      player2_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
-      active_turn: params.gameType === "chess" ? "player1" : null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return mapDbMatchToStoredMatch(data);
+  const isBotMatch = !!params.botDifficulty;
+  const baseInsert = {
+    game_type: params.gameType,
+    player1_id: user.id,
+    player1_username: params.player1.username,
+    player2_username: params.player2.username,
+    player1_rating: params.player1.rating,
+    player2_rating: params.player2.rating,
+    stake_amount: params.stakeAmount,
+    platform_fee: platformFee,
+    total_pot: totalPot,
+    winner_payout: winnerPayout,
+    bot_difficulty: params.botDifficulty ?? null,
+    player1_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
+    player2_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
+    active_turn: params.gameType === "chess" ? "player1" : null,
+  };
+
+  const insertAttempts: Array<Record<string, unknown>> = isBotMatch
+    ? [
+        { ...baseInsert, status: "active", is_bot: true, player2_id: null },
+        { ...baseInsert, status: "in_progress", is_bot: true, player2_id: null },
+        { ...baseInsert, status: "in_progress", is_bot: true, player2_id: BOT_PLAYER_UUID },
+        { ...baseInsert, status: "in_progress", player2_id: null },
+        { ...baseInsert, status: "in_progress", player2_id: BOT_PLAYER_UUID },
+      ]
+    : [{ ...baseInsert, status: "in_progress" }];
+
+  let created: Record<string, unknown> | null = null;
+  let lastError: unknown = null;
+  for (const payload of insertAttempts) {
+    const { data, error } = await supabase.from("matches").insert(payload).select().single();
+    if (!error && data) {
+      created = data as Record<string, unknown>;
+      break;
+    }
+    lastError = error;
+    // eslint-disable-next-line no-console
+    console.error("[createMatch] Match insert attempt failed", { payload, error });
+  }
+
+  if (!created) {
+    throw lastError instanceof Error ? lastError : new Error("Failed to create match");
+  }
+
+  return mapDbMatchToStoredMatch(created as Parameters<typeof mapDbMatchToStoredMatch>[0]);
 }
 
 export async function getMatch(id: string): Promise<StoredMatch | null> {

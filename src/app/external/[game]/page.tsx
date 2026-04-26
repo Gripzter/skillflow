@@ -16,6 +16,7 @@ import SkilliesIcon from "@/components/SkilliesIcon";
 import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
+const SEARCH_TIMEOUT_SECONDS = 10;
 const CS2_MAPS = ["Any", "Dust 2", "Mirage", "Inferno", "Nuke", "Anubis", "Ancient", "Overpass"];
 const MODES = [
   {
@@ -367,7 +368,9 @@ export default function CS2LobbyPage() {
               <p className="mt-2 text-body-gray">
                 CS2 • {MODES.find((m) => m.id === selectedMode)?.title}
               </p>
-              <p className="mt-2 text-sm text-body-gray">Searching... {formatTime(matchmakingElapsed)}</p>
+              <p className="mt-2 text-sm text-body-gray">
+                Searching... {formatTime(matchmakingElapsed)} / {formatTime(SEARCH_TIMEOUT_SECONDS)}
+              </p>
               <button
                 type="button"
                 onClick={handleCancelMatchmaking}
