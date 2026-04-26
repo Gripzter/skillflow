@@ -147,7 +147,7 @@ export default function PlayGamePage() {
   // Fallback: if navigateToMatchId was set (e.g. from a code path that didn't use handleMatchReady), navigate
   useEffect(() => {
     if (!navigateToMatchId) return;
-    const matchUrl = `/match/${navigateToMatchId}`;
+    const matchUrl = `/play/match/${navigateToMatchId}`;
     window.location.href = matchUrl;
   }, [navigateToMatchId]);
 
@@ -174,12 +174,12 @@ export default function PlayGamePage() {
   const runBotFallbackMatch = useCallback(async () => {
     if (botFallbackStartedRef.current) return;
     botFallbackStartedRef.current = true;
-    await cancelSearching();
-    const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
-    const opponent = generateFakeOpponent(myGameRating);
-    setOpponentFound(opponent);
-    setOpponentAvatarGradient(pickRandomOpponentGradient());
-    try {
+
+    const createBotMatch = async (): Promise<string> => {
+      const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
+      const opponent = generateFakeOpponent(myGameRating);
+      setOpponentFound(opponent);
+      setOpponentAvatarGradient(pickRandomOpponentGradient());
       const newMatch = await createMatch({
         gameType: gameSlug,
         gameDisplayName: gameName,
@@ -189,16 +189,32 @@ export default function PlayGamePage() {
         botDifficulty: resolvedBotDifficulty,
       });
       setMatch(newMatch);
+      if (!newMatch?.id) {
+        throw new Error("createBotMatch returned an invalid match id");
+      }
+      return newMatch.id;
+    };
+
+    try {
+      await cancelSearching();
+      const botMatchId = await createBotMatch();
       setTimeout(() => {
-        window.location.href = `/match/${newMatch.id}`;
+        window.location.href = `/play/match/${botMatchId}`;
       }, 1200);
-    } catch {
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[PlayGamePage] createBotMatch fallback failed:", error);
       try {
         await creditSP(userId, stakeAmount, "match_refund", "Matchmaking failed – stake refunded");
+        const spData = await getUserSPData(userId);
+        setBalance(Number(spData?.balanceSp ?? 0));
         dispatchWalletUpdated();
-      } catch {
+      } catch (refundError) {
+        // eslint-disable-next-line no-console
+        console.error("[PlayGamePage] stake refund failed after bot fallback error:", refundError);
         dispatchWalletUpdated();
       }
+      showToast("Could not create a bot match. Your Skillies were refunded.", "error");
       setMatchmaking(false);
       setOpponentFound(null);
       setMatch(null);
@@ -212,6 +228,7 @@ export default function PlayGamePage() {
     myGameRating,
     pickRandomOpponentGradient,
     player1,
+    showToast,
     stakeAmount,
     userId,
   ]);
@@ -242,7 +259,7 @@ export default function PlayGamePage() {
         dispatchWalletUpdated();
       }
     }
-  }, [elapsedTimer, stakeAmount, isPractice, isRestricted, useRealMatchmaking, cancelSearching]);
+  }, [elapsedTimer, stakeAmount, isPractice, isRestricted, useRealMatchmaking, cancelSearching, userId]);
 
   const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
     if (process.env.NODE_ENV !== "production") {
@@ -250,7 +267,7 @@ export default function PlayGamePage() {
       console.log("[PlayGamePage] onMatchReady called", match?.id, _role, "— navigating with window.location.href");
     }
     if (match?.id) {
-      const matchUrl = `/match/${match.id}`;
+      const matchUrl = `/play/match/${match.id}`;
       window.location.href = matchUrl;
     }
   }, []);
@@ -285,7 +302,7 @@ export default function PlayGamePage() {
           });
           setMatch(newMatch);
           setTimeout(() => {
-            window.location.href = `/match/${newMatch.id}`;
+            window.location.href = `/play/match/${newMatch.id}`;
           }, 1200);
         } catch {
           setMatchmaking(false);
@@ -348,6 +365,7 @@ export default function PlayGamePage() {
     handleMatchReady,
     botDifficulty,
     myGameRating,
+    stakeAmount,
     showToast,
     runBotFallbackMatch,
   ]);
@@ -361,6 +379,19 @@ export default function PlayGamePage() {
     match,
     opponentFound,
     realMatchStatus,
+    runBotFallbackMatch,
+    useRealMatchmaking,
+  ]);
+
+  useEffect(() => {
+    if (!useRealMatchmaking || !matchmaking || match || opponentFound) return;
+    if (matchmakingElapsed < 5) return;
+    void runBotFallbackMatch();
+  }, [
+    matchmaking,
+    matchmakingElapsed,
+    match,
+    opponentFound,
     runBotFallbackMatch,
     useRealMatchmaking,
   ]);
@@ -518,7 +549,7 @@ export default function PlayGamePage() {
           </section>
         )}
 
-        <div className="fixed bottom-[76px] left-0 right-0 z-30 px-4 pb-4 md:static md:mt-10 md:px-0 md:pb-0">
+        <div className="sticky bottom-0 z-50 mt-8 w-full bg-[#0E0E12] p-4 pointer-events-auto md:static md:mt-10 md:w-auto md:bg-transparent md:p-0">
           <button
             type="button"
             onClick={handleFindMatch}

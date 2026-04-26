@@ -72,11 +72,15 @@ export function useMatchmaking() {
           options.onMatchReady?.(matchData, matchRole);
         },
         (err) => {
+          // eslint-disable-next-line no-console
+          console.error("[useMatchmaking] startMatchmakingApi onError:", err);
           setError(err);
           setStatus("error");
         }
       );
     } catch (err: unknown) {
+      // eslint-disable-next-line no-console
+      console.error("[useMatchmaking] startMatchmaking threw:", err);
       const message = err instanceof Error ? err.message : "Matchmaking failed";
       setError(message);
       setStatus("error");
