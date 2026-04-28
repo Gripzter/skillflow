@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import SPIcon from "@/components/SPIcon";
 
 interface FoundersRewardProps {
@@ -44,11 +45,20 @@ export default function FoundersReward({ lifetimeSp, currentTier }: FoundersRewa
     >
       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#FFB347]/20 blur-2xl" aria-hidden />
       <div className="flex items-center justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-3">
+          <Image
+            src="/images/badge-founders.png"
+            alt="Founders badge"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
+          <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#FFB347]">
             Beta Founders Program
           </p>
           <h3 className="mt-1 text-lg font-bold text-white">FOUNDERS REWARD</h3>
+          </div>
         </div>
         {unlocked ? (
           <span className="rounded-full border border-[#FFB347]/60 bg-[#FFB347]/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#FFD700]">

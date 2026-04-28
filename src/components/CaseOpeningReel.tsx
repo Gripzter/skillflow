@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import type { CaseDrop, CaseItemRarity } from "@/lib/cases";
 import SkilliesIcon from "@/components/SkilliesIcon";
 
 type CaseOpeningReelProps = {
+  caseId: "bronze" | "gold" | "diamond" | "drop_crate" | null;
   lootTable: CaseDrop[];
   winningItem: CaseDrop;
   onComplete: (item: CaseDrop) => void;
@@ -15,6 +17,21 @@ const ITEM_GAP = 12;
 const ITEM_PITCH = ITEM_WIDTH + ITEM_GAP;
 const TOTAL_ITEMS = 58;
 const WIN_INDEX = 48;
+
+const BORDER_PREVIEW_BY_RARITY: Record<CaseItemRarity, string> = {
+  common: "/images/border-common.png",
+  uncommon: "/images/border-common.png",
+  rare: "/images/border-rare.png",
+  epic: "/images/border-epic.png",
+  legendary: "/images/border-legendary.png",
+};
+
+const CASE_IMAGE_BY_ID: Record<"bronze" | "gold" | "diamond" | "drop_crate", string> = {
+  bronze: "/images/Case-bronze.png",
+  gold: "/images/case-gold.png",
+  diamond: "/images/case-diamond.png",
+  drop_crate: "/images/case-free.png",
+};
 
 function rarityClasses(rarity: CaseItemRarity): string {
   switch (rarity) {
@@ -35,8 +52,7 @@ function rarityClasses(rarity: CaseItemRarity): string {
 function iconForType(itemType: CaseDrop["item_type"]): ReactNode {
   if (itemType === "sp") return <SkilliesIcon size={20} />;
   if (itemType === "badge") return "🏅";
-  if (itemType === "border") return "🖼️";
-  return "⚡";
+  return null;
 }
 
 function weightedRandom(lootTable: CaseDrop[]): CaseDrop {
@@ -59,6 +75,7 @@ function isHighValueDrop(item: CaseDrop): boolean {
 }
 
 export default function CaseOpeningReel({
+  caseId,
   lootTable,
   winningItem,
   onComplete,
@@ -118,7 +135,14 @@ export default function CaseOpeningReel({
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
       <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0F1118] p-5 shadow-[0_0_40px_rgba(0,0,0,0.55)]">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Opening Case...</h3>
+          <div className="flex items-center gap-3">
+            {caseId ? (
+              <div className="relative h-10 w-10 overflow-hidden rounded-lg border border-white/10">
+                <Image src={CASE_IMAGE_BY_ID[caseId]} alt={`${caseId} case`} fill className="object-cover" />
+              </div>
+            ) : null}
+            <h3 className="text-lg font-semibold text-white">Opening Case...</h3>
+          </div>
           <span className="text-xs uppercase tracking-[0.15em] text-gray-400">Good luck</span>
         </div>
 
@@ -154,7 +178,29 @@ export default function CaseOpeningReel({
                   }`}
                   style={{ width: ITEM_WIDTH }}
                 >
-                  <p className="text-lg leading-none">{iconForType(item.item_type)}</p>
+                  <div className="flex h-12 items-center justify-center">
+                    {item.item_type === "border" ? (
+                      <div className="relative h-10 w-14 overflow-hidden rounded border border-white/20">
+                        <Image
+                          src={BORDER_PREVIEW_BY_RARITY[item.rarity]}
+                          alt={`${item.rarity} border preview`}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : item.item_type === "multiplier" ? (
+                      <div className="relative h-10 w-10 overflow-hidden rounded">
+                        <Image
+                          src={item.item_id.includes("3x") ? "/images/multiplier-3x.png" : "/images/multiplier-2x.png"}
+                          alt={item.item_name}
+                          fill
+                          className="object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-lg leading-none">{iconForType(item.item_type)}</p>
+                    )}
+                  </div>
                   <p className="mt-2 line-clamp-2 text-xs font-semibold">{item.item_name}</p>
                   <p className="mt-1 text-[10px] uppercase tracking-[0.12em] opacity-90">
                     {item.rarity}

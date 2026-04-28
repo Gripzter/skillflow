@@ -125,17 +125,17 @@ const QUICK_GAMES = [
   {
     slug: "chess",
     name: "Chess",
-    gradient: "from-amber-500/20 to-rose-500/20",
+    image: "/images/chess-card.png",
   },
   {
     slug: "connect-4",
     name: "Connect 4",
-    gradient: "from-red-500/30 to-amber-400/30",
+    image: "/images/connect4-card.png",
   },
   {
     slug: "reaction-duel",
     name: "Reaction Duel",
-    gradient: "from-orange-500/30 to-red-500/30",
+    image: "/images/reaction-duel-card.png",
   },
 ] as const;
 
@@ -551,9 +551,18 @@ export default function DashboardPage() {
       {showFoundersPrompt && !showOnboarding ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-charcoal/95 px-4">
           <div className="w-full max-w-xl rounded-card border border-white/10 bg-card p-6 shadow-[0_0_32px_rgba(0,0,0,0.45)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal">
-              FOUNDERS PROGRAM
-            </p>
+            <div className="mb-3 flex items-center gap-2">
+              <Image
+                src="/images/badge-founders.png"
+                alt="Founders badge"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain"
+              />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-teal">
+                FOUNDERS PROGRAM
+              </p>
+            </div>
             <h2 className="mt-2 text-2xl font-extrabold text-white">FOUNDERS PROGRAM</h2>
             <p className="mt-3 text-sm text-body-gray">
               Join the SkillFlow Founders Program and earn exclusive rewards during our beta. Founders get permanent badges, starting credits, and early access to new features.
@@ -810,13 +819,7 @@ export default function DashboardPage() {
                   style={{ animationDelay: `${160 + index * 60}ms` }}
                 >
                   <Image
-                    src={
-                      game.slug === "chess"
-                        ? "/games/chess.jpg"
-                        : game.slug === "connect-4"
-                        ? "/games/connect4.jpg"
-                        : "/games/reaction.jpg"
-                    }
+                    src={game.image}
                     alt={`${game.name} background`}
                     fill
                     className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
@@ -1027,15 +1030,21 @@ export default function DashboardPage() {
                 const opponentName = userIsPlayer1 ? match.player2?.username ?? "Opponent" : match.player1?.username ?? "Opponent";
                 const gameImageSrc =
                   match.gameType === "chess"
-                    ? "/games/chess.jpg"
+                    ? "/images/chess-card.png"
                     : match.gameType === "connect-4"
-                    ? "/games/connect4.jpg"
+                    ? "/images/connect4-card.png"
                     : match.gameType === "reaction-duel"
-                    ? "/games/reaction.jpg"
+                    ? "/images/reaction-duel-card.png"
                     : match.gameType === "spelling-bee"
-                    ? "/games/spelling.jpg"
-                    : match.gameType === "8-ball-pool"
-                    ? "/games/pool.jpg"
+                    ? "/images/spelling-bee-card.png"
+                    : match.gameType === "checkers"
+                    ? "/images/checkers-card.png"
+                    : match.gameType === "memory-match"
+                    ? "/images/memory-match-card.png"
+                    : match.gameType === "typing-race"
+                    ? "/images/typing-race-card.png"
+                    : match.gameType === "trivia"
+                    ? "/images/trivia-card.png"
                     : undefined;
                 const borderColorClass = isDraw
                   ? "border-l-amber-400/60"

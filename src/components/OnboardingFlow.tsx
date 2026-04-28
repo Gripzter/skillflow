@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import { createMatch, getCurrentUser } from "@/lib/api";
@@ -16,7 +17,7 @@ interface OnboardingFlowProps {
 
 type GameCard = {
   slug: string;
-  emoji: string;
+  image: string;
   name: string;
   tagline: string;
 };
@@ -24,37 +25,37 @@ type GameCard = {
 const FIRST_GAMES: GameCard[] = [
   {
     slug: "chess",
-    emoji: "♟️",
+    image: "/images/chess-card.png",
     name: "Chess",
     tagline: "Classic strategy",
   },
   {
     slug: "connect-4",
-    emoji: "🔴",
+    image: "/images/connect4-card.png",
     name: "Connect 4",
     tagline: "Drop to connect",
   },
   {
     slug: "reaction-duel",
-    emoji: "⚡",
+    image: "/images/reaction-duel-card.png",
     name: "Reaction Duel",
     tagline: "Test your reflexes",
   },
   {
     slug: "memory-match",
-    emoji: "🧠",
+    image: "/images/memory-match-card.png",
     name: "Memory Match",
     tagline: "Match the pairs",
   },
   {
     slug: "checkers",
-    emoji: "🏁",
+    image: "/images/checkers-card.png",
     name: "Checkers",
     tagline: "Jump and king",
   },
   {
     slug: "spelling-bee",
-    emoji: "📝",
+    image: "/images/spelling-bee-card.png",
     name: "Spelling Bee",
     tagline: "Word power",
   },
@@ -279,6 +280,15 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             <div className="mx-auto w-full max-w-lg space-y-8 text-center">
               <div className="w-full rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
                 <div className="rounded-2xl bg-[#1A1A24] p-6 md:p-8">
+                  <div className="mb-4 flex justify-center">
+                    <Image
+                      src="/images/badge-founders.png"
+                      alt="Founders badge"
+                      width={32}
+                      height={32}
+                      className="h-8 w-8 object-contain"
+                    />
+                  </div>
                   <p className="text-xs font-semibold uppercase tracking-widest text-[#FF5E00]">
                     BETA FOUNDERS PROGRAM
                   </p>
@@ -322,7 +332,15 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                     onClick={() => handleChooseGame(game.slug)}
                     className="rounded-xl border border-[#2A2A3A] bg-[#1A1A24] p-4 text-left transition duration-200 hover:scale-[1.05] hover:border-[#FF5E00] hover:shadow-[0_0_22px_rgba(255,94,0,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    <p className="text-2xl">{game.emoji}</p>
+                    <div className="relative h-12 w-full overflow-hidden rounded-md border border-white/10">
+                      <Image
+                        src={game.image}
+                        alt={`${game.name} thumbnail`}
+                        fill
+                        className="object-cover"
+                        loading="lazy"
+                      />
+                    </div>
                     <p className="mt-2 text-sm font-semibold text-white md:text-base">{game.name}</p>
                     <p className="mt-1 text-xs text-gray-400 md:text-sm">{game.tagline}</p>
                   </button>

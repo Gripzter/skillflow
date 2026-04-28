@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Image from "next/image";
 import type { CaseDrop, CaseItemRarity } from "@/lib/cases";
 import SkilliesIcon from "@/components/SkilliesIcon";
 
@@ -30,9 +31,16 @@ function rarityGlow(rarity: CaseItemRarity): string {
 function iconForType(itemType: CaseDrop["item_type"]): ReactNode {
   if (itemType === "sp") return <SkilliesIcon size={44} />;
   if (itemType === "badge") return "🏅";
-  if (itemType === "border") return "🖼️";
-  return "⚡";
+  return null;
 }
+
+const BORDER_PREVIEW_BY_RARITY: Record<CaseItemRarity, string> = {
+  common: "/images/border-common.png",
+  uncommon: "/images/border-common.png",
+  rare: "/images/border-rare.png",
+  epic: "/images/border-epic.png",
+  legendary: "/images/border-legendary.png",
+};
 
 export default function CaseResultModal({
   item,
@@ -74,7 +82,27 @@ export default function CaseResultModal({
         <div
           className={`mx-auto mt-4 flex h-36 w-36 items-center justify-center rounded-2xl border text-5xl ${rarityGlow(item.rarity)} animate-pulse`}
         >
-          {iconForType(item.item_type)}
+          {item.item_type === "border" ? (
+            <div className="relative h-24 w-24 overflow-hidden rounded-lg border border-white/20">
+              <Image
+                src={BORDER_PREVIEW_BY_RARITY[item.rarity]}
+                alt={`${item.rarity} border preview`}
+                fill
+                className="object-cover"
+              />
+            </div>
+          ) : item.item_type === "multiplier" ? (
+            <div className="relative h-24 w-24 overflow-hidden rounded-lg">
+              <Image
+                src={item.item_id.includes("3x") ? "/images/multiplier-3x.png" : "/images/multiplier-2x.png"}
+                alt={item.item_name}
+                fill
+                className="object-contain"
+              />
+            </div>
+          ) : (
+            iconForType(item.item_type)
+          )}
         </div>
         <h3 className="mt-5 text-2xl font-bold text-white">{item.item_name}</h3>
         <p className="mt-1 text-xs uppercase tracking-[0.16em] text-gray-400">{item.rarity}</p>
@@ -86,7 +114,15 @@ export default function CaseResultModal({
                 {valueLabel} <SkilliesIcon size={18} />
               </span>
             ) : isMultiplier ? (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-2">
+                <span className="relative h-6 w-6 overflow-hidden rounded">
+                  <Image
+                    src={item.item_id.includes("3x") ? "/images/multiplier-3x.png" : "/images/multiplier-2x.png"}
+                    alt={item.item_name}
+                    fill
+                    className="object-contain"
+                  />
+                </span>
                 {item.item_name}
               </span>
             ) : (

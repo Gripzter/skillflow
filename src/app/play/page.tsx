@@ -24,213 +24,57 @@ interface UpcomingLastTouchSession {
 }
 
 const GAMES = [
-  { name: "Chess", slug: "chess", gradient: "from-amber-500/20 to-rose-500/20", active: true },
-  { name: "Connect 4", slug: "connect-4", gradient: "from-red-500/30 to-amber-400/30", active: true },
-  { name: "Reaction Duel", slug: "reaction-duel", gradient: "from-orange-500/30 to-red-500/30", active: true },
-  { name: "Spelling Bee", slug: "spelling-bee", gradient: "from-amber-500/30 to-yellow-600/30", active: true },
-  { name: "Memory Match", slug: "memory-match", gradient: "from-purple-500/40 via-pink-500/40 to-fuchsia-500/40", active: true },
-  { name: "Checkers", slug: "checkers", gradient: "from-[#FF5E00]/25 to-[#2A3A5C]/25", active: true },
-  { name: "Trivia", slug: "trivia", gradient: "from-violet-500/30 to-blue-500/30", active: true },
-  { name: "Typing Race", slug: "typing-race", gradient: "from-teal/30 to-cyan-500/20", active: true },
-  { name: "Mini Golf", slug: "mini-golf", gradient: "from-emerald-500/20 to-teal/30", active: false },
-  { name: "Darts", slug: "darts", gradient: "from-purple/20 to-pink-500/20", active: false },
-  { name: "8 Ball Pool", slug: "8-ball-pool", gradient: "from-emerald-500/25 to-emerald-500/5", active: false },
+  { name: "Chess", slug: "chess", image: "/images/chess-card.png", active: true },
+  { name: "Connect 4", slug: "connect-4", image: "/images/connect4-card.png", active: true },
+  { name: "Reaction Duel", slug: "reaction-duel", image: "/images/reaction-duel-card.png", active: true },
+  { name: "Memory Match", slug: "memory-match", image: "/images/memory-match-card.png", active: true },
+  { name: "Checkers", slug: "checkers", image: "/images/checkers-card.png", active: true },
+  { name: "Spelling Bee", slug: "spelling-bee", image: "/images/spelling-bee-card.png", active: true },
+  { name: "Typing Race", slug: "typing-race", image: "/images/typing-race-card.png", active: true },
+  { name: "Trivia", slug: "trivia", image: "/images/trivia-card.png", active: true },
 ];
-
-function useRandom(min: number, max: number, seed: string): number {
-  const [n, setN] = useState(min);
-  useEffect(() => {
-    setN(min + Math.floor(Math.random() * (max - min + 1)));
-  }, [min, max, seed]);
-  return n;
-}
 
 function GameCard({
   name,
   slug,
-  gradient,
+  image,
   active,
   playersOnline,
   waitSec,
   isPractice,
-  emoji,
 }: {
   name: string;
   slug: string;
-  gradient: string;
+  image: string;
   active: boolean;
   playersOnline: number;
   waitSec: number;
   isPractice: boolean;
-  emoji?: string;
 }) {
   const content = (
     <div
-      className={`card-border relative flex min-h-[160px] flex-col justify-between overflow-hidden rounded-card bg-card transition-all duration-200 ${
+      className={`card-border group relative flex h-[260px] w-[170px] shrink-0 flex-col justify-between overflow-hidden rounded-card bg-card transition-all duration-200 md:h-[280px] md:w-full ${
         active
           ? isPractice
             ? "hover:-translate-y-0.5 hover:border-purple-500/40 hover:shadow-[0_0_26px_rgba(168,85,247,0.35)] cursor-pointer"
             : "hover:-translate-y-0.5 hover:border-steel-blue-bright hover:shadow-[0_0_26px_rgba(42,58,92,0.6)] cursor-pointer"
-          : slug === "8-ball-pool"
-            ? "pointer-events-none opacity-50"
-            : "cursor-not-allowed opacity-60"
+          : "cursor-not-allowed opacity-60"
       }`}
     >
-      {(slug === "chess" || slug === "connect-4" || slug === "reaction-duel" || slug === "spelling-bee" || slug === "8-ball-pool") && (
-        <>
-          <Image
-            src={
-              slug === "chess"
-                ? "/games/chess.jpg"
-                : slug === "connect-4"
-                ? "/games/connect4.jpg"
-                : slug === "reaction-duel"
-                ? "/games/reaction.jpg"
-                : slug === "spelling-bee"
-                ? "/games/spelling.jpg"
-                : "/games/pool.jpg"
-            }
-            alt={`${name} background`}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-        </>
-      )}
-      {slug === "checkers" && (
-        <>
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "linear-gradient(135deg, #1A1A22 0%, #0E0E12 100%)",
-              opacity: 0.95,
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 opacity-35">
-            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 p-2">
-              {Array.from({ length: 16 }).map((_, i) => {
-                const rr = Math.floor(i / 4);
-                const cc = i % 4;
-                const dark = (rr + cc) % 2 === 0;
-                return (
-                  <div
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={i}
-                    className="w-full h-full"
-                    style={{
-                      background: dark ? "rgba(42,58,92,0.35)" : "rgba(255,255,255,0.02)",
-                      border: "1px solid rgba(255,255,255,0.01)",
-                    }}
-                  />
-                );
-              })}
-            </div>
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-        </>
-      )}
-      {slug === "memory-match" && (
-        <>
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "linear-gradient(135deg, #1A1A22 0%, #0E0E12 100%)",
-              opacity: 0.9,
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 opacity-20">
-            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 p-1">
-              {Array.from({ length: 16 }).map((_, i) => {
-                const rr = Math.floor(i / 4);
-                const cc = i % 4;
-                const icon = (rr + cc) % 2 === 0 ? "🧠" : "🧩";
-                return (
-                  <div
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={i}
-                    className="flex items-center justify-center"
-                    style={{
-                      fontSize: 14,
-                      color: "rgba(255,255,255,0.35)",
-                      textShadow: "0 0 14px rgba(168,85,247,0.12)",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {icon}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-        </>
-      )}
-      {slug === "trivia" && (
-        <>
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "linear-gradient(135deg, #12103A 0%, #0E0E12 100%)",
-              opacity: 0.95,
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 opacity-25">
-            <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 p-2">
-              {["🌍","⚽","🔬","📜","🎬","🎵","🗺️","🎮","💻","🍕","🌍","⚽","🔬","📜","🎬","🎮"].map((icon, i) => (
-                <div
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={i}
-                  className="flex items-center justify-center"
-                  style={{ fontSize: 13, lineHeight: 1 }}
-                >
-                  {icon}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-        </>
-      )}
-      {slug === "typing-race" && (
-        <>
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "linear-gradient(135deg, #071A1E 0%, #0E0E12 100%)",
-              opacity: 0.97,
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-20">
-            {["T", "y", "p", "e", "W", "P", "M", "⌨", "a", "b", "c", "d"].map((ch, i) => (
-              <span
-                key={i}
-                className="absolute font-mono text-teal select-none"
-                style={{
-                  fontSize: 11 + (i % 3) * 3,
-                  left: `${(i * 23 + 7) % 90}%`,
-                  top: `${(i * 17 + 5) % 80}%`,
-                  opacity: 0.6 + (i % 3) * 0.15,
-                }}
-              >
-                {ch}
-              </span>
-            ))}
-          </div>
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
-        </>
-      )}
+      <Image
+        src={image}
+        alt={`${name} background`}
+        fill
+        className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+        loading="lazy"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/20" />
       {!active && (
-        <div className={`absolute inset-0 rounded-card bg-gradient-to-br ${gradient} opacity-40`} />
+        <div className="absolute inset-0 rounded-card bg-black/40" />
       )}
       <div className="relative z-10 p-5">
-        <div>
-          <p className="font-semibold text-white flex items-center gap-2">
-            <span>{name}</span>
-            {active && (slug === "checkers" || slug === "memory-match" || slug === "trivia" || slug === "typing-race") && emoji ? (
-              <span className="text-[18px] leading-none">{emoji}</span>
-            ) : null}
-          </p>
+        <div className="space-y-2">
+          <p className="text-lg font-semibold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.65)]">{name}</p>
           {active ? (
             <span
               className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -250,18 +94,11 @@ function GameCard({
           <p>~{waitSec} sec avg wait</p>
         </div>
       </div>
-      {!active && slug !== "8-ball-pool" && (
+      {!active && (
         <div className="absolute inset-0 flex items-center justify-center">
           <svg className="h-10 w-10 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
           </svg>
-        </div>
-      )}
-      {!active && slug === "8-ball-pool" && (
-        <div className="pointer-events-none absolute inset-0 flex items-start justify-end p-3">
-          <span className="rounded-full bg-[#2A3A5C] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-            Coming Soon
-          </span>
         </div>
       )}
     </div>
@@ -439,20 +276,21 @@ export default function PlayPage() {
         <p className="mt-1 text-body-gray">
           {isPractice ? "Select a game to play for free" : "Select a game and stake to find your opponent"}
         </p>
-        <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3">
-          {(isPractice ? GAMES.filter((g) => g.active || g.slug === "8-ball-pool") : GAMES).map((game, i) => (
-            <GameCard
-              key={game.slug}
-              name={game.name}
-              slug={game.slug}
-              gradient={game.gradient}
-              active={game.active}
-              playersOnline={onlineCount}
-              waitSec={playersWait[i]?.wait ?? 15}
-              isPractice={isPractice}
-              emoji={game.slug === "checkers" ? "⬛" : game.slug === "memory-match" ? "🧠" : game.slug === "trivia" ? "🧠" : game.slug === "typing-race" ? "⌨️" : undefined}
-            />
-          ))}
+        <div className="-mx-4 mt-8 overflow-x-auto px-4 pb-2 md:mx-0 md:px-0">
+          <div className="flex gap-4 md:grid md:grid-cols-4">
+            {(isPractice ? GAMES.filter((g) => g.active) : GAMES).map((game, i) => (
+              <GameCard
+                key={game.slug}
+                name={game.name}
+                slug={game.slug}
+                image={game.image}
+                active={game.active}
+                playersOnline={onlineCount}
+                waitSec={playersWait[i]?.wait ?? 15}
+                isPractice={isPractice}
+              />
+            ))}
+          </div>
         </div>
       </main>
     </div>

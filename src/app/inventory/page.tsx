@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -36,6 +37,14 @@ const RARITY_STYLES: Record<CaseItemRarity, string> = {
   rare: "bg-purple-500/20 text-purple-300",
   epic: "bg-pink-500/20 text-pink-300",
   legendary: "bg-amber-500/20 text-amber-300",
+};
+
+const BORDER_PREVIEW_BY_RARITY: Record<CaseItemRarity, string> = {
+  common: "/images/border-common.png",
+  uncommon: "/images/border-common.png",
+  rare: "/images/border-rare.png",
+  epic: "/images/border-epic.png",
+  legendary: "/images/border-legendary.png",
 };
 
 export default function InventoryPage() {
@@ -191,6 +200,14 @@ export default function InventoryPage() {
                     item.equipped ? "border-orange-400 bg-orange-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
+                  <div className="relative mb-3 h-20 w-full overflow-hidden rounded border border-white/15">
+                    <Image
+                      src={BORDER_PREVIEW_BY_RARITY[item.rarity]}
+                      alt={`${item.rarity} border preview`}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
                   <p className="text-sm font-semibold text-white">{item.item_name}</p>
                   <span className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium ${RARITY_STYLES[item.rarity]}`}>
                     {item.rarity}
@@ -264,9 +281,19 @@ export default function InventoryPage() {
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {activeMultipliers.map((multiplier) => (
                 <div key={multiplier.id} className="rounded-lg border border-purple-500/25 bg-purple-500/10 p-4">
-                  <p className="text-sm font-semibold text-white">
-                    {multiplier.multiplier_name || multiplier.multiplier_id}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="relative h-8 w-8 overflow-hidden rounded">
+                      <Image
+                        src={multiplier.multiplier_id.includes("3x") ? "/images/multiplier-3x.png" : "/images/multiplier-2x.png"}
+                        alt={multiplier.multiplier_name || multiplier.multiplier_id}
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                    <p className="text-sm font-semibold text-white">
+                      {multiplier.multiplier_name || multiplier.multiplier_id}
+                    </p>
+                  </div>
                   <p className="mt-2 text-xs text-purple-200">
                     {getMultiplierStatusLabel(multiplier)}
                   </p>

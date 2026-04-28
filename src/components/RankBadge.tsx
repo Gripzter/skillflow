@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 type RankTier = "bronze" | "silver" | "gold" | "platinum" | "diamond";
 type RankBadgeSize = "small" | "large";
 
@@ -21,35 +23,27 @@ function toTier(tier: string): RankTier {
   return "bronze";
 }
 
-const TIER_COLORS: Record<RankTier, string> = {
-  bronze: "#CD7F32",
-  silver: "#C0C0C0",
-  gold: "#FFD700",
-  platinum: "#00CED1",
-  diamond: "#B9F2FF",
+const TIER_IMAGES: Record<RankTier, string> = {
+  bronze: "/images/rank-bronze.png",
+  silver: "/images/rank-silver.png",
+  gold: "/images/rank-gold.png",
+  platinum: "/images/rank-platinum.png",
+  diamond: "/images/rank-diamond.png",
 };
 
 export default function RankBadge({ tier, size = "small" }: RankBadgeProps) {
   const normalizedTier = toTier(tier.toLowerCase());
-  const color = TIER_COLORS[normalizedTier];
-  const isLarge = size === "large";
+  const pixelSize = size === "large" ? 40 : 24;
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border bg-[#0E0E12] font-semibold uppercase tracking-[0.12em] ${
-        isLarge ? "gap-2 px-3 py-1.5 text-xs" : "gap-1.5 px-2 py-1 text-[10px]"
-      }`}
-      style={{
-        borderColor: `${color}66`,
-        color,
-      }}
-    >
-      <span
-        className={isLarge ? "h-2.5 w-2.5 rounded-full" : "h-2 w-2 rounded-full"}
-        style={{ backgroundColor: color }}
-        aria-hidden
+    <span className="inline-flex items-center" title={normalizedTier}>
+      <Image
+        src={TIER_IMAGES[normalizedTier]}
+        alt={`${normalizedTier} rank`}
+        width={pixelSize}
+        height={pixelSize}
+        className="h-auto w-auto"
       />
-      {normalizedTier}
     </span>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import LoadingRing from "@/components/LoadingRing";
@@ -35,6 +36,13 @@ const CASE_CARD_META: Record<Exclude<CaseKey, "drop_crate">, { accent: string }>
   bronze: { accent: "#CD7F32" },
   gold: { accent: "#FFD700" },
   diamond: { accent: "#B9F2FF" },
+};
+
+const CASE_IMAGES: Record<CaseKey, string> = {
+  bronze: "/images/Case-bronze.png",
+  gold: "/images/case-gold.png",
+  diamond: "/images/case-diamond.png",
+  drop_crate: "/images/case-free.png",
 };
 
 function parseRewardDescription(description: string | null): string {
@@ -243,15 +251,20 @@ export default function CasesPage() {
                   </span>
                 </div>
                 <div
-                  className="mt-4 flex h-28 items-center justify-center rounded-xl border text-sm font-semibold"
+                  className="relative mt-4 h-36 overflow-hidden rounded-xl border"
                   style={{
                     borderColor: `${accent}88`,
                     boxShadow: `0 0 24px ${accent}33`,
-                    color: accent,
-                    background: `linear-gradient(135deg, ${accent}24, rgba(12,12,16,0.9))`,
                   }}
                 >
-                  {tier.name.toUpperCase()}
+                  <Image
+                    src={CASE_IMAGES[caseId]}
+                    alt={`${tier.name} art`}
+                    fill
+                    className="object-cover"
+                    loading="lazy"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                 </div>
                 <button
                   type="button"
@@ -276,6 +289,15 @@ export default function CasesPage() {
             <p className="text-sm text-body-gray">You have {freeCrates} Drop Crates</p>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-4">
+            <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10">
+              <Image
+                src={CASE_IMAGES.drop_crate}
+                alt="Drop crate artwork"
+                fill
+                className="object-cover"
+                loading="lazy"
+              />
+            </div>
             <div className="rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm text-body-gray">
               Free case with Bronze-like odds
             </div>
@@ -333,6 +355,7 @@ export default function CasesPage() {
 
       {reelData ? (
         <CaseOpeningReel
+          caseId={lastOpenedCaseId}
           lootTable={reelData.lootTable}
           winningItem={reelData.winningItem}
           onComplete={(item) => {
