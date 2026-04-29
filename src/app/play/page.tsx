@@ -68,13 +68,13 @@ function GameCard({
         className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
         loading="lazy"
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/45 to-black/20" />
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-[40%] bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       {!active && (
         <div className="absolute inset-0 rounded-card bg-black/40" />
       )}
-      <div className="relative z-10 p-5">
-        <div className="space-y-2">
-          <p className="text-lg font-semibold text-white [text-shadow:0_2px_8px_rgba(0,0,0,0.65)]">{name}</p>
+      <div className="relative z-10 mt-auto p-4">
+        <div className="space-y-1">
+          <p className="text-lg font-bold text-white [text-shadow:0_2px_4px_rgba(0,0,0,0.8)]">{name}</p>
           {active ? (
             <span
               className={`mt-2 inline-block w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -89,7 +89,7 @@ function GameCard({
             </span>
           )}
         </div>
-        <div className="mt-3 space-y-1 text-xs text-body-gray">
+        <div className="mt-2 space-y-1 text-xs text-slate-200">
           <p>{playersOnline} players online</p>
           <p>~{waitSec} sec avg wait</p>
         </div>
@@ -234,7 +234,7 @@ export default function PlayPage() {
       />
       <ModeToggleBarContent />
       <main className="relative mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
-        {!isPractice && (
+        {!isPractice && lastTouchSession && (
           <Link
             href="/last-touch"
             className="group relative mb-8 block overflow-hidden rounded-2xl border-2 border-steel-blue bg-black/40 p-6 shadow-[0_0_40px_rgba(42,58,92,0.4)] transition-all duration-300 hover:border-steel-blue-bright hover:shadow-[0_0_60px_rgba(42,58,92,0.6)]"

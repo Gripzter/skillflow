@@ -41,10 +41,18 @@ const RARITY_STYLES: Record<CaseItemRarity, string> = {
 
 const BORDER_PREVIEW_BY_RARITY: Record<CaseItemRarity, string> = {
   common: "/images/border-common.png",
-  uncommon: "/images/border-common.png",
+  uncommon: "",
   rare: "/images/border-rare.png",
   epic: "/images/border-epic.png",
   legendary: "/images/border-legendary.png",
+};
+
+const RARITY_RING_STYLES: Record<CaseItemRarity, string> = {
+  common: "border-slate-400/80",
+  uncommon: "border-emerald-400/80",
+  rare: "border-blue-400/80",
+  epic: "border-purple-400/80",
+  legendary: "",
 };
 
 export default function InventoryPage() {
@@ -166,6 +174,17 @@ export default function InventoryPage() {
     [inventory]
   );
 
+  function getInventoryPreviewImage(item: InventoryRow): string | null {
+    if (item.item_type === "badge") {
+      if (item.item_id === "badge_omega_founder" || item.item_name === "Omega Founder Badge") {
+        return "/images/badge-founders.png";
+      }
+      return null;
+    }
+    const image = BORDER_PREVIEW_BY_RARITY[item.rarity];
+    return image || null;
+  }
+
   if (loading) {
     return <LoadingRing />;
   }
@@ -192,21 +211,31 @@ export default function InventoryPage() {
           {borderItems.length === 0 ? (
             <p className="mt-3 text-sm text-body-gray">No borders yet — open cases to find some!</p>
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {borderItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-lg border p-4 ${
+                  className={`rounded-xl border p-5 ${
                     item.equipped ? "border-orange-400 bg-orange-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
-                  <div className="relative mb-3 h-20 w-full overflow-hidden rounded border border-white/15">
-                    <Image
-                      src={BORDER_PREVIEW_BY_RARITY[item.rarity]}
-                      alt={`${item.rarity} border preview`}
-                      fill
-                      className="object-cover"
-                    />
+                  <div className="mb-4 flex items-center justify-center">
+                    {getInventoryPreviewImage(item) ? (
+                      <div className="relative h-20 w-20 overflow-hidden rounded-full border border-white/20 bg-black/40 p-2">
+                        <Image
+                          src={getInventoryPreviewImage(item) as string}
+                          alt={`${item.item_name} preview`}
+                          fill
+                          className="object-contain p-2"
+                        />
+                      </div>
+                    ) : item.rarity === "legendary" ? (
+                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-yellow-400 p-1">
+                        <div className="h-full w-full rounded-full bg-charcoal/90" />
+                      </div>
+                    ) : (
+                      <div className={`h-20 w-20 rounded-full border-4 ${RARITY_RING_STYLES[item.rarity]} bg-charcoal/90`} />
+                    )}
                   </div>
                   <p className="text-sm font-semibold text-white">{item.item_name}</p>
                   <span className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium ${RARITY_STYLES[item.rarity]}`}>
@@ -239,14 +268,32 @@ export default function InventoryPage() {
           {badgeItems.length === 0 ? (
             <p className="mt-3 text-sm text-body-gray">No badges yet — open cases to find some!</p>
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {badgeItems.map((item) => (
                 <div
                   key={item.id}
-                  className={`rounded-lg border p-4 ${
+                  className={`rounded-xl border p-5 ${
                     item.equipped ? "border-orange-400 bg-orange-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
+                  <div className="mb-4 flex items-center justify-center">
+                    {getInventoryPreviewImage(item) ? (
+                      <div className="relative h-20 w-20 overflow-hidden rounded-full border border-white/20 bg-black/40 p-2">
+                        <Image
+                          src={getInventoryPreviewImage(item) as string}
+                          alt={`${item.item_name} preview`}
+                          fill
+                          className="object-contain p-2"
+                        />
+                      </div>
+                    ) : item.rarity === "legendary" ? (
+                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-yellow-400 p-1">
+                        <div className="h-full w-full rounded-full bg-charcoal/90" />
+                      </div>
+                    ) : (
+                      <div className={`h-20 w-20 rounded-full border-4 ${RARITY_RING_STYLES[item.rarity]} bg-charcoal/90`} />
+                    )}
+                  </div>
                   <p className="text-sm font-semibold text-white">{item.item_name}</p>
                   <span className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium ${RARITY_STYLES[item.rarity]}`}>
                     {item.rarity}

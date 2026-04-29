@@ -251,7 +251,7 @@ export default function CasesPage() {
                   </span>
                 </div>
                 <div
-                  className="relative mt-4 h-36 overflow-hidden rounded-xl border"
+                  className="relative mt-4 aspect-square overflow-hidden rounded-xl border bg-black/60"
                   style={{
                     borderColor: `${accent}88`,
                     boxShadow: `0 0 24px ${accent}33`,
@@ -261,10 +261,10 @@ export default function CasesPage() {
                     src={CASE_IMAGES[caseId]}
                     alt={`${tier.name} art`}
                     fill
-                    className="object-cover"
+                    className="object-contain p-3"
                     loading="lazy"
                   />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                 </div>
                 <button
                   type="button"
@@ -289,12 +289,12 @@ export default function CasesPage() {
             <p className="text-sm text-body-gray">You have {freeCrates} Drop Crates</p>
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-4">
-            <div className="relative h-24 w-24 overflow-hidden rounded-xl border border-white/10">
+            <div className="relative aspect-square w-24 overflow-hidden rounded-xl border border-white/10 bg-black/60">
               <Image
                 src={CASE_IMAGES.drop_crate}
                 alt="Drop crate artwork"
                 fill
-                className="object-cover"
+                className="object-contain p-2"
                 loading="lazy"
               />
             </div>

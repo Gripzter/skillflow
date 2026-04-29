@@ -801,7 +801,8 @@ export default function DashboardPage() {
               One tap to play
             </span>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="-mx-1 overflow-x-auto px-1 pb-2">
+            <div className="flex gap-4">
             {QUICK_GAMES.map((game, index) => {
               const stats = quickGameStats[index];
               const playersOnline = stats?.playersOnline ?? 0;
@@ -815,14 +816,14 @@ export default function DashboardPage() {
                   type="button"
                   onClick={() => router.push(`/play/${game.slug}`)}
                   disabled={isLoading}
-                  className={`group relative flex h-[120px] flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-card text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
+                  className={`group relative flex h-[280px] min-w-[200px] flex-col justify-between overflow-hidden rounded-xl border border-white/10 bg-card text-left text-sm text-gray-100 transition-all duration-200 hover:-translate-y-0.5 ${accentClasses}`}
                   style={{ animationDelay: `${160 + index * 60}ms` }}
                 >
                   <Image
                     src={game.image}
                     alt={`${game.name} background`}
                     fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    className="object-cover object-center transition-transform duration-300 group-hover:scale-[1.02]"
                     loading="lazy"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-transparent lg:from-black/80 lg:via-black/50" />
@@ -852,6 +853,7 @@ export default function DashboardPage() {
                 </button>
               );
             })}
+            </div>
           </div>
         </section>
 
