@@ -32,7 +32,7 @@ export default function GamesGrid() {
           <p className="text-[13px] text-[#888]">All games — no luck, pure skill</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-[14px] sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-[14px] md:grid-cols-3 xl:grid-cols-4">
           {games.map((game, index) => (
             <button
               key={game.slug}
@@ -40,19 +40,31 @@ export default function GamesGrid() {
               onClick={() => {
                 window.location.href = `/games/${game.slug}`;
               }}
-              className="rounded-[8px] border border-[#1a1a22] bg-[#13131a] p-[18px] text-left transition-all duration-150 hover:-translate-y-[2px] hover:border-[#2a2a35]"
+              className="group cursor-pointer overflow-hidden rounded-[12px] border border-[#1a1a22] bg-[#13131a] p-0 text-left transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[#2a2a35]"
             >
-              <Image
-                src={game.image}
-                width={400}
-                height={300}
-                quality={90}
-                priority={index < 4}
-                alt={`${game.name} card`}
-                className="mb-[14px] h-[220px] w-full rounded-[6px] bg-[#0E0E12] object-contain"
-              />
-              <p className="text-[14px] font-medium text-white">{game.name}</p>
-              <p className="mt-1 text-[11px] text-[#666]">{game.subtitle}</p>
+              <div className="relative aspect-[2/3] w-full bg-[#13131a]">
+                <Image
+                  src={game.image}
+                  width={1024}
+                  height={1536}
+                  quality={90}
+                  priority={index < 4}
+                  alt={game.name}
+                  sizes="(max-width: 480px) 50vw, (max-width: 768px) 33vw, (max-width: 1280px) 25vw, 300px"
+                  className="h-full w-full object-cover object-center transition-transform duration-200 ease-out group-hover:scale-[1.05]"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                    display: "block",
+                  }}
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(14,14,18,0.95)_0%,rgba(14,14,18,0.7)_60%,transparent_100%)] px-[14px] pb-[14px] pt-4">
+                  <p className="mb-1 text-[15px] font-medium text-white">{game.name}</p>
+                  <p className="text-[11px] text-[#aaa]">{game.subtitle}</p>
+                </div>
+              </div>
             </button>
           ))}
         </div>
