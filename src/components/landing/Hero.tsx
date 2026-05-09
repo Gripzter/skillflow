@@ -28,7 +28,7 @@ export default function Hero() {
         <div className="mt-8 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={() => goTo("/auth/signup")}
+            onClick={() => goTo("/signup")}
             className="rounded-[8px] bg-[#FF5E00] px-6 py-3.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90"
           >
             Play free →

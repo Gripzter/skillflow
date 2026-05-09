@@ -171,6 +171,7 @@ export default function LiveMatchShowcase() {
   const [showcase, setShowcase] = useState<ShowcaseMatch | null>(null);
   const [board, setBoard] = useState<BoardState>(createInitialBoard);
   const [justMovedSquare, setJustMovedSquare] = useState<string | null>(null);
+  const [showCheckmate, setShowCheckmate] = useState(false);
   const [liveSeconds, setLiveSeconds] = useState(0);
   const appliedMoveCountRef = useRef(0);
   const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -383,6 +384,7 @@ export default function LiveMatchShowcase() {
     const runReplay = () => {
       let current = createInitialBoard();
       setBoard(current);
+      setShowCheckmate(false);
       let idx = 0;
 
       const step = () => {
@@ -398,6 +400,7 @@ export default function LiveMatchShowcase() {
           stepTimer = setTimeout(step, 1500);
           return;
         }
+        setShowCheckmate(true);
         replayTimeoutRef.current = setTimeout(runReplay, 3000);
       };
 
@@ -449,7 +452,7 @@ export default function LiveMatchShowcase() {
     <button
       type="button"
       onClick={() => {
-        window.location.href = "/auth/signup";
+        window.location.href = "/signup";
       }}
       className="w-full rounded-xl border border-[#1a1a22] bg-[#13131a] p-5 text-left transition-colors hover:border-[#2a2a35]"
     >
@@ -484,6 +487,9 @@ export default function LiveMatchShowcase() {
       </p>
 
       <div className="rounded-md bg-[#0E0E12] p-2">
+        {showCheckmate ? (
+          <p className="mb-2 text-center text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">CHECKMATE</p>
+        ) : null}
         <div className="grid grid-cols-8 overflow-hidden rounded-sm">
           {squares.map(({ square, rowIndex, colIndex, piece }) => {
             const isDark = (rowIndex + colIndex) % 2 === 0;

@@ -9,7 +9,7 @@ export default function FinalCTA() {
         <button
           type="button"
           onClick={() => {
-            window.location.href = "/auth/signup";
+            window.location.href = "/signup";
           }}
           className="mt-6 rounded-[8px] bg-[#FF5E00] px-8 py-3.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90"
         >

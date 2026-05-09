@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { isSanitizedUsername } from "@/lib/sanitize";
 import { nearestValidSpAmount } from "@/lib/spValidation";
+import { generateSeededTickerBatch } from "@/lib/tickerPool";
 
 type TickerEvent = {
   username: string;
@@ -15,7 +16,6 @@ type SpRow = {
   user_id: string;
   amount: number | null;
   description: string | null;
-  created_at: string;
 };
 
 type ProfileRow = {
@@ -35,32 +35,6 @@ const GAME_LABELS: Record<string, string> = {
   "typing-race": "Typing Race",
 };
 
-const seededEvents: TickerEvent[] = [
-  { username: "shadowfox", game: "Reaction Duel", amount: 100 },
-  { username: "kira_06", game: "Chess", amount: 200 },
-  { username: "nova_xx", game: "Memory Match", amount: 100 },
-  { username: "drift99", game: "Connect 4", amount: 50 },
-  { username: "alex_p", game: "Spelling Bee", amount: 100 },
-  { username: "silent_k", game: "Checkers", amount: 200 },
-  { username: "phoenix77", game: "Chess", amount: 500 },
-  { username: "maverick", game: "Reaction Duel", amount: 100 },
-  { username: "echo_99", game: "Typing Race", amount: 100 },
-  { username: "vortex", game: "Trivia", amount: 200 },
-  { username: "lunar_op", game: "Chess", amount: 100 },
-  { username: "rogue_z", game: "Memory Match", amount: 50 },
-];
-
-const fallbackExtraEvents: TickerEvent[] = [
-  { username: "ionblade", game: "Chess", amount: 100 },
-  { username: "omega_run", game: "Reaction Duel", amount: 200 },
-  { username: "quickmint", game: "Typing Race", amount: 50 },
-  { username: "atlas_q", game: "Spelling Bee", amount: 100 },
-  { username: "ravenbyte", game: "Checkers", amount: 200 },
-  { username: "neongrid", game: "Connect 4", amount: 100 },
-  { username: "solohex", game: "Trivia", amount: 50 },
-  { username: "zenlock", game: "Memory Match", amount: 100 },
-];
-
 function parseGameType(description: string | null | undefined): string {
   if (!description) return "Ranked Match";
   const match = description.match(/game:([a-z0-9-]+)/i);
@@ -68,53 +42,68 @@ function parseGameType(description: string | null | undefined): string {
   return GAME_LABELS[match[1].toLowerCase()] ?? "Ranked Match";
 }
 
-function buildTickerEntries(real: TickerEvent[]): TickerEvent[] {
+function buildTickerEntries(real: TickerEvent[], seeded: TickerEvent[]): TickerEvent[] {
   const merged: TickerEvent[] = [];
   const seen = new Set<string>();
-  const realPool = [...real];
-  const seededPool = [...seededEvents, ...fallbackExtraEvents];
+  let realIndex = 0;
+  let seededIndex = 0;
 
-  let useReal = true;
-  for (let i = 0; i < 8; i += 1) {
-    const source = useReal ? realPool : seededPool;
-    const next = source.shift();
-    if (next && !seen.has(next.username.toLowerCase())) {
-      merged.push(next);
-      seen.add(next.username.toLowerCase());
+  // Place real entries every 3rd slot.
+  while (merged.length < 28 && (realIndex < real.length || seededIndex < seeded.length)) {
+    const slot = merged.length;
+    const wantsReal = slot % 3 === 2;
+    if (wantsReal && realIndex < real.length) {
+      const candidate = real[realIndex];
+      realIndex += 1;
+      if (!seen.has(candidate.username.toLowerCase())) {
+        merged.push(candidate);
+        seen.add(candidate.username.toLowerCase());
+      }
+      continue;
     }
-    useReal = !useReal;
+
+    if (seededIndex < seeded.length) {
+      const candidate = seeded[seededIndex];
+      seededIndex += 1;
+      if (!seen.has(candidate.username.toLowerCase())) {
+        merged.push(candidate);
+        seen.add(candidate.username.toLowerCase());
+      }
+      continue;
+    }
+
+    if (realIndex < real.length) {
+      const candidate = real[realIndex];
+      realIndex += 1;
+      if (!seen.has(candidate.username.toLowerCase())) {
+        merged.push(candidate);
+        seen.add(candidate.username.toLowerCase());
+      }
+      continue;
+    }
   }
 
-  while (merged.length < 16 && (realPool.length > 0 || seededPool.length > 0)) {
-    const source = realPool.length >= seededPool.length ? realPool : seededPool;
-    const next = source.shift();
-    if (next && !seen.has(next.username.toLowerCase())) {
-      merged.push(next);
-      seen.add(next.username.toLowerCase());
-    }
-  }
-
-  let topUpIndex = 0;
-  while (merged.length < 16 && topUpIndex < seededPool.length) {
-    const candidate = seededPool[topUpIndex];
+  while (merged.length < 24 && seededIndex < seeded.length) {
+    const candidate = seeded[seededIndex];
+    seededIndex += 1;
     if (!seen.has(candidate.username.toLowerCase())) {
       merged.push(candidate);
       seen.add(candidate.username.toLowerCase());
     }
-    topUpIndex += 1;
   }
 
-  return merged.slice(0, 20);
+  return merged.slice(0, 28);
 }
 
 export default function LiveTicker() {
-  const [events, setEvents] = useState<TickerEvent[]>(seededEvents);
+  const [events, setEvents] = useState<TickerEvent[]>(generateSeededTickerBatch(20));
 
   const loadTicker = useCallback(async () => {
+    const seeded = generateSeededTickerBatch(20);
     try {
       const supabase = createClient();
       if (!supabase) {
-        setEvents(buildTickerEntries([]));
+        setEvents(buildTickerEntries([], seeded));
         return;
       }
 
@@ -128,7 +117,7 @@ export default function LiveTicker() {
         .limit(200);
 
       if (txError || !txRows) {
-        setEvents(buildTickerEntries([]));
+        setEvents(buildTickerEntries([], seeded));
         return;
       }
 
@@ -142,7 +131,7 @@ export default function LiveTicker() {
       const dedupedRows = Array.from(latestByUser.values()).slice(0, 8);
       const userIds = dedupedRows.map((row) => row.user_id);
       if (userIds.length === 0) {
-        setEvents(buildTickerEntries([]));
+        setEvents(buildTickerEntries([], seeded));
         return;
       }
 
@@ -152,7 +141,7 @@ export default function LiveTicker() {
         .in("id", userIds);
 
       if (profileError || !profiles) {
-        setEvents(buildTickerEntries([]));
+        setEvents(buildTickerEntries([], seeded));
         return;
       }
 
@@ -176,9 +165,9 @@ export default function LiveTicker() {
         })
         .filter((row): row is TickerEvent => !!row);
 
-      setEvents(buildTickerEntries(sanitized));
+      setEvents(buildTickerEntries(sanitized, seeded));
     } catch {
-      setEvents(buildTickerEntries([]));
+      setEvents(buildTickerEntries([], seeded));
     }
   }, []);
 
@@ -190,7 +179,10 @@ export default function LiveTicker() {
     return () => clearInterval(interval);
   }, [loadTicker]);
 
-  const rendered = useMemo(() => (events.length > 0 ? events : seededEvents), [events]);
+  const rendered = useMemo(
+    () => (events.length > 0 ? events : generateSeededTickerBatch(20)),
+    [events]
+  );
   const doubled = [...rendered, ...rendered];
 
   return (
