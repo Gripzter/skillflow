@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { fallbackFeaturedMatches } from "@/lib/landingFallback";
+import { fabricatedMoveSequence, fallbackFeaturedMatches } from "@/lib/landingFallback";
 import { isSanitizedUsername } from "@/lib/sanitize";
+import { nearestValidSpAmount } from "@/lib/spValidation";
 
 type MatchRow = {
   id: string;
@@ -18,8 +19,9 @@ type MatchRow = {
   bet_amount?: number | null;
   created_at: string;
   completed_at: string | null;
-  match_start_time?: string | null;
+  match_start_time: string | null;
   move_log?: Array<{ player_id?: string; action?: Record<string, unknown> }> | null;
+  move_history?: Array<{ from?: string; to?: string; piece?: string } | string> | null;
 };
 
 type ProfileTierRow = {
@@ -27,52 +29,22 @@ type ProfileTierRow = {
   rank_tier: string | null;
 };
 
+type ChessMove = { from: string; to: string; piece?: string };
+type BoardState = Record<string, string | null>;
+
 type ShowcaseMatch = {
-  kind: "live" | "featured";
+  kind: "live" | "featured" | "fabricated";
   id: string;
   game: string;
-  timerLabel: string;
   startedAt: string | null;
   player1: { id: string | null; username: string; rank: string };
   player2: { id: string | null; username: string; rank: string };
   bet: number | null;
-  moveLog: Array<{ player_id?: string; action?: Record<string, unknown> }>;
+  moves: ChessMove[];
 };
 
-const BOARD_POSITIONS = [
-  [
-    "♜..♛♚..♜",
-    ".♟♟.♝♟♟.",
-    "..♞....♟",
-    "....♟...",
-    "..♗.♙...",
-    ".....♘..",
-    "♙♙♙..♙♙♙",
-    "♖.♗♕♔..♖",
-  ],
-  [
-    "♜..♛♚..♜",
-    ".♟♟...♟.",
-    "..♞.♝..♟",
-    "...♟♟...",
-    "..♗.♙...",
-    "...♘...♘",
-    "♙♙♙..♙♙♙",
-    "♖.♗♕♔..♖",
-  ],
-  [
-    "♜..♛♚..♜",
-    ".♟♟...♟.",
-    "....♝..♟",
-    "..♞♟♟...",
-    "..♗.♙...",
-    "...♘...♘",
-    "♙♙♙..♙♙♙",
-    "♖.♗♕♔..♖",
-  ],
-] as const;
-
-const FALLBACK_POSITION = BOARD_POSITIONS[1];
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 
 const TIER_SCORE: Record<string, number> = {
   bronze: 1,
@@ -111,6 +83,63 @@ function formatDuration(totalSeconds: number): string {
   return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
+function createInitialBoard(): BoardState {
+  return {
+    a8: "♜", b8: "♞", c8: "♝", d8: "♛", e8: "♚", f8: "♝", g8: "♞", h8: "♜",
+    a7: "♟", b7: "♟", c7: "♟", d7: "♟", e7: "♟", f7: "♟", g7: "♟", h7: "♟",
+    a6: null, b6: null, c6: null, d6: null, e6: null, f6: null, g6: null, h6: null,
+    a5: null, b5: null, c5: null, d5: null, e5: null, f5: null, g5: null, h5: null,
+    a4: null, b4: null, c4: null, d4: null, e4: null, f4: null, g4: null, h4: null,
+    a3: null, b3: null, c3: null, d3: null, e3: null, f3: null, g3: null, h3: null,
+    a2: "♙", b2: "♙", c2: "♙", d2: "♙", e2: "♙", f2: "♙", g2: "♙", h2: "♙",
+    a1: "♖", b1: "♘", c1: "♗", d1: "♕", e1: "♔", f1: "♗", g1: "♘", h1: "♖",
+  };
+}
+
+function isSquare(value: string | null | undefined): value is string {
+  return typeof value === "string" && /^[a-h][1-8]$/i.test(value);
+}
+
+function applyMove(board: BoardState, move: ChessMove): BoardState {
+  if (!isSquare(move.from) || !isSquare(move.to)) return board;
+  const next = { ...board };
+  const from = move.from.toLowerCase();
+  const to = move.to.toLowerCase();
+  const movingPiece = next[from] ?? move.piece ?? null;
+  if (!movingPiece) return board;
+  next[from] = null;
+  next[to] = movingPiece;
+  return next;
+}
+
+function extractMoveLogMoves(log: MatchRow["move_log"]): ChessMove[] {
+  if (!Array.isArray(log)) return [];
+  const parsed: ChessMove[] = [];
+  for (const row of log) {
+    const action = row?.action ?? {};
+    const from = typeof action.from === "string" ? action.from.toLowerCase() : null;
+    const to = typeof action.to === "string" ? action.to.toLowerCase() : null;
+    if (isSquare(from) && isSquare(to)) {
+      parsed.push({ from, to });
+    }
+  }
+  return parsed;
+}
+
+function extractMoveHistoryMoves(history: MatchRow["move_history"]): ChessMove[] {
+  if (!Array.isArray(history)) return [];
+  const parsed: ChessMove[] = [];
+  for (const move of history) {
+    if (!move || typeof move === "string") return [];
+    const from = typeof move.from === "string" ? move.from.toLowerCase() : null;
+    const to = typeof move.to === "string" ? move.to.toLowerCase() : null;
+    const piece = typeof move.piece === "string" ? move.piece : undefined;
+    if (!isSquare(from) || !isSquare(to)) return [];
+    parsed.push({ from, to, piece });
+  }
+  return parsed;
+}
+
 function pickFallbackFeatured(): ShowcaseMatch {
   const key = "skillflow_fallback_featured_index";
   let index = Math.floor(Math.random() * fallbackFeaturedMatches.length);
@@ -127,31 +156,35 @@ function pickFallbackFeatured(): ShowcaseMatch {
   const pick = fallbackFeaturedMatches[index] ?? fallbackFeaturedMatches[0];
 
   return {
-    kind: "featured",
+    kind: "fabricated",
     id: `fallback-${index}`,
     game: pick.game,
-    timerLabel: "Final",
     startedAt: null,
     player1: { id: null, username: pick.player1.username, rank: pick.player1.rank },
     player2: { id: null, username: pick.player2.username, rank: pick.player2.rank },
     bet: pick.bet,
-    moveLog: [],
+    moves: fabricatedMoveSequence,
   };
-}
-
-function parseHighlightSquare(moveLog: ShowcaseMatch["moveLog"]): string | null {
-  if (!Array.isArray(moveLog) || moveLog.length === 0) return null;
-  const last = moveLog[moveLog.length - 1]?.action ?? {};
-  const to = last.to;
-  if (typeof to === "string" && /^[a-h][1-8]$/i.test(to)) {
-    return to.toLowerCase();
-  }
-  return null;
 }
 
 export default function LiveMatchShowcase() {
   const [showcase, setShowcase] = useState<ShowcaseMatch | null>(null);
+  const [board, setBoard] = useState<BoardState>(createInitialBoard);
+  const [justMovedSquare, setJustMovedSquare] = useState<string | null>(null);
   const [liveSeconds, setLiveSeconds] = useState(0);
+  const appliedMoveCountRef = useRef(0);
+  const pulseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const replayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const animateMove = useCallback((move: ChessMove) => {
+    if (!isSquare(move.to)) return;
+    setBoard((prev) => applyMove(prev, move));
+    setJustMovedSquare(move.to.toLowerCase());
+    if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+    pulseTimeoutRef.current = setTimeout(() => {
+      setJustMovedSquare(null);
+    }, 400);
+  }, []);
 
   const loadShowcase = useCallback(async () => {
     try {
@@ -221,43 +254,57 @@ export default function LiveMatchShowcase() {
         })
         .sort((a, b) => b.combinedRankScore - a.combinedRankScore);
 
-      const picked = active[0] ?? completedToday[0];
-      if (!picked) {
-        setShowcase(pickFallbackFeatured());
+      const pickedLive = active[0];
+      if (pickedLive) {
+        const liveMoves = extractMoveLogMoves(pickedLive.row.move_log);
+        setShowcase({
+          kind: "live",
+          id: pickedLive.row.id,
+          game: toGameLabel(pickedLive.row.game_type),
+          startedAt: pickedLive.row.created_at,
+          player1: {
+            id: pickedLive.row.player1_id,
+            username: pickedLive.row.player1_username ?? "player_one",
+            rank: toTierLabel(pickedLive.p1Tier),
+          },
+          player2: {
+            id: pickedLive.row.player2_id,
+            username: pickedLive.row.player2_username ?? "player_two",
+            rank: toTierLabel(pickedLive.p2Tier),
+          },
+          bet: pickedLive.bet > 0 ? pickedLive.bet : null,
+          moves: liveMoves,
+        });
         return;
       }
 
-      const row = picked.row;
-      const isLive = row.status === "in_progress";
-      const endedAt = row.completed_at ? new Date(row.completed_at).getTime() : null;
-      const startedAt = row.match_start_time ?? row.created_at;
+      const pickedCompleted = completedToday[0];
+      if (pickedCompleted) {
+        const replayMoves = extractMoveHistoryMoves(pickedCompleted.row.move_history);
+        if (replayMoves.length > 0) {
+          setShowcase({
+            kind: "featured",
+            id: pickedCompleted.row.id,
+            game: toGameLabel(pickedCompleted.row.game_type),
+            startedAt: pickedCompleted.row.created_at,
+            player1: {
+              id: pickedCompleted.row.player1_id,
+              username: pickedCompleted.row.player1_username ?? "player_one",
+              rank: toTierLabel(pickedCompleted.p1Tier),
+            },
+            player2: {
+              id: pickedCompleted.row.player2_id,
+              username: pickedCompleted.row.player2_username ?? "player_two",
+              rank: toTierLabel(pickedCompleted.p2Tier),
+            },
+            bet: pickedCompleted.bet > 0 ? pickedCompleted.bet : null,
+            moves: replayMoves,
+          });
+          return;
+        }
+      }
 
-      const timerLabel =
-        isLive
-          ? formatDuration(Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000))
-          : endedAt
-            ? formatDuration(Math.floor((endedAt - new Date(row.created_at).getTime()) / 1000))
-            : "Final";
-
-      setShowcase({
-        kind: isLive ? "live" : "featured",
-        id: row.id,
-        game: toGameLabel(row.game_type),
-        timerLabel,
-        startedAt: startedAt ?? null,
-        player1: {
-          id: row.player1_id,
-          username: row.player1_username ?? "player_one",
-          rank: toTierLabel(picked.p1Tier),
-        },
-        player2: {
-          id: row.player2_id,
-          username: row.player2_username ?? "player_two",
-          rank: toTierLabel(picked.p2Tier),
-        },
-        bet: picked.bet > 0 ? picked.bet : null,
-        moveLog: Array.isArray(row.move_log) ? row.move_log : [],
-      });
+      setShowcase(pickFallbackFeatured());
     } catch {
       setShowcase(pickFallbackFeatured());
     }
@@ -265,35 +312,138 @@ export default function LiveMatchShowcase() {
 
   useEffect(() => {
     void loadShowcase();
-    const poll = setInterval(() => {
+    const refresh = setInterval(() => {
       void loadShowcase();
-    }, 3000);
-    return () => clearInterval(poll);
+    }, 15_000);
+    return () => clearInterval(refresh);
   }, [loadShowcase]);
+
+  useEffect(() => {
+    if (!showcase || showcase.kind !== "live") return;
+    const supabase = createClient();
+    if (!supabase) return;
+
+    let cancelled = false;
+    const syncFromMoves = (moves: ChessMove[]) => {
+      const initial = createInitialBoard();
+      let boardState = initial;
+      for (const move of moves) {
+        boardState = applyMove(boardState, move);
+      }
+      setBoard(boardState);
+      appliedMoveCountRef.current = moves.length;
+    };
+
+    syncFromMoves(showcase.moves);
+
+    const poll = setInterval(async () => {
+      if (cancelled) return;
+      try {
+        const { data, error } = await supabase
+          .from("matches")
+          .select("id, status, created_at, move_log")
+          .eq("id", showcase.id)
+          .single();
+
+        if (error || !data) {
+          setShowcase(pickFallbackFeatured());
+          return;
+        }
+
+        const status = String((data as { status?: string }).status ?? "");
+        if (status !== "in_progress") {
+          void loadShowcase();
+          return;
+        }
+
+        const moves = extractMoveLogMoves((data as { move_log?: MatchRow["move_log"] }).move_log);
+        const previousCount = appliedMoveCountRef.current;
+        if (moves.length > previousCount) {
+          for (let i = previousCount; i < moves.length; i += 1) {
+            animateMove(moves[i]);
+          }
+          appliedMoveCountRef.current = moves.length;
+        }
+      } catch {
+        setShowcase(pickFallbackFeatured());
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+    };
+  }, [animateMove, loadShowcase, showcase]);
+
+  useEffect(() => {
+    if (!showcase || showcase.kind === "live") return;
+    let cancelled = false;
+    let stepTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const runReplay = () => {
+      let current = createInitialBoard();
+      setBoard(current);
+      let idx = 0;
+
+      const step = () => {
+        if (cancelled) return;
+        if (idx < showcase.moves.length) {
+          const move = showcase.moves[idx];
+          current = applyMove(current, move);
+          setBoard(current);
+          setJustMovedSquare(move.to);
+          if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+          pulseTimeoutRef.current = setTimeout(() => setJustMovedSquare(null), 400);
+          idx += 1;
+          stepTimer = setTimeout(step, 1500);
+          return;
+        }
+        replayTimeoutRef.current = setTimeout(runReplay, 3000);
+      };
+
+      stepTimer = setTimeout(step, 1500);
+    };
+
+    runReplay();
+
+    return () => {
+      cancelled = true;
+      if (stepTimer) clearTimeout(stepTimer);
+      if (replayTimeoutRef.current) clearTimeout(replayTimeoutRef.current);
+    };
+  }, [showcase]);
 
   useEffect(() => {
     if (!showcase || showcase.kind !== "live" || !showcase.startedAt) return;
     const tick = () => {
-      setLiveSeconds(Math.floor((Date.now() - new Date(showcase.startedAt as string).getTime()) / 1000));
+      setLiveSeconds(Math.floor((Date.now() - new Date(showcase.startedAt).getTime()) / 1000));
     };
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [showcase]);
 
-  const board = useMemo(() => {
-    if (!showcase || showcase.kind !== "live") return FALLBACK_POSITION;
-    const index = showcase.moveLog.length % BOARD_POSITIONS.length;
-    return BOARD_POSITIONS[index] ?? FALLBACK_POSITION;
-  }, [showcase]);
+  useEffect(() => {
+    return () => {
+      if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current);
+      if (replayTimeoutRef.current) clearTimeout(replayTimeoutRef.current);
+    };
+  }, []);
 
-  const highlightSquare = useMemo(() => parseHighlightSquare(showcase?.moveLog ?? []), [showcase?.moveLog]);
-
-  const timerText =
-    showcase?.kind === "live" ? formatDuration(liveSeconds) : (showcase?.timerLabel ?? "Final");
-
+  const timerText = showcase?.kind === "live" ? formatDuration(liveSeconds) : "REPLAY";
   const badgeLabel = showcase?.kind === "live" ? "LIVE — Chess match" : "FEATURED MATCH";
   const badgeDot = showcase?.kind === "live" ? "bg-[#22c55e]" : "bg-[#FF5E00]";
+  const displayBet = showcase?.bet ? nearestValidSpAmount(showcase.bet) : null;
+  const squares = useMemo(
+    () =>
+      RANKS.flatMap((rank, rowIndex) =>
+        FILES.map((file, colIndex) => {
+          const square = `${file}${rank}`;
+          return { square, rowIndex, colIndex, piece: board[square] ?? null };
+        })
+      ),
+    [board]
+  );
 
   return (
     <button
@@ -324,9 +474,9 @@ export default function LiveMatchShowcase() {
       </div>
 
       <p className="mb-4 text-center text-[12px] text-[#888]">
-        {showcase?.bet ? (
+        {displayBet ? (
           <>
-            <span className="text-[#FF5E00]">{showcase.bet} SP</span> on the line
+            <span className="text-[#FF5E00]">{displayBet} SP</span> on the line
           </>
         ) : (
           "Ranked match"
@@ -335,32 +485,42 @@ export default function LiveMatchShowcase() {
 
       <div className="rounded-md bg-[#0E0E12] p-2">
         <div className="grid grid-cols-8 overflow-hidden rounded-sm">
-          {board.flatMap((row, rowIndex) =>
-            row.split("").map((piece, colIndex) => {
-              const file = String.fromCharCode(97 + colIndex);
-              const rank = String(8 - rowIndex);
-              const square = `${file}${rank}`;
-              const isDark = (rowIndex + colIndex) % 2 === 0;
-              const isHighlight = highlightSquare === square && piece !== ".";
-
-              return (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className={`flex h-8 w-8 items-center justify-center text-[18px] sm:h-9 sm:w-9 ${
-                    isDark ? "bg-[#2a2a35]" : "bg-[#13131a]"
-                  }`}
-                >
-                  <span className={isHighlight ? "text-[#FF5E00]" : "text-[#f0f0f0]"}>
-                    {piece === "." ? "" : piece}
-                  </span>
-                </div>
-              );
-            })
-          )}
+          {squares.map(({ square, rowIndex, colIndex, piece }) => {
+            const isDark = (rowIndex + colIndex) % 2 === 0;
+            const pulse = justMovedSquare === square ? "piece-just-moved" : "";
+            return (
+              <div
+                key={square}
+                className={`chess-square flex h-8 w-8 items-center justify-center text-[18px] sm:h-9 sm:w-9 ${
+                  isDark ? "bg-[#2a2a35]" : "bg-[#13131a]"
+                }`}
+              >
+                <span className={`text-[#f0f0f0] ${pulse}`}>{piece ?? ""}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <p className="mt-3 text-[11px] text-[#666]">Watch live matches across the platform</p>
+      <style jsx>{`
+        @keyframes piece-pulse {
+          0% {
+            color: #ff5e00;
+            transform: scale(1.2);
+          }
+          100% {
+            color: #ffffff;
+            transform: scale(1);
+          }
+        }
+        .piece-just-moved {
+          animation: piece-pulse 400ms ease-out;
+        }
+        .chess-square > * {
+          transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+      `}</style>
     </button>
   );
 }

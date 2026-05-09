@@ -1,9 +1,11 @@
+import Image from "next/image";
+
 const tiers = [
-  { name: "Bronze", range: "0–1,999 SP", color: "#7a4a1a" },
-  { name: "Silver", range: "2,000–4,999 SP", color: "#888" },
-  { name: "Gold", range: "5,000–9,999 SP", color: "#d4a017" },
-  { name: "Platinum", range: "10,000–19,999 SP", color: "#7eb0b0" },
-  { name: "Diamond", range: "20,000+ SP", color: "#5dd5d5", founders: true },
+  { name: "BRONZE", range: "0–1,999 SP", image: "/images/rank-bronze.png" },
+  { name: "SILVER", range: "2,000–4,999 SP", image: "/images/rank-silver.png" },
+  { name: "GOLD", range: "5,000–9,999 SP", image: "/images/rank-gold.png" },
+  { name: "PLATINUM", range: "10,000–19,999 SP", image: "/images/rank-platinum.png" },
+  { name: "DIAMOND", range: "20,000+ SP", image: "/images/rank-diamond.png", isFounders: true },
 ];
 
 export default function RankLadder() {
@@ -23,18 +25,20 @@ export default function RankLadder() {
             <div
               key={tier.name}
               className={`relative rounded-[8px] bg-[#13131a] p-5 text-center ${
-                tier.founders ? "border-2 border-[#FF5E00]" : "border border-[#1a1a22]"
+                tier.isFounders ? "border-2 border-[#FF5E00]" : "border border-[#1a1a22]"
               }`}
             >
-              {tier.founders ? (
+              {tier.isFounders ? (
                 <span className="absolute left-1/2 top-[-9px] -translate-x-1/2 rounded-[10px] bg-[#FF5E00] px-2 py-[2px] text-[9px] tracking-[0.5px] text-white">
                   FOUNDERS
                 </span>
               ) : null}
-              <span
-                className="mx-auto mb-[10px] block h-8 w-8 rounded-full"
-                style={{ backgroundColor: tier.color }}
-                aria-hidden
+              <Image
+                src={tier.image}
+                width={64}
+                height={64}
+                alt={tier.name}
+                className="mx-auto mb-3"
               />
               <p className="text-[12px] font-medium uppercase text-white">{tier.name}</p>
               <p className="mt-[2px] text-[10px] text-[#666]">{tier.range}</p>

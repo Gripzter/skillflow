@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
 
 type FoundersSectionProps = {
   remaining: number | null;
@@ -8,8 +8,6 @@ type FoundersSectionProps = {
 };
 
 export default function FoundersSection({ remaining, closed }: FoundersSectionProps) {
-  const [showBadgeImage, setShowBadgeImage] = useState(true);
-
   return (
     <section id="founders" className="border-t border-[#1a1a22] bg-[#0a0a0e]">
       <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-12 px-8 py-[60px] md:grid-cols-2">
@@ -50,19 +48,13 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
         </div>
 
         <div className="rounded-xl border border-[#1a1a22] bg-[#13131a] p-8 text-center">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#FF5E00]">
-            {showBadgeImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src="/badges/founder.png"
-                alt="Omega Founder badge"
-                className="h-full w-full object-cover"
-                onError={() => setShowBadgeImage(false)}
-              />
-            ) : (
-              <span className="text-[32px] font-bold text-white">F</span>
-            )}
-          </div>
+          <Image
+            src="/images/badge-founders.png"
+            width={120}
+            height={120}
+            alt="Omega Founder Badge"
+            className="mx-auto mb-4"
+          />
 
           <p className="text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">MYTHIC TIER</p>
           <p className="mt-2 text-[18px] font-medium text-white">Omega Founder Badge</p>
