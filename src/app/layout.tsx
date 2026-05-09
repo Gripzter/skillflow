@@ -21,6 +21,15 @@ export const metadata: Metadata = {
     "Compete in skill-based games. Earn SkillPoints. Climb ranks. Open cases. Join the Founders Program during beta and earn exclusive rewards.",
   keywords:
     "skill gaming, competitive gaming, esports, chess, connect 4, reaction games, earn rewards",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
+  },
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
     description:
@@ -48,7 +57,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#0E0E12" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"
