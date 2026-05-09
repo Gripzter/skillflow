@@ -1,38 +1,30 @@
-"use client";
+import LandingNav from "@/components/landing/LandingNav";
+import LiveTicker from "@/components/landing/LiveTicker";
+import Hero from "@/components/landing/Hero";
+import GamesGrid from "@/components/landing/GamesGrid";
+import RankLadder from "@/components/landing/RankLadder";
+import FoundersSection from "@/components/landing/FoundersSection";
+import FinalCTA from "@/components/landing/FinalCTA";
+import LandingFooter from "@/components/landing/LandingFooter";
 
-import LandingNavbar from "./LandingNavbar";
-import LandingHero from "./LandingHero";
-import GameShowcase from "./GameShowcase";
-import HowItWorksSection from "./HowItWorksSection";
-import StatsSection from "./StatsSection";
-import WhySkillFlow from "./WhySkillFlow";
-import FinalCTASection from "./FinalCTASection";
-import LandingFooter from "./LandingFooter";
-import ScrollReveal from "./ScrollReveal";
+type LandingPageProps = {
+  foundersRemaining: number | null;
+  foundersClosed: boolean;
+};
 
-export default function LandingPage() {
+export default function LandingPage({ foundersRemaining, foundersClosed }: LandingPageProps) {
   return (
-    <>
-      <LandingNavbar />
+    <div className="min-h-screen bg-[#0E0E12] text-white">
+      <LandingNav />
+      <LiveTicker />
       <main>
-        <LandingHero />
-        <ScrollReveal>
-          <GameShowcase />
-        </ScrollReveal>
-        <ScrollReveal>
-          <HowItWorksSection />
-        </ScrollReveal>
-        <ScrollReveal>
-          <StatsSection />
-        </ScrollReveal>
-        <ScrollReveal>
-          <WhySkillFlow />
-        </ScrollReveal>
-        <ScrollReveal>
-          <FinalCTASection />
-        </ScrollReveal>
-        <LandingFooter />
+        <Hero />
+        <GamesGrid />
+        <RankLadder />
+        <FoundersSection remaining={foundersRemaining} closed={foundersClosed} />
+        <FinalCTA />
       </main>
-    </>
+      <LandingFooter />
+    </div>
   );
 }

@@ -1,41 +1,59 @@
-"use client";
-
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getCurrentUser } from "@/lib/api";
+import { unstable_cache } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import LandingPage from "@/components/landing";
-import LoadingRing from "@/components/LoadingRing";
+import ReferralCapture from "@/components/landing/ReferralCapture";
+import { createServerSupabaseClient } from "@/lib/supabase-server";
 
-const REFERRAL_STORAGE_KEY = "skillflow_referral_code";
+const getFoundersData = unstable_cache(
+  async () => {
+    try {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !anonKey) {
+        return { remaining: 1000, closed: false };
+      }
+      const supabase = createSupabaseClient(url, anonKey);
 
-function HomeContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [checking, setChecking] = useState(true);
+      const { count, error } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .or("rank_tier.eq.platinum,rank_tier.eq.diamond,rank_tier.eq.Platinum,rank_tier.eq.Diamond");
 
-  useEffect(() => {
-    const ref = searchParams.get("ref")?.trim()?.toLowerCase();
-    if (ref && typeof window !== "undefined") {
-      window.localStorage.setItem(REFERRAL_STORAGE_KEY, ref);
+      if (error) {
+        return { remaining: 1000, closed: false };
+      }
+
+      const qualified = Number(count ?? 0);
+      if (qualified > 1000) {
+        return { remaining: null, closed: true };
+      }
+      return { remaining: Math.max(0, 1000 - qualified), closed: false };
+    } catch {
+      return { remaining: 1000, closed: false };
     }
-    getCurrentUser()
-      .then((user) => {
-        if (user) router.replace("/dashboard");
-      })
-      .finally(() => setChecking(false));
-  }, [router, searchParams]);
+  },
+  ["landing-founders-remaining"],
+  { revalidate: 300 }
+);
 
-  if (checking) {
-    return <LoadingRing />;
+export default async function Home() {
+  const supabase = createServerSupabaseClient();
+  if (supabase) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      redirect("/dashboard");
+    }
   }
 
-  return <LandingPage />;
-}
+  const founders = await getFoundersData();
 
-export default function Home() {
   return (
-    <Suspense fallback={<LoadingRing />}>
-      <HomeContent />
-    </Suspense>
+    <>
+      <ReferralCapture />
+      <LandingPage foundersRemaining={founders.remaining} foundersClosed={founders.closed} />
+    </>
   );
 }
