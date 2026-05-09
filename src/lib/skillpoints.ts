@@ -110,6 +110,16 @@ export async function awardMatchSP(
   won: boolean,
   options?: AwardMatchSpOptions
 ): Promise<SpResult> {
+  // Diagnostic payout log for production verification.
+  // eslint-disable-next-line no-console
+  console.log("[SP_AWARD]", {
+    userId,
+    won,
+    matchId: options?.matchId,
+    gameType: options?.gameType,
+    timestamp: new Date().toISOString(),
+  });
+
   const supabase = createClient();
   if (!supabase) {
     return { success: false, error: "Supabase is not configured." };

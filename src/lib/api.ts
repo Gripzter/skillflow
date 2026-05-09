@@ -141,6 +141,7 @@ function mapDbMatchToStoredMatch(row: {
     isRealMultiplayer: !!row.player2_id && !row.is_bot,
     player1Id: row.player1_id ?? undefined,
     player2Id: row.player2_id ?? undefined,
+    isBot: !!row.is_bot,
     botDifficulty:
       row.bot_difficulty === "rookie" || row.bot_difficulty === "gamer" || row.bot_difficulty === "professional"
         ? row.bot_difficulty
@@ -553,6 +554,7 @@ export async function updateMatch(
   updates: Partial<{
     status: string;
     winner: "player1" | "player2" | "draw";
+    winnerId: string | null;
     moveLog: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
     matchStartTime: string;
     timeLimitMs: number;
@@ -583,6 +585,7 @@ export async function updateMatch(
   const row: {
     status?: string;
     result?: string;
+    winner_id?: string | null;
     completed_at?: string;
     move_log?: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
     match_start_time?: string;
@@ -595,6 +598,7 @@ export async function updateMatch(
   if (updates.status) row.status = updates.status;
   if (updates.winner === "draw") row.result = "draw";
   else if (updates.winner) row.result = updates.winner === "player1" ? "player1_win" : "player2_win";
+  if (Object.prototype.hasOwnProperty.call(updates, "winnerId")) row.winner_id = updates.winnerId ?? null;
   if (updates.status === "completed") row.completed_at = new Date().toISOString();
   if (updates.moveLog) row.move_log = updates.moveLog;
   if (updates.matchStartTime) row.match_start_time = updates.matchStartTime;
@@ -629,30 +633,35 @@ export async function completeMatchAndSettle(
       (outcome === "player2" && match.player2Id === currentUserId));
   const didDraw = outcome === "draw";
   const didLoss = !isWinner && !didDraw;
+  const result = outcome === "draw" ? "draw" : outcome === "player1" ? "player1_win" : "player2_win";
+
+  const winnerId =
+    result === "player1_win" ? (match.player1Id ?? null) : result === "player2_win" ? (match.player2Id ?? null) : null;
 
   async function awardSkillPointsForMatchResult() {
-    const awardedIds = new Set<string>();
+    const isBotMatch = match.isBot === true;
     const targets: Array<{ userId: string; won: boolean }> = [];
 
-    const roleOutcome = (role: "player1" | "player2"): boolean =>
-      outcome === "draw" ? false : outcome === role;
+    if (isBotMatch) {
+      const humanPlayerId = match.player1Id ?? match.player2Id;
+      if (!isUuid(humanPlayerId)) {
+        // eslint-disable-next-line no-console
+        console.error("[SP] Bot match missing human player ID", { matchId: match.id, result });
+        return;
+      }
 
-    if (isUuid(match.player1Id)) {
-      targets.push({ userId: match.player1Id, won: roleOutcome("player1") });
-      awardedIds.add(match.player1Id);
-    }
-    if (isUuid(match.player2Id) && !awardedIds.has(match.player2Id)) {
-      targets.push({ userId: match.player2Id, won: roleOutcome("player2") });
-      awardedIds.add(match.player2Id);
-    }
+      const humanWon =
+        (match.player1Id === humanPlayerId && result === "player1_win") ||
+        (match.player2Id === humanPlayerId && result === "player2_win");
 
-    // Practice / bot matches may not carry player IDs on the match object.
-    // In those cases, award only the authenticated human player.
-    if (targets.length === 0 && isUuid(currentUserId)) {
-      targets.push({
-        userId: currentUserId,
-        won: outcome === "draw" ? false : outcome === "player1",
-      });
+      targets.push({ userId: humanPlayerId, won: humanWon });
+    } else {
+      if (isUuid(match.player1Id)) {
+        targets.push({ userId: match.player1Id, won: result === "player1_win" });
+      }
+      if (isUuid(match.player2Id)) {
+        targets.push({ userId: match.player2Id, won: result === "player2_win" });
+      }
     }
 
     for (const target of targets) {
@@ -713,6 +722,7 @@ export async function completeMatchAndSettle(
     await updateMatch(match.id, {
       status: "completed",
       winner: outcome === "draw" ? undefined : outcome,
+      winnerId,
     });
     await awardSkillPointsForMatchResult();
     return;
@@ -761,7 +771,11 @@ export async function completeMatchAndSettle(
         "match_win"
       );
     }
-    await updateMatch(match.id, { status: "completed", winner: outcome });
+    await updateMatch(match.id, {
+      status: "completed",
+      winner: outcome,
+      winnerId,
+    });
     await updateGameStatsForCurrentUser();
     await awardSkillPointsForMatchResult();
     return;
@@ -773,7 +787,11 @@ export async function completeMatchAndSettle(
     `Draw – ${match.gameDisplayName} (stake refunded)`,
     "match_refund"
   );
-  await updateMatch(match.id, { status: "completed", winner: "draw" });
+  await updateMatch(match.id, {
+    status: "completed",
+    winner: "draw",
+    winnerId,
+  });
   await updateGameStatsForCurrentUser();
   await awardSkillPointsForMatchResult();
 }

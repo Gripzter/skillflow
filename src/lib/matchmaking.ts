@@ -103,6 +103,8 @@ export interface StoredMatch {
   /** Real match: player user IDs for role resolution */
   player1Id?: string;
   player2Id?: string;
+  /** Real match flag for bot opponents */
+  isBot?: boolean;
   /** Practice only: bot difficulty */
   botDifficulty?: "rookie" | "gamer" | "professional";
   /** Persisted replay log (Supabase JSONB: move_log). */
