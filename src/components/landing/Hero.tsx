@@ -1,6 +1,6 @@
 "use client";
 
-import LiveStatsPanel from "@/components/landing/LiveStatsPanel";
+import PromoRotator from "@/components/landing/PromoRotator";
 
 function goTo(href: string) {
   window.location.href = href;
@@ -49,7 +49,7 @@ export default function Hero() {
         </div>
       </div>
 
-      <LiveStatsPanel />
+      <PromoRotator />
     </section>
   );
 }
