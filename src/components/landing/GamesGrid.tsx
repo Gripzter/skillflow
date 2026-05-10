@@ -20,6 +20,12 @@ const games: GameCard[] = [
   { name: "Typing Race", slug: "typing-race", image: "/images/typing-race-card.png", subtitle: "Fastest fingers win" },
 ];
 
+const SIGNUP_URL = "/signup";
+
+function handleCardClick() {
+  window.location.href = SIGNUP_URL;
+}
+
 export default function GamesGrid() {
   return (
     <section id="games" className="border-t border-[#1a1a22]">
@@ -37,9 +43,7 @@ export default function GamesGrid() {
             <button
               key={game.slug}
               type="button"
-              onClick={() => {
-                window.location.href = `/games/${game.slug}`;
-              }}
+              onClick={handleCardClick}
               className="group cursor-pointer overflow-hidden rounded-[12px] border border-[#1a1a22] bg-[#13131a] p-0 text-left transition-all duration-200 ease-out hover:scale-[1.02] hover:border-[#2a2a35]"
             >
               <div className="relative aspect-[2/3] w-full bg-[#13131a]">

@@ -23,12 +23,14 @@ export const metadata: Metadata = {
     "skill gaming, competitive gaming, esports, chess, connect 4, reaction games, earn rewards",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon-v2.ico", sizes: "any" },
+      { url: "/icon-16-v2.png", type: "image/png", sizes: "16x16" },
+      { url: "/icon-32-v2.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon-192-v2.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512-v2.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: "/apple-touch-icon.png",
-    shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon-v2.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon-v2.ico",
   },
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
@@ -57,7 +59,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#0E0E12" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" />
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"

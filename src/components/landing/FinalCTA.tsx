@@ -13,7 +13,7 @@ export default function FinalCTA() {
           }}
           className="mt-6 rounded-[8px] bg-[#FF5E00] px-8 py-3.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90"
         >
-          Play free →
+          Play now →
         </button>
       </div>
     </section>

@@ -51,7 +51,7 @@ export default function LandingNav() {
             onClick={() => goTo("/signup")}
             className="rounded-md bg-[#FF5E00] px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
           >
-            Play free
+            Play now
           </button>
         </div>
       </div>
