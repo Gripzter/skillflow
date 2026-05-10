@@ -16,20 +16,12 @@ export default function Footer() {
             Privacy
           </Link>
           <span className="hidden text-body-gray/50 sm:inline">•</span>
-          <Link href="/responsible-play" className="hover:text-white">
-            Responsible Play
+          <Link href="/acceptable-use" className="hover:text-white">
+            Acceptable Use
           </Link>
           <span className="hidden text-body-gray/50 sm:inline">•</span>
-          <Link href="/responsible-gaming" className="hover:text-white">
-            Responsible Gaming
-          </Link>
-          <span className="hidden text-body-gray/50 sm:inline">•</span>
-          <Link href="/fairplay" className="hover:text-white">
-            Fair Play
-          </Link>
-          <span className="hidden text-body-gray/50 sm:inline">•</span>
-          <Link href="/refund" className="hover:text-white">
-            Refunds
+          <Link href="/skillies" className="hover:text-white">
+            About Skillies
           </Link>
         </nav>
         <div className="order-2 text-center md:order-3 md:text-right">

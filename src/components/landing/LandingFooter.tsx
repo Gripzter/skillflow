@@ -1,9 +1,3 @@
-"use client";
-
-function goTo(href: string) {
-  window.location.href = href;
-}
-
 export default function LandingFooter() {
   return (
     <footer className="border-t border-[#1a1a22]">
@@ -14,31 +8,25 @@ export default function LandingFooter() {
           <span className="text-[#444]">© 2026 Xmas Group</span>
         </div>
 
-        <div className="flex items-center gap-5">
-          <button type="button" onClick={() => goTo("/terms")} className="transition-colors hover:text-white">
+        <div style={{ display: "flex", gap: 20, fontSize: 11, color: "#666", flexWrap: "wrap" }}>
+          <a href="/terms" style={{ color: "#666" }}>
             Terms
-          </button>
-          <button type="button" onClick={() => goTo("/privacy")} className="transition-colors hover:text-white">
+          </a>
+          <a href="/privacy" style={{ color: "#666" }}>
             Privacy
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              window.open("#", "_blank", "noopener,noreferrer");
-            }}
-            className="transition-colors hover:text-white"
-          >
+          </a>
+          <a href="/acceptable-use" style={{ color: "#666" }}>
+            Acceptable Use
+          </a>
+          <a href="/skillies" style={{ color: "#666" }}>
+            About Skillies
+          </a>
+          <a href="#" style={{ color: "#666" }}>
             Discord
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              window.open("#", "_blank", "noopener,noreferrer");
-            }}
-            className="transition-colors hover:text-white"
-          >
+          </a>
+          <a href="#" style={{ color: "#666" }}>
             Twitter
-          </button>
+          </a>
         </div>
       </div>
     </footer>
