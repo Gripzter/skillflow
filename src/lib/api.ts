@@ -555,6 +555,7 @@ export async function updateMatch(
     status: string;
     winner: "player1" | "player2" | "draw";
     winnerId: string | null;
+    loserId: string | null;
     moveLog: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
     matchStartTime: string;
     timeLimitMs: number;
@@ -586,6 +587,7 @@ export async function updateMatch(
     status?: string;
     result?: string;
     winner_id?: string | null;
+    loser_id?: string | null;
     completed_at?: string;
     move_log?: Array<{ player_id: string; action: Record<string, unknown>; timestamp_ms: number }>;
     match_start_time?: string;
@@ -599,6 +601,7 @@ export async function updateMatch(
   if (updates.winner === "draw") row.result = "draw";
   else if (updates.winner) row.result = updates.winner === "player1" ? "player1_win" : "player2_win";
   if (Object.prototype.hasOwnProperty.call(updates, "winnerId")) row.winner_id = updates.winnerId ?? null;
+  if (Object.prototype.hasOwnProperty.call(updates, "loserId")) row.loser_id = updates.loserId ?? null;
   if (updates.status === "completed") row.completed_at = new Date().toISOString();
   if (updates.moveLog) row.move_log = updates.moveLog;
   if (updates.matchStartTime) row.match_start_time = updates.matchStartTime;
@@ -626,6 +629,30 @@ export async function completeMatchAndSettle(
   const currentUser = await getCurrentUser();
   const currentUserId = currentUser?.id;
 
+  // eslint-disable-next-line no-console
+  console.log("[MATCH_END_START]", {
+    timestamp: new Date().toISOString(),
+    matchId: match?.id ?? "UNKNOWN",
+    rawMatchData: JSON.stringify({
+      id: match?.id,
+      player1_id: match?.player1Id,
+      player2_id: match?.player2Id,
+      is_bot: match?.isBot,
+      game_type: match?.gameType,
+      bet_amount: match?.stakeAmount,
+      status: match?.status,
+      result: match?.winner === "player1" ? "player1_win" : match?.winner === "player2" ? "player2_win" : null,
+      winner_id: null,
+      loser_id: null,
+    }),
+    inputs: JSON.stringify({
+      outcome,
+      currentUserId,
+      isPractice: match?.isPractice,
+      isRealMultiplayer: match?.isRealMultiplayer,
+    }),
+  });
+
   const isWinner =
     outcome !== "draw" &&
     !!currentUserId &&
@@ -633,10 +660,113 @@ export async function completeMatchAndSettle(
       (outcome === "player2" && match.player2Id === currentUserId));
   const didDraw = outcome === "draw";
   const didLoss = !isWinner && !didDraw;
-  const result = outcome === "draw" ? "draw" : outcome === "player1" ? "player1_win" : "player2_win";
+  let result: "player1_win" | "player2_win" | "draw" = "draw";
+  let winnerId: string | null = null;
+  let loserId: string | null = null;
 
-  const winnerId =
-    result === "player1_win" ? (match.player1Id ?? null) : result === "player2_win" ? (match.player2Id ?? null) : null;
+  if (outcome !== "draw") {
+    if (match.isBot) {
+      const possibleHumanIds = [match.player1Id, match.player2Id].filter(
+        (id): id is string => isUuid(id) && id !== BOT_PLAYER_UUID
+      );
+      const humanPlayerId =
+        possibleHumanIds.length === 1
+          ? possibleHumanIds[0]
+          : currentUserId && possibleHumanIds.includes(currentUserId)
+            ? currentUserId
+            : possibleHumanIds[0];
+
+      if (!humanPlayerId) {
+        throw new Error("No human player in match — cannot finalize");
+      }
+
+      const humanIsPlayer1 = match.player1Id === humanPlayerId;
+      const humanIsPlayer2 = match.player2Id === humanPlayerId;
+      if (!humanIsPlayer1 && !humanIsPlayer2) {
+        throw new Error("Human player role is invalid — cannot finalize");
+      }
+
+      const humanWon = (outcome === "player1" && humanIsPlayer1) || (outcome === "player2" && humanIsPlayer2);
+
+      if (humanWon) {
+        if (humanIsPlayer1) {
+          result = "player1_win";
+          winnerId = match.player1Id ?? null;
+          loserId = match.player2Id ?? null;
+        } else {
+          result = "player2_win";
+          winnerId = match.player2Id ?? null;
+          loserId = match.player1Id ?? null;
+        }
+      } else if (humanIsPlayer1) {
+        result = "player2_win";
+        winnerId = match.player2Id ?? null;
+        loserId = match.player1Id ?? null;
+      } else {
+        result = "player1_win";
+        winnerId = match.player1Id ?? null;
+        loserId = match.player2Id ?? null;
+      }
+    } else {
+      result = outcome === "player1" ? "player1_win" : "player2_win";
+      winnerId = result === "player1_win" ? (match.player1Id ?? null) : (match.player2Id ?? null);
+      loserId = result === "player1_win" ? (match.player2Id ?? null) : (match.player1Id ?? null);
+    }
+  }
+
+  async function persistFinalizedMatch() {
+    if (match.isPractice || isDevMode()) {
+      await updateMatch(match.id, {
+        status: "completed",
+        winner: result === "draw" ? "draw" : result === "player1_win" ? "player1" : "player2",
+        winnerId,
+        loserId,
+      });
+      // eslint-disable-next-line no-console
+      console.log("[MATCH_FINALIZED]", {
+        matchId: match.id,
+        result,
+        winnerId,
+        loserId,
+        isBot: match.isBot,
+      });
+      return true;
+    }
+
+    const supabase = createClient();
+    if (!supabase) {
+      // eslint-disable-next-line no-console
+      console.error("[MATCH_FINALIZE_FAILED]", { matchId: match.id, error: "Supabase not configured" });
+      return false;
+    }
+
+    const { error: updateError } = await supabase
+      .from("matches")
+      .update({
+        result,
+        winner_id: winnerId,
+        loser_id: loserId,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", match.id);
+
+    if (updateError) {
+      // eslint-disable-next-line no-console
+      console.error("[MATCH_FINALIZE_FAILED]", { matchId: match.id, error: updateError });
+      return false;
+    }
+
+    // eslint-disable-next-line no-console
+    console.log("[MATCH_FINALIZED]", {
+      matchId: match.id,
+      result,
+      winnerId,
+      loserId,
+      isBot: match.isBot,
+    });
+    return true;
+  }
 
   async function awardSkillPointsForMatchResult() {
     const isBotMatch = match.isBot === true;
@@ -666,6 +796,20 @@ export async function completeMatchAndSettle(
 
     for (const target of targets) {
       try {
+        // eslint-disable-next-line no-console
+        console.log("[AWARD_SP_CALL]", {
+          timestamp: new Date().toISOString(),
+          matchId: match.id,
+          userId: target.userId,
+          won: target.won,
+          resolvedFromMatch: {
+            matchResult: result,
+            matchWinnerId: winnerId,
+            isPlayer1: match.player1Id === target.userId,
+            isPlayer2: match.player2Id === target.userId,
+            isBot: match.isBot,
+          },
+        });
         const awardResult = await awardMatchSP(target.userId, target.won, {
           matchId: match.id,
           gameType: match.gameType,
@@ -719,11 +863,8 @@ export async function completeMatchAndSettle(
   }
 
   if (match.isPractice) {
-    await updateMatch(match.id, {
-      status: "completed",
-      winner: outcome === "draw" ? undefined : outcome,
-      winnerId,
-    });
+    const persisted = await persistFinalizedMatch();
+    if (!persisted) return;
     await awardSkillPointsForMatchResult();
     return;
   }
@@ -771,11 +912,8 @@ export async function completeMatchAndSettle(
         "match_win"
       );
     }
-    await updateMatch(match.id, {
-      status: "completed",
-      winner: outcome,
-      winnerId,
-    });
+    const persisted = await persistFinalizedMatch();
+    if (!persisted) return;
     await updateGameStatsForCurrentUser();
     await awardSkillPointsForMatchResult();
     return;
@@ -787,11 +925,8 @@ export async function completeMatchAndSettle(
     `Draw – ${match.gameDisplayName} (stake refunded)`,
     "match_refund"
   );
-  await updateMatch(match.id, {
-    status: "completed",
-    winner: "draw",
-    winnerId,
-  });
+  const persisted = await persistFinalizedMatch();
+  if (!persisted) return;
   await updateGameStatsForCurrentUser();
   await awardSkillPointsForMatchResult();
 }

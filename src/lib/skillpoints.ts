@@ -110,6 +110,14 @@ export async function awardMatchSP(
   won: boolean,
   options?: AwardMatchSpOptions
 ): Promise<SpResult> {
+  // eslint-disable-next-line no-console
+  console.log("[AWARD_SP_ENTRY]", {
+    timestamp: new Date().toISOString(),
+    userId,
+    won,
+    options: JSON.stringify(options),
+  });
+
   // Diagnostic payout log for production verification.
   // eslint-disable-next-line no-console
   console.log("[SP_AWARD]", {
@@ -158,6 +166,77 @@ export async function awardMatchSP(
         rankTier: calculateRankTier(Number(profile.lifetime_sp ?? 0)) as RankTier,
       };
     }
+  }
+
+  // HARDENED: When matchId is provided, derive `won` from the matches table directly.
+  // The caller's `won` parameter is ignored. The match row is the single source of truth.
+  if (options?.matchId) {
+    const { data: matchRow, error: matchErr } = await supabase
+      .from("matches")
+      .select("id, player1_id, player2_id, result, is_bot, winner_id")
+      .eq("id", options.matchId)
+      .single();
+
+    if (matchErr || !matchRow) {
+      // eslint-disable-next-line no-console
+      console.error("[AWARD_SP_NO_MATCH]", {
+        userId,
+        matchId: options.matchId,
+        error: matchErr?.message,
+      });
+      return { success: false, error: "Match not found for SP award." };
+    }
+
+    // Verify the user was actually a player in this match
+    const isPlayer1 = matchRow.player1_id === userId;
+    const isPlayer2 = matchRow.player2_id === userId;
+
+    if (!isPlayer1 && !isPlayer2) {
+      // eslint-disable-next-line no-console
+      console.error("[AWARD_SP_USER_NOT_IN_MATCH]", {
+        userId,
+        matchId: options.matchId,
+        player1: matchRow.player1_id,
+        player2: matchRow.player2_id,
+      });
+      return { success: false, error: "User was not a player in this match." };
+    }
+
+    // Derive the correct `won` value from the match result
+    let derivedWon: boolean;
+    if (matchRow.result === "draw") {
+      // For draws, treat as a loss (consolation SP).
+      derivedWon = false;
+    } else if (matchRow.result === "player1_win") {
+      derivedWon = isPlayer1;
+    } else if (matchRow.result === "player2_win") {
+      derivedWon = isPlayer2;
+    } else {
+      // eslint-disable-next-line no-console
+      console.error("[AWARD_SP_UNKNOWN_RESULT]", {
+        userId,
+        matchId: options.matchId,
+        result: matchRow.result,
+      });
+      return { success: false, error: "Match result is invalid or missing." };
+    }
+
+    // Compare derived value to passed value — if they disagree, log loudly
+    if (derivedWon !== won) {
+      // eslint-disable-next-line no-console
+      console.error("[AWARD_SP_WON_MISMATCH]", {
+        userId,
+        matchId: options.matchId,
+        passedWon: won,
+        derivedWon,
+        matchResult: matchRow.result,
+        isPlayer1,
+        isPlayer2,
+      });
+    }
+
+    // OVERRIDE: use the derived value, ignore what was passed
+    won = derivedWon;
   }
 
   const baseAmount = won ? SP_REWARDS.MATCH_WIN : SP_REWARDS.MATCH_LOSS;
@@ -236,6 +315,18 @@ export async function awardMatchSP(
   if (updateError) {
     return { success: false, error: "Failed to update user SP profile." };
   }
+
+  // eslint-disable-next-line no-console
+  console.log("[AWARD_SP_INSERT]", {
+    timestamp: new Date().toISOString(),
+    userId,
+    matchId: options?.matchId,
+    amount: baseAwardWithMultiplier,
+    type: matchType,
+    multiplier,
+    baseAmount,
+    dailyBonus,
+  });
 
   const { error: txError } = await supabase.from("sp_transactions").insert({
     user_id: userId,
