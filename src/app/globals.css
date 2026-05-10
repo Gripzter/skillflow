@@ -309,3 +309,48 @@ main,
   max-height: min(520px, calc(100dvh - 260px));
   min-height: 0;
 }
+
+/* Legal page typography (applies to all pages under /(legal)/) */
+.legal-page h1 {
+  font-size: 32px;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: -1px;
+  margin: 0 0 8px 0;
+}
+
+.legal-page h2 {
+  font-size: 18px;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 40px 0 12px 0;
+}
+
+.legal-page p {
+  color: #aaa;
+  margin: 0 0 16px 0;
+}
+
+.legal-page ul {
+  color: #aaa;
+  padding-left: 20px;
+  margin: 0 0 16px 0;
+}
+
+.legal-page ul li {
+  margin-bottom: 8px;
+}
+
+.legal-page strong {
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.legal-page a {
+  color: #ff5e00;
+  text-decoration: none;
+}
+
+.legal-page a:hover {
+  text-decoration: underline;
+}
