@@ -22,15 +22,16 @@ export const metadata: Metadata = {
   keywords:
     "skill gaming, competitive gaming, esports, chess, connect 4, reaction games, earn rewards",
   icons: {
+    // The browser tab favicon and small icon slots — use ONLY the square 192 mark.
+    // DO NOT include 512 here because browsers may pick the largest and try to render
+    // the wide wordmark in a square slot, which causes distortion.
     icon: [
-      { url: "/favicon-v2.ico", sizes: "any" },
-      { url: "/icon-16-v2.png", type: "image/png", sizes: "16x16" },
-      { url: "/icon-32-v2.png", type: "image/png", sizes: "32x32" },
-      { url: "/icon-192-v2.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512-v2.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico?v=3", sizes: "any" },
+      { url: "/icon-192.png?v=3", type: "image/png", sizes: "192x192" },
     ],
-    apple: [{ url: "/apple-touch-icon-v2.png", sizes: "180x180", type: "image/png" }],
-    shortcut: "/favicon-v2.ico",
+    // Apple touch icon (iOS home screen) — square 192 mark.
+    apple: [{ url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico?v=3",
   },
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
@@ -59,7 +60,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#0E0E12" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"
