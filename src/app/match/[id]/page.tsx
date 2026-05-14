@@ -1146,7 +1146,7 @@ function MatchPageContent() {
             chatToastVisible ? "top-3 opacity-100" : "-top-12 opacity-0"
           }`}
         >
-          <p className="truncate text-xs font-semibold text-[#FF5E00]">{activeChatToast.sender}</p>
+          <p className="truncate text-xs font-semibold text-[#FFFF00]">{activeChatToast.sender}</p>
           <p className="truncate text-sm text-white/90">{activeChatToast.message}</p>
         </div>
       )}

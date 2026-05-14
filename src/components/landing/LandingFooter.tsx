@@ -3,7 +3,7 @@ export default function LandingFooter() {
     <footer className="border-t border-[#1a1a22]">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-8 py-6 text-[11px] text-[#666] md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
-          <span className="h-3 w-[3px] rounded-[2px] bg-[#FF5E00]" />
+          <span className="h-3 w-[3px] rounded-[2px] bg-[#FFFF00]" />
           <span>skillflow</span>
           <span className="text-[#444]">© 2026 Xmas Group</span>
         </div>

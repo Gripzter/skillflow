@@ -149,7 +149,7 @@ export default function AdminRevenuePage() {
     {
       label: "Match Fees (Platform)",
       value: summary.matchFees,
-      color: "text-[#FF5E00]",
+      color: "text-[#FFFF00]",
       hint: "5% cut from completed matches",
     },
     {
@@ -204,7 +204,7 @@ export default function AdminRevenuePage() {
                     ? "text-white"
                     : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
                 }`}
-                style={period === p ? { background: "#FF5E00" } : {}}
+                style={period === p ? { background: "#FFFF00" } : {}}
               >
                 {p.charAt(0).toUpperCase() + p.slice(1)}
               </button>
@@ -217,7 +217,7 @@ export default function AdminRevenuePage() {
               data={chartData}
               totalLabel="Total this period"
               averageLabel="Average"
-              color="#FF5E00"
+              color="#FFFF00"
             />
           ) : (
             <p className="py-8 text-center text-sm text-[#9CA3AF]">No data yet.</p>

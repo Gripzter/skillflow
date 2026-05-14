@@ -166,7 +166,7 @@ export default function AdminUsersPage() {
         placeholder="Search by username, email, or ID…"
         value={search}
         onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-        className="w-full max-w-sm rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-[#6B7280] focus:border-[#FF5E00] focus:outline-none"
+        className="w-full max-w-sm rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-[#6B7280] focus:border-[#FFFF00] focus:outline-none"
       />
 
       {/* Table */}

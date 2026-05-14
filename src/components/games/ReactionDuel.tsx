@@ -23,7 +23,7 @@ const ROUND_START_DELAY_MAX = 5000;
 
 function reactionLabel(ms: number): { text: string; color: string } {
   if (ms < 200) return { text: "INSANE! 🔥", color: "#FACC15" };
-  if (ms < 300) return { text: "Great!", color: "#FF5E00" };
+  if (ms < 300) return { text: "Great!", color: "#FFFF00" };
   if (ms < 400) return { text: "Good", color: "#22C55E" };
   if (ms < 500) return { text: "OK", color: "#FACC15" };
   return { text: "Slow", color: "#9ca3af" };
@@ -83,7 +83,7 @@ export default function ReactionDuel({
   const [roundHistory, setRoundHistory] = useState<{ p1: Reaction; p2: Reaction; winner: "player1" | "player2" | "draw" }[]>([]);
   const [targetPos, setTargetPos] = useState<{ x: number; y: number } | null>(null);
   const [targetDiameter, setTargetDiameter] = useState(TARGET_BASE);
-  const [targetColor, setTargetColor] = useState("#FF5E00");
+  const [targetColor, setTargetColor] = useState("#FFFF00");
   const [p1Reaction, setP1Reaction] = useState<Reaction | null>(null);
   const [p2Reaction, setP2Reaction] = useState<Reaction | null>(null);
   const [roundResult, setRoundResult] = useState<{ p1: Reaction; p2: Reaction; winner: "player1" | "player2" | "draw" } | null>(null);
@@ -470,7 +470,7 @@ export default function ReactionDuel({
     p2Reaction === null &&
     (!isMultiplayer || myRole === "player2");
 
-  const ACCENT_P1 = "#FF5E00";
+  const ACCENT_P1 = "#FFFF00";
   const ACCENT_P2 = "#A855F7";
   const isMyTurn = isMultiplayer ? (myRole === "player1" ? p1RowActive : p2RowActive) : p1RowActive;
 
@@ -568,7 +568,7 @@ export default function ReactionDuel({
                   <span
                     className="text-6xl font-black animate-fade-in"
                     style={{
-                      color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FF5E00",
+                      color: countdownN === 3 ? "#fff" : countdownN === 2 ? "#FACC15" : "#FFFF00",
                     }}
                   >
                     {countdownN}

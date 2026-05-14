@@ -39,8 +39,8 @@ export default function FoundersReward({ lifetimeSp, currentTier }: FoundersRewa
     <section
       className={`relative overflow-hidden rounded-card border p-5 ${
         unlocked
-          ? "border-[#FFB347]/50 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.2),transparent_45%),linear-gradient(135deg,rgba(255,94,0,0.18),rgba(12,12,16,0.9))]"
-          : "border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255,94,0,0.14),transparent_45%),rgba(16,16,22,0.82)]"
+          ? "border-[#FFB347]/50 bg-[radial-gradient(circle_at_top_right,rgba(255,179,71,0.2),transparent_45%),linear-gradient(135deg,rgba(255, 255, 0, 0.18),rgba(12,12,16,0.9))]"
+          : "border-white/10 bg-[radial-gradient(circle_at_top_right,rgba(255, 255, 0, 0.14),transparent_45%),rgba(16,16,22,0.82)]"
       }`}
     >
       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#FFB347]/20 blur-2xl" aria-hidden />
@@ -78,7 +78,7 @@ export default function FoundersReward({ lifetimeSp, currentTier }: FoundersRewa
             <span className="font-semibold text-[#FFB347]">{progressPercent.toFixed(0)}%</span>
           </div>
           <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-gradient-to-r from-[#FF5E00] to-[#FFB347]" style={{ width: `${progressPercent}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-[#FFFF00] to-[#FFB347]" style={{ width: `${progressPercent}%` }} />
           </div>
           <p className="mt-2 text-xs text-body-gray">
             <span className="inline-flex items-center gap-1">

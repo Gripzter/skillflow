@@ -85,7 +85,7 @@ export default function PromoRotator() {
               width: i === currentIndex ? 24 : 6,
               height: 6,
               borderRadius: 3,
-              background: i === currentIndex ? "#FF5E00" : "rgba(255, 255, 255, 0.25)",
+              background: i === currentIndex ? "#FFFF00" : "rgba(255, 255, 255, 0.25)",
               transition: "all 400ms ease-out",
             }}
           />

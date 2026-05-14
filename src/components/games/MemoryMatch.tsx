@@ -452,7 +452,7 @@ export default function MemoryMatch({
                     const matchedBy = card.matchedBy;
                     const borderColor =
                       isMatched && matchedBy === 1
-                        ? "#FF5E00"
+                        ? "#FFFF00"
                         : isMatched && matchedBy === 2
                           ? "#A855F7"
                           : isFlipped

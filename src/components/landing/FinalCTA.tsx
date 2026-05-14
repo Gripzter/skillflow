@@ -11,7 +11,7 @@ export default function FinalCTA() {
           onClick={() => {
             window.location.href = "/signup";
           }}
-          className="mt-6 rounded-[8px] bg-[#FF5E00] px-8 py-3.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90"
+          className="mt-6 rounded-[8px] bg-[#FFFF00] px-8 py-3.5 text-[14px] font-medium text-[#0E0E12] transition-colors hover:bg-[#E6E600]"
         >
           Play now →
         </button>

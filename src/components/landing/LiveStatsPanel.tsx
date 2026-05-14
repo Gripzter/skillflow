@@ -73,7 +73,7 @@ export default function LiveStatsPanel() {
         <span>LIVE NOW</span>
       </div>
 
-      <p className="mt-6 text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">PLAYERS ONLINE</p>
+      <p className="mt-6 text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">PLAYERS ONLINE</p>
       <p
         key={`players-${tickVersion}`}
         className="stat-tick mt-1 text-[64px] font-medium leading-none tracking-[-2px] text-white"

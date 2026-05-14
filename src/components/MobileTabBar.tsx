@@ -54,7 +54,7 @@ export default function MobileTabBar() {
         const isActive =
           pathname === tab.href ||
           pathname.startsWith(tab.href + "/");
-        const color = isActive ? "text-[#FF5E00]" : "text-[#888]";
+        const color = isActive ? "text-[#FFFF00]" : "text-[#888]";
         return (
           <button
             type="button"

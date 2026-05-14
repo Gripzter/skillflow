@@ -13,7 +13,7 @@ export default function RankLadder() {
     <section id="ranks" className="border-t border-[#1a1a22]">
       <div className="mx-auto w-full max-w-[1200px] px-8 py-[60px]">
         <div className="mb-8">
-          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">THE LADDER</p>
+          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">THE LADDER</p>
           <h2 className="mt-2 text-[32px] font-medium tracking-[-1px] text-white">Five tiers. One climb.</h2>
           <p className="mt-4 max-w-[520px] text-[14px] leading-[1.6] text-[#888]">
             Earn SkillPoints for every match. Climb from Bronze to Diamond. Each tier unlocks cosmetics, multipliers, and bragging rights you can wear across the platform.
@@ -25,11 +25,11 @@ export default function RankLadder() {
             <div
               key={tier.name}
               className={`relative rounded-[8px] bg-[#13131a] p-5 text-center ${
-                tier.isFounders ? "border-2 border-[#FF5E00]" : "border border-[#1a1a22]"
+                tier.isFounders ? "border-2 border-[#FFFF00]" : "border border-[#1a1a22]"
               }`}
             >
               {tier.isFounders ? (
-                <span className="absolute left-1/2 top-[-9px] -translate-x-1/2 rounded-[10px] bg-[#FF5E00] px-2 py-[2px] text-[9px] tracking-[0.5px] text-white">
+                <span className="absolute left-1/2 top-[-9px] -translate-x-1/2 rounded-[10px] bg-[#FFFF00] px-2 py-[2px] text-[9px] tracking-[0.5px] text-[#0E0E12]">
                   FOUNDERS
                 </span>
               ) : null}

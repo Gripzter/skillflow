@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { ToastProvider } from "@/components/Toast";
 import { GeoProvider } from "@/contexts/GeoContext";
@@ -26,12 +26,12 @@ export const metadata: Metadata = {
     // DO NOT include 512 here because browsers may pick the largest and try to render
     // the wide wordmark in a square slot, which causes distortion.
     icon: [
-      { url: "/favicon.ico?v=4", sizes: "any" },
-      { url: "/icon-192.png?v=4", type: "image/png", sizes: "192x192" },
+      { url: "/favicon.ico?v=3", sizes: "any" },
+      { url: "/icon-192.png?v=3", type: "image/png", sizes: "192x192" },
     ],
     // Apple touch icon (iOS home screen) — square 192 mark.
-    apple: [{ url: "/apple-touch-icon.png?v=4", sizes: "180x180", type: "image/png" }],
-    shortcut: "/favicon.ico?v=4",
+    apple: [{ url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" }],
+    shortcut: "/favicon.ico?v=3",
   },
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
@@ -42,6 +42,10 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FFFF00",
 };
 
 export default function RootLayout({
@@ -58,9 +62,9 @@ export default function RootLayout({
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#0E0E12" />
+        <meta name="theme-color" content="#FFFF00" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Rajdhani:wght@400;500;600;700&display=swap"
           rel="stylesheet"

@@ -42,7 +42,7 @@ export default function GameResultOverlay({
         angle: 60,
         spread: 55,
         origin: { x: 0, y: 0.65 },
-        colors: ["#FF5E00", "#FFD700", "#FF9900", "#FFFFFF", "#FF4444"],
+        colors: ["#FFFF00", "#FFD700", "#FF9900", "#FFFFFF", "#FF4444"],
         zIndex: 60,
       });
       confetti({
@@ -50,7 +50,7 @@ export default function GameResultOverlay({
         angle: 120,
         spread: 55,
         origin: { x: 1, y: 0.65 },
-        colors: ["#FF5E00", "#FFD700", "#FF9900", "#FFFFFF", "#44BBFF"],
+        colors: ["#FFFF00", "#FFD700", "#FF9900", "#FFFFFF", "#44BBFF"],
         zIndex: 60,
       });
       if (Date.now() < end) {
@@ -97,7 +97,7 @@ export default function GameResultOverlay({
 
   if (isVictory) {
     headline = "VICTORY";
-    headlineColor = "#FF5E00";
+    headlineColor = "#FFFF00";
     if (!isPractice) amountValue = winnerPayout;
     subtext = wonByForfeit
       ? "Opponent forfeited. You win!"
@@ -123,7 +123,7 @@ export default function GameResultOverlay({
         className="pointer-events-none absolute inset-0"
         style={{
           background: isVictory
-            ? "radial-gradient(ellipse at 50% 60%, rgba(255,94,0,0.12) 0%, transparent 70%)"
+            ? "radial-gradient(ellipse at 50% 60%, rgba(255, 255, 0, 0.12) 0%, transparent 70%)"
             : isDraw
               ? "radial-gradient(ellipse at 50% 60%, rgba(96,165,250,0.08) 0%, transparent 70%)"
               : "radial-gradient(ellipse at 50% 60%, rgba(107,114,128,0.06) 0%, transparent 70%)",
@@ -145,7 +145,7 @@ export default function GameResultOverlay({
           <p
             className="mt-4 text-4xl font-bold tabular-nums sm:text-5xl"
             style={{
-              color: isVictory ? "#FF5E00" : isDraw ? "#60A5FA" : "#6B7280",
+              color: isVictory ? "#FFFF00" : isDraw ? "#60A5FA" : "#6B7280",
             }}
           >
             {isDraw ? (
@@ -169,7 +169,7 @@ export default function GameResultOverlay({
             type="button"
             onClick={handlePlayAgain}
             className="w-full rounded-xl py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ background: "#FF5E00" }}
+            style={{ background: "#FFFF00" }}
           >
             Play Again
           </button>

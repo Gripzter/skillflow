@@ -18,9 +18,9 @@ const config: Config = {
         "primary-text": "#F0F0F4",
 
         // Accents
-        teal: "#FF5E00", // real-money accent (legacy name kept for class compatibility)
+        teal: "#FFFF00", // real-money accent (legacy name kept for class compatibility)
         purple: "#A855F7", // practice accent (legacy name kept for class compatibility)
-        "teal-hover": "#FF7A2E",
+        "teal-hover": "#E6E600",
         "purple-hover": "#C084FC",
 
         // Atmospheric steel blue
@@ -30,7 +30,7 @@ const config: Config = {
         // Admin dashboard (distinct from player site)
         "admin-bg": "#0A0B0F",
         "admin-card": "#12131A",
-        "admin-accent": "#FF5E00",
+        "admin-accent": "#FFFF00",
         "admin-pink": "#EC4899",
         "admin-success": "#22C55E",
         "admin-warning": "#F59E0B",
@@ -52,7 +52,7 @@ const config: Config = {
       },
       backgroundImage: {
         "gradient-teal-purple":
-          "linear-gradient(135deg, #FF5E00 0%, #FF7A2E 100%)",
+          "linear-gradient(135deg, #FFFF00 0%, #E6E600 100%)",
         "mesh-gradient":
           "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(42, 58, 92, 0.15), transparent), radial-gradient(ellipse 60% 40% at 100% 0%, rgba(42, 58, 92, 0.12), transparent)",
       },

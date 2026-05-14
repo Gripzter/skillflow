@@ -250,7 +250,7 @@ export function drawPockets(
     if (callPocketMode || highlightPocketId === i) {
       ctx.strokeStyle = "rgba(0,229,199,0.6)";
       ctx.lineWidth = 4;
-      ctx.shadowColor = "#FF5E00";
+      ctx.shadowColor = "#FFFF00";
       ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(x, y, r * 1.15, 0, Math.PI * 2);

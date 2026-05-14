@@ -215,7 +215,7 @@ export default function AdminOverviewPage() {
           <Link
             href="/admin/revenue"
             className="text-sm hover:underline"
-            style={{ color: "#FF5E00" }}
+            style={{ color: "#FFFF00" }}
           >
             Full report →
           </Link>
@@ -227,7 +227,7 @@ export default function AdminOverviewPage() {
             averageValue={avgChart}
             totalLabel="30-day total"
             averageLabel="Daily avg"
-            color="#FF5E00"
+            color="#FFFF00"
           />
         </div>
       </div>
@@ -239,7 +239,7 @@ export default function AdminOverviewPage() {
           <Link
             href="/admin/matches"
             className="text-sm hover:underline"
-            style={{ color: "#FF5E00" }}
+            style={{ color: "#FFFF00" }}
           >
             View all →
           </Link>

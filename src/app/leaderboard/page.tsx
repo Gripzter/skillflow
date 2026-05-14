@@ -403,7 +403,7 @@ export default function LeaderboardPage() {
                     rank % 2 === 0 ? "bg-card" : "bg-[#1A1A22]"
                   } ${
                     activeTab === "skillpoints" && player.id === currentUserId
-                      ? "bg-[#FF5E00]/8"
+                      ? "bg-[#FFFF00]/8"
                       : player.isCurrentUser
                         ? isPractice
                           ? "bg-purple-500/10"
@@ -451,7 +451,7 @@ export default function LeaderboardPage() {
                       key={player.id}
                       className={`${rowBaseClasses} ${
                         activeTab === "skillpoints" && player.id === currentUserId
-                          ? "border-l-2 border-l-[#FF5E00]"
+                          ? "border-l-2 border-l-[#FFFF00]"
                           : "hover:border-l-2 hover:border-l-teal"
                       }`}
                     >
@@ -507,7 +507,7 @@ export default function LeaderboardPage() {
                   key={player.id}
                   className={`card-border flex items-center justify-between gap-3 rounded-card p-4 ${
                     activeTab === "skillpoints" && player.id === currentUserId
-                      ? "border-[#FF5E00]/60 bg-[#FF5E00]/10"
+                      ? "border-[#FFFF00]/60 bg-[#FFFF00]/10"
                       : player.isCurrentUser
                         ? (isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10")
                         : ""

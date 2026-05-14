@@ -148,8 +148,8 @@ export default function CaseOpeningReel({
 
         <div ref={trackRef} className="relative overflow-hidden rounded-xl border border-white/10 bg-black/30 py-4">
           <div className="pointer-events-none absolute inset-y-0 left-1/2 z-20 -translate-x-1/2">
-            <div className="mx-auto h-5 w-5 rotate-45 rounded-sm border border-[#FF5E00]/80 bg-[#FF5E00]/70 shadow-[0_0_20px_rgba(255,94,0,0.75)] animate-pulse" />
-            <div className="mx-auto mt-1 h-[120px] w-[2px] bg-gradient-to-b from-[#FF5E00] via-[#FF5E00]/40 to-transparent" />
+            <div className="mx-auto h-5 w-5 rotate-45 rounded-sm border border-[#FFFF00]/80 bg-[#FFFF00]/70 shadow-[0_0_20px_rgba(255, 255, 0, 0.75)] animate-pulse" />
+            <div className="mx-auto mt-1 h-[120px] w-[2px] bg-gradient-to-b from-[#FFFF00] via-[#FFFF00]/40 to-transparent" />
           </div>
 
           <div

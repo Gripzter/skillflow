@@ -13,11 +13,11 @@ const BOARD_LIGHT = "#1A1A22";
 const BOARD_DARK = "#242430";
 const BOARD_BORDER = "#2A3A5C";
 
-const P1 = "#FF5E00";
+const P1 = "#FFFF00";
 const P2 = "#C8C8D4";
 const KING_GOLD = "#FFD700";
 
-const ACCENT_ORANGE = "#FF5E00";
+const ACCENT_ORANGE = "#FFFF00";
 const ACCENT_PURPLE = "#A855F7";
 
 function formatPieceCodeToDisplay(piece: number): string {
@@ -587,15 +587,15 @@ export default function Checkers({
   );
 
   const accent = isPractice ? ACCENT_PURPLE : ACCENT_ORANGE;
-  const validDotColor = isPractice ? "rgba(168,85,247,0.3)" : "rgba(255,94,0,0.3)";
-  const mandatoryGlow = isPractice ? "rgba(168,85,247,0.25)" : "rgba(255,94,0,0.25)";
-  const mandatoryGlow2 = isPractice ? "rgba(168,85,247,0.18)" : "rgba(255,94,0,0.18)";
+  const validDotColor = isPractice ? "rgba(168,85,247,0.3)" : "rgba(255, 255, 0, 0.3)";
+  const mandatoryGlow = isPractice ? "rgba(168,85,247,0.25)" : "rgba(255, 255, 0, 0.25)";
+  const mandatoryGlow2 = isPractice ? "rgba(168,85,247,0.18)" : "rgba(255, 255, 0, 0.18)";
   const lastMoveGlow = "rgba(42,58,92,0.18)";
 
   const myName = myRole === "player1" ? player1.username : player2.username;
   const opponentName = myRole === "player1" ? player2.username : player1.username;
 
-  const sideCardAccent = isPractice ? "rgba(168,85,247,0.45)" : "rgba(255,94,0,0.45)";
+  const sideCardAccent = isPractice ? "rgba(168,85,247,0.45)" : "rgba(255, 255, 0, 0.45)";
   const sideCardBorder = isMyTurn ? sideCardAccent : "rgba(255,255,255,0.08)";
 
   // Derived highlights.

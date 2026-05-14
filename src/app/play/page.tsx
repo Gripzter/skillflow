@@ -263,7 +263,7 @@ export default function PlayPage() {
                     Starts in {ltCountdownSec == null ? "—:—" : `${ltMins}:${ltSecs.toString().padStart(2, "0")}`}
                   </p>
                 </div>
-                <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_20px_rgba(255,94,0,0.5)]">
+                <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_20px_rgba(255, 255, 0, 0.5)]">
                   Join Now
                 </span>
               </div>

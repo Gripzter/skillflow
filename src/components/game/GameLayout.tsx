@@ -100,7 +100,7 @@ function PlayerCard({
   afkRingVisible?: boolean;
 }) {
   const initial = (player.username || "?").charAt(0).toUpperCase();
-  const avatarBg = playerKey === "player1" ? "#FF5E00" : "#2A3A5C";
+  const avatarBg = playerKey === "player1" ? "#FFFF00" : "#2A3A5C";
   const clockText = formatPlayerClock(player.timeLeftSec);
   const clockDanger = typeof player.timeLeftSec === "number" && player.timeLeftSec < 60;
   const clockColor = clockDanger ? "#ef4444" : isActive ? "#e0e0e0" : "#555";
@@ -112,7 +112,7 @@ function PlayerCard({
       }`}
       style={{
         background: "#16161e",
-        borderColor: isActive ? "#FF5E00" : "#2A3A5C",
+        borderColor: isActive ? "#FFFF00" : "#2A3A5C",
       }}
     >
       {isActive && (
@@ -162,7 +162,7 @@ function PlayerCard({
           </div>
         </div>
         <div className="ml-auto flex shrink-0 flex-col items-end">
-          <span className="text-[15px] font-medium tabular-nums md:text-[20px]" style={{ color: "#FF5E00" }}>
+          <span className="text-[15px] font-medium tabular-nums md:text-[20px]" style={{ color: "#FFFF00" }}>
             {player.score}
           </span>
           <span className="text-[9px] uppercase tracking-wide text-[#555]">
@@ -295,7 +295,7 @@ export default function GameLayout({
           </span>
         </div>
         <div className="flex-1 text-center">
-          <span className="text-[18px] font-medium tabular-nums" style={{ color: "#FF5E00" }}>
+          <span className="text-[18px] font-medium tabular-nums" style={{ color: "#FFFF00" }}>
             {timerDisplay}
           </span>
         </div>
@@ -305,7 +305,7 @@ export default function GameLayout({
               PRACTICE
             </span>
           ) : (
-            <span className="text-[13px] font-semibold tabular-nums" style={{ color: "#FF5E00" }}>
+            <span className="text-[13px] font-semibold tabular-nums" style={{ color: "#FFFF00" }}>
               {realStakeDisplay ?? "—"}
             </span>
           )}
@@ -368,7 +368,7 @@ export default function GameLayout({
 
           {/* Turn indicator — hidden on mobile when no per-move timer (active card border shows turn) */}
           <div className={`shrink-0 flex-wrap items-center justify-center gap-2 px-2 py-0.5 text-center md:py-1 ${turnTimerDisplay ? "flex" : "hidden md:flex"}`}>
-            <span className="hidden text-[12px] font-medium md:inline" style={{ color: "#FF5E00" }}>{turnText}</span>
+            <span className="hidden text-[12px] font-medium md:inline" style={{ color: "#FFFF00" }}>{turnText}</span>
             {turnTimerDisplay ? (
               <span className="rounded-full border border-[#2a2a34] px-2 py-0.5 text-[11px] tabular-nums text-[#ccc]" style={{ background: "#16161e" }}>
                 {turnTimerDisplay}
@@ -402,7 +402,7 @@ export default function GameLayout({
                       </p>
                     ) : (
                       <p key={entry.id} className="py-0.5 text-[12px] leading-snug">
-                        <span className="text-[11px] font-bold" style={{ color: "#FF5E00" }}>{entry.sender ?? "?"}: </span>
+                        <span className="text-[11px] font-bold" style={{ color: "#FFFF00" }}>{entry.sender ?? "?"}: </span>
                         <span style={{ color: "#ccc" }}>{entry.text}</span>
                       </p>
                     ),
@@ -428,7 +428,7 @@ export default function GameLayout({
                       className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
                       style={{ background: "#1a1a22" }}
                     />
-                    <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-medium text-white" style={{ background: "#FF5E00" }}>
+                    <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-medium text-white" style={{ background: "#FFFF00" }}>
                       Send
                     </button>
                   </div>
@@ -457,7 +457,7 @@ export default function GameLayout({
             <div ref={desktopChatRef} className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto px-2 py-2">
               {chatOnly.map((entry) => (
                 <p key={entry.id} className="py-0.5 text-[12px] leading-snug">
-                  <span className="text-[11px] font-bold" style={{ color: "#FF5E00" }}>{entry.sender ?? "?"}: </span>
+                  <span className="text-[11px] font-bold" style={{ color: "#FFFF00" }}>{entry.sender ?? "?"}: </span>
                   <span style={{ color: "#999" }}>{entry.text}</span>
                 </p>
               ))}
@@ -482,7 +482,7 @@ export default function GameLayout({
                   className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1.5 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
                   style={{ background: "#1a1a22" }}
                 />
-                <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-medium text-white" style={{ background: "#FF5E00" }}>
+                <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-medium text-white" style={{ background: "#FFFF00" }}>
                   Send
                 </button>
               </div>

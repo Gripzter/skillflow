@@ -45,7 +45,7 @@ interface MatchRow {
 }
 
 const STATUS_STYLES: Record<ReportStatus, string> = {
-  new: "bg-[#FF5E00]/10 text-[#FF5E00]",
+  new: "bg-[#FFFF00]/10 text-[#FFFF00]",
   reviewed: "bg-yellow-500/10 text-yellow-400",
   resolved: "bg-green-500/10 text-green-400",
 };
@@ -301,7 +301,7 @@ export default function AdminReportsPage() {
                 ? "text-white"
                 : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
             }`}
-            style={statusFilter === s ? { background: "#FF5E00" } : {}}
+            style={statusFilter === s ? { background: "#FFFF00" } : {}}
           >
             {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
             {s !== "all" && (
@@ -477,7 +477,7 @@ CREATE TRIGGER reports_set_updated_at
                                 [r.id]: e.target.value as ReportStatus,
                               }))
                             }
-                            className="w-full rounded-lg border border-white/10 bg-admin-bg px-3 py-2 text-sm text-white focus:border-[#FF5E00] focus:outline-none"
+                            className="w-full rounded-lg border border-white/10 bg-admin-bg px-3 py-2 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
                           >
                             <option value="new">New</option>
                             <option value="reviewed">Reviewed</option>
@@ -492,7 +492,7 @@ CREATE TRIGGER reports_set_updated_at
                             onChange={(e) =>
                               setNotes((prev) => ({ ...prev, [r.id]: e.target.value }))
                             }
-                            className="w-full resize-none rounded-lg border border-white/10 bg-admin-bg px-3 py-2 text-sm text-white placeholder-[#6B7280] focus:border-[#FF5E00] focus:outline-none"
+                            className="w-full resize-none rounded-lg border border-white/10 bg-admin-bg px-3 py-2 text-sm text-white placeholder-[#6B7280] focus:border-[#FFFF00] focus:outline-none"
                             placeholder="Add internal notes…"
                           />
                         </div>
@@ -502,7 +502,7 @@ CREATE TRIGGER reports_set_updated_at
                         disabled={saving === r.id}
                         onClick={() => saveReport(r.id)}
                         className="rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:opacity-90 transition-opacity"
-                        style={{ background: "#FF5E00" }}
+                        style={{ background: "#FFFF00" }}
                       >
                         {saving === r.id ? "Saving…" : "Save Changes"}
                       </button>

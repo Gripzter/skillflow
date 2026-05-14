@@ -32,7 +32,7 @@ export default function GamesGrid() {
       <div className="mx-auto w-full max-w-[1200px] px-8 py-[60px]">
         <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
           <div>
-            <p className="text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">EIGHT GAMES</p>
+            <p className="text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">EIGHT GAMES</p>
             <h2 className="mt-2 text-[32px] font-medium tracking-[-1px] text-white">Pick your weapon</h2>
           </div>
           <p className="text-[13px] text-[#888]">All games — no luck, pure skill</p>

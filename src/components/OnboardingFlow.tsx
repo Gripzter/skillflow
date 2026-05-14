@@ -193,7 +193,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(circle at 50% 40%, rgba(255,94,0,0.08) 0%, transparent 60%)",
+              "radial-gradient(circle at 50% 40%, rgba(255, 255, 0, 0.08) 0%, transparent 60%)",
           }}
         />
         <div className="w-full text-center">
@@ -216,7 +216,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                 {sparkles.map((sparkle) => (
                   <span
                     key={sparkle}
-                    className="sparkle-dot absolute rounded-full bg-[#FF5E00]/40"
+                    className="sparkle-dot absolute rounded-full bg-[#FFFF00]/40"
                     style={{
                       left: `${8 + sparkle * 12}%`,
                       bottom: `${10 + (sparkle % 3) * 6}%`,
@@ -278,7 +278,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
 
           {step === 2 && (
             <div className="mx-auto w-full max-w-lg space-y-8 text-center">
-              <div className="w-full rounded-2xl bg-gradient-to-r from-[#FF5E00] to-[#FF8C00] p-px">
+              <div className="w-full rounded-2xl bg-gradient-to-r from-[#FFFF00] to-[#FF8C00] p-px">
                 <div className="rounded-2xl bg-[#1A1A24] p-6 md:p-8">
                   <div className="mb-4 flex justify-center">
                     <Image
@@ -289,7 +289,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                       className="h-8 w-8 object-contain"
                     />
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-[#FF5E00]">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-[#FFFF00]">
                     BETA FOUNDERS PROGRAM
                   </p>
                   <p className="mt-4 text-base text-gray-300">
@@ -304,7 +304,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   <div className="mt-6">
                     <div className="h-2 overflow-hidden rounded-full bg-[#2A2A3A]">
                       <div
-                        className="h-full rounded-full bg-[#FF5E00]"
+                        className="h-full rounded-full bg-[#FFFF00]"
                         style={{ width: `${founderProgress}%` }}
                       />
                     </div>
@@ -330,7 +330,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                     type="button"
                     disabled={saving}
                     onClick={() => handleChooseGame(game.slug)}
-                    className="rounded-xl border border-[#2A2A3A] bg-[#1A1A24] p-4 text-left transition duration-200 hover:scale-[1.05] hover:border-[#FF5E00] hover:shadow-[0_0_22px_rgba(255,94,0,0.35)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-[#2A2A3A] bg-[#1A1A24] p-4 text-left transition duration-200 hover:scale-[1.05] hover:border-[#FFFF00] hover:shadow-[0_0_22px_rgba(255, 255, 0, 0.35)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <div className="relative h-12 w-full overflow-hidden rounded-md border border-white/10">
                       <Image
@@ -355,7 +355,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             <button
               type="button"
               onClick={() => setStep((prev) => (Math.min(3, prev + 1) as OnboardingStep))}
-              className="w-full rounded-lg bg-[#FF5E00] px-5 py-3 text-base font-semibold text-white transition hover:bg-[#e55300] md:w-[280px]"
+              className="w-full rounded-lg bg-[#FFFF00] px-5 py-3 text-base font-semibold text-[#0E0E12] transition hover:bg-[#E6E600] md:w-[280px]"
             >
               Next
             </button>
@@ -412,10 +412,10 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
         @keyframes orangeGlow {
           0%,
           100% {
-            box-shadow: 0 0 14px rgba(255, 94, 0, 0.35);
+            box-shadow: 0 0 14px rgba(255, 255, 0, 0.35);
           }
           50% {
-            box-shadow: 0 0 28px rgba(255, 94, 0, 0.55);
+            box-shadow: 0 0 28px rgba(255, 255, 0, 0.55);
           }
         }
         @keyframes floatUp {

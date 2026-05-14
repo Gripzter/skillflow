@@ -272,7 +272,7 @@ export default function CasesPage() {
                   disabled={!canAfford || isOpening}
                   className={`mt-4 w-full rounded-lg px-4 py-2.5 font-semibold text-white transition-opacity ${
                     canAfford && !isOpening
-                      ? "bg-[#FF5E00] hover:opacity-90"
+                      ? "bg-[#FFFF00] hover:opacity-90"
                       : "cursor-not-allowed bg-white/10 text-gray-500"
                   }`}
                 >
@@ -307,7 +307,7 @@ export default function CasesPage() {
               disabled={!canOpenFreeCrate}
               className={`rounded-lg px-4 py-2.5 font-semibold text-white transition-opacity ${
                 canOpenFreeCrate
-                  ? "bg-[#FF5E00] hover:opacity-90"
+                  ? "bg-[#FFFF00] hover:opacity-90"
                   : "cursor-not-allowed bg-white/10 text-gray-500"
               }`}
             >

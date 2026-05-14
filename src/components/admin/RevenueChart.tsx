@@ -27,7 +27,7 @@ export default function RevenueChart({
   averageLabel = "Average daily",
   totalValue,
   averageValue,
-  color = "#FF5E00",
+  color = "#FFFF00",
 }: RevenueChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const padding = { top: 20, right: 20, bottom: 40, left: 56 };

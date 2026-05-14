@@ -435,7 +435,7 @@ export default function LiveMatchShowcase() {
 
   const timerText = showcase?.kind === "live" ? formatDuration(liveSeconds) : "REPLAY";
   const badgeLabel = showcase?.kind === "live" ? "LIVE — Chess match" : "FEATURED MATCH";
-  const badgeDot = showcase?.kind === "live" ? "bg-[#22c55e]" : "bg-[#FF5E00]";
+  const badgeDot = showcase?.kind === "live" ? "bg-[#22c55e]" : "bg-[#FFFF00]";
   const displayBet = showcase?.bet ? nearestValidSpAmount(showcase.bet) : null;
   const squares = useMemo(
     () =>
@@ -467,19 +467,19 @@ export default function LiveMatchShowcase() {
       <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
         <div>
           <p className="text-[13px] font-medium text-white">{showcase?.player1.username ?? "phoenix77"}</p>
-          <p className="mt-1 text-[10px] tracking-[0.5px] text-[#FF5E00]">{showcase?.player1.rank ?? "GOLD II"}</p>
+          <p className="mt-1 text-[10px] tracking-[0.5px] text-[#FFFF00]">{showcase?.player1.rank ?? "GOLD II"}</p>
         </div>
         <p className="font-mono text-[18px] text-[#444]">vs</p>
         <div className="text-right">
           <p className="text-[13px] font-medium text-white">{showcase?.player2.username ?? "shadowfox"}</p>
-          <p className="mt-1 text-[10px] tracking-[0.5px] text-[#FF5E00]">{showcase?.player2.rank ?? "GOLD I"}</p>
+          <p className="mt-1 text-[10px] tracking-[0.5px] text-[#FFFF00]">{showcase?.player2.rank ?? "GOLD I"}</p>
         </div>
       </div>
 
       <p className="mb-4 text-center text-[12px] text-[#888]">
         {displayBet ? (
           <>
-            <span className="text-[#FF5E00]">{displayBet} SP</span> on the line
+            <span className="text-[#FFFF00]">{displayBet} SP</span> on the line
           </>
         ) : (
           "Ranked match"
@@ -488,7 +488,7 @@ export default function LiveMatchShowcase() {
 
       <div className="rounded-md bg-[#0E0E12] p-2">
         {showCheckmate ? (
-          <p className="mb-2 text-center text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">CHECKMATE</p>
+          <p className="mb-2 text-center text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">CHECKMATE</p>
         ) : null}
         <div className="grid grid-cols-8 overflow-hidden rounded-sm">
           {squares.map(({ square, rowIndex, colIndex, piece }) => {
@@ -512,7 +512,7 @@ export default function LiveMatchShowcase() {
       <style jsx>{`
         @keyframes piece-pulse {
           0% {
-            color: #ff5e00;
+            color: #FFFF00;
             transform: scale(1.2);
           }
           100% {

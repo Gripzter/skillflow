@@ -194,7 +194,7 @@ export default function LiveTicker() {
             <span className="text-[#888]">
               {event.username} won {event.game}
             </span>
-            <span className="text-[#FF5E00]">+{event.amount} SP</span>
+            <span className="text-[#FFFF00]">+{event.amount} SP</span>
           </div>
         ))}
       </div>

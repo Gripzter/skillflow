@@ -404,9 +404,9 @@ export default function ConnectFour({
                             ? `radial-gradient(circle at 32% 28%, ${RED_CENTER}, 70%, ${RED_EDGE})`
                             : `radial-gradient(circle at 32% 28%, ${YELLOW_CENTER}, 70%, ${YELLOW_EDGE})`,
                           boxShadow: isWinCell
-                            ? "0 0 16px rgba(255,94,0,0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
+                            ? "0 0 16px rgba(255, 255, 0, 0.8), inset -2px -2px 4px rgba(0,0,0,0.3)"
                             : "inset -3px -3px 6px rgba(0,0,0,0.35), inset 3px 3px 6px rgba(255,255,255,0.25)",
-                          border: isWinCell ? "3px solid rgba(255,94,0,0.9)" : undefined,
+                          border: isWinCell ? "3px solid rgba(255, 255, 0, 0.9)" : undefined,
                           ["--drop-from" as string]: `${dropFromY}px`,
                           animation: isDroppingHere ? "connect4Drop 500ms cubic-bezier(0.34,1.56,0.64,1) forwards" : "none",
                         }}
@@ -430,7 +430,7 @@ export default function ConnectFour({
                   y1={PAD + winResult.cells[0][0] * (cellSize + GAP) + cellSize / 2}
                   x2={PAD + winResult.cells[3][1] * (cellSize + GAP) + cellSize / 2}
                   y2={PAD + winResult.cells[3][0] * (cellSize + GAP) + cellSize / 2}
-                  stroke="rgba(255,94,0,0.95)"
+                  stroke="rgba(255, 255, 0, 0.95)"
                   strokeWidth="4"
                   strokeLinecap="round"
                 />

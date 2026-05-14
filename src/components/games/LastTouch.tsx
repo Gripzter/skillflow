@@ -734,7 +734,7 @@ export default function LastTouch({
   if (!liveSession) {
     return (
       <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black text-transparent">
+        <h1 className="bg-gradient-to-r from-[#FFFF00] via-[#FF7A2E] to-[#FFFF00] bg-clip-text text-4xl font-black text-transparent">
           LAST TOUCH
         </h1>
         <p className="text-body-gray">No upcoming sessions. Check back soon!</p>
@@ -904,7 +904,7 @@ export default function LastTouch({
                   onContextMenu={(e) => e.preventDefault()}
                   className={`absolute z-20 flex cursor-pointer select-none flex-col items-center justify-center border-4 transition-all ${
                     isHolding
-                      ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(255,94,0,0.6)]"
+                      ? "border-teal bg-gradient-to-br from-teal/60 to-purple-500/60 shadow-[0_0_60px_rgba(255, 255, 0, 0.6)]"
                       : "border-white/20 bg-white/5 hover:border-teal/50"
                   }`}
                   style={{
@@ -1047,7 +1047,7 @@ export default function LastTouch({
   return (
     <div className="relative flex flex-col gap-6 pb-8">
       <div className="text-center">
-        <h1 className="bg-gradient-to-r from-[#FF5E00] via-[#FF7A2E] to-[#FF5E00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
+        <h1 className="bg-gradient-to-r from-[#FFFF00] via-[#FF7A2E] to-[#FFFF00] bg-clip-text text-4xl font-black tracking-tight text-transparent sm:text-5xl md:text-6xl">
           LAST TOUCH
         </h1>
         <p className="mt-2 text-body-gray">Hold your ground. Win it all.</p>
@@ -1085,7 +1085,7 @@ export default function LastTouch({
             type="button"
             onClick={handleJoin}
             disabled={liveSession.status !== "upcoming"}
-            className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(255,94,0,0.4)] transition hover:opacity-95 disabled:opacity-50"
+            className="w-full rounded-xl bg-teal py-4 text-lg font-bold text-charcoal shadow-[0_0_30px_rgba(255, 255, 0, 0.4)] transition hover:opacity-95 disabled:opacity-50"
           >
             Get Your Ticket - ${liveSession.entry_fee.toFixed(2)}
           </button>

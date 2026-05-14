@@ -12,7 +12,7 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
     <section id="founders" className="border-t border-[#1a1a22] bg-[#0a0a0e]">
       <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-12 px-8 py-[60px] md:grid-cols-2">
         <div>
-          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">FOUNDERS PROGRAM</p>
+          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">FOUNDERS PROGRAM</p>
           <h2 className="mt-2 text-[32px] font-medium tracking-[-1px] text-white">Get in before everyone else.</h2>
           <p className="mt-4 text-[14px] leading-[1.6] text-[#888]">
             Reach Platinum during beta and you&apos;re in. Permanent Founders badge nobody else can earn after launch.
@@ -30,7 +30,7 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
                 key={item}
                 className={`flex items-start py-1.5 ${index !== arr.length - 1 ? "border-b border-[#1a1a22]" : ""}`}
               >
-                <span className="mr-2 text-[#FF5E00]">●</span>
+                <span className="mr-2 text-[#FFFF00]">●</span>
                 <span>{item}</span>
               </li>
             ))}
@@ -41,7 +41,7 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
             onClick={() => {
               window.location.href = "/founders";
             }}
-            className="mt-6 rounded-[8px] bg-[#FF5E00] px-6 py-3.5 text-[14px] font-medium text-white transition-opacity hover:opacity-90"
+            className="mt-6 rounded-[8px] bg-[#FFFF00] px-6 py-3.5 text-[14px] font-medium text-[#0E0E12] transition-colors hover:bg-[#E6E600]"
           >
             Reserve my spot →
           </button>
@@ -56,13 +56,13 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
             className="mx-auto mb-4"
           />
 
-          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FF5E00]">MYTHIC TIER</p>
+          <p className="text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">MYTHIC TIER</p>
           <p className="mt-2 text-[18px] font-medium text-white">Omega Founder Badge</p>
           <p className="mt-1 text-[12px] text-[#666]">Awarded once. Never re-issued.</p>
 
           <div className="mt-4 flex items-center justify-between border-t border-[#1a1a22] pt-4 text-[11px] text-[#888]">
             <span>Spots remaining</span>
-            <span className="font-medium text-[#FF5E00]">{closed ? "Closed" : `${remaining ?? 1000} / 1,000`}</span>
+            <span className="font-medium text-[#FFFF00]">{closed ? "Closed" : `${remaining ?? 1000} / 1,000`}</span>
           </div>
         </div>
       </div>

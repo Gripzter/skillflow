@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --accent: #ff5e00;
-  --accent-light: rgba(255, 94, 0, 0.15);
+  --accent: #FFFF00;
+  --accent-light: rgba(255, 255, 0, 0.15);
   --accent-glow: rgba(42, 58, 92, 0.5); /* ambient glow now steel blue */
   --accent-dark: #ff7a2e;
 }
@@ -124,12 +124,12 @@ main,
 @keyframes gameLayoutActivePulse {
   0%,
   100% {
-    border-color: #ff5e00;
-    box-shadow: 0 0 0 0 rgba(255, 94, 0, 0);
+    border-color: #FFFF00;
+    box-shadow: 0 0 0 0 rgba(255, 255, 0, 0);
   }
   50% {
-    border-color: #ff5e00;
-    box-shadow: 0 0 8px 0 rgba(255, 94, 0, 0.15);
+    border-color: #FFFF00;
+    box-shadow: 0 0 8px 0 rgba(255, 255, 0, 0.15);
   }
 }
 .game-layout-card-active {
@@ -347,7 +347,7 @@ main,
 }
 
 .legal-page a {
-  color: #ff5e00;
+  color: #FFFF00;
   text-decoration: none;
 }
 

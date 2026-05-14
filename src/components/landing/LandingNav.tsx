@@ -21,7 +21,7 @@ export default function LandingNav() {
           className="flex items-center gap-2 text-white"
           aria-label="Go to homepage"
         >
-          <span className="h-[18px] w-1 rounded-[2px] bg-[#FF5E00]" />
+          <span className="h-[18px] w-1 rounded-[2px] bg-[#FFFF00]" />
           <span className="text-[18px] font-bold tracking-[-0.5px]">skillflow</span>
         </button>
 
@@ -49,7 +49,7 @@ export default function LandingNav() {
           <button
             type="button"
             onClick={() => goTo("/signup")}
-            className="rounded-md bg-[#FF5E00] px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
+            className="rounded-md bg-[#FFFF00] px-4 py-2 text-[13px] font-medium text-[#0E0E12] transition-colors hover:bg-[#E6E600]"
           >
             Play now
           </button>

@@ -86,7 +86,7 @@ export default function AdminSidebar() {
         <span className="text-base font-bold tracking-tight text-white">SkillFlow</span>
         <span
           className="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-white"
-          style={{ background: "#FF5E00" }}
+          style={{ background: "#FFFF00" }}
         >
           ADMIN
         </span>
@@ -110,11 +110,11 @@ export default function AdminSidebar() {
               {isActive && (
                 <span
                   className="absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r-full"
-                  style={{ background: "#FF5E00" }}
+                  style={{ background: "#FFFF00" }}
                 />
               )}
               <span
-                className={isActive ? "text-[#FF5E00]" : "text-current"}
+                className={isActive ? "text-[#FFFF00]" : "text-current"}
                 aria-hidden
               >
                 {icon}

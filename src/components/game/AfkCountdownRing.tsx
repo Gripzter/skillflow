@@ -37,7 +37,7 @@ export default function AfkCountdownRing({
           cy="50"
           r={R}
           fill="none"
-          stroke={isDanger ? "#DC3545" : "#FF5E00"}
+          stroke={isDanger ? "#DC3545" : "#FFFF00"}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}

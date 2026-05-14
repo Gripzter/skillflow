@@ -141,7 +141,7 @@ export default function AdminMatchesPage() {
     fees: filtered.filter((m) => m.status === "completed").reduce((s, m) => s + (m.platform_fee || 0), 0),
   }), [filtered]);
 
-  const selectCls = "rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FF5E00] focus:outline-none";
+  const selectCls = "rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FFFF00] focus:outline-none";
 
   if (loading) {
     return <LoadingRing />;

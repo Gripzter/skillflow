@@ -291,7 +291,7 @@ export default function ProfilePage() {
           style={{
             backgroundImage: isPractice
               ? "linear-gradient(135deg, rgba(168,85,247,0.07) 0%, transparent 50%, rgba(192,132,252,0.06) 100%)"
-              : "linear-gradient(135deg, rgba(255,94,0,0.06) 0%, transparent 50%, rgba(255,122,46,0.05) 100%)",
+              : "linear-gradient(135deg, rgba(255, 255, 0, 0.06) 0%, transparent 50%, rgba(255,122,46,0.05) 100%)",
           }}
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
@@ -603,8 +603,8 @@ export default function ProfilePage() {
             <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full max-w-full" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient id="ratingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#FF5E00" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#FF5E00" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#FFFF00" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#FFFF00" stopOpacity="0" />
                 </linearGradient>
               </defs>
               {/* Grid */}
@@ -655,7 +655,7 @@ export default function ProfilePage() {
                       })
                       .join(" ")}
                     fill="none"
-                    stroke="#FF5E00"
+                    stroke="#FFFF00"
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -668,7 +668,7 @@ export default function ProfilePage() {
                   y1={pad.top + innerH / 2}
                   x2={chartW - pad.right}
                   y2={pad.top + innerH / 2}
-                  stroke="#FF5E00"
+                  stroke="#FFFF00"
                   strokeWidth="2"
                   strokeDasharray="4 4"
                 />

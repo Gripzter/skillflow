@@ -778,7 +778,7 @@ export default function DashboardPage() {
                   </Skeleton>
                 </div>
                 <Skeleton isLoading={isLoading} className="rounded-xl">
-                  <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255,94,0,0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
+                  <span className="rounded-lg bg-teal px-4 py-2 text-sm font-semibold text-charcoal shadow-[0_0_22px_rgba(255, 255, 0, 0.6)] transition-transform duration-150 group-hover:-translate-y-0.5">
                     Join Now
                   </span>
                 </Skeleton>

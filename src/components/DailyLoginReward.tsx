@@ -37,7 +37,7 @@ export default function DailyLoginReward({
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-charcoal/90 px-4">
       <div
-        className={`relative w-full max-w-2xl rounded-card border border-orange-500/35 bg-card p-6 shadow-[0_0_40px_rgba(255,94,0,0.25)] transition-transform duration-200 ${
+        className={`relative w-full max-w-2xl rounded-card border border-orange-500/35 bg-card p-6 shadow-[0_0_40px_rgba(255, 255, 0, 0.25)] transition-transform duration-200 ${
           claimFx ? "scale-[1.02]" : "scale-100"
         }`}
       >

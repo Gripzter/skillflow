@@ -4,7 +4,7 @@ All cards: 16:9 aspect ratio, 1920x1080 PNG or JPG.
 
 Brand palette to match:
 - Code Black background: #0E0E12
-- Plasma Orange accent: #FF5E00
+- Plasma Orange accent: #FFFF00
 - White text: #FFFFFF
 
 Style: Premium, dark, dramatic. Think GTA Online loading screens, Stake.com promo banners,
@@ -50,6 +50,6 @@ gradient. Text area: "kira_06 — 8-WIN STREAK". Hot-streak energy.
 - Leave at least 30-40% of the card with a darker zone where overlay text would sit
 - Avoid text in the AI-generated image itself (you can add text in Photoshop/Canva after,
   or skip text and let the visual carry it)
-- Keep the orange (#FF5E00) as the dominant accent in 4 of 6 cards
+- Keep the orange (#FFFF00) as the dominant accent in 4 of 6 cards
 - Use blue/cyan only for Diamond rank card (Card 4)
 - Match the existing game card art style (saturated, 3D, dramatic lighting)

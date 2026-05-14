@@ -143,7 +143,7 @@ export default function CaseResultModal({
             <button
               type="button"
               onClick={onOpenAnother}
-              className="w-full rounded-lg bg-[#FF5E00] px-4 py-2.5 font-semibold text-white transition-opacity hover:opacity-90"
+              className="w-full rounded-lg bg-[#FFFF00] px-4 py-2.5 font-semibold text-[#0E0E12] transition-colors hover:bg-[#E6E600]"
             >
               Open Another
             </button>

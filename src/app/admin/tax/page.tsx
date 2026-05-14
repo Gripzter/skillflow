@@ -217,7 +217,7 @@ export default function AdminTaxPage() {
           <select
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FF5E00] focus:outline-none"
+            className="rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
           >
             {availableYears.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -228,7 +228,7 @@ export default function AdminTaxPage() {
             onClick={() => downloadCSV(yearQuarters, year)}
             disabled={yearQuarters.length === 0}
             className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ background: "#FF5E00" }}
+            style={{ background: "#FFFF00" }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M7 2v7M4 6l3 3 3-3M2 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -243,7 +243,7 @@ export default function AdminTaxPage() {
         {[
           { label: "Total Deposits", val: yearTotals.deposits, color: "text-green-400" },
           { label: "Total Withdrawals", val: yearTotals.withdrawals, color: "text-red-400" },
-          { label: "Match Fees Earned", val: yearTotals.matchFees, color: "text-[#FF5E00]" },
+          { label: "Match Fees Earned", val: yearTotals.matchFees, color: "text-[#FFFF00]" },
           { label: "Stripe Fees (est.)", val: yearTotals.stripeFees, color: "text-yellow-400" },
           { label: "Withdrawal Fees (est.)", val: yearTotals.withdrawalFees, color: "text-yellow-400" },
           { label: `Net Revenue ${year}`, val: yearTotals.netRevenue, color: yearTotals.netRevenue >= 0 ? "text-green-400" : "text-red-400" },
@@ -295,7 +295,7 @@ export default function AdminTaxPage() {
                     <td className="px-4 py-3 font-medium text-white">{q.label}</td>
                     <td className={tdCls}>${q.deposits.toFixed(2)}</td>
                     <td className={tdCls}>${q.withdrawals.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right text-[#FF5E00]">${q.matchFees.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right text-[#FFFF00]">${q.matchFees.toFixed(2)}</td>
                     <td className={tdCls}>{q.matchCount}</td>
                     <td className="px-4 py-3 text-right text-yellow-400">${q.stripeFees.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right text-yellow-400">${q.withdrawalFees.toFixed(2)}</td>
@@ -309,7 +309,7 @@ export default function AdminTaxPage() {
                   <td className="px-4 py-3 font-bold text-white">Total {year}</td>
                   <td className={`${tdCls} font-semibold text-white`}>${yearTotals.deposits.toFixed(2)}</td>
                   <td className={`${tdCls} font-semibold text-white`}>${yearTotals.withdrawals.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-right font-semibold text-[#FF5E00]">${yearTotals.matchFees.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-[#FFFF00]">${yearTotals.matchFees.toFixed(2)}</td>
                   <td className={`${tdCls} font-semibold text-white`}>{yearTotals.matchCount}</td>
                   <td className="px-4 py-3 text-right font-semibold text-yellow-400">${yearTotals.stripeFees.toFixed(2)}</td>
                   <td className="px-4 py-3 text-right font-semibold text-yellow-400">${yearTotals.withdrawalFees.toFixed(2)}</td>

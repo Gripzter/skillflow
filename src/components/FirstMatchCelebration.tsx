@@ -59,8 +59,8 @@ export default function FirstMatchCelebration({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#06070D]/92 px-4">
-      <div className="first-match-pop relative w-full max-w-2xl overflow-hidden rounded-2xl border border-orange-300/35 bg-[#0E111B] p-6 shadow-[0_0_60px_rgba(255,94,0,0.22)] md:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,94,0,0.14),transparent_60%)]" />
+      <div className="first-match-pop relative w-full max-w-2xl overflow-hidden rounded-2xl border border-orange-300/35 bg-[#0E111B] p-6 shadow-[0_0_60px_rgba(255, 255, 0, 0.22)] md:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255, 255, 0, 0.14),transparent_60%)]" />
 
         <div className="confetti-burst pointer-events-none absolute left-1/2 top-1/2">
           {dots.map((dot) => (
@@ -142,7 +142,7 @@ export default function FirstMatchCelebration({
         }
 
         .dot:nth-child(5n) {
-          background: #ff5e00;
+          background: #FFFF00;
         }
 
         @keyframes burst {
