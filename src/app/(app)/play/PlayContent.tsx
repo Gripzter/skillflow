@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import GameCardChallenges from "@/components/play/GameCardChallenges";
 import LoadingRing from "@/components/LoadingRing";
+import PromoCarousel from "@/components/play/PromoCarousel";
 import { useDailyChallenges } from "@/hooks/useDailyChallenges";
 import { useGames, type GameCategory } from "@/hooks/useGames";
 import { useGameOrder } from "@/hooks/useGameOrder";
@@ -128,7 +129,11 @@ export default function PlayContent() {
       <AppNavbar currentPage="play" initialOpenSpModal={openSpFromUrl} />
 
       <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
-        <h1 className="text-[32px] font-black tracking-[-0.03em] text-white">Pick a game. Match in 20 seconds.</h1>
+        <PromoCarousel />
+
+        <h1 className="mt-8 text-[32px] font-black tracking-[-0.03em] text-white">
+          Play smarter. Match faster. Earn more.
+        </h1>
         <p className="mt-2 text-sm text-[#9CA3AF]">Beta · Free to play · Earn SkillPoints</p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -164,28 +169,6 @@ export default function PlayContent() {
         </div>
 
         <section className="mt-12">
-          <div className="-mx-1 overflow-x-auto px-1">
-            <div className="inline-flex min-w-full gap-2 pb-1">
-              {challenges.map((challenge) => (
-                <div
-                  key={challenge.id}
-                  className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full border px-3 py-2 text-xs ${
-                    challenge.completed
-                      ? "border-[#1F1F26] bg-[#16161C] text-[#6B7280]"
-                      : "border-[#1F1F26] bg-[#16161C] text-[#D1D5DB]"
-                  }`}
-                >
-                  <span>{challenge.completed ? "✓" : "◉"}</span>
-                  <span>{challenge.description}</span>
-                  <span>{Number(challenge.progress)}/{Number(challenge.target)}</span>
-                  <span className={challenge.completed ? "text-[#6B7280]" : "text-[#FFFF00]"}>
-                    +{Number(challenge.reward_sp).toLocaleString()} SP
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {matches.length > 0 ? (
             <p className="mt-4 text-sm text-[#9CA3AF]">
               Last match: {matches[0].resultLabel} vs {matches[0].opponent} ·
