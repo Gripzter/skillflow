@@ -39,6 +39,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import { escrowMatch } from "@/lib/matchActions";
+import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -130,6 +131,7 @@ function MatchPageContent() {
   const [match, setMatch] = useState<StoredMatch | null>(null);
   const [timerNowMs, setTimerNowMs] = useState(Date.now());
   const [outcome, setOutcome] = useState<Outcome>(null);
+  const [settlementError, setSettlementError] = useState<string | null>(null);
   const [forfeitConfirm, setForfeitConfirm] = useState(false);
   const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
   const [connectionCheckState, setConnectionCheckState] = useState<"checking" | "ok" | "warning" | "unrecommended">("checking");
@@ -600,9 +602,18 @@ function MatchPageContent() {
           if (!forfeitHandledRef.current && m) {
             forfeitHandledRef.current = true;
             setWonByForfeit(true);
-            completeMatchAndSettle(m, "player1").catch(() => {});
-            dispatchWalletUpdated();
-            setOutcome("victory");
+            completeMatchAndSettle(m, "player1")
+              .then(() => {
+                dispatchWalletUpdated();
+                setOutcome("victory");
+              })
+              .catch((error) => {
+                // eslint-disable-next-line no-console
+                console.error("[MatchPage] Forfeit settlement failed", { matchId: m.id, error });
+                setSettlementError(
+                  "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
+                );
+              });
           }
           return 0;
         }
@@ -618,8 +629,8 @@ function MatchPageContent() {
    * Only Player 1 persists the result (completeMatchAndSettle) to avoid double-writes.
    */
   const handleGameEnd = useCallback(
-    async (winner: "player1" | "player2") => {
-      if (!match) return;
+    async (winner: "player1" | "player2"): Promise<boolean> => {
+      if (!match) return false;
       const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
       // Practice/dev matches may not have stable user IDs on the match record,
       // so fall back to role-based win detection.
@@ -628,15 +639,19 @@ function MatchPageContent() {
       try {
         await completeMatchAndSettle(match, winner);
         dispatchWalletUpdated();
-      } catch {
+        setOutcome(iWon ? "victory" : "defeat");
+        return true;
+      } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("[MatchPage] Failed to persist match result", { matchId: match.id, winner });
-        showToast("Match result could not be saved — please contact support", "error");
+        console.error("[MatchPage] Failed to persist match result", { matchId: match.id, winner, error });
+        setSettlementError(
+          "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
+        );
         dispatchWalletUpdated();
+        return false;
       }
-      setOutcome(iWon ? "victory" : "defeat");
     },
-    [match, userId, showToast]
+    [match, userId]
   );
 
   const handleWin = useCallback(() => handleGameEnd("player1"), [handleGameEnd]);
@@ -647,17 +662,26 @@ function MatchPageContent() {
     try {
       await completeMatchAndSettle(match, "draw");
       dispatchWalletUpdated();
-    } catch {
+      setOutcome("draw");
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("[MatchPage] Failed to persist draw", { matchId: match.id, error });
+      setSettlementError(
+        "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
+      );
       dispatchWalletUpdated();
     }
-    setOutcome("draw");
   }, [match]);
 
   const handleForfeitConfirm = useCallback(async () => {
     if (match?.isRealMultiplayer && (match?.gameType === "chess" || match?.gameType === "connect-4")) {
       await sendGameEvent({ type: "resign" }).catch(() => {});
     }
-    await handleGameEnd("player2");
+    const settled = await handleGameEnd("player2");
+    if (!settled) {
+      setForfeitConfirm(false);
+      return;
+    }
     setForfeitConfirm(false);
     if (typeof window !== "undefined" && match) {
       window.location.href = `/play/${match.gameType}`;
@@ -675,7 +699,8 @@ function MatchPageContent() {
       sendGameEvent({ type: "afk_forfeit" }).catch(() => {});
     }
     handleGameEnd(opponentRole)
-      .finally(() => {
+      .then((settled) => {
+        if (!settled) return;
         window.location.href = `/play/${match.gameType}`;
       })
       .catch(() => {
@@ -1511,6 +1536,17 @@ function MatchPageContent() {
           earnedSp={celebrationEarnedSp}
           gameSlug={match.gameType}
           onClose={() => setShowFirstMatchCelebration(false)}
+        />
+      ) : null}
+
+      {settlementError ? (
+        <SettlementErrorScreen
+          message={settlementError}
+          onRefresh={() => window.location.reload()}
+          onContinue={() => {
+            setSettlementError(null);
+            window.location.href = "/play";
+          }}
         />
       ) : null}
 

@@ -36,6 +36,9 @@ export async function escrowMatch(opts: {
     throw new Error("Invalid opponentId");
   }
 
+  // Temporary diagnostic logs for broken settlement triage.
+  // eslint-disable-next-line no-console
+  console.log("[CLIENT_ESCROW_CALL]", opts);
   const token = await getAccessToken();
   const res = await fetch(`${getFunctionsBaseUrl()}/match-escrow`, {
     method: "POST",
@@ -50,12 +53,17 @@ export async function escrowMatch(opts: {
       opponentIsBot: opts.opponentIsBot,
     }),
   });
+  // eslint-disable-next-line no-console
+  console.log("[CLIENT_ESCROW_RESULT]", res.status);
 
   const payload = await res.json().catch(() => ({} as Record<string, unknown>));
   if (!res.ok) {
     const message =
       typeof payload.error === "string" ? payload.error : `Escrow failed: ${res.status}`;
     throw new Error(message);
+  }
+  if (payload.status !== "escrowed" && payload.status !== "already_escrowed") {
+    throw new Error("Escrow did not reach escrowed state");
   }
   return payload;
 }
@@ -70,6 +78,9 @@ export async function settleMatch(opts: {
     throw new Error("Invalid winnerId");
   }
 
+  // Temporary diagnostic logs for broken settlement triage.
+  // eslint-disable-next-line no-console
+  console.log("[CLIENT_SETTLE_CALL]", opts);
   const token = await getAccessToken();
   const idempotencyKey = `${opts.matchId}:${opts.winnerId ?? "draw"}:${crypto.randomUUID()}`;
 
@@ -86,12 +97,17 @@ export async function settleMatch(opts: {
       idempotencyKey,
     }),
   });
+  // eslint-disable-next-line no-console
+  console.log("[CLIENT_SETTLE_RESULT]", res.status);
 
   const payload = await res.json().catch(() => ({} as Record<string, unknown>));
   if (!res.ok) {
     const message =
       typeof payload.error === "string" ? payload.error : `Settlement failed: ${res.status}`;
     throw new Error(message);
+  }
+  if (payload.status !== "settled" && payload.status !== "already_settled") {
+    throw new Error("Settlement did not reach settled state");
   }
   return payload;
 }
