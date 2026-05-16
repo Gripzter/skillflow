@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ConnectionBadge from "@/components/ConnectionBadge";
@@ -9,6 +8,7 @@ import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import SkillPointsModal from "@/components/modals/SkillPointsModal";
 import SkilliesModal from "@/components/modals/SkilliesModal";
+import Wordmark from "@/components/Wordmark";
 import { useProfile } from "@/hooks/useProfile";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
@@ -71,16 +71,7 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
       <header className="sticky top-0 z-50 h-14 border-b border-[#1F1F26] bg-[#0E0E12] px-3 sm:px-4">
         <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-3">
           <div className="flex min-w-[120px] items-center">
-            <Link href="/play" className="inline-flex items-center">
-              <Image
-                src="/images/Skillflow_logo_v3.png"
-                alt="SkillFlow"
-                width={160}
-                height={24}
-                className="h-6 w-auto"
-                priority
-              />
-            </Link>
+            <Wordmark href="/play" size="sm" />
           </div>
 
           <nav className="hidden items-center gap-8 md:flex">
