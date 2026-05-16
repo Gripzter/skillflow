@@ -7,9 +7,9 @@ type WordmarkProps = {
 };
 
 const sizeMap = {
-  sm: "text-lg",
-  md: "text-2xl",
-  lg: "text-4xl",
+  sm: { text: "text-lg", bar: "h-5 w-[3px]", gap: "gap-2" },
+  md: { text: "text-2xl", bar: "h-6 w-[4px]", gap: "gap-2.5" },
+  lg: { text: "text-5xl", bar: "h-12 w-[6px]", gap: "gap-4" },
 } as const;
 
 export default function Wordmark({
@@ -17,13 +17,20 @@ export default function Wordmark({
   size = "sm",
   className = "",
 }: WordmarkProps) {
+  const s = sizeMap[size];
+
   const content = (
-    <span
-      className={`select-none font-black leading-none tracking-tight ${sizeMap[size]} ${className}`}
-      style={{ fontFamily: "Inter, system-ui, sans-serif", letterSpacing: "-0.02em" }}
-    >
-      <span className="text-white">Skill</span>
-      <span className="text-[#FFFF00]">Flow</span>
+    <span className={`inline-flex items-center ${s.gap} ${className}`}>
+      <span
+        aria-hidden="true"
+        className={`${s.bar} inline-block bg-[#FFFF00]`}
+      />
+      <span
+        className={`select-none font-black leading-none tracking-tight text-white lowercase ${s.text}`}
+        style={{ fontFamily: "Inter, system-ui, sans-serif", letterSpacing: "-0.03em" }}
+      >
+        skillflow
+      </span>
     </span>
   );
 
