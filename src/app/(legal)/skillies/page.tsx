@@ -60,7 +60,7 @@ export default function SkilliesPage() {
 
       <h2>Questions</h2>
       <p>
-        If you have questions about Skillies, contact <a href="mailto:support@skillflow.gg">support@skillflow.gg</a>.
+        If you have questions about Skillies, contact <a href="mailto:admin@skillflow.gg">admin@skillflow.gg</a>.
       </p>
     </>
   );

@@ -19,6 +19,7 @@ import {
 } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
 import { pickBotDifficulty } from "@/lib/matchmaking";
+import { startMatch } from "@/lib/matchActions";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -159,17 +160,15 @@ export default function PlaySpellingBeePage() {
     setOpponentFound(opponent);
     setOpponentAvatarGradient(pickRandomOpponentGradient());
     try {
-      const newMatch = await createMatch({
-        gameType: GAME_SLUG,
-        gameDisplayName: GAME_NAME,
-        stakeAmount,
-        player1,
-        player2: opponent,
-        botDifficulty: resolvedBotDifficulty,
+      const started = await startMatch({
+        game: GAME_SLUG,
+        opponentId: null,
+        stake: stakeAmount,
+        opponentIsBot: true,
       });
-      setMatch(newMatch);
+      setBalance(started.player_a_balance_after);
       setTimeout(() => {
-        window.location.href = `/match/${newMatch.id}`;
+        window.location.href = `/match/${started.match_id}`;
       }, 1200);
     } catch (error) {
       const supabaseError = error as {
@@ -265,19 +264,7 @@ export default function PlaySpellingBeePage() {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       botFallbackStartedRef.current = false;
-      try {
-        await startMatchmaking({
-          gameType: GAME_SLUG,
-          stakeAmount,
-          userId,
-          username,
-          rating: myGameRating,
-          isRealMoney: true,
-          onMatchReady: handleMatchReady,
-        });
-      } catch {
-        void runBotFallbackMatch();
-      }
+      await runBotFallbackMatch();
       return;
     }
 
@@ -290,8 +277,6 @@ export default function PlaySpellingBeePage() {
     useRealMatchmaking,
     userId,
     username,
-    startMatchmaking,
-    handleMatchReady,
     botDifficulty,
     myGameRating,
     showToast,

@@ -70,7 +70,7 @@ export default function ResponsiblePlayPage() {
           </ul>
           <p className="mt-2">
             To request self‑exclusion today, email{" "}
-            <span className="text-teal">support@skillflow.gg</span> from the email address linked to your account. We may ask for
+            <span className="text-teal">admin@skillflow.gg</span> from the email address linked to your account. We may ask for
             additional verification to protect your account.
           </p>
           <p className="mt-2">
@@ -141,7 +141,7 @@ export default function ResponsiblePlayPage() {
             <li>Parents and guardians should keep devices and account credentials secure.</li>
             <li>
               If you suspect that someone under 18 is using SkillFlow, please notify us at{" "}
-              <span className="text-teal">support@skillflow.gg</span> so we can investigate.
+              <span className="text-teal">admin@skillflow.gg</span> so we can investigate.
             </li>
           </ul>
         </section>

@@ -118,7 +118,7 @@ export default function RefundPolicyPage() {
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-6">
             <li>
-              Email: <span className="text-teal">support@skillflow.gg</span>
+              Email: <span className="text-teal">admin@skillflow.gg</span>
             </li>
             <li>
               Include your username, the date and amount of the transaction, and a clear explanation of why you are requesting a

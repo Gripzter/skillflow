@@ -1,113 +1,97 @@
+"use client";
+
 import { createClient } from "@/lib/supabase/client";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FUNCTIONS_BASE = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1`;
 
-function isUuid(value: string | null | undefined): value is string {
-  return !!value && UUID_RE.test(value);
-}
+type StartMatchInput = {
+  game: string;
+  opponentId: string | null;
+  stake: number;
+  opponentIsBot: boolean;
+};
 
-async function getAccessToken() {
+type StartMatchResult = {
+  match_id: string;
+  stake_sp: number;
+  player_a_balance_after: number;
+  player_b_balance_after: number | null;
+};
+
+export async function startMatch(input: StartMatchInput): Promise<StartMatchResult> {
   const supabase = createClient();
   if (!supabase) throw new Error("Supabase not configured");
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("Not authenticated");
-  return session.access_token;
-}
+  if (!session) throw new Error("Not authenticated");
 
-function getFunctionsBaseUrl() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) throw new Error("Supabase URL missing");
-  return `${url}/functions/v1`;
-}
-
-export async function escrowMatch(opts: {
-  matchId: string;
-  opponentId: string | null;
-  stake: number;
-  opponentIsBot: boolean;
-}) {
-  if (!isUuid(opts.matchId)) throw new Error("Invalid matchId");
-  if (!Number.isInteger(opts.stake) || opts.stake < 50 || opts.stake > 5000) {
-    throw new Error("Invalid stake");
-  }
-  if (!opts.opponentIsBot && !isUuid(opts.opponentId)) {
-    throw new Error("Invalid opponentId");
-  }
-
-  // Temporary diagnostic logs for broken settlement triage.
+  // Temporary diagnostics requested during recovery.
   // eslint-disable-next-line no-console
-  console.log("[CLIENT_ESCROW_CALL]", opts);
-  const token = await getAccessToken();
-  const res = await fetch(`${getFunctionsBaseUrl()}/match-escrow`, {
+  console.log("[CLIENT_START_CALL]", input);
+  const res = await fetch(`${FUNCTIONS_BASE}/match-start`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({
-      matchId: opts.matchId,
-      opponentId: opts.opponentId,
-      stake: opts.stake,
-      opponentIsBot: opts.opponentIsBot,
-    }),
+    body: JSON.stringify(input),
   });
   // eslint-disable-next-line no-console
-  console.log("[CLIENT_ESCROW_RESULT]", res.status);
+  console.log("[CLIENT_START_RESULT]", res.status);
 
-  const payload = await res.json().catch(() => ({} as Record<string, unknown>));
   if (!res.ok) {
-    const message =
-      typeof payload.error === "string" ? payload.error : `Escrow failed: ${res.status}`;
-    throw new Error(message);
+    const err = await res.json().catch(() => ({ error: "Unknown" }));
+    throw new Error(err.error || `Match start failed: HTTP ${res.status}`);
   }
-  if (payload.status !== "escrowed" && payload.status !== "already_escrowed") {
-    throw new Error("Escrow did not reach escrowed state");
-  }
-  return payload;
+
+  return res.json();
 }
 
-export async function settleMatch(opts: {
+type FinishMatchInput = {
   matchId: string;
   winnerId: string | null;
-  gameResult: unknown;
-}) {
-  if (!isUuid(opts.matchId)) throw new Error("Invalid matchId");
-  if (opts.winnerId !== null && !isUuid(opts.winnerId)) {
-    throw new Error("Invalid winnerId");
-  }
+  gameResult?: unknown;
+};
 
-  // Temporary diagnostic logs for broken settlement triage.
+type FinishMatchResult = {
+  status: "settled" | "already_settled";
+  match_id: string;
+  winner_id: string | null;
+  winner_is_bot: boolean;
+  caller_won: boolean;
+  payout: number;
+  caller_balance: number;
+};
+
+export async function finishMatch(input: FinishMatchInput): Promise<FinishMatchResult> {
+  const supabase = createClient();
+  if (!supabase) throw new Error("Supabase not configured");
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const idempotencyKey = `${input.matchId}-${session.user.id}`;
+
+  // Temporary diagnostics requested during recovery.
   // eslint-disable-next-line no-console
-  console.log("[CLIENT_SETTLE_CALL]", opts);
-  const token = await getAccessToken();
-  const idempotencyKey = `${opts.matchId}:${opts.winnerId ?? "draw"}:${crypto.randomUUID()}`;
-
-  const res = await fetch(`${getFunctionsBaseUrl()}/match-settle`, {
+  console.log("[CLIENT_FINISH_CALL]", input);
+  const res = await fetch(`${FUNCTIONS_BASE}/match-finish`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({
-      matchId: opts.matchId,
-      winnerId: opts.winnerId,
-      gameResult: opts.gameResult,
-      idempotencyKey,
-    }),
+    body: JSON.stringify({ ...input, idempotencyKey }),
   });
   // eslint-disable-next-line no-console
-  console.log("[CLIENT_SETTLE_RESULT]", res.status);
+  console.log("[CLIENT_FINISH_RESULT]", res.status);
 
-  const payload = await res.json().catch(() => ({} as Record<string, unknown>));
   if (!res.ok) {
-    const message =
-      typeof payload.error === "string" ? payload.error : `Settlement failed: ${res.status}`;
-    throw new Error(message);
+    const err = await res.json().catch(() => ({ error: "Unknown" }));
+    throw new Error(err.error || `Match finish failed: HTTP ${res.status}`);
   }
-  if (payload.status !== "settled" && payload.status !== "already_settled") {
-    throw new Error("Settlement did not reach settled state");
-  }
-  return payload;
+
+  return res.json();
 }

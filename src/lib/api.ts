@@ -22,7 +22,6 @@ import {
   type StoredMatch,
   type PlayerInfo,
 } from "@/lib/matchmaking";
-import { CHESS_INITIAL_CLOCK_MS } from "@/lib/games/match-timers";
 import {
   getPracticeMatch,
   getPracticeMatches,
@@ -34,7 +33,7 @@ import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
 import { incrementMatchCount } from "@/lib/cases";
 import { updateChallengeProgress } from "@/lib/daily-challenges";
-import { settleMatch as settleMatchViaEdge } from "@/lib/matchActions";
+import { finishMatch } from "@/lib/matchActions";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
@@ -51,25 +50,6 @@ const BOT_PLAYER_UUID = "00000000-0000-0000-0000-000000000001";
 
 function isUuid(value: string | null | undefined): value is string {
   return !!value && UUID_RE.test(value);
-}
-
-function logBotInsertError(error: unknown, payload: Record<string, unknown>) {
-  const err = error as {
-    message?: string;
-    details?: string;
-    hint?: string;
-    code?: string;
-  } | null;
-  // eslint-disable-next-line no-console
-  console.error(
-    "Bot match creation failed:",
-    err?.message,
-    err?.details,
-    err?.hint,
-    err?.code
-  );
-  // eslint-disable-next-line no-console
-  console.error("[createMatch] Bot match payload", payload);
 }
 
 function isDevMode(): boolean {
@@ -449,78 +429,7 @@ export async function createMatch(params: {
       params.gameDisplayName
     );
   }
-  const supabase = createClient();
-  if (!supabase) throw new Error("Not configured");
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-  const { totalPot, platformFee, winnerPayout } = computePayout(params.stakeAmount);
-  const isBotMatch = !!params.botDifficulty;
-  const baseInsert = {
-    game_type: params.gameType,
-    player1_id: user.id,
-    player1_username: params.player1.username,
-    player2_username: params.player2.username,
-    player1_rating: params.player1.rating,
-    player2_rating: params.player2.rating,
-    stake_amount: params.stakeAmount,
-    platform_fee: platformFee,
-    total_pot: totalPot,
-    winner_payout: winnerPayout,
-    bot_difficulty: params.botDifficulty ?? null,
-    state: "pending",
-    player_a: user.id,
-    player_b: isBotMatch ? null : null,
-    player_a_is_bot: false,
-    player_b_is_bot: isBotMatch,
-    stake_sp: params.stakeAmount,
-    player1_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
-    player2_remaining_time_ms: params.gameType === "chess" ? CHESS_INITIAL_CLOCK_MS : null,
-    active_turn: params.gameType === "chess" ? "player1" : null,
-  };
-
-  const insertAttempts: Array<Record<string, unknown>> = isBotMatch
-    ? [
-        {
-          ...baseInsert,
-          status: "in_progress",
-          is_bot: true,
-          bot_name: params.player2.username,
-          player2_id: BOT_PLAYER_UUID,
-        },
-        {
-          ...baseInsert,
-          status: "in_progress",
-          is_bot: true,
-          bot_name: params.player2.username,
-          player2_id: null,
-        },
-        { ...baseInsert, status: "in_progress", player2_id: null },
-        { ...baseInsert, status: "in_progress", player2_id: BOT_PLAYER_UUID },
-      ]
-    : [{ ...baseInsert, status: "in_progress" }];
-
-  let created: Record<string, unknown> | null = null;
-  let lastError: unknown = null;
-  for (const payload of insertAttempts) {
-    const { data, error } = await supabase.from("matches").insert(payload).select().single();
-    if (!error && data) {
-      created = data as Record<string, unknown>;
-      break;
-    }
-    lastError = error;
-    if (isBotMatch) {
-      logBotInsertError(error, payload);
-    } else {
-      // eslint-disable-next-line no-console
-      console.error("[createMatch] Match insert attempt failed", { payload, error });
-    }
-  }
-
-  if (!created) {
-    throw lastError instanceof Error ? lastError : new Error("Failed to create match");
-  }
-
-  return mapDbMatchToStoredMatch(created as Parameters<typeof mapDbMatchToStoredMatch>[0]);
+  throw new Error("createMatch is practice-only; use startMatch() for real matches");
 }
 
 export async function getMatch(id: string): Promise<StoredMatch | null> {
@@ -925,7 +834,7 @@ export async function completeMatchAndSettle(
     const settlementWinnerId =
       match.isBot && winnerId === BOT_PLAYER_UUID ? null : isUuid(winnerId) ? winnerId : null;
 
-    await settleMatchViaEdge({
+    await finishMatch({
       matchId: match.id,
       winnerId: settlementWinnerId,
       gameResult: { outcome, gameType: match.gameType },
@@ -948,7 +857,7 @@ export async function completeMatchAndSettle(
     return;
   }
 
-  await settleMatchViaEdge({
+  await finishMatch({
     matchId: match.id,
     winnerId: null,
     gameResult: { outcome: "draw", gameType: match.gameType },

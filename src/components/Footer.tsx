@@ -25,8 +25,8 @@ export default function Footer() {
           </Link>
         </nav>
         <div className="order-2 text-center md:order-3 md:text-right">
-          <a href="mailto:support@skillflow.gg" className="hover:text-white">
-            support@skillflow.gg
+          <a href="mailto:admin@skillflow.gg" className="hover:text-white">
+            admin@skillflow.gg
           </a>
         </div>
       </div>

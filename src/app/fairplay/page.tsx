@@ -89,7 +89,7 @@ export default function FairPlayPage() {
           <ul className="mt-2 list-disc space-y-1 pl-6">
             <li>Use any in‑game &quot;Report&quot; or &quot;Report Issue&quot; options where available.</li>
             <li>
-              Or email <span className="text-teal">support@skillflow.gg</span> with your username, the opponent&#39;s username, match ID,
+              Or email <span className="text-teal">admin@skillflow.gg</span> with your username, the opponent&#39;s username, match ID,
               date/time, and a clear description of what happened.
             </li>
             <li>Attach screenshots, video clips, or links to external match data when possible.</li>
@@ -131,7 +131,7 @@ export default function FairPlayPage() {
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-6">
             <li>
-              Email <span className="text-teal">support@skillflow.gg</span> from the email associated with your account.
+              Email <span className="text-teal">admin@skillflow.gg</span> from the email associated with your account.
             </li>
             <li>
               Include your username, any relevant match IDs, the date the action occurred, and a clear explanation of why you

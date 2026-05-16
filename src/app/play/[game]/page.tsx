@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
 import { pickBotDifficulty } from "@/lib/matchmaking";
+import { startMatch } from "@/lib/matchActions";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -176,19 +177,14 @@ export default function PlayGamePage() {
       const opponent = generateFakeOpponent(myGameRating);
       setOpponentFound(opponent);
       setOpponentAvatarGradient(pickRandomOpponentGradient());
-      const newMatch = await createMatch({
-        gameType: gameSlug,
-        gameDisplayName: gameName,
-        stakeAmount,
-        player1,
-        player2: opponent,
-        botDifficulty: resolvedBotDifficulty,
+      const started = await startMatch({
+        game: gameSlug,
+        opponentId: null,
+        stake: stakeAmount,
+        opponentIsBot: true,
       });
-      setMatch(newMatch);
-      if (!newMatch?.id) {
-        throw new Error("createBotMatch returned an invalid match id");
-      }
-      return newMatch.id;
+      setBalance(started.player_a_balance_after);
+      return started.match_id;
     };
 
     try {
@@ -305,19 +301,7 @@ export default function PlayGamePage() {
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       botFallbackStartedRef.current = false;
-      try {
-        await startMatchmaking({
-          gameType: gameSlug,
-          stakeAmount,
-          userId,
-          username,
-          rating: myGameRating,
-          isRealMoney: true,
-          onMatchReady: handleMatchReady,
-        });
-      } catch {
-        void runBotFallbackMatch();
-      }
+      await runBotFallbackMatch();
       return;
     }
   }, [
@@ -331,8 +315,6 @@ export default function PlayGamePage() {
     useRealMatchmaking,
     userId,
     username,
-    startMatchmaking,
-    handleMatchReady,
     botDifficulty,
     myGameRating,
     stakeAmount,

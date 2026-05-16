@@ -41,8 +41,8 @@ export default function SettlementErrorScreen({
         </div>
 
         <a
-          href="mailto:support@skillflow.com?subject=Settlement%20failure"
-          className="mt-4 inline-block text-sm text-red-200 underline underline-offset-4 hover:text-white"
+          href="mailto:admin@skillflow.gg?subject=Match%20Settlement%20Issue"
+          className="mt-4 inline-block text-sm text-white/70 underline hover:text-white"
         >
           Contact support
         </a>

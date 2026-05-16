@@ -38,7 +38,6 @@ import type { MatchUiState } from "@/components/game/matchUi";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
-import { escrowMatch } from "@/lib/matchActions";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
 
 const OPPONENT_RECONNECT_SEC = 60;
@@ -163,7 +162,6 @@ function MatchPageContent() {
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const firstCelebrationTriggeredRef = useRef(false);
-  const escrowAttemptedForMatchRef = useRef<string | null>(null);
   const matchRef = useRef<StoredMatch | null>(null);
   const matchStartMsRef = useRef<number>(Date.now());
   const bothPlayersConfirmedRef = useRef(false);
@@ -854,33 +852,6 @@ function MatchPageContent() {
       cancelled = true;
     };
   }, [outcome, preMatchCompletedCount, userId, match]);
-
-  useEffect(() => {
-    if (!match || match.isPractice || isDevMode || !userId) return;
-    if (escrowAttemptedForMatchRef.current === match.id) return;
-    escrowAttemptedForMatchRef.current = match.id;
-
-    const opponentId = userId === match.player1Id ? (match.player2Id ?? null) : (match.player1Id ?? null);
-    const opponentIsBot = !opponentId || !!match.isBot;
-
-    void escrowMatch({
-      matchId: match.id,
-      opponentId,
-      stake: match.stakeAmount,
-      opponentIsBot,
-    })
-      .then(() => {
-        dispatchWalletUpdated();
-      })
-      .catch((error) => {
-        const message = error instanceof Error ? error.message : "Escrow failed";
-        // Already escrowed by the other participant is a healthy state.
-        if (message.includes("not in pending state")) return;
-        // eslint-disable-next-line no-console
-        console.error("[MATCH_ESCROW_FAIL]", { matchId: match.id, userId, error });
-        showToast("Unable to lock match stake. Please rejoin the match.", "error");
-      });
-  }, [isDevMode, match, showToast, userId]);
 
   async function handleLogout() {
     setLoggingOut(true);
