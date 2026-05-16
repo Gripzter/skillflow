@@ -109,7 +109,7 @@ function LoginContent() {
           }).eq("user_id", user.id);
         }
         showToast("Welcome back!", "success");
-        router.push("/dashboard");
+        router.push("/play");
         router.refresh();
       }
     } catch {
@@ -138,7 +138,7 @@ function LoginContent() {
           })
         );
       }
-      router.push("/dashboard");
+      router.push("/play");
       router.refresh();
     } else {
       setDevError("Invalid developer code");

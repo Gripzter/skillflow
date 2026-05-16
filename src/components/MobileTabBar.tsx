@@ -11,7 +11,7 @@ const TABS: readonly {
   label: string;
   Icon: ComponentType<{ size?: number; className?: string }>;
 }[] = [
-  { href: "/dashboard", label: "Home", Icon: House },
+  { href: "/play", label: "Home", Icon: House },
   { href: "/play", label: "Play", Icon: Gamepad2 },
   { href: "/wallet", label: "Wallet", Icon: Wallet },
   { href: "/leaderboard", label: "Rank", Icon: Trophy },

@@ -1,17 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMyProfile } from "@/lib/api";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import ConnectionBadge from "@/components/ConnectionBadge";
-import RankBadge from "@/components/RankBadge";
-import DevSpGrantButton from "@/components/DevSpGrantButton";
-import { usePlayMode } from "@/contexts/PlayModeContext";
-import { getUserSPData } from "@/lib/skillpoints";
+import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import {
-  IS_SWEEPSTAKES_LAUNCH,
-  PRIZE_POOL_BANNER_TEXT,
-} from "@/constants/economy";
+import SkillPointsModal from "@/components/modals/SkillPointsModal";
+import SkilliesModal from "@/components/modals/SkilliesModal";
+import { useProfile } from "@/hooks/useProfile";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -22,282 +20,186 @@ export function dispatchWalletUpdated() {
 }
 
 interface AppNavbarProps {
-  username: string;
-  isDevMode: boolean;
-  onLogout: () => void;
-  loggingOut: boolean;
-  currentPage: "dashboard" | "wallet" | "play" | "leaderboard" | "profile" | "external" | "settings" | "referrals" | "skillpoints" | "cases" | "inventory";
+  username?: string;
+  isDevMode?: boolean;
+  onLogout?: () => void;
+  loggingOut?: boolean;
+  currentPage?:
+    | "dashboard"
+    | "wallet"
+    | "play"
+    | "leaderboard"
+    | "profile"
+    | "external"
+    | "settings"
+    | "referrals"
+    | "skillpoints"
+    | "cases"
+    | "inventory";
 }
 
-export default function AppNavbar({
-  username,
-  isDevMode,
-  onLogout,
-  loggingOut,
-  currentPage,
-}: AppNavbarProps) {
-  const { isPractice } = usePlayMode();
-  const [balance, setBalance] = useState(0);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [rankTier, setRankTier] = useState("bronze");
+const NAV_ITEMS = [
+  { label: "Play", href: "/play" },
+  { label: "Cases", href: "/cases" },
+  { label: "Inventory", href: "/inventory" },
+  { label: "Leaderboard", href: "/leaderboard" },
+  { label: "Referrals", href: "/referrals" },
+] as const;
+
+function formatTier(tier: string) {
+  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
+}
+
+export default function AppNavbar(_props: AppNavbarProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { profile } = useProfile();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [spModalOpen, setSpModalOpen] = useState(false);
+  const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const profile = await getMyProfile();
-      if (!profile || typeof profile.id !== "string") return;
-      const spData = await getUserSPData(profile.id);
-      if (!cancelled && spData) {
-        setBalance(Number(spData.balanceSp ?? 0));
-      }
+    if (pathname === "/play" && searchParams.get("sp") === "1") {
+      setSpModalOpen(true);
     }
-    load();
-    const handleUpdate = () => void load();
-    window.addEventListener(WALLET_UPDATED_EVENT, handleUpdate);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(WALLET_UPDATED_EVENT, handleUpdate);
-    };
-  }, []);
+  }, [pathname, searchParams]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadRank() {
-      const profile = await getMyProfile();
-      if (!profile || typeof profile.id !== "string") return;
-      const spData = await getUserSPData(profile.id);
-      if (!cancelled && spData) {
-        setRankTier(spData.rankTier);
-      }
-    }
-    loadRank();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadAvatar() {
-      const profile = await getMyProfile();
-      if (!cancelled && profile && "avatar_url" in profile) {
-        const url = (profile as any).avatar_url as string | null;
-        if (url) setAvatarUrl(url);
-      }
-    }
-    loadAvatar();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const goTo = (href: string) => {
-    if (typeof window !== "undefined") {
-      window.location.href = href;
-    }
-  };
+  const avatarInitial = profile.username.charAt(0).toUpperCase() || "P";
 
   return (
-    <header className="navbar sticky top-0 z-50 border-b border-white/5 bg-charcoal/95 backdrop-blur-sm px-4 py-3 sm:px-6 lg:px-8">
-      {IS_SWEEPSTAKES_LAUNCH ? (
-        <div className="mx-auto mb-2 max-w-[1200px] rounded-lg border border-amber-300/30 bg-amber-500/10 px-3 py-2 text-center text-[11px] font-medium text-amber-100">
-          {PRIZE_POOL_BANNER_TEXT}
-        </div>
-      ) : null}
-      <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-        <div className="flex items-center gap-4 sm:gap-6">
+    <>
+      <header className="sticky top-0 z-50 h-14 border-b border-[#1F1F26] bg-[#0E0E12] px-3 sm:px-4">
+        <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-3">
+          <div className="flex min-w-[120px] items-center">
+            <Link href="/play" className="inline-flex items-center">
+              <Image
+                src="/images/Skillflow_logo_v3.png"
+                alt="SkillFlow"
+                width={160}
+                height={24}
+                className="h-6 w-auto"
+                priority
+              />
+            </Link>
+          </div>
+
+          <nav className="hidden items-center gap-8 md:flex">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`relative pb-1 text-sm font-medium transition-colors ${
+                    active ? "text-white" : "text-[#9CA3AF] hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                  {active ? <span className="absolute -bottom-[11px] left-0 h-0.5 w-full bg-[#FFFF00]" /> : null}
+                </Link>
+              );
+            })}
+          </nav>
+
           <button
             type="button"
-            onClick={() => goTo("/")}
-            className="logo shrink-0 text-xl font-bold tracking-tight"
+            onClick={() => setMobileMenuOpen((value) => !value)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#9CA3AF] hover:bg-white/5 hover:text-white md:hidden"
+            aria-label="Toggle menu"
           >
-            <span className="text-white">Skill</span>
-            <span className={isPractice ? "text-purple-500" : "text-teal"}>Flow</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" strokeWidth="2">
+              <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+            </svg>
           </button>
-          {isPractice && (
-            <span className="hidden rounded-full border border-purple-500/30 bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-purple-400 sm:inline-flex">
-              PRACTICE
-            </span>
-          )}
-          <nav className="hidden items-center gap-1 sm:flex">
-          <button
-            type="button"
-            onClick={() => goTo("/dashboard")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "dashboard"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Dashboard
-          </button>
-          {!isPractice && !IS_SWEEPSTAKES_LAUNCH && (
+
+          <div className="flex min-w-[170px] items-center justify-end gap-2 sm:gap-3">
             <button
               type="button"
-              onClick={() => goTo("/wallet")}
-              className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                currentPage === "wallet"
-                  ? "active bg-white/10 text-white"
-                  : "text-body-gray hover:text-white"
-              }`}
+              onClick={() => setSpModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#1F1F26] bg-[#16161C] px-2 py-1.5 text-xs text-[#9CA3AF] transition-colors hover:border-[#FFFF00]"
             >
-              Wallet
+              <SPIcon size={14} />
+              <span className="hidden sm:inline">{formatTier(profile.rankTier)} · </span>
+              <span>{profile.lifetimeSp.toLocaleString()}</span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => goTo("/skillpoints")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "skillpoints"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            SkillPoints
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo("/cases")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "cases"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Cases
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo("/inventory")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "inventory"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Inventory
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo("/play")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "play"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Play
-          </button>
-          {/* Arena + Last Touch removed — not yet built */}
-          <button
-            type="button"
-            onClick={() => goTo("/leaderboard")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "leaderboard"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Leaderboard
-          </button>
-          <button
-            type="button"
-            onClick={() => goTo("/referrals")}
-            className={`nav-link rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              currentPage === "referrals"
-                ? "active bg-white/10 text-white"
-                : "text-body-gray hover:text-white"
-            }`}
-          >
-            Referrals
-          </button>
-          </nav>
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          <ConnectionBadge />
-          {!isPractice && !IS_SWEEPSTAKES_LAUNCH && (
-            <div className="wallet-badge flex items-center gap-1.5 rounded-lg border border-white/15 bg-card/60 px-3 py-2 shadow-[0_0_16px_rgba(16,185,129,0.35)]">
+            <button
+              type="button"
+              onClick={() => setSkilliesModalOpen(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-[#1F1F26] bg-[#16161C] px-2 py-1.5 text-xs transition-colors hover:border-[#FFFF00]"
+            >
               <SkilliesIcon size={14} />
-              <span className="text-sm font-bold text-white">{Math.floor(balance).toLocaleString()} Skillies</span>
-            </div>
-          )}
+              <span className="text-[#FFFF00]">{profile.balanceSp.toLocaleString()}</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => goTo("/profile")}
-            className="hidden items-center gap-2 rounded-lg px-2 py-1.5 text-body-gray transition-colors hover:bg-white/5 hover:text-white sm:flex"
-          >
-            {avatarUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="h-6 w-6 rounded-full object-cover"
-              />
-            )}
-            <span className="text-sm font-medium">{username}</span>
-            <RankBadge tier={rankTier} />
-            {isDevMode && (
-              <span className="rounded bg-purple/20 px-1.5 py-0.5 text-xs font-medium text-purple">
-                DEV
-              </span>
-            )}
-          </button>
+            <ConnectionBadge />
 
-          <button
-            type="button"
-            onClick={() => goTo("/settings")}
-            className="settings-link hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-body-gray transition-colors hover:bg-white/5 hover:text-white md:flex"
-            aria-label="Settings"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
+            <Link
+              href="/settings"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/5 hover:text-white"
+              aria-label="Settings"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </Link>
 
-          <button
-            type="button"
-            onClick={() => goTo("/profile")}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ring-2 ring-white/10 transition-opacity hover:opacity-90 ${
-              isPractice ? "from-purple-500/40 to-fuchsia-500/40" : "from-teal/40 to-purple/40"
-            }`}
-            aria-label="Profile"
-          >
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarUrl}
-                alt="Avatar"
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              <span className="text-sm font-bold text-white">
-                {username.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={onLogout}
-            disabled={loggingOut}
-            className="hidden rounded-lg p-2 text-body-gray transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60 md:inline-flex"
-            aria-label="Log out"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-          </button>
+            <Link
+              href="/profile"
+              className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-1 ring-white/20"
+              aria-label="Profile"
+            >
+              {profile.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-white">{avatarInitial}</span>
+              )}
+            </Link>
+          </div>
         </div>
-      </div>
-      <DevSpGrantButton isDevMode={isDevMode} />
-    </header>
+
+        {mobileMenuOpen ? (
+          <div className="absolute left-3 right-3 top-14 z-40 rounded-xl border border-[#1F1F26] bg-[#16161C] p-2 md:hidden">
+            {NAV_ITEMS.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block rounded-lg px-3 py-2 text-sm ${
+                    active ? "bg-white/5 text-white" : "text-[#9CA3AF]"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
+      </header>
+
+      <SkillPointsModal
+        isOpen={spModalOpen}
+        onClose={() => setSpModalOpen(false)}
+        userId={profile.id}
+        lifetimeSp={profile.lifetimeSp}
+        balanceSp={profile.balanceSp}
+        rankTier={profile.rankTier}
+      />
+      <SkilliesModal
+        isOpen={skilliesModalOpen}
+        onClose={() => setSkilliesModalOpen(false)}
+        userId={profile.id}
+        balanceSp={profile.balanceSp}
+      />
+    </>
   );
 }
