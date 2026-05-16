@@ -30,30 +30,30 @@ function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(90deg, rgba(14,14,18,0.92) 0%, rgba(14,14,18,0.7) 30%, rgba(14,14,18,0) 60%)",
+            "linear-gradient(90deg, rgba(14,14,18,0.94) 0%, rgba(14,14,18,0.78) 35%, rgba(14,14,18,0) 70%)",
         }}
       />
 
-      <div className="relative z-10 flex h-full items-center px-6 md:px-10 lg:px-14">
-        <div className="max-w-md">
+      <div className="relative z-10 h-full flex items-center px-5 sm:px-8 md:px-12 lg:px-16">
+        <div className="max-w-[280px] sm:max-w-sm md:max-w-md">
           {slide.accent ? (
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em]" style={{ color: accentColor }}>
               {slide.accent}
             </div>
           ) : null}
 
-          <h2 className="mb-2 text-3xl font-black leading-[1.05] tracking-tight text-white md:text-4xl lg:text-5xl">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[1.05] tracking-tight mb-2">
             {slide.headline}
           </h2>
 
-          {slide.subline ? <p className="mb-5 text-sm leading-snug text-white/70 md:text-base">{slide.subline}</p> : null}
+          {slide.subline ? <p className="text-xs sm:text-sm md:text-base text-white/70 mb-4 sm:mb-5 leading-snug">{slide.subline}</p> : null}
 
           {slide.external ? (
             <a
               href={slide.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFFF00] px-5 py-2.5 text-sm font-bold text-black transition-all hover:brightness-110"
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
             >
               {slide.cta}
               <svg
@@ -73,7 +73,7 @@ function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
           ) : (
             <Link
               href={slide.href}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFFF00] px-5 py-2.5 text-sm font-bold text-black transition-all hover:brightness-110"
+              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
             >
               {slide.cta}
               <svg
@@ -154,8 +154,7 @@ export default function PromoCarousel() {
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#16161C]"
-      style={{ aspectRatio: "4 / 1" }}
+      className="relative w-full overflow-hidden rounded-2xl border border-white/[0.06] bg-[#16161C] aspect-[16/10] sm:aspect-[5/2] md:aspect-[4/1]"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onTouchStart={onTouchStart}

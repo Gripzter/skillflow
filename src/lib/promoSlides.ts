@@ -25,12 +25,12 @@ export type PromoSlide = {
 export const PROMO_SLIDES: PromoSlide[] = [
   {
     id: "last-touch",
-    image: "/images/promo/last-touch.jpg",
+    image: "/images/events/last-touch.jpg",
     accent: "FEATURED EVENT",
     headline: "Last Touch",
     subline: "Hold your ground. Win the pot.",
     cta: "Join Now",
-    href: "/last-touch",
+    href: "/events/last-touch",
   },
   {
     id: "founders",

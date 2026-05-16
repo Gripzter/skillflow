@@ -3,8 +3,7 @@
 import type { ComponentType } from "react";
 import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
-import { Gamepad2, Gift, House, Trophy, Wallet } from "lucide-react";
-import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
+import { CalendarDays, Gift, House, Trophy, Wallet } from "lucide-react";
 
 const TABS: readonly {
   href: string;
@@ -12,8 +11,8 @@ const TABS: readonly {
   Icon: ComponentType<{ size?: number; className?: string }>;
 }[] = [
   { href: "/play", label: "Home", Icon: House },
-  { href: "/play", label: "Play", Icon: Gamepad2 },
-  { href: "/wallet", label: "Wallet", Icon: Wallet },
+  { href: "/events", label: "Events", Icon: CalendarDays },
+  { href: "/skillpoints", label: "SP", Icon: Wallet },
   { href: "/leaderboard", label: "Rank", Icon: Trophy },
   { href: "/cases", label: "Cases", Icon: Gift },
 ];
@@ -32,12 +31,7 @@ export default function MobileTabBar() {
     return null;
   }
 
-  const tabs = (isPractice ? TABS.filter((t) => t.href !== "/wallet") : TABS).map((tab) => {
-    if (tab.href === "/wallet" && IS_SWEEPSTAKES_LAUNCH) {
-      return { ...tab, href: "/skillpoints", label: "SP" };
-    }
-    return tab;
-  });
+  const tabs = TABS;
   const goTo = (href: string) => {
     if (typeof window !== "undefined") {
       window.location.href = href;

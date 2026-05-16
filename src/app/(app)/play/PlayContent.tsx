@@ -65,19 +65,21 @@ function PlayGameCard({
       <div className="pointer-events-none absolute bottom-0 inset-x-0 h-[40%] bg-gradient-to-t from-black/80 via-black/45 to-transparent" />
 
       {index === 0 ? (
-        <div className="absolute right-3 top-3 z-10 rounded-full bg-[#FFFF00] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-black">
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#FFFF00] text-black text-[9px] sm:text-[11px] font-bold uppercase tracking-wide rounded">
           HOT
         </div>
       ) : null}
 
       <GameCardChallenges challenges={scopedChallenges} visible={hovered} />
 
-      <div className="absolute bottom-0 left-0 p-4">
-        <p className="text-[20px] font-black text-white">{game.name}</p>
-        <p className="mt-1 text-[13px] font-medium tracking-tight text-[#FFFF00]">
+      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+        <h3 className="text-base sm:text-lg lg:text-xl font-black text-white mb-0.5 sm:mb-1 leading-tight">
+          {game.name}
+        </h3>
+        <div className="text-[11px] sm:text-[13px] text-[#FFFF00] font-medium leading-tight">
           {onlineCount.toLocaleString()} online
-        </p>
-        <p className="mt-1 text-xs font-normal text-[#9CA3AF]">~{game.waitSeconds}s wait</p>
+        </div>
+        <div className="text-[10px] sm:text-xs text-white/60 leading-tight">~{game.waitSeconds}s wait</div>
       </div>
     </Link>
   );
@@ -156,7 +158,7 @@ export default function PlayContent() {
           })}
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
           {filteredGames.map((game, index) => (
             <PlayGameCard
               key={game.slug}

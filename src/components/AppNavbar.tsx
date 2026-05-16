@@ -33,6 +33,7 @@ interface AppNavbarProps {
     | "external"
     | "settings"
     | "referrals"
+    | "events"
     | "skillpoints"
     | "cases"
     | "inventory";
@@ -41,6 +42,7 @@ interface AppNavbarProps {
 
 const NAV_ITEMS = [
   { label: "Play", href: "/play" },
+  { label: "Events", href: "/events" },
   { label: "Cases", href: "/cases" },
   { label: "Inventory", href: "/inventory" },
   { label: "Leaderboard", href: "/leaderboard" },
