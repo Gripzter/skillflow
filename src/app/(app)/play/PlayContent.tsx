@@ -5,9 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
+import DailyChallengesStrip from "@/components/play/DailyChallengesStrip";
 import LoadingRing from "@/components/LoadingRing";
 import { useDailyChallenges } from "@/hooks/useDailyChallenges";
 import { useGames, type GameCategory } from "@/hooks/useGames";
+import { useGameOrder } from "@/hooks/useGameOrder";
 import { useProfile } from "@/hooks/useProfile";
 import { useRecentMatches } from "@/hooks/useRecentMatches";
 
@@ -18,27 +20,48 @@ const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
   { label: "KNOWLEDGE", value: "knowledge" },
 ];
 
+// TODO: Replace with real presence query when profile heartbeat/current_game is available.
+function fakeOnlineCount(slug: string, bucket: number): number {
+  const seed = [...slug].reduce((acc, char) => acc + char.charCodeAt(0), 0) + bucket;
+  return 80 + ((seed * 37) % 420);
+}
+
 export default function PlayContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<"all" | GameCategory>("all");
+  const [onlineBucket, setOnlineBucket] = useState(Math.floor(Date.now() / (5 * 60 * 1000)));
   const { profile, loading } = useProfile();
   const { games } = useGames();
+  const orderedGames = useGameOrder(games, profile.id || null);
   const { challenges } = useDailyChallenges(profile.id, 3);
   const { matches } = useRecentMatches({ limit: 1, username: profile.username });
 
   const openSpFromUrl = useMemo(() => searchParams.get("sp") === "1", [searchParams]);
 
   const filteredGames = useMemo(() => {
-    if (activeFilter === "all") return games;
-    return games.filter((game) => game.category === activeFilter);
-  }, [activeFilter, games]);
+    if (activeFilter === "all") return orderedGames;
+    return orderedGames.filter((game) => game.category === activeFilter);
+  }, [activeFilter, orderedGames]);
+
+  const onlineCountBySlug = useMemo(() => {
+    return Object.fromEntries(
+      orderedGames.map((game) => [game.slug, fakeOnlineCount(game.slug, onlineBucket)])
+    ) as Record<string, number>;
+  }, [orderedGames, onlineBucket]);
 
   useEffect(() => {
     if (!loading && !profile.id) {
       router.push("/login");
     }
   }, [loading, profile.id, router]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setOnlineBucket(Math.floor(Date.now() / (5 * 60 * 1000)));
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   if (loading || !profile.id) {
     return <LoadingRing />;
@@ -72,6 +95,8 @@ export default function PlayContent() {
           })}
         </div>
 
+        <DailyChallengesStrip challenges={challenges} />
+
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {filteredGames.map((game, index) => (
             <Link
@@ -97,8 +122,10 @@ export default function PlayContent() {
 
               <div className="absolute bottom-0 left-0 p-4">
                 <p className="text-[20px] font-black text-white">{game.name}</p>
-                <p className="mt-1 text-xs text-[#9CA3AF]">1v1</p>
-                <p className="mt-1 text-xs font-semibold text-[#FFFF00]">~{game.waitSeconds}s wait</p>
+                <p className="mt-1 text-[13px] font-medium tracking-tight text-[#FFFF00]">
+                  {onlineCountBySlug[game.slug]?.toLocaleString() ?? "0"} online
+                </p>
+                <p className="mt-1 text-xs font-normal text-[#9CA3AF]">~{game.waitSeconds}s wait</p>
               </div>
             </Link>
           ))}
