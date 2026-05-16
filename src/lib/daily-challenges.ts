@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase";
 
 export type ChallengeType =
   | "win_matches"
+  | "play_matches"
   | "complete_matches"
   | "try_new_game"
   | "win_streak"
@@ -9,9 +10,9 @@ export type ChallengeType =
 
 export type DailyChallengeTemplate = {
   type: ChallengeType;
-  description: string;
-  target: number;
+  count: number;
   rewardSp: number;
+  template: string;
 };
 
 export type DailyChallengeRow = {
@@ -24,6 +25,7 @@ export type DailyChallengeRow = {
   reward_sp: number;
   completed: boolean;
   claimed: boolean;
+  game_slug: string | null;
   expires_at: string;
   created_at: string;
 };
@@ -40,21 +42,32 @@ type DailyChallengeDbRow = {
   reward_sp: number;
   completed: boolean;
   claimed: boolean;
+  game_slug?: string | null;
   expires_at: string;
   created_at: string;
 };
 
-export const DAILY_CHALLENGE_TEMPLATES: DailyChallengeTemplate[] = [
-  { type: "win_matches", description: "Win 3 matches", target: 3, rewardSp: 150 },
-  { type: "complete_matches", description: "Complete 5 matches", target: 5, rewardSp: 100 },
-  {
-    type: "try_new_game",
-    description: "Play a game you haven't played today",
-    target: 1,
-    rewardSp: 100,
-  },
-  { type: "win_streak", description: "Win 2 matches in a row", target: 2, rewardSp: 200 },
-  { type: "play_variety", description: "Play 3 different games", target: 3, rewardSp: 150 },
+const ACTIVE_GAMES = [
+  { slug: "chess", name: "Chess" },
+  { slug: "connect-4", name: "Connect 4" },
+  { slug: "checkers", name: "Checkers" },
+  { slug: "reaction-duel", name: "Reaction Duel" },
+  { slug: "memory-match", name: "Memory Match" },
+  { slug: "typing-race", name: "Typing Race" },
+  { slug: "spelling-bee", name: "Spelling Bee" },
+  { slug: "trivia", name: "Trivia" },
+] as const;
+
+const GAME_SCOPED_TEMPLATES: DailyChallengeTemplate[] = [
+  { type: "win_matches", count: 2, rewardSp: 150, template: "Win 2 {game} matches" },
+  { type: "win_matches", count: 3, rewardSp: 250, template: "Win 3 {game} matches" },
+  { type: "play_matches", count: 5, rewardSp: 100, template: "Play 5 {game} matches" },
+  { type: "win_streak", count: 2, rewardSp: 200, template: "2-win streak in {game}" },
+];
+
+const UNIVERSAL_TEMPLATES: DailyChallengeTemplate[] = [
+  { type: "play_matches", count: 5, rewardSp: 100, template: "Play 5 matches" },
+  { type: "win_matches", count: 3, rewardSp: 150, template: "Win 3 matches" },
 ];
 
 function getUtcDayWindow(date = new Date()) {
@@ -91,6 +104,7 @@ function normalizeDailyChallengeRow(row: DailyChallengeDbRow): DailyChallengeRow
     reward_sp: Number(row.reward_sp ?? 0),
     completed: Boolean(row.completed),
     claimed: Boolean(row.claimed),
+    game_slug: row.game_slug ?? null,
     expires_at: row.expires_at,
     created_at: row.created_at,
   };
@@ -135,8 +149,12 @@ export async function resolveSessionUserId(
   }
 }
 
-function pickRandomTemplates(count: number): DailyChallengeTemplate[] {
-  const shuffled = [...DAILY_CHALLENGE_TEMPLATES].sort(() => Math.random() - 0.5);
+function pickRandom<T>(items: readonly T[]): T {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function pickRandomDistinctGames(count: number) {
+  const shuffled = [...ACTIVE_GAMES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, Math.max(0, Math.min(count, shuffled.length)));
 }
 
@@ -234,42 +252,78 @@ export async function getDailyChallenges(userId: string): Promise<DailyChallenge
         ? new Date(candidateExpiry.getTime() + 24 * 60 * 60 * 1000)
         : candidateExpiry;
     const expiresAt = expiresAtDate.toISOString();
-    const templates = pickRandomTemplates(3);
-    const rowsToInsert = templates.map((template) => ({
-      user_id: resolvedUserId,
-      challenge_type: template.type,
-      challenge_description: template.description,
-      description: template.description,
-      target: template.target,
-      progress: 0,
-      reward_sp: template.rewardSp,
-      completed: false,
-      claimed: false,
-      expires_at: expiresAt,
-    }));
+    const scopedGames = pickRandomDistinctGames(3);
+    const scopedRows = scopedGames.map((game) => {
+      const template = pickRandom(GAME_SCOPED_TEMPLATES);
+      const description = template.template.replace("{game}", game.name);
+      return {
+        user_id: resolvedUserId,
+        challenge_type: template.type,
+        challenge_description: description,
+        description,
+        target: template.count,
+        progress: 0,
+        reward_sp: template.rewardSp,
+        completed: false,
+        claimed: false,
+        expires_at: expiresAt,
+        game_slug: game.slug,
+      };
+    });
+    const includeUniversal = Math.random() > 0.5;
+    const universalRows = includeUniversal
+      ? [
+          (() => {
+            const template = pickRandom(UNIVERSAL_TEMPLATES);
+            const description = template.template;
+            return {
+              user_id: resolvedUserId,
+              challenge_type: template.type,
+              challenge_description: description,
+              description,
+              target: template.count,
+              progress: 0,
+              reward_sp: template.rewardSp,
+              completed: false,
+              claimed: false,
+              expires_at: expiresAt,
+              game_slug: null as string | null,
+            };
+          })(),
+        ]
+      : [];
+    const rowsToInsert = [...scopedRows, ...universalRows];
 
     // eslint-disable-next-line no-console
     console.log("[DailyChallenges] Generating new daily challenges", {
       userId: resolvedUserId,
-      challengeTypes: templates.map((t) => t.type),
+      challengeTypes: rowsToInsert.map((row) => row.challenge_type),
       expiresAt,
     });
 
     let { error: insertError } = await supabase.from("daily_challenges").insert(rowsToInsert);
     if (insertError) {
       // Backward-compatible insert for schemas still using `type`.
-      const legacyRowsToInsert = templates.map((template) => ({
+      const legacyRowsToInsert = rowsToInsert.map((row) => ({
         user_id: resolvedUserId,
-        type: template.type,
-        description: template.description,
-        target: template.target,
+        type: row.challenge_type,
+        description: row.description,
+        target: row.target,
         progress: 0,
-        reward_sp: template.rewardSp,
+        reward_sp: row.reward_sp,
         completed: false,
         claimed: false,
         expires_at: expiresAt,
+        game_slug: row.game_slug,
       }));
-      const { error: legacyInsertError } = await supabase.from("daily_challenges").insert(legacyRowsToInsert);
+      let { error: legacyInsertError } = await supabase.from("daily_challenges").insert(legacyRowsToInsert);
+      if (legacyInsertError) {
+        const fallbackWithoutGameSlug = legacyRowsToInsert.map(({ game_slug: _gameSlug, ...rest }) => rest);
+        const { error: legacyWithoutSlugError } = await supabase
+          .from("daily_challenges")
+          .insert(fallbackWithoutGameSlug);
+        legacyInsertError = legacyWithoutSlugError;
+      }
       insertError = legacyInsertError;
     }
 
@@ -320,14 +374,21 @@ export async function updateChallengeProgress(
   if (!supabase) return [];
   try {
     const nowIso = new Date().toISOString();
-    const { data: active, error: activeError } = await supabase
+    let query = supabase
       .from("daily_challenges")
       .select("*")
       .eq("user_id", resolvedUserId)
       .eq("claimed", false)
       .eq("completed", false)
-      .gt("expires_at", nowIso)
-      .order("created_at", { ascending: true });
+      .gt("expires_at", nowIso);
+
+    if (gameType) {
+      query = query.or(`game_slug.is.null,game_slug.eq.${gameType}`);
+    } else {
+      query = query.is("game_slug", null);
+    }
+
+    const { data: active, error: activeError } = await query.order("created_at", { ascending: true });
 
     if (activeError) {
       // eslint-disable-next-line no-console
@@ -367,7 +428,7 @@ export async function updateChallengeProgress(
         touched = true;
       }
 
-      if (challenge.type === "complete_matches" && isMatchCompleteEvent) {
+      if ((challenge.type === "complete_matches" || challenge.type === "play_matches") && isMatchCompleteEvent) {
         nextProgress = Math.min(challenge.target, nextProgress + 1);
         touched = true;
       }
