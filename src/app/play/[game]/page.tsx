@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
+import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
@@ -18,7 +18,8 @@ import {
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
+import { getUserSPData } from "@/lib/skillpoints";
+import { pickBotDifficulty } from "@/lib/matchmaking";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -162,12 +163,6 @@ export default function PlayGamePage() {
     [myGameRating, username]
   );
 
-  const getBotDifficultyForRating = useCallback((rating: number): BotDifficulty => {
-    if (rating < 1000) return "rookie";
-    if (rating <= 1500) return "gamer";
-    return "professional";
-  }, []);
-
   const pickRandomOpponentGradient = useCallback(() => {
     return OPPONENT_AVATAR_GRADIENTS[Math.floor(Math.random() * OPPONENT_AVATAR_GRADIENTS.length)];
   }, []);
@@ -177,7 +172,7 @@ export default function PlayGamePage() {
     botFallbackStartedRef.current = true;
 
     const createBotMatch = async (): Promise<string> => {
-      const resolvedBotDifficulty = getBotDifficultyForRating(myGameRating);
+      const resolvedBotDifficulty = pickBotDifficulty(myGameRating) as BotDifficulty;
       const opponent = generateFakeOpponent(myGameRating);
       setOpponentFound(opponent);
       setOpponentAvatarGradient(pickRandomOpponentGradient());
@@ -229,7 +224,6 @@ export default function PlayGamePage() {
     cancelSearching,
     gameName,
     gameSlug,
-    getBotDifficultyForRating,
     myGameRating,
     pickRandomOpponentGradient,
     player1,
@@ -253,17 +247,7 @@ export default function PlayGamePage() {
     setOpponentFound(null);
     setMatch(null);
     setMatchmakingElapsed(0);
-    if (!isPractice && !isRestricted) {
-      try {
-        await creditSP(userId, stakeAmount, "match_refund", "Match cancelled – stake refunded");
-        const spData = await getUserSPData(userId);
-        setBalance(Number(spData?.balanceSp ?? 0));
-        dispatchWalletUpdated();
-      } catch {
-        dispatchWalletUpdated();
-      }
-    }
-  }, [elapsedTimer, stakeAmount, isPractice, isRestricted, useRealMatchmaking, cancelSearching, userId]);
+  }, [elapsedTimer, useRealMatchmaking, cancelSearching]);
 
   const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
     if (process.env.NODE_ENV !== "production") {
@@ -318,24 +302,6 @@ export default function PlayGamePage() {
 
     if (useRealMatchmaking) {
       if (insufficientBalance || stakeAmount < 1) return;
-      try {
-        const spendResult = await spendSP(
-          userId,
-          stakeAmount,
-          "match_entry",
-          `Match entry – ${gameName}`
-        );
-        if (!spendResult.success) {
-          showToast(spendResult.error, "error");
-          return;
-        }
-        const spData = await getUserSPData(userId);
-        setBalance(Number(spData?.balanceSp ?? 0));
-        dispatchWalletUpdated();
-      } catch {
-        showToast("Unable to start match right now. Please try again.", "error");
-        return;
-      }
       setMatchmaking(true);
       setMatchmakingElapsed(0);
       botFallbackStartedRef.current = false;

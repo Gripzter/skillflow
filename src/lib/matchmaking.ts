@@ -142,6 +142,14 @@ export function generateFakeOpponent(baseRating: number = 1000): PlayerInfo {
   };
 }
 
+export function pickBotDifficulty(playerRating: number): "rookie" | "gamer" | "professional" {
+  const variance = 50 + Math.random() * 100;
+  const target = playerRating + (Math.random() < 0.5 ? -variance : variance);
+  if (target < 1300) return "rookie";
+  if (target < 1700) return "gamer";
+  return "professional";
+}
+
 export function computePayout(stakeAmount: number): {
   totalPot: number;
   platformFee: number;

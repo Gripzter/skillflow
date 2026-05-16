@@ -34,6 +34,7 @@ import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
 import { incrementMatchCount } from "@/lib/cases";
 import { updateChallengeProgress } from "@/lib/daily-challenges";
+import { settleMatch as settleMatchViaEdge } from "@/lib/matchActions";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
@@ -475,24 +476,17 @@ export async function createMatch(params: {
     ? [
         {
           ...baseInsert,
-          status: "active",
-          is_bot: true,
-          bot_name: params.player2.username,
-          player2_id: null,
-        },
-        {
-          ...baseInsert,
-          status: "in_progress",
-          is_bot: true,
-          bot_name: params.player2.username,
-          player2_id: null,
-        },
-        {
-          ...baseInsert,
           status: "in_progress",
           is_bot: true,
           bot_name: params.player2.username,
           player2_id: BOT_PLAYER_UUID,
+        },
+        {
+          ...baseInsert,
+          status: "in_progress",
+          is_bot: true,
+          bot_name: params.player2.username,
+          player2_id: null,
         },
         { ...baseInsert, status: "in_progress", player2_id: null },
         { ...baseInsert, status: "in_progress", player2_id: BOT_PLAYER_UUID },
@@ -768,7 +762,7 @@ export async function completeMatchAndSettle(
     return true;
   }
 
-  async function awardSkillPointsForMatchResult() {
+  async function awardSkillPointsForMatchResult(skipSpAwards = false) {
     const isBotMatch = match.isBot === true;
     const targets: Array<{ userId: string; won: boolean }> = [];
 
@@ -796,46 +790,48 @@ export async function completeMatchAndSettle(
 
     for (const target of targets) {
       try {
-        // eslint-disable-next-line no-console
-        console.log("[AWARD_SP_CALL]", {
-          timestamp: new Date().toISOString(),
-          matchId: match.id,
-          userId: target.userId,
-          won: target.won,
-          resolvedFromMatch: {
-            matchResult: result,
-            matchWinnerId: winnerId,
-            isPlayer1: match.player1Id === target.userId,
-            isPlayer2: match.player2Id === target.userId,
-            isBot: match.isBot,
-          },
-        });
-        const awardResult = await awardMatchSP(target.userId, target.won, {
-          matchId: match.id,
-          gameType: match.gameType,
-        });
-        if (!awardResult.success) {
+        if (!skipSpAwards) {
           // eslint-disable-next-line no-console
-          console.error("[SP] Match reward failed", {
+          console.log("[AWARD_SP_CALL]", {
+            timestamp: new Date().toISOString(),
             matchId: match.id,
             userId: target.userId,
-            error: awardResult.error,
+            won: target.won,
+            resolvedFromMatch: {
+              matchResult: result,
+              matchWinnerId: winnerId,
+              isPlayer1: match.player1Id === target.userId,
+              isPlayer2: match.player2Id === target.userId,
+              isBot: match.isBot,
+            },
           });
-          continue;
-        }
-
-        if (target.won) {
-          const streakResult = await awardStreakBonusIfEligible(target.userId, {
+          const awardResult = await awardMatchSP(target.userId, target.won, {
             matchId: match.id,
             gameType: match.gameType,
           });
-          if (!streakResult.success) {
+          if (!awardResult.success) {
             // eslint-disable-next-line no-console
-            console.error("[SP] Streak bonus failed", {
+            console.error("[SP] Match reward failed", {
               matchId: match.id,
               userId: target.userId,
-              error: streakResult.error,
+              error: awardResult.error,
             });
+            continue;
+          }
+
+          if (target.won) {
+            const streakResult = await awardStreakBonusIfEligible(target.userId, {
+              matchId: match.id,
+              gameType: match.gameType,
+            });
+            if (!streakResult.success) {
+              // eslint-disable-next-line no-console
+              console.error("[SP] Streak bonus failed", {
+                matchId: match.id,
+                userId: target.userId,
+                error: streakResult.error,
+              });
+            }
           }
         }
 
@@ -905,13 +901,40 @@ export async function completeMatchAndSettle(
   }
 
   if (outcome === "player1" || outcome === "player2") {
-    if (isWinner) {
-      await creditWallet(
-        match.winnerPayout,
-        `Match win – ${match.gameDisplayName}`,
-        "match_win"
-      );
+    if (isDevMode()) {
+      if (isWinner) {
+        await creditWallet(
+          match.winnerPayout,
+          `Match win – ${match.gameDisplayName}`,
+          "match_win"
+        );
+      }
+      const persisted = await persistFinalizedMatch();
+      if (!persisted) return;
+      await updateGameStatsForCurrentUser();
+      await awardSkillPointsForMatchResult();
+      return;
     }
+
+    const settlementWinnerId =
+      match.isBot && winnerId === BOT_PLAYER_UUID ? null : isUuid(winnerId) ? winnerId : null;
+
+    await settleMatchViaEdge({
+      matchId: match.id,
+      winnerId: settlementWinnerId,
+      gameResult: { outcome, gameType: match.gameType },
+    });
+    await updateGameStatsForCurrentUser();
+    await awardSkillPointsForMatchResult(true);
+    return;
+  }
+
+  if (isDevMode()) {
+    await creditWallet(
+      match.stakeAmount,
+      `Draw – ${match.gameDisplayName} (stake refunded)`,
+      "match_refund"
+    );
     const persisted = await persistFinalizedMatch();
     if (!persisted) return;
     await updateGameStatsForCurrentUser();
@@ -919,16 +942,13 @@ export async function completeMatchAndSettle(
     return;
   }
 
-  // draw: refund stake to this user
-  await creditWallet(
-    match.stakeAmount,
-    `Draw – ${match.gameDisplayName} (stake refunded)`,
-    "match_refund"
-  );
-  const persisted = await persistFinalizedMatch();
-  if (!persisted) return;
+  await settleMatchViaEdge({
+    matchId: match.id,
+    winnerId: null,
+    gameResult: { outcome: "draw", gameType: match.gameType },
+  });
   await updateGameStatsForCurrentUser();
-  await awardSkillPointsForMatchResult();
+  await awardSkillPointsForMatchResult(true);
 }
 
 // ============ LEADERBOARD ============
