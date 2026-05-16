@@ -946,10 +946,7 @@ function MatchPageContent() {
   const formatSkillies = (amount: number) => `${amount.toLocaleString()} Skillies`;
   const shortId = match.id.slice(0, 8);
   const myRole = myRoleComputed;
-  const opponentDisplayName = useMemo(
-    () => opponentNameFromUrl?.trim() || pickOpponentName(matchId),
-    [matchId, opponentNameFromUrl]
-  );
+  const opponentDisplayName = opponentNameFromUrl?.trim() || pickOpponentName(matchId);
   const displayedPlayer1 =
     myRole === "player1" ? safePlayer1 : { ...safePlayer1, username: opponentDisplayName };
   const displayedPlayer2 =

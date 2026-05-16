@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -20,7 +20,6 @@ import {
   type StoredMatch,
 } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
-import { pickBotDifficulty } from "@/lib/matchmaking";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
 
@@ -54,8 +53,11 @@ const GAME_SLUG_TO_NAME: Record<string, string> = {
   "last-touch": "Last Touch",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function PlayGamePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams();
   const gameSlug = (params?.game as string) || "";
   const gameName = GAME_SLUG_TO_NAME[gameSlug] || gameSlug.replace(/-/g, " ");
@@ -105,7 +107,6 @@ export default function PlayGamePage() {
     match: realMatch,
     role: realRole,
     error: realMatchError,
-    startMatchmaking,
     cancelSearching,
   } = useMatchmaking();
 
@@ -185,7 +186,6 @@ export default function PlayGamePage() {
     botFallbackStartedRef.current = true;
 
     const createBotMatch = async (): Promise<string> => {
-      const resolvedBotDifficulty = pickBotDifficulty(myGameRating) as BotDifficulty;
       const opponent = generateFakeOpponent(myGameRating);
       setOpponentFound(opponent);
       setOpponentAvatarGradient(pickRandomOpponentGradient());
@@ -259,17 +259,6 @@ export default function PlayGamePage() {
     setMatch(null);
     setMatchmakingElapsed(0);
   }, [elapsedTimer, useRealMatchmaking, cancelSearching]);
-
-  const handleMatchReady = useCallback((match: { id: string }, _role: "player1" | "player2") => {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[PlayGamePage] onMatchReady called", match?.id, _role, "— navigating with window.location.href");
-    }
-    if (match?.id) {
-      const matchUrl = `/play/match/${match.id}`;
-      window.location.href = matchUrl;
-    }
-  }, []);
 
   const handlePlay = useCallback(
     async (stakeToPlay: number) => {
@@ -438,16 +427,13 @@ export default function PlayGamePage() {
   }, []);
 
   useEffect(() => {
-    const autostake = typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("autostake")
-      : null;
-    if (!autostake || loading || effectivePractice) return;
+    const autostake = searchParams.get("autostake");
+    if (!autostake) return;
     const stakeNum = Number.parseInt(autostake, 10);
-    if (STAKE_PRESETS.includes(stakeNum)) {
-      router.replace(`/play/${gameSlug}`, { scroll: false });
-      void handlePlay(stakeNum);
-    }
-  }, [effectivePractice, gameSlug, handlePlay, loading, router]);
+    if (![100, 200, 500, 1000, 2500].includes(stakeNum)) return;
+    router.replace(`/play/${gameSlug}`, { scroll: false });
+    void handlePlay(stakeNum);
+  }, [searchParams, router, gameSlug, handlePlay]);
 
   if (loading) {
     return <LoadingRing />;

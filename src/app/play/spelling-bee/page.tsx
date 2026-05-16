@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -19,7 +19,6 @@ import {
   type StoredMatch,
 } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
-import { pickBotDifficulty } from "@/lib/matchmaking";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
 
@@ -43,8 +42,11 @@ const DIFFICULTY_OPTIONS: { value: BotDifficulty; label: string; description: st
   { value: "professional", label: "Professional", description: "Near-perfect play. Only the best can win." },
 ];
 
-export default function PlaySpellingBeePage() {
+export const dynamic = "force-dynamic";
+
+function PlaySpellingBeePageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
@@ -82,7 +84,6 @@ export default function PlaySpellingBeePage() {
     match: realMatch,
     role: realRole,
     error: realMatchError,
-    startMatchmaking,
     cancelSearching,
   } = useMatchmaking();
 
@@ -132,16 +133,6 @@ export default function PlaySpellingBeePage() {
     const timer = setInterval(() => setMatchmakingElapsed((e) => e + 1), 1000);
     return () => clearInterval(timer);
   }, [matchmaking, useRealMatchmaking]);
-
-  const handleMatchReady = useCallback((match: { id: string }) => {
-    if (process.env.NODE_ENV !== "production") {
-      // eslint-disable-next-line no-console
-      console.log("[SpellingBee] onMatchReady — navigating with window.location.href to", `/match/${match?.id}`);
-    }
-    if (match?.id) {
-      window.location.href = `/match/${match.id}`;
-    }
-  }, []);
 
   const handlePlay = useCallback(
     async (stakeToPlay: number) => {
@@ -227,7 +218,6 @@ export default function PlaySpellingBeePage() {
     if (botFallbackStartedRef.current) return;
     botFallbackStartedRef.current = true;
     await cancelSearching();
-    const resolvedBotDifficulty = pickBotDifficulty(myGameRating) as BotDifficulty;
     const opponent = generateFakeOpponent(myGameRating);
     setOpponentFound(opponent);
     setOpponentAvatarGradient(pickRandomOpponentGradient());
@@ -384,16 +374,13 @@ export default function PlaySpellingBeePage() {
   }, []);
 
   useEffect(() => {
-    const autostake = typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("autostake")
-      : null;
-    if (!autostake || loading || isPractice) return;
+    const autostake = searchParams.get("autostake");
+    if (!autostake) return;
     const stakeNum = Number.parseInt(autostake, 10);
-    if (STAKE_PRESETS.includes(stakeNum)) {
-      router.replace(`/play/${GAME_SLUG}`, { scroll: false });
-      void handlePlay(stakeNum);
-    }
-  }, [handlePlay, isPractice, loading, router]);
+    if (![100, 200, 500, 1000, 2500].includes(stakeNum)) return;
+    router.replace(`/play/${GAME_SLUG}`, { scroll: false });
+    void handlePlay(stakeNum);
+  }, [searchParams, router, handlePlay]);
 
   if (loading) {
     return <LoadingRing />;
@@ -660,5 +647,13 @@ export default function PlaySpellingBeePage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PlaySpellingBeePage() {
+  return (
+    <Suspense fallback={<LoadingRing />}>
+      <PlaySpellingBeePageContent />
+    </Suspense>
   );
 }
