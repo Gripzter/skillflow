@@ -227,7 +227,7 @@ export default function AdminTaxPage() {
             type="button"
             onClick={() => downloadCSV(yearQuarters, year)}
             disabled={yearQuarters.length === 0}
-            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold text-black transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: "#FFFF00" }}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

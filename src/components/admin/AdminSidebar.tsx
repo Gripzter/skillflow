@@ -85,7 +85,7 @@ export default function AdminSidebar() {
       <div className="flex items-center gap-2.5 border-b border-white/5 px-5 py-[18px]">
         <span className="text-base font-bold tracking-tight text-white">SkillFlow</span>
         <span
-          className="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-white"
+          className="rounded px-1.5 py-0.5 text-[9px] font-bold tracking-widest text-black"
           style={{ background: "#FFFF00" }}
         >
           ADMIN

@@ -106,7 +106,7 @@ export default function GameResultOverlay({
         : `You defeated ${opponentUsername}`;
   } else if (isDefeat) {
     headline = "DEFEAT";
-    headlineColor = "#6B7280";
+    headlineColor = "rgba(255,255,255,0.9)";
     if (!isPractice) amountValue = -stakeAmount;
     subtext = `${opponentUsername} won this one`;
   } else {
@@ -145,7 +145,7 @@ export default function GameResultOverlay({
           <p
             className="mt-4 text-4xl font-bold tabular-nums sm:text-5xl"
             style={{
-              color: isVictory ? "#FFFF00" : isDraw ? "#60A5FA" : "#6B7280",
+              color: isVictory ? "#FFFF00" : isDraw ? "#60A5FA" : "#FFFFFF",
             }}
           >
             {isDraw ? (
@@ -159,7 +159,7 @@ export default function GameResultOverlay({
         )}
 
         {/* Subtext */}
-        <p className="mt-3 text-[15px]" style={{ color: "#888" }}>
+        <p className="mt-3 text-[15px]" style={{ color: isDefeat ? "rgba(255,255,255,0.6)" : "#888" }}>
           {subtext}
         </p>
 
@@ -168,7 +168,7 @@ export default function GameResultOverlay({
           <button
             type="button"
             onClick={handlePlayAgain}
-            className="w-full rounded-xl py-3.5 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
+            className="w-full rounded-xl py-3.5 text-[15px] font-bold text-black transition-opacity hover:opacity-90"
             style={{ background: "#FFFF00" }}
           >
             Play Again

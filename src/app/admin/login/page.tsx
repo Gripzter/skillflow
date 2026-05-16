@@ -22,7 +22,7 @@ export default function AdminLoginRedirect() {
         </p>
         <Link
           href="/login"
-          className="mt-6 inline-block rounded-lg px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="mt-6 inline-block rounded-lg px-6 py-2.5 text-sm font-bold text-black transition-opacity hover:opacity-90"
           style={{ background: "#FFFF00" }}
         >
           Go to Login

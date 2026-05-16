@@ -301,7 +301,7 @@ export default function AdminReportsPage() {
                 ? "text-white"
                 : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
             }`}
-            style={statusFilter === s ? { background: "#FFFF00" } : {}}
+            style={statusFilter === s ? { background: "#FFFF00", color: "#0E0E12" } : {}}
           >
             {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
             {s !== "all" && (
@@ -501,7 +501,7 @@ CREATE TRIGGER reports_set_updated_at
                         type="button"
                         disabled={saving === r.id}
                         onClick={() => saveReport(r.id)}
-                        className="rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:opacity-90 transition-opacity"
+                        className="rounded-lg px-5 py-2 text-sm font-bold text-black disabled:opacity-50 hover:opacity-90 transition-opacity"
                         style={{ background: "#FFFF00" }}
                       >
                         {saving === r.id ? "Saving…" : "Save Changes"}

@@ -428,7 +428,7 @@ export default function GameLayout({
                       className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
                       style={{ background: "#1a1a22" }}
                     />
-                    <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-medium text-white" style={{ background: "#FFFF00" }}>
+                    <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1 text-[11px] font-bold text-black" style={{ background: "#FFFF00" }}>
                       Send
                     </button>
                   </div>
@@ -482,7 +482,7 @@ export default function GameLayout({
                   className="min-w-0 flex-1 rounded-lg border border-[#2a2a34] px-2.5 py-1.5 text-[12px] text-[#e0e0e0] placeholder:text-[#666]"
                   style={{ background: "#1a1a22" }}
                 />
-                <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-medium text-white" style={{ background: "#FFFF00" }}>
+                <button type="button" onClick={sendChat} className="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-bold text-black" style={{ background: "#FFFF00" }}>
                   Send
                 </button>
               </div>

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
+import MatchmakingScreen from "@/components/match/MatchmakingScreen";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
@@ -21,6 +22,7 @@ import {
 import { getUserSPData } from "@/lib/skillpoints";
 import { pickBotDifficulty } from "@/lib/matchmaking";
 import { startMatch } from "@/lib/matchActions";
+import { pickOpponentName } from "@/lib/opponentNames";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -83,6 +85,16 @@ export default function PlayGamePage() {
   const findMatchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [navigateToMatchId, setNavigateToMatchId] = useState<string | null>(null);
   const botFallbackStartedRef = useRef(false);
+  const [matchmakingState, setMatchmakingState] = useState<
+    | { phase: "stake_select" }
+    | {
+        phase: "searching";
+        stake: number;
+        opponentName: string;
+        matchId: string | null;
+        error: string | null;
+      }
+  >({ phase: "stake_select" });
 
   const { isPractice } = usePlayMode();
   const { isRestricted } = useGeo();
@@ -210,7 +222,10 @@ export default function PlayGamePage() {
         supabaseError?.hint,
         supabaseError?.code
       );
-      showToast("Could not create a bot match. Please try again.", "error");
+      showToast(
+        `Could not create a bot match: ${error instanceof Error ? error.message : "Unknown error"}`,
+        "error"
+      );
       setMatchmaking(false);
       setOpponentFound(null);
       setMatch(null);
@@ -256,6 +271,67 @@ export default function PlayGamePage() {
     }
   }, []);
 
+  const handlePlay = useCallback(
+    async (stakeToPlay: number) => {
+      const opponentName = pickOpponentName(crypto.randomUUID());
+      setMatchmakingState({
+        phase: "searching",
+        stake: stakeToPlay,
+        opponentName,
+        matchId: null,
+        error: null,
+      });
+
+      try {
+        const started = await startMatch({
+          game: gameSlug,
+          opponentId: null,
+          stake: stakeToPlay,
+          opponentIsBot: true,
+        });
+        setBalance(started.player_a_balance_after);
+        setMatchmakingState((prev) =>
+          prev.phase === "searching" ? { ...prev, matchId: started.match_id } : prev
+        );
+
+        sessionStorage.setItem(
+          "lastMatchConfig",
+          JSON.stringify({
+            game: gameSlug,
+            stake: stakeToPlay,
+            opponentName,
+          })
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Couldn't start match";
+        setMatchmakingState({
+          phase: "searching",
+          stake: stakeToPlay,
+          opponentName,
+          matchId: null,
+          error: message,
+        });
+      }
+    },
+    [gameSlug]
+  );
+
+  const handleMatchmakingReady = useCallback(() => {
+    if (matchmakingState.phase !== "searching") return;
+    if (matchmakingState.error) {
+      showToast(matchmakingState.error, "error");
+      setMatchmakingState({ phase: "stake_select" });
+      return;
+    }
+    if (matchmakingState.matchId) {
+      router.push(
+        `/match/${matchmakingState.matchId}?opponent=${encodeURIComponent(matchmakingState.opponentName)}`
+      );
+      return;
+    }
+    window.setTimeout(handleMatchmakingReady, 500);
+  }, [matchmakingState, router, showToast]);
+
   const handleFindMatch = useCallback(async () => {
     if (!userId) {
       showToast("Still loading your profile. Please try again in a moment.", "error");
@@ -298,10 +374,7 @@ export default function PlayGamePage() {
 
     if (useRealMatchmaking) {
       if (insufficientBalance || stakeAmount < 1) return;
-      setMatchmaking(true);
-      setMatchmakingElapsed(0);
-      botFallbackStartedRef.current = false;
-      await runBotFallbackMatch();
+      await handlePlay(stakeAmount);
       return;
     }
   }, [
@@ -320,6 +393,7 @@ export default function PlayGamePage() {
     stakeAmount,
     showToast,
     runBotFallbackMatch,
+    handlePlay,
   ]);
 
   useEffect(() => {
@@ -363,8 +437,31 @@ export default function PlayGamePage() {
     };
   }, []);
 
+  useEffect(() => {
+    const autostake = typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("autostake")
+      : null;
+    if (!autostake || loading || effectivePractice) return;
+    const stakeNum = Number.parseInt(autostake, 10);
+    if (STAKE_PRESETS.includes(stakeNum)) {
+      router.replace(`/play/${gameSlug}`, { scroll: false });
+      void handlePlay(stakeNum);
+    }
+  }, [effectivePractice, gameSlug, handlePlay, loading, router]);
+
   if (loading) {
     return <LoadingRing />;
+  }
+
+  if (matchmakingState.phase === "searching") {
+    return (
+      <MatchmakingScreen
+        stake={matchmakingState.stake}
+        gameName={gameName}
+        opponentName={matchmakingState.opponentName}
+        onReady={handleMatchmakingReady}
+      />
+    );
   }
 
   const formatTime = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;

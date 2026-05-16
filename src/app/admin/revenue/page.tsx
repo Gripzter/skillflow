@@ -204,7 +204,7 @@ export default function AdminRevenuePage() {
                     ? "text-white"
                     : "bg-white/5 text-[#9CA3AF] hover:bg-white/10"
                 }`}
-                style={period === p ? { background: "#FFFF00" } : {}}
+                style={period === p ? { background: "#FFFF00", color: "#0E0E12" } : {}}
               >
                 {p.charAt(0).toUpperCase() + p.slice(1)}
               </button>

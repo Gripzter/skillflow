@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -39,6 +39,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
+import { pickOpponentName } from "@/lib/opponentNames";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -117,8 +118,10 @@ function toMoveAction(gameType: string, event: Record<string, unknown>): Record<
 
 function MatchPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const params = useParams();
   const matchId = (params?.id as string) || "";
+  const opponentNameFromUrl = searchParams.get("opponent");
   const { isPractice } = usePlayMode();
   const { showToast } = useToast();
 
@@ -865,6 +868,28 @@ function MatchPageContent() {
     }
   }
 
+  const handlePlayAgain = useCallback(() => {
+    const fallbackGame = match?.gameType ?? "chess";
+    const lastConfigJson = sessionStorage.getItem("lastMatchConfig");
+    if (!lastConfigJson) {
+      router.push(`/play/${fallbackGame}`);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(lastConfigJson) as { game?: string; stake?: number };
+      const rematchGame = parsed.game || fallbackGame;
+      const rematchStake = Number(parsed.stake);
+      if (!Number.isFinite(rematchStake)) {
+        router.push(`/play/${rematchGame}`);
+        return;
+      }
+      router.push(`/play/${rematchGame}?autostake=${Math.trunc(rematchStake)}`);
+    } catch {
+      router.push(`/play/${fallbackGame}`);
+    }
+  }, [match?.gameType, router]);
+
   useEffect(() => {
     setMatchUi(null);
   }, [matchId]);
@@ -921,6 +946,14 @@ function MatchPageContent() {
   const formatSkillies = (amount: number) => `${amount.toLocaleString()} Skillies`;
   const shortId = match.id.slice(0, 8);
   const myRole = myRoleComputed;
+  const opponentDisplayName = useMemo(
+    () => opponentNameFromUrl?.trim() || pickOpponentName(matchId),
+    [matchId, opponentNameFromUrl]
+  );
+  const displayedPlayer1 =
+    myRole === "player1" ? safePlayer1 : { ...safePlayer1, username: opponentDisplayName };
+  const displayedPlayer2 =
+    myRole === "player1" ? { ...safePlayer2, username: opponentDisplayName } : safePlayer2;
   const matchStartMs =
     typeof match.matchStartTime === "string" ? new Date(match.matchStartTime).getTime() : NaN;
   const effectiveMatchStartMs =
@@ -930,8 +963,7 @@ function MatchPageContent() {
     match.status === "in_progress"
       ? Math.max(0, Math.ceil((timeLimitMs - Math.max(0, timerNowMs - effectiveMatchStartMs)) / 1000))
       : 0;
-  const opponentUsername =
-    myRole === "player1" ? safePlayer2.username : safePlayer1.username;
+  const opponentUsername = opponentDisplayName;
   const waitingForOpponent = isRealMultiplayer && connectionCheckPassed && !opponentConnected && !outcome;
   const connectionTone =
     connectionStatus === "disconnected"
@@ -993,16 +1025,16 @@ function MatchPageContent() {
     matchId: match.id,
     mode: (match.isPractice ? "practice" : "real") as "practice" | "real",
     player1: {
-      username: safePlayer1.username,
-      rating: safePlayer1.rating,
+      username: displayedPlayer1.username,
+      rating: displayedPlayer1.rating,
       score: matchUi?.scores.player1 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
       isBot: false,
       timeLeftSec: matchUi?.playerTimeLeftSec?.player1,
     },
     player2: {
-      username: safePlayer2.username,
-      rating: safePlayer2.rating,
+      username: displayedPlayer2.username,
+      rating: displayedPlayer2.rating,
       score: matchUi?.scores.player2 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
       isBot: !isRealMultiplayer,
@@ -1182,8 +1214,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <Chess
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1211,8 +1243,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <ConnectFour
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1233,8 +1265,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <ReactionDuel
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1256,8 +1288,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <MemoryMatch
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1280,8 +1312,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <Checkers
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1303,8 +1335,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <SpellingBee
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1326,8 +1358,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <Trivia
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1348,8 +1380,8 @@ function MatchPageContent() {
           {match.status === "in_progress" && !outcome ? (
             <GameLayout {...gameLayoutProps}>
               <TypingRace
-                player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-                player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
                 onGameEnd={handleGameEnd}
                 onGameDraw={handleDraw}
                 isPlayer2Bot={!isRealMultiplayer}
@@ -1369,8 +1401,8 @@ function MatchPageContent() {
         <main className="mx-auto flex min-h-0 w-full max-w-full flex-1 flex-col px-4 py-6">
           <div className="flex w-full flex-col bg-transparent">
             <EightBallPool
-              player1={{ username: safePlayer1.username, rating: safePlayer1.rating }}
-              player2={{ username: safePlayer2.username, rating: safePlayer2.rating }}
+              player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+              player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
               onGameEnd={handleGameEnd}
               isPlayer2Bot={!isRealMultiplayer}
             />
@@ -1380,10 +1412,10 @@ function MatchPageContent() {
         <main className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 px-4 py-6 md:grid-cols-[1fr_2fr_1fr]">
           <div className="card-border rounded-card bg-card p-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-2xl font-bold text-white">
-              {safePlayer1.username.charAt(0)}
+              {displayedPlayer1.username.charAt(0)}
             </div>
-            <p className="mt-2 font-medium text-white">{safePlayer1.username}</p>
-            <p className="text-xs text-body-gray">Rating {safePlayer1.rating}</p>
+            <p className="mt-2 font-medium text-white">{displayedPlayer1.username}</p>
+            <p className="text-xs text-body-gray">Rating {displayedPlayer1.rating}</p>
             <p className="mt-4 text-3xl font-bold text-teal">0</p>
             <p className="text-xs text-body-gray">Score</p>
           </div>
@@ -1412,12 +1444,12 @@ function MatchPageContent() {
           </div>
           <div className="card-border rounded-card bg-card p-4 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-purple/40 to-rose-500/40 text-2xl font-bold text-white">
-              {safePlayer2.username.charAt(0)}
+              {displayedPlayer2.username.charAt(0)}
             </div>
             <p className="mt-2 font-medium text-white">
-              {safePlayer2.username}
+              {displayedPlayer2.username}
             </p>
-            <p className="text-xs text-body-gray">Rating {safePlayer2.rating}</p>
+            <p className="text-xs text-body-gray">Rating {displayedPlayer2.rating}</p>
             <p className="mt-4 text-3xl font-bold text-white">0</p>
             <p className="text-xs text-body-gray">Score</p>
           </div>
@@ -1497,7 +1529,7 @@ function MatchPageContent() {
           gameType={match.gameType}
           opponentUsername={opponentUsername}
           wonByForfeit={wonByForfeit}
-          onPlayAgain={() => { window.location.href = `/play/${match.gameType}`; }}
+          onPlayAgain={handlePlayAgain}
           onLeave={() => { window.location.href = "/play"; }}
         />
       )}
