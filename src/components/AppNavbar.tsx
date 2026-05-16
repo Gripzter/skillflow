@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
@@ -52,17 +52,18 @@ function formatTier(tier: string) {
 
 export default function AppNavbar(_props: AppNavbarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { profile } = useProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [spModalOpen, setSpModalOpen] = useState(false);
   const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
 
   useEffect(() => {
-    if (pathname === "/play" && searchParams.get("sp") === "1") {
+    if (pathname !== "/play" || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("sp") === "1") {
       setSpModalOpen(true);
     }
-  }, [pathname, searchParams]);
+  }, [pathname]);
 
   const avatarInitial = profile.username.charAt(0).toUpperCase() || "P";
 
