@@ -1030,7 +1030,7 @@ export default function LastTouch({
               className={`flex h-56 w-56 items-center justify-center rounded-full border-4 transition-all ${
                 isHolding
                   ? "animate-pulse border-teal bg-teal/20 shadow-[0_0_60px_rgba(16,185,129,0.5)]"
-                  : "animate-pulse border-orange-400 bg-orange-400/10"
+                  : "animate-pulse border-yellow-400 bg-yellow-400/10"
               }`}
             >
               <span className="text-center text-lg font-bold text-white">
@@ -1102,7 +1102,7 @@ export default function LastTouch({
             type="button"
             onClick={handleEnterArena}
             disabled={inArena}
-            className="w-full rounded-xl bg-orange-500 py-4 text-lg font-bold text-black shadow-[0_0_30px_rgba(249,115,22,0.45)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
+            className="w-full rounded-xl bg-yellow-500 py-4 text-lg font-bold text-black shadow-[0_0_30px_rgba(249,115,22,0.45)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-55"
           >
             {inArena ? "Inside Arena" : "Enter Arena"}
           </button>

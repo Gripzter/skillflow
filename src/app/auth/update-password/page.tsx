@@ -26,7 +26,7 @@ export default function UpdatePasswordPage() {
   const strength = useMemo(() => passwordStrength(password), [password]);
   const strengthClass = {
     weak: "bg-red-500",
-    fair: "bg-orange-500",
+    fair: "bg-yellow-500",
     good: "bg-yellow-500",
     strong: "bg-emerald-500",
   };
@@ -79,7 +79,7 @@ export default function UpdatePasswordPage() {
                 }`}
               />
             </div>
-            <span className={`text-xs ${strength === "weak" ? "text-red-400" : strength === "fair" ? "text-orange-400" : strength === "good" ? "text-yellow-400" : "text-emerald-400"}`}>
+            <span className={`text-xs ${strength === "weak" ? "text-red-400" : strength === "fair" ? "text-yellow-400" : strength === "good" ? "text-yellow-400" : "text-emerald-400"}`}>
               {strengthLabel[strength]}
             </span>
           </div>

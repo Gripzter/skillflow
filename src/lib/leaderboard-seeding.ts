@@ -30,7 +30,7 @@ const FALLBACK_GRADIENTS: string[] = [
   "from-rose-500/40 to-purple/40",
   "from-green-500/40 to-emerald-500/40",
   "from-cyan-400/40 to-blue-500/40",
-  "from-orange-500/40 to-amber-500/40",
+  "from-yellow-500/40 to-amber-500/40",
 ];
 
 /**

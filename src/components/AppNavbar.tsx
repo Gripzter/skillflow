@@ -36,6 +36,7 @@ interface AppNavbarProps {
     | "skillpoints"
     | "cases"
     | "inventory";
+  initialOpenSpModal?: boolean;
 }
 
 const NAV_ITEMS = [
@@ -50,7 +51,7 @@ function formatTier(tier: string) {
   return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
 }
 
-export default function AppNavbar(_props: AppNavbarProps) {
+export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps) {
   const pathname = usePathname();
   const { profile } = useProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,12 +59,10 @@ export default function AppNavbar(_props: AppNavbarProps) {
   const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
 
   useEffect(() => {
-    if (pathname !== "/play" || typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("sp") === "1") {
+    if (pathname === "/play" && initialOpenSpModal) {
       setSpModalOpen(true);
     }
-  }, [pathname]);
+  }, [pathname, initialOpenSpModal]);
 
   const avatarInitial = profile.username.charAt(0).toUpperCase() || "P";
 

@@ -37,18 +37,18 @@ export default function DailyLoginReward({
   return (
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-charcoal/90 px-4">
       <div
-        className={`relative w-full max-w-2xl rounded-card border border-orange-500/35 bg-card p-6 shadow-[0_0_40px_rgba(255, 255, 0, 0.25)] transition-transform duration-200 ${
+        className={`relative w-full max-w-2xl rounded-card border border-yellow-500/35 bg-card p-6 shadow-[0_0_40px_rgba(255, 255, 0, 0.25)] transition-transform duration-200 ${
           claimFx ? "scale-[1.02]" : "scale-100"
         }`}
       >
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-400">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-yellow-400">
               Daily Login Reward
             </p>
             <h2 className="mt-1 text-2xl font-extrabold text-white">Day {currentDay} Reward</h2>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-xl border border-orange-400/40 bg-orange-500/10 px-3 py-2 text-orange-300">
+          <div className="inline-flex items-center gap-2 rounded-xl border border-yellow-400/40 bg-yellow-500/10 px-3 py-2 text-yellow-300">
             <span className="text-lg font-bold">{rewardAmount.toLocaleString()} Skillies</span>
             <SkilliesIcon size={18} />
           </div>
@@ -60,7 +60,7 @@ export default function DailyLoginReward({
               key={item.day}
               className={`rounded-lg border px-2 py-3 text-center transition-colors ${
                 item.isCurrent
-                  ? "border-orange-400 bg-orange-500/15"
+                  ? "border-yellow-400 bg-yellow-500/15"
                   : item.isPast
                     ? "border-emerald-500/40 bg-emerald-500/10"
                     : "border-white/10 bg-black/20"
@@ -87,7 +87,7 @@ export default function DailyLoginReward({
             await onClaim();
             setTimeout(() => setClaimFx(false), 350);
           }}
-          className="mt-6 w-full rounded-lg bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-6 w-full rounded-lg bg-yellow-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {claiming ? "Claiming..." : `Claim ${rewardAmount.toLocaleString()} Skillies`}
         </button>

@@ -196,7 +196,7 @@ export default function CS2LobbyPage() {
   return (
     <div className="min-h-screen bg-charcoal">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
-      <div className="absolute inset-0 bg-gradient-to-b from-orange-950/10 via-transparent" aria-hidden />
+      <div className="absolute inset-0 bg-gradient-to-b from-yellow-950/10 via-transparent" aria-hidden />
       <AppNavbar
         username={username}
         isDevMode={isDevMode}
@@ -392,7 +392,7 @@ export default function CS2LobbyPage() {
                 </div>
                 <span className="text-2xl font-bold text-teal drop-shadow-teal-glow">VS</span>
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/40 to-red-500/40 text-lg font-bold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500/40 to-red-500/40 text-lg font-bold text-white">
                     {opponentFound.username.charAt(0)}
                   </div>
                   <p className="mt-2 font-medium text-white">{opponentFound.username}</p>

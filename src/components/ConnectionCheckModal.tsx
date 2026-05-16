@@ -28,9 +28,9 @@ export function ConnectionCheckWarning({ metrics, onContinue, onCancel }: Connec
           Your internet connection is currently unstable. This may affect your gameplay experience.
         </p>
         <div className="mt-4 rounded-lg border border-white/10 bg-[#1A1D27] p-4 font-mono text-sm">
-          <p className="text-body-gray">Ping: <span className={metrics.pingAvg >= 100 ? "text-orange-400" : "text-teal"}>{Math.round(metrics.pingAvg || metrics.ping)}ms</span></p>
-          <p className="mt-1 text-body-gray">Jitter: <span className={metrics.jitter >= 30 ? "text-orange-400" : "text-teal"}>{metrics.jitter}ms</span></p>
-          <p className="mt-1 text-body-gray">Packet loss: <span className={metrics.packetLoss >= 2 ? "text-orange-400" : "text-teal"}>{metrics.packetLoss}%</span></p>
+          <p className="text-body-gray">Ping: <span className={metrics.pingAvg >= 100 ? "text-yellow-400" : "text-teal"}>{Math.round(metrics.pingAvg || metrics.ping)}ms</span></p>
+          <p className="mt-1 text-body-gray">Jitter: <span className={metrics.jitter >= 30 ? "text-yellow-400" : "text-teal"}>{metrics.jitter}ms</span></p>
+          <p className="mt-1 text-body-gray">Packet loss: <span className={metrics.packetLoss >= 2 ? "text-yellow-400" : "text-teal"}>{metrics.packetLoss}%</span></p>
         </div>
         <label className="mt-4 flex cursor-pointer items-start gap-3">
           <input

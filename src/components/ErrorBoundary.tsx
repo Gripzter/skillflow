@@ -178,7 +178,7 @@ function ErrorScreen({
               padding: "12px 24px",
               borderRadius: "10px",
               border: "none",
-              background: "linear-gradient(135deg, #FFFF00, #FF7A2E)",
+              background: "linear-gradient(135deg, #FFFF00, #E6E600)",
               color: "#0A0E17",
               fontSize: "14px",
               fontWeight: "700",
@@ -190,7 +190,7 @@ function ErrorScreen({
 
           <button
             type="button"
-            onClick={() => (window.location.href = "/dashboard")}
+            onClick={() => (window.location.href = "/play")}
             style={{
               padding: "12px 24px",
               borderRadius: "10px",
@@ -201,7 +201,7 @@ function ErrorScreen({
               cursor: "pointer",
             }}
           >
-            Back to Dashboard
+            Back to Play
           </button>
         </div>
 

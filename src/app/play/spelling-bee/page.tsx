@@ -28,7 +28,7 @@ const OPPONENT_AVATAR_GRADIENTS = [
   "from-cyan-500/40 to-blue-500/40",
   "from-emerald-500/40 to-teal-500/40",
   "from-fuchsia-500/40 to-violet-500/40",
-  "from-amber-500/40 to-orange-500/40",
+  "from-amber-500/40 to-yellow-500/40",
 ];
 
 type BotDifficulty = "rookie" | "gamer" | "professional";
@@ -540,7 +540,7 @@ export default function PlaySpellingBeePage() {
               <p className="text-2xl font-bold text-amber-400">Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/40 to-orange-500/40 text-lg font-bold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/40 to-yellow-500/40 text-lg font-bold text-white">
                     {username.charAt(0)}
                   </div>
                   <p className="mt-2 font-medium text-white">{username}</p>
@@ -592,7 +592,7 @@ export default function PlaySpellingBeePage() {
               <p className={`text-2xl font-bold ${isPractice ? "text-purple-400" : "text-amber-400"}`}>Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/40 to-orange-500/40 text-lg font-bold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/40 to-yellow-500/40 text-lg font-bold text-white">
                     {player1.username.charAt(0)}
                   </div>
                   <p className="mt-2 font-medium text-white">{player1.username}</p>

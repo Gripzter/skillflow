@@ -437,7 +437,7 @@ export default function ExternalMatchRoomPage() {
   return (
     <div className="flex min-h-screen flex-col bg-charcoal">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
-      <div className="absolute inset-0 bg-gradient-to-b from-orange-950/10 via-transparent" aria-hidden />
+      <div className="absolute inset-0 bg-gradient-to-b from-yellow-950/10 via-transparent" aria-hidden />
       <AppNavbar
         username={username}
         isDevMode={isDevMode}
@@ -491,7 +491,7 @@ export default function ExternalMatchRoomPage() {
               </p>
             </div>
             <div className="card-border rounded-card bg-card p-4 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/40 to-red-500/40 text-xl font-bold text-white">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-yellow-500/40 to-red-500/40 text-xl font-bold text-white">
                 {match.player2.username.charAt(0)}
               </div>
               <p className="mt-2 font-medium text-white">{match.player2.username}</p>

@@ -27,7 +27,7 @@ const OPPONENT_AVATAR_GRADIENTS = [
   "from-cyan-500/40 to-blue-500/40",
   "from-emerald-500/40 to-teal-500/40",
   "from-fuchsia-500/40 to-violet-500/40",
-  "from-amber-500/40 to-orange-500/40",
+  "from-amber-500/40 to-yellow-500/40",
 ];
 
 export type BotDifficulty = "rookie" | "gamer" | "professional";

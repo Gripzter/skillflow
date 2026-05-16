@@ -12,7 +12,7 @@ const EXTERNAL_GAMES = [
     slug: "cs2",
     name: "Counter-Strike 2",
     tags: ["1v1", "5v5", "PC"],
-    gradient: "from-blue-900/80 to-orange-600/80",
+    gradient: "from-blue-900/80 to-yellow-600/80",
     status: "active" as const,
     playersOnline: "2,847 players",
   },
@@ -44,7 +44,7 @@ const EXTERNAL_GAMES = [
     slug: "nba-2k",
     name: "NBA 2K25",
     tags: ["1v1", "Console", "PC"],
-    gradient: "from-orange-600/80 to-red-600/80",
+    gradient: "from-yellow-600/80 to-red-600/80",
     status: "coming-soon" as const,
     playersOnline: "Coming Soon",
   },
@@ -106,7 +106,7 @@ export default function ExternalGamesHubPage() {
         className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern"
         aria-hidden
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-orange-950/10 via-transparent to-transparent" aria-hidden />
+      <div className="absolute inset-0 bg-gradient-to-b from-yellow-950/10 via-transparent to-transparent" aria-hidden />
       <AppNavbar
         username={username}
         isDevMode={isDevMode}
@@ -115,7 +115,7 @@ export default function ExternalGamesHubPage() {
         currentPage="external"
       />
       <main className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
-        <div className="border-b border-orange-500/20 pb-6">
+        <div className="border-b border-yellow-500/20 pb-6">
           <h1 className="text-3xl font-bold text-white sm:text-4xl">Arena 🎮</h1>
           <p className="mt-2 text-lg text-body-gray">
             Wager on your skill in real games. Play on your platform, win on ours.
@@ -129,7 +129,7 @@ export default function ExternalGamesHubPage() {
               <div
                 className={`card-border relative flex min-h-[200px] flex-col justify-between overflow-hidden rounded-card p-5 transition-all duration-200 ${
                   isActive
-                    ? "cursor-pointer hover:-translate-y-1 hover:border-orange-500/40 hover:shadow-lg hover:shadow-orange-500/10"
+                    ? "cursor-pointer hover:-translate-y-1 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-orange-500/10"
                     : "cursor-not-allowed opacity-60"
                 }`}
               >

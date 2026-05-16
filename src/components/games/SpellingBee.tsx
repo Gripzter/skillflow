@@ -60,7 +60,7 @@ const DIFFICULTY_LABELS: Record<string, string> = {
 const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "bg-emerald-500/30 text-emerald-400 border-emerald-500/50",
   medium: "bg-amber-500/30 text-amber-400 border-amber-500/50",
-  hard: "bg-orange-500/30 text-orange-400 border-orange-500/50",
+  hard: "bg-yellow-500/30 text-yellow-400 border-yellow-500/50",
   expert: "bg-red-500/30 text-red-400 border-red-500/50",
 };
 
@@ -581,7 +581,7 @@ export default function SpellingBee({
 
   const timerPercent = (timerRemainingMs / ROUND_TIME_MS) * 100;
   const timerColor =
-    timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-orange-500" : "bg-red-500";
+    timerPercent > 33 ? "bg-amber-500" : timerPercent > 20 ? "bg-yellow-500" : "bg-red-500";
 
   const p1RowActive =
     (phase === "round_active" || phase === "tiebreaker_active") &&
@@ -927,7 +927,7 @@ export default function SpellingBee({
           )}
           <div className="flex shrink-0 items-center justify-between px-1 text-sm">
             {(phase === "round_active" || phase === "tiebreaker_active") && (
-              <span className={`font-mono font-bold tabular-nums ${timerPercent <= 20 ? "text-red-400" : timerPercent <= 33 ? "text-orange-400" : "text-amber-400"}`}>
+              <span className={`font-mono font-bold tabular-nums ${timerPercent <= 20 ? "text-red-400" : timerPercent <= 33 ? "text-yellow-400" : "text-amber-400"}`}>
                 {Math.ceil(timerRemainingMs / 1000)}s
               </span>
             )}

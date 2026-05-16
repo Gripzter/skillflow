@@ -216,7 +216,7 @@ export default function InventoryPage() {
                 <div
                   key={item.id}
                   className={`rounded-xl border p-5 ${
-                    item.equipped ? "border-orange-400 bg-orange-500/10" : "border-white/10 bg-black/20"
+                    item.equipped ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
                   <div className="mb-4 flex items-center justify-center">
@@ -243,7 +243,7 @@ export default function InventoryPage() {
                   </span>
                   <div className="mt-3">
                     {item.equipped ? (
-                      <span className="rounded bg-orange-500/20 px-2 py-1 text-xs font-semibold text-orange-300">
+                      <span className="rounded bg-yellow-500/20 px-2 py-1 text-xs font-semibold text-yellow-300">
                         Equipped
                       </span>
                     ) : (
@@ -273,7 +273,7 @@ export default function InventoryPage() {
                 <div
                   key={item.id}
                   className={`rounded-xl border p-5 ${
-                    item.equipped ? "border-orange-400 bg-orange-500/10" : "border-white/10 bg-black/20"
+                    item.equipped ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-black/20"
                   }`}
                 >
                   <div className="mb-4 flex items-center justify-center">
@@ -300,7 +300,7 @@ export default function InventoryPage() {
                   </span>
                   <div className="mt-3">
                     {item.equipped ? (
-                      <span className="rounded bg-orange-500/20 px-2 py-1 text-xs font-semibold text-orange-300">
+                      <span className="rounded bg-yellow-500/20 px-2 py-1 text-xs font-semibold text-yellow-300">
                         Equipped
                       </span>
                     ) : (
