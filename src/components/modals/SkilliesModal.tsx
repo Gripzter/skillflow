@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import { useSpTransactions } from "@/hooks/useSpTransactions";
 
@@ -23,26 +24,63 @@ export default function SkilliesModal({
 }: SkilliesModalProps) {
   const { transactions, loading } = useSpTransactions({ userId, limit: 10 });
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-[480px] rounded-2xl border border-[#1F1F26] bg-[#16161C] p-5 sm:p-6">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <h2 className="text-[28px] font-black tracking-[-0.02em] text-white">Skillies</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md p-1.5 text-[#9CA3AF] hover:bg-white/5 hover:text-white"
-            aria-label="Close Skillies modal"
+    <div className="fixed inset-0 z-[120] flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Close Skillies modal"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+      />
+
+      <div
+        className="relative w-full max-h-[92vh] overflow-y-auto rounded-t-3xl border border-[#1F1F26] bg-[#16161C] px-5 pb-8 pt-5 sm:max-h-[85vh] sm:w-auto sm:max-w-[480px] sm:rounded-2xl sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-10 sm:w-10"
+          aria-label="Close Skillies modal"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            x
-          </button>
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        <div className="mb-4 -mt-1 flex justify-center sm:hidden">
+          <div className="h-1 w-10 rounded-full bg-white/20" />
+        </div>
+
+        <div className="mb-5 sm:mb-6">
+          <h2 className="pr-12 text-2xl font-black tracking-[-0.02em] text-white sm:text-[28px]">
+            Skillies
+          </h2>
         </div>
 
         <div className="rounded-xl border border-[#1F1F26] bg-[#0E0E12] p-4 text-center">

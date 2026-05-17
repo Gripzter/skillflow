@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ConnectionBadge from "@/components/ConnectionBadge";
-import SPIcon from "@/components/SPIcon";
-import SkilliesIcon from "@/components/SkilliesIcon";
+import MobileMenuDrawer from "@/components/MobileMenuDrawer";
 import SkillPointsModal from "@/components/modals/SkillPointsModal";
 import SkilliesModal from "@/components/modals/SkilliesModal";
 import Wordmark from "@/components/Wordmark";
@@ -70,13 +69,25 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
 
   return (
     <>
-      <header className="sticky top-0 z-50 h-14 border-b border-[#1F1F26] bg-[#0E0E12] px-3 sm:px-4">
-        <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-3">
-          <div className="flex min-w-[120px] items-center">
+      <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0E0E12]/95 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between gap-2 px-3 sm:h-16 sm:gap-3 sm:px-4 lg:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/5 hover:text-white md:hidden"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <Wordmark href="/play" size="sm" />
           </div>
 
-          <nav className="hidden items-center gap-8 md:flex">
+          <nav className="hidden items-center gap-6 lg:gap-8 md:flex">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
@@ -94,42 +105,39 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
             })}
           </nav>
 
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((value) => !value)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-[#9CA3AF] hover:bg-white/5 hover:text-white md:hidden"
-            aria-label="Toggle menu"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5" strokeWidth="2">
-              <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
-            </svg>
-          </button>
-
-          <div className="flex min-w-[170px] items-center justify-end gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setSpModalOpen(true)}
-              className="inline-flex items-center gap-1 rounded-full border border-[#1F1F26] bg-[#16161C] px-2 py-1.5 text-xs text-[#9CA3AF] transition-colors hover:border-[#FFFF00]"
+              className="inline-flex whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
+              aria-label={`SkillPoints: ${profile.lifetimeSp.toLocaleString()}`}
             >
-              <SPIcon size={14} />
-              <span className="hidden sm:inline">{formatTier(profile.rankTier)} · </span>
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]">
+                SP
+              </span>
+              <span className="hidden text-white/60 sm:inline">{formatTier(profile.rankTier)} ·</span>
               <span>{profile.lifetimeSp.toLocaleString()}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setSkilliesModalOpen(true)}
-              className="inline-flex items-center gap-1 rounded-full border border-[#1F1F26] bg-[#16161C] px-2 py-1.5 text-xs transition-colors hover:border-[#FFFF00]"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-[#FFFF00] transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
+              aria-label={`Skillies: ${profile.balanceSp.toLocaleString()}`}
             >
-              <SkilliesIcon size={14} />
-              <span className="text-[#FFFF00]">{profile.balanceSp.toLocaleString()}</span>
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] font-bold text-black sm:h-5 sm:w-5 sm:text-[10px]">
+                S
+              </span>
+              <span>{profile.balanceSp.toLocaleString()}</span>
             </button>
 
-            <ConnectionBadge />
+            <div className="hidden sm:flex">
+              <ConnectionBadge />
+            </div>
 
             <Link
               href="/settings"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#9CA3AF] transition-colors hover:bg-white/5 hover:text-white"
+              className="hidden h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white/5 hover:text-white sm:flex"
               aria-label="Settings"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,7 +153,7 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
 
             <Link
               href="/profile"
-              className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ring-1 ring-white/20"
+              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 sm:h-9 sm:w-9"
               aria-label="Profile"
             >
               {profile.avatarUrl ? (
@@ -157,27 +165,8 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
             </Link>
           </div>
         </div>
-
-        {mobileMenuOpen ? (
-          <div className="absolute left-3 right-3 top-14 z-40 rounded-xl border border-[#1F1F26] bg-[#16161C] p-2 md:hidden">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`block rounded-lg px-3 py-2 text-sm ${
-                    active ? "bg-white/5 text-white" : "text-[#9CA3AF]"
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        ) : null}
       </header>
+      <MobileMenuDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
 
       <SkillPointsModal
         isOpen={spModalOpen}
