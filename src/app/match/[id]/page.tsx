@@ -133,6 +133,12 @@ function MatchPageContent() {
   const [match, setMatch] = useState<StoredMatch | null>(null);
   const [timerNowMs, setTimerNowMs] = useState(Date.now());
   const [outcome, setOutcome] = useState<Outcome>(null);
+  const [isSettling, setIsSettling] = useState(false);
+  const [resultTotals, setResultTotals] = useState<{
+    payout: number;
+    stakeLost: number;
+    newBalance: number | null;
+  } | null>(null);
   const [settlementError, setSettlementError] = useState<string | null>(null);
   const [forfeitConfirm, setForfeitConfirm] = useState(false);
   const [connectionCheckPassed, setConnectionCheckPassed] = useState(false);
@@ -603,10 +609,17 @@ function MatchPageContent() {
           if (!forfeitHandledRef.current && m) {
             forfeitHandledRef.current = true;
             setWonByForfeit(true);
+            setIsSettling(true);
             completeMatchAndSettle(m, "player1")
-              .then(() => {
+              .then((settlement) => {
                 dispatchWalletUpdated();
+                setResultTotals({
+                  payout: settlement.payout,
+                  stakeLost: m.stakeAmount,
+                  newBalance: settlement.callerBalance,
+                });
                 setOutcome("victory");
+                setIsSettling(false);
               })
               .catch((error) => {
                 // eslint-disable-next-line no-console
@@ -614,6 +627,7 @@ function MatchPageContent() {
                 setSettlementError(
                   "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
                 );
+                setIsSettling(false);
               });
           }
           return 0;
@@ -638,9 +652,24 @@ function MatchPageContent() {
       const iWon = winnerId ? winnerId === userId : winner === "player1";
 
       try {
-        await completeMatchAndSettle(match, winner);
+        setIsSettling(true);
+        const settlement = await completeMatchAndSettle(match, winner);
         dispatchWalletUpdated();
+        if (iWon) {
+          setResultTotals({
+            payout: settlement.payout,
+            stakeLost: match.stakeAmount,
+            newBalance: settlement.callerBalance,
+          });
+        } else {
+          setResultTotals({
+            payout: settlement.payout,
+            stakeLost: match.stakeAmount,
+            newBalance: settlement.callerBalance,
+          });
+        }
         setOutcome(iWon ? "victory" : "defeat");
+        setIsSettling(false);
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -649,6 +678,7 @@ function MatchPageContent() {
           "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
         );
         dispatchWalletUpdated();
+        setIsSettling(false);
         return false;
       }
     },
@@ -661,9 +691,16 @@ function MatchPageContent() {
   const handleDraw = useCallback(async () => {
     if (!match) return;
     try {
-      await completeMatchAndSettle(match, "draw");
+      setIsSettling(true);
+      const settlement = await completeMatchAndSettle(match, "draw");
       dispatchWalletUpdated();
+      setResultTotals({
+        payout: settlement.payout,
+        stakeLost: match.stakeAmount,
+        newBalance: settlement.callerBalance,
+      });
       setOutcome("draw");
+      setIsSettling(false);
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("[MatchPage] Failed to persist draw", { matchId: match.id, error });
@@ -671,6 +708,7 @@ function MatchPageContent() {
         "We couldn't finalize this match. Your stake is safe - refresh and check your balance. If anything looks off, contact support."
       );
       dispatchWalletUpdated();
+      setIsSettling(false);
     }
   }, [match]);
 
@@ -1516,6 +1554,13 @@ function MatchPageContent() {
         </div>
       )}
 
+      {isSettling ? (
+        <div className="fixed inset-0 z-[65] flex min-h-screen flex-col items-center justify-center gap-4 bg-[#0E0E12]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FFFF00] border-t-transparent" />
+          <p className="text-sm text-white/60">Finalizing result...</p>
+        </div>
+      ) : null}
+
       {/* Game result overlay — victory, defeat, or draw */}
       {outcome && (
         <GameResultOverlay
@@ -1523,6 +1568,9 @@ function MatchPageContent() {
           isPractice={match.isPractice}
           stakeAmount={match.stakeAmount}
           winnerPayout={match.winnerPayout}
+          payoutOverride={resultTotals?.payout}
+          stakeLostOverride={resultTotals?.stakeLost}
+          newBalance={resultTotals?.newBalance}
           gameType={match.gameType}
           opponentUsername={opponentUsername}
           wonByForfeit={wonByForfeit}

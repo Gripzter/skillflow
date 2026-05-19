@@ -11,6 +11,9 @@ interface GameResultOverlayProps {
   isPractice: boolean;
   stakeAmount: number;
   winnerPayout: number;
+  payoutOverride?: number;
+  stakeLostOverride?: number;
+  newBalance?: number | null;
   gameType: string;
   opponentUsername: string;
   wonByForfeit?: boolean;
@@ -23,6 +26,9 @@ export default function GameResultOverlay({
   isPractice,
   stakeAmount,
   winnerPayout,
+  payoutOverride,
+  stakeLostOverride,
+  newBalance,
   opponentUsername,
   wonByForfeit,
   onPlayAgain,
@@ -98,7 +104,7 @@ export default function GameResultOverlay({
   if (isVictory) {
     headline = "VICTORY";
     headlineColor = "#FFFF00";
-    if (!isPractice) amountValue = winnerPayout;
+    if (!isPractice) amountValue = payoutOverride ?? winnerPayout;
     subtext = wonByForfeit
       ? "Opponent forfeited. You win!"
       : isPractice
@@ -107,7 +113,7 @@ export default function GameResultOverlay({
   } else if (isDefeat) {
     headline = "DEFEAT";
     headlineColor = "rgba(255,255,255,0.9)";
-    if (!isPractice) amountValue = -stakeAmount;
+    if (!isPractice) amountValue = -(stakeLostOverride ?? stakeAmount);
     subtext = `${opponentUsername} won this one`;
   } else {
     headline = "DRAW";
@@ -159,6 +165,12 @@ export default function GameResultOverlay({
         )}
 
         {/* Subtext */}
+        {(isVictory || isDefeat) && typeof newBalance === "number" ? (
+          <p className="mt-2 text-sm text-white/50">
+            New balance: {newBalance.toLocaleString()} Skillies
+          </p>
+        ) : null}
+
         <p className="mt-3 text-[15px]" style={{ color: isDefeat ? "rgba(255,255,255,0.6)" : "#888" }}>
           {subtext}
         </p>

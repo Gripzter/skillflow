@@ -534,7 +534,12 @@ export async function completeMatch(matchId: string, winner: "player1" | "player
 export async function completeMatchAndSettle(
   match: StoredMatch,
   outcome: "player1" | "player2" | "draw"
-): Promise<void> {
+): Promise<{
+  status: "local" | "settled" | "already_settled";
+  callerWon: boolean;
+  payout: number;
+  callerBalance: number | null;
+}> {
   const currentUser = await getCurrentUser();
   const currentUserId = currentUser?.id;
 
@@ -775,9 +780,11 @@ export async function completeMatchAndSettle(
 
   if (match.isPractice) {
     const persisted = await persistFinalizedMatch();
-    if (!persisted) return;
+    if (!persisted) {
+      return { status: "local", callerWon: isWinner, payout: 0, callerBalance: null };
+    }
     await awardSkillPointsForMatchResult();
-    return;
+    return { status: "local", callerWon: isWinner, payout: 0, callerBalance: null };
   }
 
   async function updateGameStatsForCurrentUser() {
@@ -817,53 +824,71 @@ export async function completeMatchAndSettle(
 
   if (outcome === "player1" || outcome === "player2") {
     if (isDevMode()) {
+      let callerBalance: number | null = null;
+      let payout = 0;
       if (isWinner) {
-        await creditWallet(
+        callerBalance = await creditWallet(
           match.winnerPayout,
           `Match win – ${match.gameDisplayName}`,
           "match_win"
         );
+        payout = match.winnerPayout;
       }
       const persisted = await persistFinalizedMatch();
-      if (!persisted) return;
+      if (!persisted) {
+        return { status: "local", callerWon: isWinner, payout, callerBalance };
+      }
       await updateGameStatsForCurrentUser();
       await awardSkillPointsForMatchResult();
-      return;
+      return { status: "local", callerWon: isWinner, payout, callerBalance };
     }
 
     const settlementWinnerId =
       match.isBot && winnerId === BOT_PLAYER_UUID ? null : isUuid(winnerId) ? winnerId : null;
 
-    await finishMatch({
+    const settlement = await finishMatch({
       matchId: match.id,
       winnerId: settlementWinnerId,
       gameResult: { outcome, gameType: match.gameType },
     });
     await updateGameStatsForCurrentUser();
     await awardSkillPointsForMatchResult(true);
-    return;
+    return {
+      status: settlement.status,
+      callerWon: settlement.caller_won,
+      payout: settlement.payout,
+      callerBalance: settlement.caller_balance,
+    };
   }
 
   if (isDevMode()) {
-    await creditWallet(
+    const callerBalance = await creditWallet(
       match.stakeAmount,
       `Draw – ${match.gameDisplayName} (stake refunded)`,
       "match_refund"
     );
     const persisted = await persistFinalizedMatch();
-    if (!persisted) return;
+    if (!persisted) {
+      return { status: "local", callerWon: false, payout: 0, callerBalance };
+    }
     await updateGameStatsForCurrentUser();
     await awardSkillPointsForMatchResult();
-    return;
+    return { status: "local", callerWon: false, payout: 0, callerBalance };
   }
 
-  await finishMatch({
+  const settlement = await finishMatch({
     matchId: match.id,
     winnerId: null,
     gameResult: { outcome: "draw", gameType: match.gameType },
   });
   await updateGameStatsForCurrentUser();
   await awardSkillPointsForMatchResult(true);
+  return {
+    status: settlement.status,
+    callerWon: false,
+    payout: settlement.payout,
+    callerBalance: settlement.caller_balance,
+  };
 }
 
 // ============ LEADERBOARD ============
