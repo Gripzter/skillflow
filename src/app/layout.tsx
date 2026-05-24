@@ -27,12 +27,11 @@ export const metadata: Metadata = {
     // DO NOT include 512 here because browsers may pick the largest and try to render
     // the wide wordmark in a square slot, which causes distortion.
     icon: [
-      { url: "/favicon.ico?v=3", sizes: "any" },
-      { url: "/icon-192.png?v=3", type: "image/png", sizes: "192x192" },
+      { url: "/icon-192.png?v=4", type: "image/png", sizes: "192x192" },
     ],
     // Apple touch icon (iOS home screen) — square 192 mark.
     apple: [{ url: "/apple-touch-icon.png?v=3", sizes: "180x180", type: "image/png" }],
-    shortcut: "/favicon.ico?v=3",
+    shortcut: "/icon-192.png?v=4",
   },
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
