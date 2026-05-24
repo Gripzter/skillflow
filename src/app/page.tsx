@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle, Lock, X } from "lucide-react";
+import { CheckCircle, X } from "lucide-react";
 
 function WaitlistForm({
   compact = false,
@@ -129,26 +129,26 @@ const TEASER_GAMES = [
   {
     title: "Chess",
     subtitle: "Classic 1v1, Glicko-2 ranked",
-    image: "/games/chess.jpg",
+    image: "/images/chess-card.png",
   },
   {
     title: "Connect 4",
     subtitle: "Speed-thinking grid duel",
-    image: "/games/connect4.jpg",
+    image: "/images/connect4-card.png",
   },
   {
     title: "Reaction Duel",
     subtitle: "Sub-200ms reflexes win",
-    image: "/games/reaction.jpg",
+    image: "/images/reaction-duel-card.png",
   },
 ];
 
 const TIER_RANGES = [
-  "0-1,999 SP",
-  "2,000-4,999 SP",
-  "5,000-9,999 SP",
-  "10,000-19,999 SP",
-  "20,000+ SP",
+  { image: "/images/rank-bronze.png", range: "0-1,999 SP" },
+  { image: "/images/rank-silver.png", range: "2,000-4,999 SP" },
+  { image: "/images/rank-gold.png", range: "5,000-9,999 SP" },
+  { image: "/images/rank-platinum.png", range: "10,000-19,999 SP" },
+  { image: "/images/rank-diamond.png", range: "20,000+ SP" },
 ];
 
 function LabelPill({ children }: { children: string }) {
@@ -228,13 +228,19 @@ export default function Home() {
           Earn SkillPoints for every match. Climb the ranks. Unlock rewards only the early players will ever see.
         </p>
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-5">
-          {TIER_RANGES.map((range) => (
+          {TIER_RANGES.map((tier) => (
             <div
-              key={range}
+              key={tier.range}
               className="flex flex-col items-center rounded-xl border border-white/10 bg-[#1A1A1F] p-6 text-center transition-colors hover:border-[#FFFF00]/35"
             >
-              <Lock size={32} className="text-white/45" />
-              <p className="mt-4 text-sm text-white/70">{range}</p>
+              <Image
+                src={tier.image}
+                alt="SkillFlow rank tier"
+                width={72}
+                height={72}
+                className="h-[72px] w-[72px] object-contain"
+              />
+              <p className="mt-4 text-sm text-white/70">{tier.range}</p>
             </div>
           ))}
         </div>
