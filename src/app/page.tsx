@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useState } from "react";
+import { Lock } from "lucide-react";
 
 function WaitlistForm({
   compact = false,
@@ -65,7 +66,7 @@ function WaitlistForm({
             compact ? "h-12 text-base" : "h-14 text-lg"
           }`}
         >
-          {submitting ? "Submitting..." : "Notify me \u2192"}
+          {submitting ? "Notifying..." : "Notify me \u2192"}
         </button>
       </form>
       {helperText ? <p className="mt-3 text-xs text-white/45">{helperText}</p> : null}
@@ -78,26 +79,26 @@ const TEASER_GAMES = [
   {
     title: "Chess",
     subtitle: "Classic 1v1, Glicko-2 ranked",
-    image: "/games/chess.jpg",
+    image: "/images/chess-card.png",
   },
   {
     title: "Connect 4",
     subtitle: "Speed-thinking grid duel",
-    image: "/games/connect4.jpg",
+    image: "/images/connect4-card.png",
   },
   {
     title: "Reaction Duel",
     subtitle: "Sub-200ms reflexes win",
-    image: "/games/reaction.jpg",
+    image: "/images/reaction-duel-card.png",
   },
 ];
 
-const TIER_BADGES = [
-  { image: "/images/rank-bronze.png", range: "0-1,999 SP" },
-  { image: "/images/rank-silver.png", range: "2,000-4,999 SP" },
-  { image: "/images/rank-gold.png", range: "5,000-9,999 SP" },
-  { image: "/images/rank-platinum.png", range: "10,000-19,999 SP" },
-  { image: "/images/rank-diamond.png", range: "20,000+ SP" },
+const TIER_RANGES = [
+  "0-1,999 SP",
+  "2,000-4,999 SP",
+  "5,000-9,999 SP",
+  "10,000-19,999 SP",
+  "20,000+ SP",
 ];
 
 function LabelPill({ children }: { children: string }) {
@@ -111,18 +112,23 @@ function LabelPill({ children }: { children: string }) {
 export default function Home() {
   return (
     <main className="bg-[#0E0E12] text-white">
-      <section className="mx-auto flex min-h-screen w-full max-w-[1360px] px-6 pb-20 pt-14 md:px-10 lg:pb-24 lg:pt-20">
+      <section className="mx-auto flex min-h-screen w-full max-w-[1360px] px-6 py-24 md:px-10">
         <div className="flex w-full flex-col lg:flex-row">
           <div className="w-full lg:w-3/5 lg:pr-12">
+            <div className="flex items-center gap-3">
+              <span className="h-5 w-[3px] bg-[#FFFF00]" />
+              <span className="tracking-[0.12em] text-white/85">skillflow</span>
+            </div>
             <LabelPill>COMING SOON</LabelPill>
-            <h1 className="mt-8 text-5xl font-black uppercase leading-[0.95] tracking-tight sm:text-7xl md:text-8xl lg:text-[6.2rem] xl:text-[7.2rem]">
-              <span className="block">Something Is</span>
+            <h1 className="mt-6 text-5xl font-black uppercase leading-[0.95] tracking-tight sm:text-7xl md:text-8xl lg:text-[6.2rem] xl:text-[7.2rem]">
+              <span className="block">Skillflow</span>
+              <span className="block">Is</span>
               <span className="block">Coming.</span>
             </h1>
-            <p className="mt-7 max-w-[500px] text-base text-white/60 sm:text-lg">
+            <p className="mt-5 max-w-[500px] text-base text-white/60 sm:text-lg">
               A new way to play. A new way to win. The platform where skill pays.
             </p>
-            <div className="mt-8 max-w-[620px]">
+            <div className="mt-6 max-w-[620px]">
               <WaitlistForm
                 helperText="First access. First advantages. Be early or be late."
               />
@@ -134,11 +140,13 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="mx-auto h-px w-full max-w-[1180px] bg-[#1a1a1f]" />
+
       <section className="mx-auto w-full max-w-[1180px] px-6 py-24 md:px-10">
         <LabelPill>EIGHT GAMES</LabelPill>
-        <h2 className="mt-6 text-3xl font-bold sm:text-4xl">We have three you&apos;ll recognize.</h2>
-        <p className="mt-3 text-base text-white/60 sm:text-lg">And five more you won&apos;t see coming.</p>
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
+        <h2 className="mt-4 text-3xl font-bold sm:text-4xl">We have three you&apos;ll recognize.</h2>
+        <p className="mt-2 text-base text-white/60 sm:text-lg">And five more you won&apos;t see coming.</p>
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
           {TEASER_GAMES.map((game) => (
             <article key={game.title} className="overflow-hidden rounded-2xl border border-white/10 bg-[#15151B]">
               <div className="relative aspect-[16/10] w-full">
@@ -152,39 +160,45 @@ export default function Home() {
             </article>
           ))}
         </div>
-        <div className="mt-12 text-center">
+        <div className="mt-10 text-center">
           <p className="text-3xl font-bold text-[#FFFF00] sm:text-4xl">+5 more revealed at launch.</p>
-          <p className="mt-3 text-base text-white sm:text-lg">Want to know what they are first?</p>
-          <div className="mx-auto mt-7 max-w-[700px]">
+          <p className="mt-2 text-base text-white sm:text-lg">Want to know what they are first?</p>
+          <div className="mx-auto mt-5 max-w-[700px]">
             <WaitlistForm compact />
           </div>
         </div>
       </section>
 
+      <div className="mx-auto h-px w-full max-w-[1180px] bg-[#1a1a1f]" />
+
       <section className="mx-auto w-full max-w-[1180px] px-6 py-24 md:px-10">
         <LabelPill>THE LADDER</LabelPill>
-        <h2 className="mt-6 text-3xl font-bold sm:text-4xl">Five tiers. One climb.</h2>
-        <p className="mt-3 max-w-3xl text-base text-white/60 sm:text-lg">
+        <h2 className="mt-4 text-3xl font-bold sm:text-4xl">Five tiers. One climb.</h2>
+        <p className="mt-2 max-w-3xl text-base text-white/60 sm:text-lg">
           Earn SkillPoints for every match. Climb the ranks. Unlock rewards only the early players will ever see.
         </p>
-        <div className="mt-10 grid grid-cols-2 gap-5 md:grid-cols-5">
-          {TIER_BADGES.map((tier) => (
-            <div key={tier.range} className="flex flex-col items-center rounded-2xl border border-white/10 bg-[#15151B] p-4 text-center">
-              <Image src={tier.image} alt="Hidden tier badge" width={72} height={72} className="opacity-50" />
-              <p className="mt-3 font-mono text-sm tracking-[0.18em] text-white/55">\u2588\u2588\u2588\u2588\u2588</p>
-              <p className="mt-2 text-xs text-white/65">{tier.range}</p>
+        <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-5">
+          {TIER_RANGES.map((range) => (
+            <div
+              key={range}
+              className="flex flex-col items-center rounded-xl border border-white/10 bg-[#1A1A1F] p-6 text-center transition-colors hover:border-[#FFFF00]/35"
+            >
+              <Lock size={32} className="text-white/45" />
+              <p className="mt-4 text-sm text-white/70">{range}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col items-center justify-center px-6 py-24 text-center md:px-10">
+      <div className="mx-auto h-px w-full max-w-[1180px] bg-[#1a1a1f]" />
+
+      <section className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col items-center justify-center px-6 py-32 text-center md:px-10">
         <LabelPill>BE FIRST</LabelPill>
-        <h2 className="mt-8 text-5xl font-black tracking-tight sm:text-7xl">First to move wins.</h2>
-        <p className="mt-5 max-w-2xl text-base text-white/60 sm:text-lg">
+        <h2 className="mt-6 text-5xl font-black tracking-tight sm:text-7xl">First to move wins.</h2>
+        <p className="mt-4 max-w-2xl text-base text-white/60 sm:text-lg">
           The platform opens to the people who showed up early.
         </p>
-        <div className="mt-8 w-full max-w-[760px]">
+        <div className="mt-6 w-full max-w-[760px]">
           <WaitlistForm />
         </div>
         <p className="mt-4 text-xs text-white/45">No spam. One email when we open the doors.</p>
@@ -196,7 +210,7 @@ export default function Home() {
             <span className="h-5 w-[3px] bg-[#FFFF00]" />
             <span className="tracking-[0.12em] text-white/85">skillflow</span>
           </div>
-          <p className="text-white/45">\u00a9 2026 Xmas Group</p>
+          <p className="text-white/45">© 2026 Xmas Group</p>
         </div>
       </footer>
     </main>
