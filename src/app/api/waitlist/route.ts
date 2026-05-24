@@ -10,6 +10,27 @@ function getSupabaseClient() {
   return createClient(url, anonKey);
 }
 
+async function getWaitlistPosition(
+  supabase: ReturnType<typeof createClient>,
+  email: string
+): Promise<number | null> {
+  const { data: row, error: rowError } = await supabase
+    .from("waitlist_emails")
+    .select("created_at")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (rowError || !row?.created_at) return null;
+
+  const { count, error: countError } = await supabase
+    .from("waitlist_emails")
+    .select("id", { count: "exact", head: true })
+    .lte("created_at", row.created_at);
+
+  if (countError || typeof count !== "number") return null;
+  return count;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => null)) as { email?: string } | null;
@@ -34,12 +55,14 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === "23505") {
-        return NextResponse.json({ success: true });
+        const position = await getWaitlistPosition(supabase, email);
+        return NextResponse.json({ success: true, position });
       }
       return NextResponse.json({ error: "Could not save your email right now." }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    const position = await getWaitlistPosition(supabase, email);
+    return NextResponse.json({ success: true, position });
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }

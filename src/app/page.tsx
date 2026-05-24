@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useState } from "react";
-import { Lock } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { CheckCircle, Lock, X } from "lucide-react";
 
 function WaitlistForm({
   compact = false,
@@ -14,7 +14,20 @@ function WaitlistForm({
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [position, setPosition] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!showSuccessModal) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowSuccessModal(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showSuccessModal]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -27,12 +40,16 @@ function WaitlistForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const payload = (await response.json().catch(() => null)) as { success?: boolean; error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as
+        | { success?: boolean; error?: string; position?: number | null }
+        | null;
       if (!response.ok || !payload?.success) {
         setError(payload?.error ?? "Could not submit right now.");
         return;
       }
+      setPosition(typeof payload.position === "number" ? payload.position : null);
       setSuccess(true);
+      setShowSuccessModal(true);
       setEmail("");
     } catch {
       setError("Could not submit right now.");
@@ -42,7 +59,42 @@ function WaitlistForm({
   }
 
   if (success) {
-    return <p className="text-base font-medium text-white">You&apos;re on the list. Stand by.</p>;
+    return (
+      <>
+        {showSuccessModal ? (
+          <div
+            className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0E0E12]/90 px-4 backdrop-blur-xl"
+            onClick={() => setShowSuccessModal(false)}
+          >
+            <div
+              className="relative w-full max-w-[480px] rounded-2xl bg-[#1a1a1f] p-12 text-center text-white shadow-2xl transition-all duration-200 ease-out"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowSuccessModal(false)}
+                className="absolute right-4 top-4 text-white/50 transition-colors hover:text-white/80"
+              >
+                <X size={18} />
+              </button>
+              <CheckCircle size={56} className="mx-auto text-[#FFFF00]" />
+              <h2 className="mt-6 text-3xl font-bold tracking-tight">You&apos;re on the list.</h2>
+              <p className="mx-auto mt-4 max-w-[320px] text-base text-white/65">
+                We&apos;ll email you the moment the doors open. No spam. No noise. Just the signal.
+              </p>
+              <p className="mx-auto mt-6 inline-flex rounded-full border border-[#FFFF00]/50 bg-[#FFFF00]/10 px-4 py-2 text-sm font-medium text-[#FFFF00]">
+                {typeof position === "number"
+                  ? `You are early. #${position} in line.`
+                  : "You are early."}
+              </p>
+              <p className="mt-6 text-sm text-white/45">Close this window and stand by.</p>
+            </div>
+          </div>
+        ) : null}
+        <p className="text-base font-medium text-white">You&apos;re on the list.</p>
+      </>
+    );
   }
 
   return (
@@ -62,11 +114,9 @@ function WaitlistForm({
         <button
           type="submit"
           disabled={submitting}
-          className={`rounded-xl bg-[#FFFF00] px-6 font-semibold text-black transition hover:brightness-95 disabled:opacity-60 ${
-            compact ? "h-12 text-base" : "h-14 text-lg"
-          }`}
+          className="h-12 whitespace-nowrap rounded-xl bg-[#FFFF00] px-8 text-base font-semibold text-black transition hover:brightness-95 disabled:opacity-60"
         >
-          {submitting ? "Notifying..." : "Notify me \u2192"}
+          {submitting ? "Notifying..." : "Notify me"}
         </button>
       </form>
       {helperText ? <p className="mt-3 text-xs text-white/45">{helperText}</p> : null}
@@ -79,17 +129,17 @@ const TEASER_GAMES = [
   {
     title: "Chess",
     subtitle: "Classic 1v1, Glicko-2 ranked",
-    image: "/images/chess-card.png",
+    image: "/games/chess.jpg",
   },
   {
     title: "Connect 4",
     subtitle: "Speed-thinking grid duel",
-    image: "/images/connect4-card.png",
+    image: "/games/connect4.jpg",
   },
   {
     title: "Reaction Duel",
     subtitle: "Sub-200ms reflexes win",
-    image: "/images/reaction-duel-card.png",
+    image: "/games/reaction.jpg",
   },
 ];
 
@@ -150,7 +200,7 @@ export default function Home() {
           {TEASER_GAMES.map((game) => (
             <article key={game.title} className="overflow-hidden rounded-2xl border border-white/10 bg-[#15151B]">
               <div className="relative aspect-[16/10] w-full">
-                <Image src={game.image} alt={game.title} fill className="object-cover" />
+                <Image src={game.image} alt={game.title} width={640} height={400} className="h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
               </div>
               <div className="p-5">
