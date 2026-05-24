@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
-  return createClient(url, anonKey);
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) return null;
+  return createClient(url, serviceRoleKey);
+}
+
+function getResendClient() {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  return new Resend(apiKey);
 }
 
 async function getWaitlistPosition(
@@ -43,6 +50,8 @@ export async function POST(request: NextRequest) {
     if (!supabase) {
       return NextResponse.json({ error: "Waitlist is not configured." }, { status: 503 });
     }
+    const resend = getResendClient();
+    const audienceId = process.env.RESEND_AUDIENCE_ID;
 
     const forwardedFor = request.headers.get("x-forwarded-for");
     const ipAddress = forwardedFor ? forwardedFor.split(",")[0].trim() : null;
@@ -55,15 +64,43 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === "23505") {
+        // Existing emails are considered successful signups in UX.
+        if (resend && audienceId) {
+          void resend.contacts
+            .create({
+              email,
+              audienceId,
+              unsubscribed: false,
+            })
+            .catch((resendError) => {
+              console.error("[waitlist] Resend sync failed for duplicate signup", resendError);
+            });
+        }
         const position = await getWaitlistPosition(supabase, email);
         return NextResponse.json({ success: true, position });
       }
+      console.error("[waitlist] Supabase insert error", error);
       return NextResponse.json({ error: "Could not save your email right now." }, { status: 500 });
+    }
+
+    if (resend && audienceId) {
+      void resend.contacts
+        .create({
+          email,
+          audienceId,
+          unsubscribed: false,
+        })
+        .catch((resendError) => {
+          console.error("[waitlist] Resend sync failed", resendError);
+        });
+    } else {
+      console.warn("[waitlist] Resend not configured; skipped audience sync");
     }
 
     const position = await getWaitlistPosition(supabase, email);
     return NextResponse.json({ success: true, position });
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  } catch (error) {
+    console.error("[waitlist] Unexpected API error", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
