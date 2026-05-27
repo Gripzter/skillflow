@@ -29,19 +29,16 @@ export default function PrivacyPage() {
 
       <h2>1. Who We Are</h2>
       <p>
-        SkillFlow is a skill-based competitive gaming platform operated by Xmas Group (&quot;Xmas Group&quot;,
-        &quot;we&quot;, &quot;us&quot;, &quot;our&quot;), a company based in Vilnius, Republic of Lithuania.
+        SkillFlow is a skill-based competitive gaming platform.
       </p>
       <p>
-        For the purposes of the EU General Data Protection Regulation (GDPR) and applicable Lithuanian data protection
-        law, Xmas Group is the data controller responsible for your personal data.
+        For the purposes of the EU General Data Protection Regulation (GDPR) and applicable data protection law,
+        SkillFlow is the data controller responsible for your personal data.
       </p>
       <p>
         <strong>Data Protection Contact:</strong>
         <br />
         Email: <a href="mailto:admin@skillflow.gg">admin@skillflow.gg</a>
-        <br />
-        Postal: Xmas Group, Vilnius, Republic of Lithuania
       </p>
       <p>
         If you have any questions or concerns about how we process your personal data, or if you wish to exercise any
@@ -214,7 +211,7 @@ export default function PrivacyPage() {
           respond to an emergency involving the safety of any person.
         </li>
         <li>
-          <strong>Business transfers:</strong> If Xmas Group is involved in a merger, acquisition, reorganization, or
+          <strong>Business transfers:</strong> If SkillFlow is involved in a merger, acquisition, reorganization, or
           sale of assets, your personal data may be transferred as part of that transaction. We will notify you of any
           such transfer and of any changes to the data controller.
         </li>
@@ -601,7 +598,7 @@ export default function PrivacyPage() {
         <br />
         Email: <a href="mailto:ada@ada.lt">ada@ada.lt</a>
       </p>
-      <p>© 2026 SkillFlow, operated by Xmas Group. All rights reserved.</p>
+      <p>© 2026 SkillFlow. All rights reserved.</p>
     </>
   );
 }

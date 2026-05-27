@@ -23,7 +23,7 @@ export default function SkilliesPage() {
         <li>Skillies are not redeemable for refunds or withdrawals.</li>
         <li>Skillies cannot be transferred between user accounts under any circumstances.</li>
         <li>Skillies are not an investment, security, financial instrument, or property.</li>
-        <li>Possession of Skillies does not entitle you to any equity, share, or financial interest in SkillFlow or Xmas Group.</li>
+        <li>Possession of Skillies does not entitle you to any equity, share, or financial interest in SkillFlow.</li>
       </ul>
 
       <h2>How you earn Skillies</h2>

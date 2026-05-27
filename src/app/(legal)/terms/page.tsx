@@ -8,7 +8,7 @@ export default function TermsPage() {
 
       <p>
         Welcome to SkillFlow. These Terms of Service (&quot;Terms&quot;) govern your access to and use of SkillFlow
-        (&quot;Service&quot;, &quot;Platform&quot;), operated by Xmas Group (&quot;we&quot;, &quot;us&quot;). By creating an
+        (&quot;Service&quot;, &quot;Platform&quot;), operated by SkillFlow (&quot;we&quot;, &quot;us&quot;). By creating an
         account or using SkillFlow, you agree to these Terms.
       </p>
 
@@ -98,15 +98,15 @@ export default function TermsPage() {
 
       <h2>11. Limitation of Liability</h2>
       <p>
-        To the fullest extent permitted by law, Xmas Group, its founders, and affiliates shall not be liable for any
+        To the fullest extent permitted by law, SkillFlow and its operators shall not be liable for any
         indirect, incidental, consequential, or punitive damages arising from your use of SkillFlow. Our total liability
         to you for any claim shall not exceed €100 EUR.
       </p>
 
       <h2>12. Governing Law</h2>
       <p>
-        These Terms are governed by the laws of the Republic of Lithuania. Disputes shall be resolved in the courts of
-        Vilnius, Lithuania, except where local law requires otherwise.
+        These Terms are governed by applicable law. Disputes shall be resolved in the competent courts, except where
+        local law requires otherwise.
       </p>
 
       <h2>13. Contact</h2>
