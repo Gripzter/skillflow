@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-
-type ConsentValue = "all" | "essential";
-
-const CONSENT_KEY = "sf_cookie_consent";
-
-function hasConsentValue(value: string | null): value is ConsentValue {
-  return value === "all" || value === "essential";
-}
+import { getCookieConsent, saveCookieConsent, type CookieConsentValue } from "@/lib/cookie-consent";
 
 export default function CookieConsentBanner() {
   const pathname = usePathname();
@@ -24,26 +17,20 @@ export default function CookieConsentBanner() {
     !pathname.startsWith("/match");
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const saved = window.localStorage.getItem(CONSENT_KEY);
-    setIsVisible(!hasConsentValue(saved));
+    const saved = getCookieConsent();
+    setIsVisible(!saved);
     setIsReady(true);
 
-    const openSettings = () => setIsVisible(true);
-    window.addEventListener("sf-open-cookie-settings", openSettings);
-    return () => window.removeEventListener("sf-open-cookie-settings", openSettings);
+    const handleUpdated = () => {
+      setIsVisible(!getCookieConsent());
+    };
+
+    window.addEventListener("sf-cookie-consent-updated", handleUpdated);
+    return () => window.removeEventListener("sf-cookie-consent-updated", handleUpdated);
   }, []);
 
-  const setConsent = (value: ConsentValue) => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(CONSENT_KEY, value);
-    document.cookie = `${CONSENT_KEY}=${value}; path=/; max-age=31536000; samesite=lax`;
+  const setConsent = (value: CookieConsentValue) => {
+    saveCookieConsent(value);
     setIsVisible(false);
   };
 

@@ -7,7 +7,7 @@ export default function LandingFooter() {
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 px-8 py-6 text-[11px] text-[#666] md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
           <Wordmark href="" size="sm" className="text-[16px]" />
-          <span className="text-[#444]">© 2026 Xmas Group</span>
+          <span className="text-[#444]">© 2026 SkillFlow, operated by Xmas Group</span>
         </div>
 
         <div style={{ display: "flex", gap: 20, fontSize: 11, color: "#666", flexWrap: "wrap" }}>
@@ -28,10 +28,10 @@ export default function LandingFooter() {
           <a href="/skillies" style={{ color: "#666" }}>
             About Skillies
           </a>
-          <a href="#" style={{ color: "#666" }}>
+          <a href="https://discord.gg" target="_blank" rel="noopener noreferrer" style={{ color: "#666" }}>
             Discord
           </a>
-          <a href="#" style={{ color: "#666" }}>
+          <a href="https://x.com/skillflowgg" target="_blank" rel="noopener noreferrer" style={{ color: "#666" }}>
             Twitter
           </a>
         </div>

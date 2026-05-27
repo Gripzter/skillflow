@@ -16,7 +16,7 @@ export default function CookieSettingsButton({
       return;
     }
 
-    window.dispatchEvent(new CustomEvent("sf-open-cookie-settings"));
+    window.dispatchEvent(new CustomEvent("sf-open-cookie-settings-modal"));
   };
 
   return (

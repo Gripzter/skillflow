@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import LegalBackButton from "@/components/LegalBackButton";
 
 export default function LegalLayout({ children }: { children: ReactNode }) {
   return (
@@ -12,6 +13,7 @@ export default function LegalLayout({ children }: { children: ReactNode }) {
         lineHeight: 1.7,
       }}
     >
+      <LegalBackButton />
       {children}
     </div>
   );

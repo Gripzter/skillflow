@@ -53,6 +53,10 @@ export default function TermsPage() {
         entirely by player skill — there is no element of chance, house edge, or random outcome. We do not guarantee
         specific opponents or match availability.
       </p>
+      <p>
+        SkillFlow charges a platform fee of 6% of the total match wager. This fee is deducted from the match pool
+        before winnings are distributed to the winner.
+      </p>
 
       <h2>6. Cosmetics and Cases</h2>
       <p>
@@ -107,7 +111,7 @@ export default function TermsPage() {
 
       <h2>13. Contact</h2>
       <p>
-        For questions about these Terms, contact us at <a href="mailto:legal@skillflow.gg">legal@skillflow.gg</a>.
+        For questions about these Terms, contact us at <a href="mailto:admin@skillflow.gg">admin@skillflow.gg</a>.
       </p>
     </>
   );

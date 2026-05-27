@@ -382,7 +382,7 @@ export default function PrivacyPage() {
         </li>
       </ul>
       <p>
-        <strong>State Data Protection Inspectorate (Valstybinė duomenų apsaugos inspekcija — VDAI)</strong>
+        <strong>State Data Protection Inspectorate (VDAI)</strong>
         <br />
         Website: <a href="https://vdai.lrv.lt">https://vdai.lrv.lt</a>
         <br />

@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="card-border border-t border-white/5 bg-[#05060A]/80 px-4 py-6 backdrop-blur-sm sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-sm text-body-gray md:flex-row">
         <div className="order-3 md:order-1 text-center md:text-left">
-          (c) 2026 SkillFlow. All rights reserved.
+          © 2026 SkillFlow, operated by Xmas Group
         </div>
         <nav className="order-1 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs md:order-2 md:text-sm">
           <Link href="/terms" className="hover:text-white">
@@ -26,6 +26,14 @@ export default function Footer() {
           <Link href="/skillies" className="hover:text-white">
             About Skillies
           </Link>
+          <span className="hidden text-body-gray/50 sm:inline">•</span>
+          <a href="https://discord.gg" target="_blank" rel="noopener noreferrer" className="hover:text-white">
+            Discord
+          </a>
+          <span className="hidden text-body-gray/50 sm:inline">•</span>
+          <a href="https://x.com/skillflowgg" target="_blank" rel="noopener noreferrer" className="hover:text-white">
+            Twitter
+          </a>
         </nav>
         <div className="order-2 text-center md:order-3 md:text-right">
           <a href="mailto:admin@skillflow.gg" className="hover:text-white">

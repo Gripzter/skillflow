@@ -8,6 +8,7 @@ import MobileTabBar from "@/components/MobileTabBar";
 import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
+import CookieSettingsController from "@/components/CookieSettingsController";
 import "./globals.css";
 
 const inter = Inter({
@@ -98,6 +99,7 @@ if (typeof window !== 'undefined') {
                 {children}
                 <MobileTabBar />
                 <CookieConsentBanner />
+                <CookieSettingsController />
               </ErrorBoundary>
             </PlayModeProvider>
           </ToastProvider>
