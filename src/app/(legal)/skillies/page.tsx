@@ -4,7 +4,7 @@ export default function SkilliesPage() {
   return (
     <>
       <h1>About Skillies</h1>
-      <p style={{ fontSize: '12px', color: '#666', marginBottom: '48px' }}>Last updated: May 10, 2026</p>
+      <p style={{ fontSize: '12px', color: '#666', marginBottom: '48px' }}>Last updated: May 26, 2026</p>
 
       <p>
         Skillies (also called &quot;SkillPoints&quot; or &quot;SP&quot;) are SkillFlow&apos;s in-platform virtual currency. This page explains exactly what Skillies are, how they work, and what they are not.

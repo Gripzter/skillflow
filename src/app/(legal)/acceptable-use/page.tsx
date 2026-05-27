@@ -4,7 +4,7 @@ export default function AcceptableUsePage() {
   return (
     <>
       <h1>Acceptable Use Policy</h1>
-      <p style={{ fontSize: "12px", color: "#666", marginBottom: "48px" }}>Last updated: May 10, 2026</p>
+      <p style={{ fontSize: "12px", color: "#666", marginBottom: "48px" }}>Last updated: May 26, 2026</p>
 
       <p>
         SkillFlow is a competitive skill-gaming platform. Fair play is the foundation. This policy outlines what is and

@@ -4,7 +4,7 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p style={{ fontSize: "12px", color: "#666", marginBottom: "48px" }}>Last updated: May 10, 2026</p>
+      <p style={{ fontSize: "12px", color: "#666", marginBottom: "48px" }}>Last updated: May 26, 2026</p>
 
       <p>
         Welcome to SkillFlow. These Terms of Service (&quot;Terms&quot;) govern your access to and use of SkillFlow

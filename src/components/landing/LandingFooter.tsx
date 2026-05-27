@@ -1,4 +1,5 @@
 import Wordmark from "@/components/Wordmark";
+import CookieSettingsButton from "@/components/CookieSettingsButton";
 
 export default function LandingFooter() {
   return (
@@ -16,6 +17,11 @@ export default function LandingFooter() {
           <a href="/privacy" style={{ color: "#666" }}>
             Privacy
           </a>
+          <CookieSettingsButton
+            className="cursor-pointer border-0 bg-transparent p-0 text-left text-[11px] hover:text-white"
+          >
+            Cookie Settings
+          </CookieSettingsButton>
           <a href="/acceptable-use" style={{ color: "#666" }}>
             Acceptable Use
           </a>

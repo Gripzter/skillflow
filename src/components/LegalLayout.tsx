@@ -27,7 +27,7 @@ export default function LegalLayout({ title, children }: LegalLayoutProps) {
         className="mx-auto max-w-3xl px-4 pt-8 pb-24 text-[15px] leading-relaxed text-gray-300 sm:px-6 md:pt-10"
       >
         <h1 className="text-2xl font-bold text-white sm:text-3xl">{title}</h1>
-        <p className="mt-1 text-sm text-body-gray">Last updated: February 17, 2026</p>
+        <p className="mt-1 text-sm text-body-gray">Last updated: May 26, 2026</p>
         {children}
       </main>
 

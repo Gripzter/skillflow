@@ -7,6 +7,7 @@ import ConnectionMonitor from "@/components/ConnectionMonitor";
 import MobileTabBar from "@/components/MobileTabBar";
 import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import CookieConsentBanner from "@/components/CookieConsentBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -96,6 +97,7 @@ if (typeof window !== 'undefined') {
                 <PracticeModeClassToggle />
                 {children}
                 <MobileTabBar />
+                <CookieConsentBanner />
               </ErrorBoundary>
             </PlayModeProvider>
           </ToastProvider>

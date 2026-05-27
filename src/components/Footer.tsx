@@ -1,4 +1,5 @@
 import Link from "next/link";
+import CookieSettingsButton from "@/components/CookieSettingsButton";
 
 export default function Footer() {
   return (
@@ -15,6 +16,8 @@ export default function Footer() {
           <Link href="/privacy" className="hover:text-white">
             Privacy
           </Link>
+          <span className="hidden text-body-gray/50 sm:inline">•</span>
+          <CookieSettingsButton className="hover:text-white">Cookie Settings</CookieSettingsButton>
           <span className="hidden text-body-gray/50 sm:inline">•</span>
           <Link href="/acceptable-use" className="hover:text-white">
             Acceptable Use
