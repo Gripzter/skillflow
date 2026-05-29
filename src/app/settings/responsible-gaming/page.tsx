@@ -7,6 +7,7 @@ import AppNavbar from "@/components/AppNavbar";
 import LoadingRing from "@/components/LoadingRing";
 import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 import { applyPendingLimitChanges, type ResponsibleGamingRow } from "@/lib/responsible-gaming";
 
 const DAILY_OPTS = [null, 10, 25, 50, 100, 250] as const;
@@ -158,7 +159,7 @@ export default function SettingsResponsibleGamingPage() {
         .select()
         .single();
       if (error) {
-        showToast(error.message, "error");
+        showToast(getUserFriendlyError(error), "error");
       } else {
         showToast("Limit updated immediately.", "success");
         setRg((prev) =>
@@ -181,7 +182,7 @@ export default function SettingsResponsibleGamingPage() {
         { user_id: user.id, cool_off_until: until, updated_at: new Date().toISOString() },
         { onConflict: "user_id" }
       );
-    if (error) showToast(error.message, "error");
+    if (error) showToast(getUserFriendlyError(error), "error");
     else {
       showToast("Cool-off period started. Real money play is disabled.", "success");
       setRg((prev) => (prev ? { ...prev, cool_off_until: until } : null));
@@ -208,7 +209,7 @@ export default function SettingsResponsibleGamingPage() {
         { onConflict: "user_id" }
       );
     if (error) {
-      showToast(error.message, "error");
+      showToast(getUserFriendlyError(error), "error");
       setSelfExcludeModal(null);
       return;
     }

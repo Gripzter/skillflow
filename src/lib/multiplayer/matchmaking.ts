@@ -8,6 +8,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 export interface DbMatch {
   id: string;
@@ -266,7 +267,7 @@ export async function startMatchmaking(
 
     return cleanup;
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Matchmaking failed";
+    const message = getUserFriendlyError(err);
     if (process.env.NODE_ENV !== "production") {
       // eslint-disable-next-line no-console
       console.error("[matchmaking] Error:", err);

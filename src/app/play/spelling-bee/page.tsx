@@ -21,6 +21,7 @@ import {
 import { getUserSPData } from "@/lib/skillpoints";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -165,7 +166,7 @@ function PlaySpellingBeePageContent() {
           })
         );
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Couldn't start match";
+        const message = getUserFriendlyError(err);
         setMatchmakingState({
           phase: "searching",
           stake: stakeToPlay,
@@ -250,7 +251,7 @@ function PlaySpellingBeePageContent() {
         supabaseError?.code
       );
       showToast(
-        `Could not create a bot match: ${error instanceof Error ? error.message : "Unknown error"}`,
+        getUserFriendlyError(error),
         "error"
       );
       setMatchmaking(false);

@@ -8,6 +8,7 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import MatchmakingScreen from "@/components/match/MatchmakingScreen";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import { useGeo } from "@/contexts/GeoContext";
 import { usePlayMode } from "@/contexts/PlayModeContext";
@@ -223,7 +224,7 @@ export default function PlayGamePage() {
         supabaseError?.code
       );
       showToast(
-        `Could not create a bot match: ${error instanceof Error ? error.message : "Unknown error"}`,
+        getUserFriendlyError(error),
         "error"
       );
       setMatchmaking(false);
@@ -292,7 +293,7 @@ export default function PlayGamePage() {
           })
         );
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Couldn't start match";
+        const message = getUserFriendlyError(err);
         setMatchmakingState({
           phase: "searching",
           stake: stakeToPlay,

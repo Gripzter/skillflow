@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -212,7 +213,7 @@ export default function SettingsPage() {
         },
       });
       if (error) {
-        setUsernameError(error.message ?? "Failed to update username.");
+        setUsernameError(getUserFriendlyError(error));
         return;
       }
       if (data?.user) {
@@ -221,7 +222,7 @@ export default function SettingsPage() {
       setShowUsernameModal(false);
       setUsernamePassword("");
     } catch (err: any) {
-      setUsernameError(err?.message ?? "Failed to update username.");
+      setUsernameError(getUserFriendlyError(err));
     } finally {
       setUsernameSaving(false);
     }
@@ -251,7 +252,7 @@ export default function SettingsPage() {
         password: passwordNew,
       });
       if (error) {
-        setPasswordError(error.message ?? "Failed to update password.");
+        setPasswordError(getUserFriendlyError(error));
         return;
       }
       setShowPasswordModal(false);
@@ -259,7 +260,7 @@ export default function SettingsPage() {
       setPasswordNew("");
       setPasswordConfirm("");
     } catch (err: any) {
-      setPasswordError(err?.message ?? "Failed to update password.");
+      setPasswordError(getUserFriendlyError(err));
     } finally {
       setPasswordSaving(false);
     }
@@ -289,7 +290,7 @@ export default function SettingsPage() {
         window.location.href = "/";
       }
     } catch (err: any) {
-      setDeleteError(err?.message ?? "Failed to delete account.");
+      setDeleteError(getUserFriendlyError(err));
     } finally {
       setDeleteLoading(false);
     }

@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 import {
   startMatchmaking as startMatchmakingApi,
   cancelMatchmaking,
@@ -47,7 +48,7 @@ export function useMatchmaking() {
 
     const supabase = createClient();
     if (!supabase) {
-      setError("Supabase not configured");
+      setError("Service is temporarily unavailable. Please try again later.");
       setStatus("error");
       return;
     }
@@ -74,14 +75,14 @@ export function useMatchmaking() {
         (err) => {
           // eslint-disable-next-line no-console
           console.error("[useMatchmaking] startMatchmakingApi onError:", err);
-          setError(err);
+          setError(getUserFriendlyError({ message: err }));
           setStatus("error");
         }
       );
     } catch (err: unknown) {
       // eslint-disable-next-line no-console
       console.error("[useMatchmaking] startMatchmaking threw:", err);
-      const message = err instanceof Error ? err.message : "Matchmaking failed";
+      const message = getUserFriendlyError(err);
       setError(message);
       setStatus("error");
     }

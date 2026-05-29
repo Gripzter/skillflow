@@ -7,6 +7,7 @@ import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
 import { updateMarketingOptIn } from "@/lib/founders-program";
@@ -113,7 +114,7 @@ function SignupContent() {
       setResendDisabled(true);
       setResendCountdown(60);
     } else {
-      setResendMessage(error.message);
+      setResendMessage(getUserFriendlyError(error));
     }
   }
 
@@ -196,10 +197,7 @@ function SignupContent() {
     try {
       const supabase = createClient();
       if (!supabase) {
-        showToast(
-          "Authentication is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
-          "error"
-        );
+        showToast("Service is temporarily unavailable. Please try again later.", "error");
         setLoading(false);
         return;
       }
@@ -219,7 +217,7 @@ function SignupContent() {
       });
 
       if (error) {
-        showToast(error.message, "error");
+        showToast(getUserFriendlyError(error), "error");
         setLoading(false);
         return;
       }

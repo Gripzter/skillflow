@@ -13,6 +13,7 @@ import {
   type TriviaCategory,
   type TriviaQuestion,
 } from "@/lib/games/trivia-logic";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const TOTAL_QUESTIONS = 10;
 const ANSWER_REVEAL_MS = 2500;
@@ -191,7 +192,7 @@ export default function Trivia({
         setCountdownN(COUNTDOWN_START);
         setPhase("countdown");
       } catch (err) {
-        setLoadError(err instanceof Error ? err.message : "Failed to load questions");
+        setLoadError(getUserFriendlyError(err));
         setPhase("load_error");
       }
     },

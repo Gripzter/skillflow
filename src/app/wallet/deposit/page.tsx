@@ -11,6 +11,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { MIN_DEPOSIT, MAX_DEPOSIT } from "@/lib/constants";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const PRESETS = [5, 10, 25, 50, 100];
 
@@ -94,7 +95,7 @@ export default function DepositPage() {
     try {
       const supabase = createClient();
       if (!supabase) {
-        setError("Not configured");
+        setError("Service is temporarily unavailable. Please try again later.");
         return;
       }
       const {
@@ -118,7 +119,7 @@ export default function DepositPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Failed to create checkout");
+        setError(getUserFriendlyError({ message: data.error }));
         setDepositLoading(false);
         return;
       }
@@ -127,9 +128,9 @@ export default function DepositPage() {
         window.location.href = data.url;
         return;
       }
-      setError("No redirect URL received");
+      setError("Unable to start checkout. Please try again.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(getUserFriendlyError(e));
     } finally {
       setDepositLoading(false);
     }

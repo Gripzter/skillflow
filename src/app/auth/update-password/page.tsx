@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { createClient } from "@/lib/supabase";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 function passwordStrength(pwd: string): "weak" | "fair" | "good" | "strong" {
   if (pwd.length < 8) return "weak";
@@ -46,13 +47,13 @@ export default function UpdatePasswordPage() {
     setLoading(true);
     const supabase = createClient();
     if (!supabase) {
-      setError("Not configured");
+      setError("Service is temporarily unavailable. Please try again later.");
       setLoading(false);
       return;
     }
     const { error: err } = await supabase.auth.updateUser({ password });
     if (err) {
-      setError(err.message);
+      setError(getUserFriendlyError(err));
       setLoading(false);
       return;
     }

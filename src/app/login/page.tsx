@@ -7,9 +7,8 @@ import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 import { createClient } from "@/lib/supabase";
-
-const DEV_ACCESS_CODE = "6174";
 
 interface FormErrors {
   email?: string;
@@ -34,12 +33,7 @@ function LoginContent() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
 
-  const [devSectionOpen, setDevSectionOpen] = useState(false);
-  const [devCode, setDevCode] = useState("");
-  const [devError, setDevError] = useState("");
-  const [devLoading, setDevLoading] = useState(false);
-
-  if (loading || devLoading) {
+  if (loading) {
     return <LoadingRing />;
   }
 
@@ -68,10 +62,7 @@ function LoginContent() {
     try {
       const supabase = createClient();
       if (!supabase) {
-        showToast(
-          "Authentication is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local.",
-          "error"
-        );
+        showToast("Service is temporarily unavailable. Please try again later.", "error");
         setLoading(false);
         return;
       }
@@ -81,7 +72,7 @@ function LoginContent() {
       });
 
       if (error) {
-        showToast(error.message, "error");
+        showToast(getUserFriendlyError(error), "error");
       } else {
         const user = authData.user;
         const { data: rg } = user
@@ -116,33 +107,6 @@ function LoginContent() {
       showToast("Something went wrong. Please try again.", "error");
     } finally {
       setLoading(false);
-    }
-  }
-
-  function handleDeveloperLogin() {
-    setDevError("");
-    if (!devCode.trim()) {
-      setDevError("Enter developer code");
-      return;
-    }
-    setDevLoading(true);
-    if (devCode.trim() === DEV_ACCESS_CODE) {
-      if (typeof window !== "undefined") {
-        localStorage.setItem("skillflow_dev_mode", "true");
-        localStorage.setItem(
-          "skillflow_dev_user",
-          JSON.stringify({
-            username: "Developer",
-            email: "dev@skillflow.com",
-            role: "developer",
-          })
-        );
-      }
-      router.push("/play");
-      router.refresh();
-    } else {
-      setDevError("Invalid developer code");
-      setDevLoading(false);
     }
   }
 
@@ -209,58 +173,6 @@ function LoginContent() {
           Log In
         </button>
       </form>
-
-      {/* Developer Access — outside form to avoid nested form hydration error */}
-      <div className="mt-6 border-t border-white/5 pt-4">
-        <button
-          type="button"
-          onClick={() => {
-            setDevSectionOpen((o) => !o);
-            setDevError("");
-            if (!devSectionOpen) setDevCode("");
-          }}
-          className="text-xs text-body-gray hover:text-white/80 transition-colors"
-        >
-          Developer Access
-        </button>
-        <div
-          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
-            devSectionOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-          }`}
-        >
-          <div className="overflow-hidden">
-            <div className="mt-3 rounded-lg border border-purple/20 bg-purple/5 px-3 py-3">
-              <div className="space-y-2">
-                <input
-                  type="password"
-                  placeholder="Enter developer code"
-                  value={devCode}
-                  onChange={(e) => {
-                    setDevCode(e.target.value);
-                    if (devError) setDevError("");
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleDeveloperLogin();
-                    }
-                  }}
-                  className="w-full rounded border border-white/10 bg-[#1A1D27] px-3 py-2 text-sm text-white placeholder:text-body-gray focus:border-purple focus:outline-none focus:ring-1 focus:ring-purple font-mono"
-                />
-                {devError && <p className="text-xs text-red-400">{devError}</p>}
-                <button
-                  type="button"
-                  onClick={handleDeveloperLogin}
-                  disabled={devLoading}
-                  className="w-full rounded-lg bg-purple py-2 text-sm font-medium text-white transition-all hover:shadow-purple-glow disabled:opacity-60"
-                >
-                  Developer Login
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <p className="mt-6 text-center text-sm text-body-gray">
         Don&apos;t have an account?{" "}

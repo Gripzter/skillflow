@@ -5,6 +5,7 @@ import Link from "next/link";
 import AuthLayout from "@/components/AuthLayout";
 import LoadingRing from "@/components/LoadingRing";
 import { createClient } from "@/lib/supabase";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 function ResetPasswordContent() {
   const [email, setEmail] = useState("");
@@ -30,14 +31,14 @@ function ResetPasswordContent() {
     setLoading(true);
     const supabase = createClient();
     if (!supabase) {
-      setError("Authentication is not configured.");
+      setError("Service is temporarily unavailable. Please try again later.");
       setLoading(false);
       return;
     }
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${typeof window !== "undefined" ? window.location.origin : ""}/auth/update-password`,
     });
-    if (err) setError(err.message);
+    if (err) setError(getUserFriendlyError(err));
     setShowSuccess(true);
     setResendDisabled(true);
     setResendCountdown(60);

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 type ReportStatus = "new" | "reviewed" | "resolved";
 
@@ -87,7 +88,7 @@ function MatchDetail({ matchId }: { matchId: string }) {
         .eq("id", matchId)
         .maybeSingle();
       if (error) {
-        setErr(error.message);
+        setErr(getUserFriendlyError(error));
       } else {
         setMatch((data as MatchRow) ?? null);
       }
@@ -192,7 +193,7 @@ export default function AdminReportsPage() {
         setError(
           err.code === "42P01"
             ? "Reports table not found. Run the migration below."
-            : err.message
+            : getUserFriendlyError(err)
         );
         setLoading(false);
         return;

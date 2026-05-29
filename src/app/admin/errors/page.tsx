@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import LoadingRing from "@/components/LoadingRing";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 type ErrorReport = {
   id: string;
@@ -28,7 +29,7 @@ export default function AdminErrorsPage() {
       const data = await res.json();
       setReports(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load reports");
+      setError(getUserFriendlyError(err));
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getWalletBalance } from "@/lib/api";
 import { createClient } from "@/lib/supabase";
 import { MIN_WITHDRAWAL, WITHDRAWAL_FEE_PERCENT } from "@/lib/constants";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 export default function WithdrawPage() {
   const router = useRouter();
@@ -54,7 +55,7 @@ export default function WithdrawPage() {
     try {
       const supabase = createClient();
       if (!supabase) {
-        setError("Not configured");
+        setError("Service is temporarily unavailable. Please try again later.");
         setSubmitLoading(false);
         return;
       }
@@ -79,7 +80,7 @@ export default function WithdrawPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Failed to submit withdrawal");
+        setError(getUserFriendlyError({ message: data.error }));
         setSubmitLoading(false);
         return;
       }
@@ -87,7 +88,7 @@ export default function WithdrawPage() {
       setPlayerReceives(data.playerReceives ?? youReceive);
       setSuccess(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(getUserFriendlyError(e));
     } finally {
       setSubmitLoading(false);
     }

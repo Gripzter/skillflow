@@ -13,6 +13,7 @@ import {
   fetchActiveSession,
   type LastTouchSession,
 } from "@/lib/games/last-touch-sessions";
+import { getUserFriendlyError } from "@/lib/errorHandler";
 
 function LastTouchPageContent() {
   const router = useRouter();
@@ -90,7 +91,7 @@ function LastTouchPageContent() {
       setBalance((b) => b - fee);
       return true;
     } catch (e) {
-      setJoinError(e instanceof Error ? e.message : "Insufficient balance");
+      setJoinError(getUserFriendlyError(e));
       return false;
     }
   }, []);
