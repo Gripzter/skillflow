@@ -174,7 +174,9 @@ function LoginContent() {
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-body-gray">
+      <div className="my-6 h-px w-full bg-white/10" aria-hidden />
+
+      <p className="text-center text-sm text-body-gray">
         Don&apos;t have an account?{" "}
         <Link href="/signup" className="text-teal font-medium hover:underline">
           Sign up
