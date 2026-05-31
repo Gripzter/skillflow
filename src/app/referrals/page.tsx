@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import { useToast } from "@/components/Toast";
@@ -10,6 +9,7 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import { createClient } from "@/lib/supabase";
 import { ensureReferralCode } from "@/lib/referrals";
 import LoadingRing from "@/components/LoadingRing";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 const SHARE_TEXT = "Join me on SkillFlow! Compete in skill games for real money. Use my link and we both get $5: ";
 const MAX_REFERRAL_BONUSES = 50;
@@ -23,7 +23,6 @@ interface ReferralRow {
 }
 
 export default function ReferralsPage() {
-  const router = useRouter();
   const { showToast } = useToast();
   const { isPractice } = usePlayMode();
   const [username, setUsername] = useState("");
@@ -37,14 +36,17 @@ export default function ReferralsPage() {
   const [history, setHistory] = useState<ReferralRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     async function load() {
       const user = await getCurrentUser();
       if (!user) {
-        router.push("/login");
+        setIsAuthenticated(false);
+        setLoading(false);
         return;
       }
+      setIsAuthenticated(true);
       const supabase = createClient();
       if (!supabase) {
         setLoading(false);
@@ -105,12 +107,16 @@ export default function ReferralsPage() {
       setLoading(false);
     }
     load();
-  }, [router]);
+  }, []);
 
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/invite/${referralCode}` : "";
   const shareMessage = SHARE_TEXT + shareUrl;
 
   function copyLink() {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     if (!shareUrl) return;
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
@@ -119,14 +125,26 @@ export default function ReferralsPage() {
   }
 
   function shareWhatsApp() {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`, "_blank");
   }
 
   function shareTwitter() {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareMessage)}`, "_blank");
   }
 
   function shareTelegram() {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent("Join me on SkillFlow — we both get $5!")}`, "_blank");
   }
 
@@ -140,7 +158,7 @@ export default function ReferralsPage() {
     <div className="min-h-screen bg-charcoal pb-24 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
-        username={username}
+        username={isAuthenticated ? username : undefined}
         isDevMode={false}
         onLogout={() => {}}
         loggingOut={false}
@@ -156,7 +174,7 @@ export default function ReferralsPage() {
             <input
               type="text"
               readOnly
-              value={shareUrl}
+              value={isAuthenticated ? shareUrl : "Create your account to unlock your referral link"}
               className="flex-1 rounded-lg border border-white/10 bg-[#1A1D27] px-3 py-2.5 text-sm text-white"
             />
             <button
@@ -171,9 +189,15 @@ export default function ReferralsPage() {
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <p className="mt-3 text-sm text-body-gray">
-            Or share your code: <span className="font-mono font-medium text-white">{referralCode}</span>
-          </p>
+          {isAuthenticated ? (
+            <p className="mt-3 text-sm text-body-gray">
+              Or share your code: <span className="font-mono font-medium text-white">{referralCode}</span>
+            </p>
+          ) : (
+            <p className="mt-3 text-sm text-body-gray">
+              Sign up to generate your personal referral code and start earning rewards.
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -221,19 +245,19 @@ export default function ReferralsPage() {
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div>
               <p className="text-xs text-body-gray">Friends Invited</p>
-              <p className="text-xl font-bold text-white">{stats.totalReferrals}</p>
+              <p className="text-xl font-bold text-white">{isAuthenticated ? stats.totalReferrals : "—"}</p>
             </div>
             <div>
               <p className="text-xs text-body-gray">Successful</p>
-              <p className={`text-xl font-bold ${isPractice ? "text-purple-300" : "text-teal"}`}>{stats.completed}</p>
+              <p className={`text-xl font-bold ${isPractice ? "text-purple-300" : "text-teal"}`}>{isAuthenticated ? stats.completed : "—"}</p>
             </div>
             <div>
               <p className="text-xs text-body-gray">Total Earned</p>
-              <p className="text-xl font-bold text-white">${stats.totalEarned.toFixed(2)}</p>
+              <p className="text-xl font-bold text-white">{isAuthenticated ? `$${stats.totalEarned.toFixed(2)}` : "—"}</p>
             </div>
             <div>
               <p className="text-xs text-body-gray">Pending</p>
-              <p className="text-xl font-bold text-amber-400">{stats.pending} waiting</p>
+              <p className="text-xl font-bold text-amber-400">{isAuthenticated ? `${stats.pending} waiting` : "—"}</p>
             </div>
           </div>
           {isMaxed && (
@@ -245,7 +269,9 @@ export default function ReferralsPage() {
 
         <section className="mt-8 rounded-xl border border-white/10 bg-card p-6">
           <h2 className="text-lg font-semibold text-white">Referral History</h2>
-          {history.length === 0 ? (
+          {!isAuthenticated ? (
+            <p className="mt-4 text-body-gray">Create an account to track invited friends and referral rewards.</p>
+          ) : history.length === 0 ? (
             <p className="mt-4 text-body-gray">No referrals yet. Share your link to get started!</p>
           ) : (
             <ul className="mt-4 space-y-3">

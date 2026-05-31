@@ -1,16 +1,11 @@
 const PROTECTED_ROUTE_PREFIXES = [
   "/admin",
-  "/cases",
   "/dashboard",
-  "/events",
-  "/external",
-  "/inventory",
+  "/external/match",
   "/last-touch",
-  "/leaderboard",
   "/match",
   "/play",
   "/profile",
-  "/referrals",
   "/settings",
   "/skillpoints",
   "/wallet",
@@ -21,9 +16,31 @@ function matchesPrefix(pathname: string, prefix: string) {
 }
 
 export function isProtectedPath(pathname: string) {
+  if (
+    pathname === "/" ||
+    pathname === "/play" ||
+    matchesPrefix(pathname, "/events") ||
+    matchesPrefix(pathname, "/cases") ||
+    matchesPrefix(pathname, "/inventory") ||
+    matchesPrefix(pathname, "/leaderboard") ||
+    matchesPrefix(pathname, "/referrals") ||
+    matchesPrefix(pathname, "/login") ||
+    matchesPrefix(pathname, "/signup") ||
+    matchesPrefix(pathname, "/auth") ||
+    matchesPrefix(pathname, "/founders") ||
+    matchesPrefix(pathname, "/fairplay") ||
+    matchesPrefix(pathname, "/legal") ||
+    matchesPrefix(pathname, "/terms") ||
+    matchesPrefix(pathname, "/privacy") ||
+    matchesPrefix(pathname, "/acceptable-use")
+  ) {
+    return false;
+  }
+
   if (matchesPrefix(pathname, "/admin/login")) {
     return false;
   }
+
   return PROTECTED_ROUTE_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix));
 }
 

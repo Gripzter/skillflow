@@ -54,10 +54,11 @@ function formatTier(tier: string) {
 
 export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps) {
   const pathname = usePathname();
-  const { profile } = useProfile();
+  const { profile, loading } = useProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [spModalOpen, setSpModalOpen] = useState(false);
   const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
+  const isAuthenticated = !loading && !!profile.id;
 
   useEffect(() => {
     if (pathname === "/play" && initialOpenSpModal) {
@@ -106,82 +107,109 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
           </nav>
 
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setSpModalOpen(true)}
-              className="inline-flex whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
-              aria-label={`SkillPoints: ${profile.lifetimeSp.toLocaleString()}`}
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]">
-                SP
-              </span>
-              <span className="hidden text-white/60 sm:inline">{formatTier(profile.rankTier)} ·</span>
-              <span>{profile.lifetimeSp.toLocaleString()}</span>
-            </button>
+            {isAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setSpModalOpen(true)}
+                  className="inline-flex whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
+                  aria-label={`SkillPoints: ${profile.lifetimeSp.toLocaleString()}`}
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]">
+                    SP
+                  </span>
+                  <span className="hidden text-white/60 sm:inline">{formatTier(profile.rankTier)} ·</span>
+                  <span>{profile.lifetimeSp.toLocaleString()}</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => setSkilliesModalOpen(true)}
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-[#FFFF00] transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
-              aria-label={`Skillies: ${profile.balanceSp.toLocaleString()}`}
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] font-bold text-black sm:h-5 sm:w-5 sm:text-[10px]">
-                S
-              </span>
-              <span>{profile.balanceSp.toLocaleString()}</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={() => setSkilliesModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-[#FFFF00] transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
+                  aria-label={`Skillies: ${profile.balanceSp.toLocaleString()}`}
+                >
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white text-[9px] font-bold text-black sm:h-5 sm:w-5 sm:text-[10px]">
+                    S
+                  </span>
+                  <span>{profile.balanceSp.toLocaleString()}</span>
+                </button>
 
-            <div className="hidden sm:flex">
-              <ConnectionBadge />
-            </div>
+                <div className="hidden sm:flex">
+                  <ConnectionBadge />
+                </div>
 
-            <Link
-              href="/settings"
-              className="hidden h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white/5 hover:text-white sm:flex"
-              aria-label="Settings"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </Link>
+                <Link
+                  href="/settings"
+                  className="hidden h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white/5 hover:text-white sm:flex"
+                  aria-label="Settings"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Link>
 
-            <Link
-              href="/profile"
-              className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 sm:h-9 sm:w-9"
-              aria-label="Profile"
-            >
-              {profile.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-xs font-bold text-white">{avatarInitial}</span>
-              )}
-            </Link>
+                <Link
+                  href="/profile"
+                  className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 sm:h-9 sm:w-9"
+                  aria-label="Profile"
+                >
+                  {profile.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-white">{avatarInitial}</span>
+                  )}
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="hidden rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/10 sm:inline-flex"
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-lg bg-[#FFFF00] px-4 py-2 text-sm font-bold text-black transition-colors hover:brightness-110"
+                >
+                  Sign Up
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </header>
-      <MobileMenuDrawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+      <MobileMenuDrawer
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        isAuthenticated={isAuthenticated}
+      />
 
-      <SkillPointsModal
-        isOpen={spModalOpen}
-        onClose={() => setSpModalOpen(false)}
-        userId={profile.id}
-        lifetimeSp={profile.lifetimeSp}
-        balanceSp={profile.balanceSp}
-        rankTier={profile.rankTier}
-      />
-      <SkilliesModal
-        isOpen={skilliesModalOpen}
-        onClose={() => setSkilliesModalOpen(false)}
-        userId={profile.id}
-        balanceSp={profile.balanceSp}
-      />
+      {isAuthenticated ? (
+        <>
+          <SkillPointsModal
+            isOpen={spModalOpen}
+            onClose={() => setSpModalOpen(false)}
+            userId={profile.id}
+            lifetimeSp={profile.lifetimeSp}
+            balanceSp={profile.balanceSp}
+            rankTier={profile.rankTier}
+          />
+          <SkilliesModal
+            isOpen={skilliesModalOpen}
+            onClose={() => setSkilliesModalOpen(false)}
+            userId={profile.id}
+            balanceSp={profile.balanceSp}
+          />
+        </>
+      ) : null}
     </>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentUser, getMyProfile } from "@/lib/api";
 import { getUserSPData, type RankTier } from "@/lib/skillpoints";
+import { markReturningUser } from "@/lib/auth-action";
 
 export type ProfileState = {
   id: string;
@@ -38,6 +39,7 @@ export function useProfile() {
           if (!cancelled) setLoading(false);
           return;
         }
+        markReturningUser();
 
         const [rawProfile, spData] = await Promise.all([
           getMyProfile(),

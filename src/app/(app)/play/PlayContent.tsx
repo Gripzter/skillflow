@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { MouseEventHandler } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import GameCardChallenges from "@/components/play/GameCardChallenges";
-import LoadingRing from "@/components/LoadingRing";
 import PromoCarousel from "@/components/play/PromoCarousel";
 import { useDailyChallenges } from "@/hooks/useDailyChallenges";
 import { useGames, type GameCategory } from "@/hooks/useGames";
@@ -14,6 +14,7 @@ import { useGameOrder } from "@/hooks/useGameOrder";
 import { useProfile } from "@/hooks/useProfile";
 import { useRecentMatches } from "@/hooks/useRecentMatches";
 import type { DailyChallengeRow } from "@/lib/daily-challenges";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
   { label: "ALL", value: "all" },
@@ -33,11 +34,13 @@ function PlayGameCard({
   index,
   onlineCount,
   challenges,
+  isAuthenticated,
 }: {
   game: { slug: string; name: string; image: string; waitSeconds: number };
   index: number;
   onlineCount: number;
   challenges: DailyChallengeRow[];
+  isAuthenticated: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const scopedChallenges = useMemo(
@@ -45,9 +48,16 @@ function PlayGameCard({
     [challenges, game.slug]
   );
 
+  const handleClick: MouseEventHandler<HTMLAnchorElement> = (event) => {
+    if (isAuthenticated) return;
+    event.preventDefault();
+    redirectToAuthAction();
+  };
+
   return (
     <Link
       href={`/play/${game.slug}`}
+      onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -86,15 +96,19 @@ function PlayGameCard({
 }
 
 export default function PlayContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<"all" | GameCategory>("all");
   const [onlineBucket, setOnlineBucket] = useState(Math.floor(Date.now() / (5 * 60 * 1000)));
   const { profile, loading } = useProfile();
+  const isAuthenticated = !!profile.id;
   const { games } = useGames();
   const orderedGames = useGameOrder(games, profile.id || null);
-  const { challenges } = useDailyChallenges(profile.id, 10);
-  const { matches } = useRecentMatches({ limit: 1, username: profile.username });
+  const { challenges } = useDailyChallenges(isAuthenticated ? profile.id : "", 10);
+  const { matches } = useRecentMatches({
+    limit: 1,
+    username: profile.username,
+    enabled: isAuthenticated,
+  });
 
   const openSpFromUrl = useMemo(() => searchParams.get("sp") === "1", [searchParams]);
 
@@ -110,28 +124,18 @@ export default function PlayContent() {
   }, [orderedGames, onlineBucket]);
 
   useEffect(() => {
-    if (!loading && !profile.id) {
-      router.push("/login");
-    }
-  }, [loading, profile.id, router]);
-
-  useEffect(() => {
     const interval = window.setInterval(() => {
       setOnlineBucket(Math.floor(Date.now() / (5 * 60 * 1000)));
     }, 30_000);
     return () => window.clearInterval(interval);
   }, []);
 
-  if (loading || !profile.id) {
-    return <LoadingRing />;
-  }
-
   return (
     <div className="min-h-screen bg-[#0E0E12] pb-24 text-white md:pb-8">
-      <AppNavbar currentPage="play" initialOpenSpModal={openSpFromUrl} />
+      <AppNavbar currentPage="play" initialOpenSpModal={isAuthenticated && !loading ? openSpFromUrl : false} />
 
       <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
-        <PromoCarousel />
+        <PromoCarousel isAuthenticated={isAuthenticated} />
 
         <h1 className="mt-8 text-[32px] font-black tracking-[-0.03em] text-white">
           Play smarter. Match faster. Earn more.
@@ -165,13 +169,14 @@ export default function PlayContent() {
               game={game}
               index={index}
               onlineCount={onlineCountBySlug[game.slug] ?? 0}
-              challenges={challenges}
+              challenges={isAuthenticated ? challenges : []}
+              isAuthenticated={isAuthenticated}
             />
           ))}
         </div>
 
         <section className="mt-12">
-          {matches.length > 0 ? (
+          {isAuthenticated && matches.length > 0 ? (
             <p className="mt-4 text-sm text-[#9CA3AF]">
               Last match: {matches[0].resultLabel} vs {matches[0].opponent} ·
               <span className="text-[#FFFF00]"> +{matches[0].spDelta} SP</span> · {matches[0].timeAgo}

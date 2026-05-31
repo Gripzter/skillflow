@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 import { createClient } from "@/lib/supabase";
+import { markReturningUser } from "@/lib/auth-action";
 
 interface FormErrors {
   email?: string;
@@ -74,6 +75,7 @@ function LoginContent() {
       if (error) {
         showToast(getUserFriendlyError(error), "error");
       } else {
+        markReturningUser();
         const user = authData.user;
         const { data: rg } = user
           ? await supabase

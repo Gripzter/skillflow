@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -32,12 +31,12 @@ const TABS: { id: LeaderboardTab; label: string }[] = [
 const PAGE_SIZE = 20;
 
 export default function LeaderboardPage() {
-  const router = useRouter();
   const [username, setUsername] = useState<string>("Player");
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [rawPlayers, setRawPlayers] = useState<LeaderboardPlayer[]>([]);
   const [practicePlayers, setPracticePlayers] = useState<LeaderboardPlayer[]>([]);
@@ -90,14 +89,16 @@ export default function LeaderboardPage() {
     async function load() {
       try {
         const user = await getCurrentUser();
-        if (!user) {
-          router.push("/login");
-          return;
+        const currentUser = user
+          ? { id: user.id, username: user.username }
+          : { id: "", username: "Guest" };
+        setIsAuthenticated(!!user);
+        if (user) {
+          setCurrentUserId(user.id);
+          setUsername(user.username);
+          setIsDevMode(user.isDevMode ?? false);
         }
-        setCurrentUserId(user.id);
-        setUsername(user.username);
-        setIsDevMode(user.isDevMode ?? false);
-        const ranked = await fetchRankedPlayersForTab("skillpoints", { id: user.id, username: user.username });
+        const ranked = await fetchRankedPlayersForTab("skillpoints", currentUser);
         setRawPlayers(ranked);
         setDisplayedRealPlayers(ranked);
         const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { skillpoints: ranked };
@@ -128,13 +129,13 @@ export default function LeaderboardPage() {
           .slice(0, 50);
         setPracticePlayers(list);
       } catch {
-        router.push("/login");
+        setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [router, fetchRankedPlayersForTab]);
+  }, [fetchRankedPlayersForTab]);
 
   const sortedPractice = useMemo(
     () => [...practicePlayers].sort((a, b) => b.totalMatches - a.totalMatches),
@@ -211,7 +212,7 @@ export default function LeaderboardPage() {
     <div className="min-h-screen bg-charcoal pb-24 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
-        username={username}
+        username={isAuthenticated ? username : undefined}
         isDevMode={isDevMode}
         onLogout={handleLogout}
         loggingOut={loggingOut}
@@ -578,7 +579,7 @@ export default function LeaderboardPage() {
       </main>
       <Footer />
       {/* Your Rank sticky bar (sits above bottom tab bar on mobile) */}
-      {currentUserRank != null && currentUserPlayer && (
+      {isAuthenticated && currentUserRank != null && currentUserPlayer && (
         <div className="fixed bottom-[60px] left-0 right-0 z-30 border-t border-white/5 bg-charcoal/95 backdrop-blur-sm md:bottom-0">
           <div className={`mx-auto flex max-w-[1200px] items-center justify-between gap-4 border-l-4 px-4 py-3 sm:px-6 ${isPractice ? "border-purple-500" : "border-teal"}`}>
             <span className="text-sm text-body-gray">Your Rank:</span>

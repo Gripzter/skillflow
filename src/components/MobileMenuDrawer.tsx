@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { label: "Home", href: "/play" },
+  { label: "Play", href: "/play" },
   { label: "Events", href: "/events" },
   { label: "Cases", href: "/cases" },
   { label: "Inventory", href: "/inventory" },
@@ -16,9 +16,10 @@ const NAV_ITEMS = [
 type Props = {
   open: boolean;
   onClose: () => void;
+  isAuthenticated: boolean;
 };
 
-export default function MobileMenuDrawer({ open, onClose }: Props) {
+export default function MobileMenuDrawer({ open, onClose, isAuthenticated }: Props) {
   const pathname = usePathname();
 
   useEffect(() => {
@@ -94,17 +95,34 @@ export default function MobileMenuDrawer({ open, onClose }: Props) {
           })}
         </nav>
 
-        <div className="mt-8 space-y-1 border-t border-white/10 pt-6">
-          <Link href="/settings" className="block px-3 py-2.5 text-sm text-white/70 hover:text-white">
-            Settings
-          </Link>
-          <a
-            href="mailto:admin@skillflow.gg"
-            className="block px-3 py-2.5 text-sm text-white/70 hover:text-white"
-          >
-            Contact support
-          </a>
-        </div>
+        {isAuthenticated ? (
+          <div className="mt-8 space-y-1 border-t border-white/10 pt-6">
+            <Link href="/settings" className="block px-3 py-2.5 text-sm text-white/70 hover:text-white">
+              Settings
+            </Link>
+            <a
+              href="mailto:admin@skillflow.gg"
+              className="block px-3 py-2.5 text-sm text-white/70 hover:text-white"
+            >
+              Contact support
+            </a>
+          </div>
+        ) : (
+          <div className="mt-8 space-y-2 border-t border-white/10 pt-6">
+            <Link
+              href="/login"
+              className="block rounded-lg border border-white/20 px-3 py-2.5 text-center text-sm font-semibold text-white"
+            >
+              Log In
+            </Link>
+            <Link
+              href="/signup"
+              className="block rounded-lg bg-[#FFFF00] px-3 py-2.5 text-center text-sm font-bold text-black"
+            >
+              Sign Up
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

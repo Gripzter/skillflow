@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
@@ -22,6 +21,7 @@ import {
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { getUserSPData } from "@/lib/skillpoints";
 import { createClient } from "@/lib/supabase";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 type RecentDrop = {
   id: string;
@@ -60,7 +60,6 @@ function renderDropName(itemName: string, source: "sp" | "inventory") {
 }
 
 export default function CasesPage() {
-  const router = useRouter();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -74,6 +73,7 @@ export default function CasesPage() {
   const [lastOpenedCaseId, setLastOpenedCaseId] = useState<CaseKey | null>(null);
   const [reelData, setReelData] = useState<{ lootTable: CaseDrop[]; winningItem: CaseDrop } | null>(null);
   const [resultItem, setResultItem] = useState<CaseDrop | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const getStableUser = useCallback(async () => {
     const firstUser = await getCurrentUser();
@@ -139,9 +139,11 @@ export default function CasesPage() {
       try {
         const user = await getStableUser();
         if (!user) {
-          router.push("/login");
+          setIsAuthenticated(false);
+          setLoading(false);
           return;
         }
+        setIsAuthenticated(true);
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
         const { resolvedUserId: effectiveUserId } = await resolveCaseUserId(user.id);
@@ -154,13 +156,13 @@ export default function CasesPage() {
         setUserId(effectiveUserId);
         await loadDashboard(effectiveUserId);
       } catch {
-        router.push("/login");
+        setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }
     }
     void load();
-  }, [getStableUser, loadDashboard, router]);
+  }, [getStableUser, loadDashboard]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -180,6 +182,10 @@ export default function CasesPage() {
   const canOpenFreeCrate = freeCrates > 0 && !isOpening;
 
   async function runOpenCase(caseId: CaseKey) {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     if (!userId) return;
     setIsOpening(true);
     setLastOpenedCaseId(caseId);
@@ -211,7 +217,7 @@ export default function CasesPage() {
     <div className="min-h-screen bg-charcoal pb-24 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
-        username={username}
+        username={isAuthenticated ? username : undefined}
         isDevMode={isDevMode}
         onLogout={handleLogout}
         loggingOut={loggingOut}
@@ -274,7 +280,7 @@ export default function CasesPage() {
                       : "cursor-not-allowed bg-white/10 text-gray-500"
                   }`}
                 >
-                  {canAfford ? "Open" : "Not enough"}
+                  {isAuthenticated ? (canAfford ? "Open" : "Not enough") : "Sign up to open"}
                 </button>
               </article>
             );
@@ -309,7 +315,7 @@ export default function CasesPage() {
                   : "cursor-not-allowed bg-white/10 text-gray-500"
               }`}
             >
-              {freeCrates > 0 ? "Open Free" : "No free crates"}
+              {isAuthenticated ? (freeCrates > 0 ? "Open Free" : "No free crates") : "Sign up to claim"}
             </button>
           </div>
         </section>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
@@ -11,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
 import { equipItem, getUserInventory, resolveCaseUserId, type CaseItemRarity } from "@/lib/cases";
 import { createClient } from "@/lib/supabase";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 type InventoryRow = {
   id: string;
@@ -56,7 +56,6 @@ const RARITY_RING_STYLES: Record<CaseItemRarity, string> = {
 };
 
 export default function InventoryPage() {
-  const router = useRouter();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -65,6 +64,7 @@ export default function InventoryPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [activeMultipliers, setActiveMultipliers] = useState<ActiveMultiplierRow[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   function getMultiplierStatusLabel(multiplier: ActiveMultiplierRow): string {
     const hourMatch = multiplier.multiplier_id.match(/_(\d+)h$/i);
     if (hourMatch) {
@@ -85,9 +85,11 @@ export default function InventoryPage() {
       try {
         const user = await getCurrentUser();
         if (!user) {
-          router.push("/login");
+          setIsAuthenticated(false);
+          setLoading(false);
           return;
         }
+        setIsAuthenticated(true);
 
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
@@ -128,14 +130,14 @@ export default function InventoryPage() {
           setActiveMultipliers(filtered);
         }
       } catch {
-        router.push("/login");
+        setIsAuthenticated(false);
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [router]);
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -147,6 +149,10 @@ export default function InventoryPage() {
   }
 
   async function handleEquip(itemId: string) {
+    if (!isAuthenticated) {
+      redirectToAuthAction();
+      return;
+    }
     if (!userId || equippingItemId) return;
     setEquippingItemId(itemId);
     try {
@@ -191,7 +197,7 @@ export default function InventoryPage() {
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
       <div className="pointer-events-none fixed inset-0 bg-mesh-gradient bg-grid-pattern" aria-hidden />
       <AppNavbar
-        username={username}
+        username={isAuthenticated ? username : undefined}
         isDevMode={isDevMode}
         onLogout={handleLogout}
         loggingOut={loggingOut}

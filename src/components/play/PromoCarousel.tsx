@@ -1,15 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type TouchEvent, type MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { PROMO_SLIDES, type PromoSlide } from "@/lib/promoSlides";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 const DWELL_MS = 5000;
 const TRANSITION_MS = 600;
 
-function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
+function Slide({
+  slide,
+  active,
+  isAuthenticated,
+}: {
+  slide: PromoSlide;
+  active: boolean;
+  isAuthenticated: boolean;
+}) {
   const accentColor = slide.accentColor ?? "#FFFF00";
+  const gateAction = !isAuthenticated && /join|open|play|bet/i.test(slide.cta);
+
+  const handleGatedAction = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!gateAction) return;
+    event.preventDefault();
+    redirectToAuthAction();
+  };
 
   return (
     <div
@@ -51,6 +67,7 @@ function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
           {slide.external ? (
             <a
               href={slide.href}
+              onClick={handleGatedAction}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
@@ -73,6 +90,7 @@ function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
           ) : (
             <Link
               href={slide.href}
+              onClick={handleGatedAction}
               className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
             >
               {slide.cta}
@@ -97,7 +115,7 @@ function Slide({ slide, active }: { slide: PromoSlide; active: boolean }) {
   );
 }
 
-export default function PromoCarousel() {
+export default function PromoCarousel({ isAuthenticated }: { isAuthenticated: boolean }) {
   const slides = PROMO_SLIDES;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -164,7 +182,7 @@ export default function PromoCarousel() {
       aria-label="Promotional highlights"
     >
       {slides.map((slide, i) => (
-        <Slide key={slide.id} slide={slide} active={i === index} />
+        <Slide key={slide.id} slide={slide} active={i === index} isAuthenticated={isAuthenticated} />
       ))}
 
       {slides.length > 1 ? (

@@ -25,9 +25,11 @@ function formatRelativeTime(createdAt: string): string {
 export function useRecentMatches({
   limit = 1,
   username,
+  enabled = true,
 }: {
   limit?: number;
   username: string;
+  enabled?: boolean;
 }) {
   const [matches, setMatches] = useState<RecentMatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,11 @@ export function useRecentMatches({
     let cancelled = false;
 
     async function load() {
+      if (!enabled) {
+        setMatches([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       const all = await getMatches();
       const completed = all
@@ -68,7 +75,7 @@ export function useRecentMatches({
     return () => {
       cancelled = true;
     };
-  }, [limit, username]);
+  }, [enabled, limit, username]);
 
   return { matches, loading };
 }

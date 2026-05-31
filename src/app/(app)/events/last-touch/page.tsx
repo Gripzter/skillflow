@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { redirectToAuthAction } from "@/lib/auth-action";
 
 export default function LastTouchEventPage() {
   return (
@@ -43,6 +46,8 @@ export default function LastTouchEventPage() {
         </div>
 
         <button
+          type="button"
+          onClick={redirectToAuthAction}
           className="w-full sm:w-auto px-8 py-4 bg-[#FFFF00] text-black font-bold text-base sm:text-lg rounded-xl hover:brightness-110 transition-all"
         >
           Join next round →
