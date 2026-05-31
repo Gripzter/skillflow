@@ -23,6 +23,8 @@ import {
 import { getUserSPData } from "@/lib/skillpoints";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
+import { useProfile } from "@/hooks/useProfile";
+import AvatarWithBorder from "@/components/AvatarWithBorder";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -100,6 +102,7 @@ export default function PlayGamePage() {
   >({ phase: "stake_select" });
 
   const { isPractice } = usePlayMode();
+  const { profile } = useProfile();
   const { isRestricted } = useGeo();
   const { showToast } = useToast();
   const effectivePractice = isPractice || isRestricted;
@@ -446,6 +449,8 @@ export default function PlayGamePage() {
         stake={matchmakingState.stake}
         gameName={gameName}
         opponentName={matchmakingState.opponentName}
+        myAvatarUrl={profile.avatarUrl}
+        myBorder={profile.equippedBorder}
         onReady={handleMatchmakingReady}
       />
     );
@@ -626,9 +631,13 @@ export default function PlayGamePage() {
               <p className="text-2xl font-bold text-teal">Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-teal/40 to-purple/40 text-lg font-bold text-white">
-                    {username.charAt(0)}
-                  </div>
+                  <AvatarWithBorder
+                    src={profile.avatarUrl}
+                    fallbackInitial={username}
+                    size="md"
+                    border={profile.equippedBorder}
+                    className="!h-12 !w-12"
+                  />
                   <p className="mt-2 font-medium text-white">{username}</p>
                   <p className="text-xs text-body-gray">Rating 1000</p>
                 </div>
@@ -686,13 +695,13 @@ export default function PlayGamePage() {
               <p className={`text-2xl font-bold ${effectivePractice ? "text-purple-400" : "text-teal"}`}>Opponent Found!</p>
               <div className="mt-8 flex w-full max-w-md items-center justify-center gap-4">
                 <div className="card-border flex flex-1 flex-col items-center rounded-card bg-card p-4">
-                  <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br text-lg font-bold text-white ${
-                      effectivePractice ? "from-purple-500/40 to-fuchsia-500/40" : "from-teal/40 to-purple/40"
-                    }`}
-                  >
-                    {player1.username.charAt(0)}
-                  </div>
+                  <AvatarWithBorder
+                    src={profile.avatarUrl}
+                    fallbackInitial={player1.username}
+                    size="md"
+                    border={profile.equippedBorder}
+                    className="!h-12 !w-12"
+                  />
                   <p className="mt-2 font-medium text-white">{player1.username}</p>
                   <p className="text-xs text-body-gray">Rating {player1.rating}</p>
                 </div>

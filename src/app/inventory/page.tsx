@@ -1,16 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
 import { useToast } from "@/components/Toast";
+import { dispatchWalletUpdated } from "@/components/AppNavbar";
 import { getCurrentUser, logout as apiLogout } from "@/lib/api";
-import { equipItem, getUserInventory, resolveCaseUserId, type CaseItemRarity } from "@/lib/cases";
+import {
+  equipItem,
+  getUserInventory,
+  resolveCaseUserId,
+  unequipItem,
+  type CaseItemRarity,
+} from "@/lib/cases";
 import { createClient } from "@/lib/supabase";
 import { redirectToAuthAction } from "@/lib/auth-action";
+import {
+  dispatchCosmeticsUpdated,
+  getSellValue,
+  sortByRarityDesc,
+} from "@/lib/inventory-cosmetics";
+import {
+  getInventoryPreviewImage,
+  getInventoryRingFallbackClass,
+  INVENTORY_RARITY_STYLES,
+} from "@/lib/inventory-ui";
 
 type InventoryRow = {
   id: string;
@@ -31,29 +48,7 @@ type ActiveMultiplierRow = {
   created_at: string;
 };
 
-const RARITY_STYLES: Record<CaseItemRarity, string> = {
-  common: "bg-slate-500/20 text-slate-300",
-  uncommon: "bg-blue-500/20 text-blue-300",
-  rare: "bg-purple-500/20 text-purple-300",
-  epic: "bg-pink-500/20 text-pink-300",
-  legendary: "bg-amber-500/20 text-amber-300",
-};
-
-const BORDER_PREVIEW_BY_RARITY: Record<CaseItemRarity, string> = {
-  common: "/images/border-common.png",
-  uncommon: "",
-  rare: "/images/border-rare.png",
-  epic: "/images/border-epic.png",
-  legendary: "/images/border-legendary.png",
-};
-
-const RARITY_RING_STYLES: Record<CaseItemRarity, string> = {
-  common: "border-slate-400/80",
-  uncommon: "border-emerald-400/80",
-  rare: "border-blue-400/80",
-  epic: "border-purple-400/80",
-  legendary: "",
-};
+type SellTarget = InventoryRow | null;
 
 export default function InventoryPage() {
   const { showToast } = useToast();
@@ -65,6 +60,16 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryRow[]>([]);
   const [activeMultipliers, setActiveMultipliers] = useState<ActiveMultiplierRow[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [actionRowId, setActionRowId] = useState<string | null>(null);
+  const [sellTarget, setSellTarget] = useState<SellTarget>(null);
+  const [selling, setSelling] = useState(false);
+  const [badgeLimitOpen, setBadgeLimitOpen] = useState(false);
+
+  const refreshInventory = useCallback(async (uid: string) => {
+    const rows = await getUserInventory(uid);
+    setInventory(rows as InventoryRow[]);
+  }, []);
+
   function getMultiplierStatusLabel(multiplier: ActiveMultiplierRow): string {
     const hourMatch = multiplier.multiplier_id.match(/_(\d+)h$/i);
     if (hourMatch) {
@@ -78,8 +83,6 @@ export default function InventoryPage() {
     return `${Number(multiplier.matches_remaining)} matches remaining`;
   }
 
-  const [equippingItemId, setEquippingItemId] = useState<string | null>(null);
-
   useEffect(() => {
     async function load() {
       try {
@@ -90,25 +93,11 @@ export default function InventoryPage() {
           return;
         }
         setIsAuthenticated(true);
-
         setUsername(user.username);
         setIsDevMode(user.isDevMode ?? false);
         const { resolvedUserId: effectiveUserId } = await resolveCaseUserId(user.id);
         setUserId(effectiveUserId);
-        // eslint-disable-next-line no-console
-        console.log("[InventoryPage] Loading inventory for user", {
-          userId: effectiveUserId,
-          originalUserId: user.id,
-          username: user.username,
-          isDevMode: user.isDevMode,
-        });
-
-        const inventory = await getUserInventory(effectiveUserId);
-        // eslint-disable-next-line no-console
-        console.log("[Inventory Page] userId:", effectiveUserId);
-        // eslint-disable-next-line no-console
-        console.log("[Inventory Page] raw inventory:", inventory);
-        setInventory(inventory as InventoryRow[]);
+        await refreshInventory(effectiveUserId);
 
         const supabase = createClient();
         if (supabase) {
@@ -137,7 +126,7 @@ export default function InventoryPage() {
     }
 
     load();
-  }, []);
+  }, [refreshInventory]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -148,45 +137,165 @@ export default function InventoryPage() {
     }
   }
 
-  async function handleEquip(itemId: string) {
+  async function handleEquip(row: InventoryRow) {
     if (!isAuthenticated) {
       redirectToAuthAction();
       return;
     }
-    if (!userId || equippingItemId) return;
-    setEquippingItemId(itemId);
+    if (!userId || actionRowId) return;
+    setActionRowId(row.id);
     try {
-      const result = await equipItem(userId, itemId);
+      const result = await equipItem(userId, row.id);
+      if (!result.success) {
+        if (result.code === "badge_limit") {
+          setBadgeLimitOpen(true);
+        } else {
+          showToast(result.error, "error");
+        }
+        return;
+      }
+      await refreshInventory(userId);
+      dispatchCosmeticsUpdated();
+      showToast("Cosmetic equipped.", "success");
+    } finally {
+      setActionRowId(null);
+    }
+  }
+
+  async function handleUnequip(row: InventoryRow) {
+    if (!userId || actionRowId) return;
+    setActionRowId(row.id);
+    try {
+      const result = await unequipItem(userId, row.id);
       if (!result.success) {
         showToast(result.error, "error");
         return;
       }
-      const updated = await getUserInventory(userId);
-      setInventory(updated as InventoryRow[]);
-      showToast("Cosmetic equipped.", "success");
+      await refreshInventory(userId);
+      dispatchCosmeticsUpdated();
+      showToast("Item unequipped.", "success");
     } finally {
-      setEquippingItemId(null);
+      setActionRowId(null);
+    }
+  }
+
+  async function confirmSell() {
+    if (!sellTarget || selling) return;
+    setSelling(true);
+    try {
+      const res = await fetch("/api/inventory/sell", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: sellTarget.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error ?? "Failed to sell item.", "error");
+        return;
+      }
+      if (userId) await refreshInventory(userId);
+      dispatchWalletUpdated();
+      dispatchCosmeticsUpdated();
+      showToast(`Sold ${data.itemName ?? sellTarget.item_name} for ${data.skilliesEarned} Skillies`, "success");
+      setSellTarget(null);
+    } catch {
+      showToast("Failed to sell item. Please try again.", "error");
+    } finally {
+      setSelling(false);
     }
   }
 
   const borderItems = useMemo(
-    () => inventory.filter((item) => item.item_type === "border"),
+    () => sortByRarityDesc(inventory.filter((item) => item.item_type === "border")),
     [inventory]
   );
   const badgeItems = useMemo(
-    () => inventory.filter((item) => item.item_type === "badge"),
+    () => sortByRarityDesc(inventory.filter((item) => item.item_type === "badge")),
     [inventory]
   );
+  const equippedBadges = useMemo(() => badgeItems.filter((b) => b.equipped), [badgeItems]);
 
-  function getInventoryPreviewImage(item: InventoryRow): string | null {
-    if (item.item_type === "badge") {
-      if (item.item_id === "badge_omega_founder" || item.item_name === "Omega Founder Badge") {
-        return "/images/badge-founders.png";
-      }
-      return null;
+  function renderItemPreview(item: InventoryRow) {
+    const preview = getInventoryPreviewImage(item);
+    if (preview) {
+      return (
+        <div className="relative h-20 w-20 overflow-hidden rounded-full border border-white/20 bg-black/40 p-2">
+          <Image src={preview} alt={`${item.item_name} preview`} fill className="object-contain p-2" />
+        </div>
+      );
     }
-    const image = BORDER_PREVIEW_BY_RARITY[item.rarity];
-    return image || null;
+    if (item.rarity === "legendary") {
+      return (
+        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-yellow-400 p-1">
+          <div className="h-full w-full rounded-full bg-charcoal/90" />
+        </div>
+      );
+    }
+    return (
+      <div
+        className={`h-20 w-20 rounded-full border-4 bg-charcoal/90 ${getInventoryRingFallbackClass(item.rarity)}`}
+      />
+    );
+  }
+
+  function renderItemCard(item: InventoryRow) {
+    const sellValue = getSellValue(item.rarity);
+    const busy = actionRowId === item.id;
+
+    return (
+      <div
+        key={item.id}
+        className={`rounded-xl border p-5 ${
+          item.equipped ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-black/20"
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-center">{renderItemPreview(item)}</div>
+        <p className="text-sm font-semibold text-white">{item.item_name}</p>
+        <span
+          className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium capitalize ${INVENTORY_RARITY_STYLES[item.rarity]}`}
+        >
+          {item.rarity}
+        </span>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {item.equipped ? (
+            <button
+              type="button"
+              onClick={() => handleUnequip(item)}
+              disabled={busy}
+              className="rounded border border-white/25 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+            >
+              Unequip
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleEquip(item)}
+              disabled={busy}
+              className="rounded bg-[#FFFF00] px-3 py-1.5 text-xs font-bold text-black disabled:opacity-60"
+            >
+              Equip
+            </button>
+          )}
+          {item.equipped ? (
+            <span
+              className="rounded bg-white/5 px-3 py-1.5 text-xs text-body-gray"
+              title="Unequip before selling"
+            >
+              Equipped
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSellTarget(item)}
+              disabled={busy}
+              className="rounded border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/20 disabled:opacity-60"
+            >
+              Sell · {sellValue} S
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
@@ -207,7 +316,9 @@ export default function InventoryPage() {
 
       <main className="relative mx-auto flex max-w-[1100px] flex-col gap-8 px-4 py-8 pb-24 md:px-6">
         <section>
-          <h1 className="text-2xl font-bold text-white">Inventory</h1>
+          <h1 className="text-2xl font-bold text-white">
+            Inventory ({inventory.length} {inventory.length === 1 ? "item" : "items"})
+          </h1>
         </section>
 
         <section className="rounded-card border border-white/10 bg-card/80 p-5">
@@ -216,53 +327,7 @@ export default function InventoryPage() {
             <p className="mt-3 text-sm text-body-gray">No borders yet — open cases to find some!</p>
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {borderItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border p-5 ${
-                    item.equipped ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-black/20"
-                  }`}
-                >
-                  <div className="mb-4 flex items-center justify-center">
-                    {getInventoryPreviewImage(item) ? (
-                      <div className="relative h-20 w-20 overflow-hidden rounded-full border border-white/20 bg-black/40 p-2">
-                        <Image
-                          src={getInventoryPreviewImage(item) as string}
-                          alt={`${item.item_name} preview`}
-                          fill
-                          className="object-contain p-2"
-                        />
-                      </div>
-                    ) : item.rarity === "legendary" ? (
-                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-yellow-400 p-1">
-                        <div className="h-full w-full rounded-full bg-charcoal/90" />
-                      </div>
-                    ) : (
-                      <div className={`h-20 w-20 rounded-full border-4 ${RARITY_RING_STYLES[item.rarity]} bg-charcoal/90`} />
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold text-white">{item.item_name}</p>
-                  <span className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium ${RARITY_STYLES[item.rarity]}`}>
-                    {item.rarity}
-                  </span>
-                  <div className="mt-3">
-                    {item.equipped ? (
-                      <span className="rounded bg-yellow-500/20 px-2 py-1 text-xs font-semibold text-yellow-300">
-                        Equipped
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleEquip(item.item_id)}
-                        disabled={equippingItemId === item.item_id}
-                        className="rounded bg-teal px-3 py-1.5 text-xs font-semibold text-charcoal disabled:opacity-60"
-                      >
-                        Equip
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              {borderItems.map(renderItemCard)}
             </div>
           )}
         </section>
@@ -273,53 +338,7 @@ export default function InventoryPage() {
             <p className="mt-3 text-sm text-body-gray">No badges yet — open cases to find some!</p>
           ) : (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {badgeItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border p-5 ${
-                    item.equipped ? "border-yellow-400 bg-yellow-500/10" : "border-white/10 bg-black/20"
-                  }`}
-                >
-                  <div className="mb-4 flex items-center justify-center">
-                    {getInventoryPreviewImage(item) ? (
-                      <div className="relative h-20 w-20 overflow-hidden rounded-full border border-white/20 bg-black/40 p-2">
-                        <Image
-                          src={getInventoryPreviewImage(item) as string}
-                          alt={`${item.item_name} preview`}
-                          fill
-                          className="object-contain p-2"
-                        />
-                      </div>
-                    ) : item.rarity === "legendary" ? (
-                      <div className="h-20 w-20 rounded-full bg-gradient-to-br from-amber-300 via-orange-500 to-yellow-400 p-1">
-                        <div className="h-full w-full rounded-full bg-charcoal/90" />
-                      </div>
-                    ) : (
-                      <div className={`h-20 w-20 rounded-full border-4 ${RARITY_RING_STYLES[item.rarity]} bg-charcoal/90`} />
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold text-white">{item.item_name}</p>
-                  <span className={`mt-2 inline-block rounded px-2 py-0.5 text-xs font-medium ${RARITY_STYLES[item.rarity]}`}>
-                    {item.rarity}
-                  </span>
-                  <div className="mt-3">
-                    {item.equipped ? (
-                      <span className="rounded bg-yellow-500/20 px-2 py-1 text-xs font-semibold text-yellow-300">
-                        Equipped
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleEquip(item.item_id)}
-                        disabled={equippingItemId === item.item_id}
-                        className="rounded bg-teal px-3 py-1.5 text-xs font-semibold text-charcoal disabled:opacity-60"
-                      >
-                        Equip
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
+              {badgeItems.map(renderItemCard)}
             </div>
           )}
         </section>
@@ -335,7 +354,11 @@ export default function InventoryPage() {
                   <div className="flex items-center gap-2">
                     <div className="relative h-8 w-8 overflow-hidden rounded">
                       <Image
-                        src={multiplier.multiplier_id.includes("3x") ? "/images/multiplier-3x.png" : "/images/multiplier-2x.png"}
+                        src={
+                          multiplier.multiplier_id.includes("3x")
+                            ? "/images/multiplier-3x.png"
+                            : "/images/multiplier-2x.png"
+                        }
                         alt={multiplier.multiplier_name || multiplier.multiplier_id}
                         fill
                         className="object-contain"
@@ -345,15 +368,89 @@ export default function InventoryPage() {
                       {multiplier.multiplier_name || multiplier.multiplier_id}
                     </p>
                   </div>
-                  <p className="mt-2 text-xs text-purple-200">
-                    {getMultiplierStatusLabel(multiplier)}
-                  </p>
+                  <p className="mt-2 text-xs text-purple-200">{getMultiplierStatusLabel(multiplier)}</p>
                 </div>
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {sellTarget ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-card p-6">
+            <h3 className="text-lg font-bold text-white">Sell item?</h3>
+            <div className="mt-4 flex flex-col items-center gap-3">
+              {renderItemPreview(sellTarget)}
+              <p className="text-center font-semibold text-white">{sellTarget.item_name}</p>
+              <span
+                className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${INVENTORY_RARITY_STYLES[sellTarget.rarity]}`}
+              >
+                {sellTarget.rarity}
+              </span>
+              <p className="text-sm text-[#FFFF00]">
+                Sell for {getSellValue(sellTarget.rarity)} Skillies
+              </p>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setSellTarget(null)}
+                disabled={selling}
+                className="flex-1 rounded-lg border border-white/20 py-2 text-sm font-medium text-white hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmSell()}
+                disabled={selling}
+                className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-60"
+              >
+                {selling ? "Selling…" : "Sell"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {badgeLimitOpen ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-xl border border-white/10 bg-card p-6">
+            <h3 className="text-lg font-bold text-white">Badge limit reached</h3>
+            <p className="mt-2 text-sm text-body-gray">
+              You can only display 3 badges. Unequip one first.
+            </p>
+            <ul className="mt-4 space-y-2">
+              {equippedBadges.map((badge) => (
+                <li
+                  key={badge.id}
+                  className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2"
+                >
+                  <span className="text-sm text-white">{badge.item_name}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleUnequip(badge);
+                      setBadgeLimitOpen(false);
+                    }}
+                    className="rounded bg-white/10 px-2 py-1 text-xs font-semibold text-white hover:bg-white/20"
+                  >
+                    Unequip
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setBadgeLimitOpen(false)}
+              className="mt-4 w-full rounded-lg border border-white/20 py-2 text-sm font-medium text-white hover:bg-white/10"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <Footer />
     </div>

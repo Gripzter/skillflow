@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/formatCurrency";
+import type { EquippedBadge, EquippedBorder } from "@/lib/inventory-cosmetics";
 
 /**
  * Generates fake leaderboard data for development.
@@ -58,6 +59,9 @@ export interface LeaderboardPlayer {
   topGame?: string;
   isPlaceholder?: boolean;
   isCurrentUser?: boolean;
+  avatarUrl?: string | null;
+  equippedBorder?: EquippedBorder | null;
+  equippedBadges?: EquippedBadge[];
 }
 
 export function generateFakeLeaderboard(

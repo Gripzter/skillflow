@@ -9,6 +9,7 @@ import SkillPointsModal from "@/components/modals/SkillPointsModal";
 import SkilliesModal from "@/components/modals/SkilliesModal";
 import Wordmark from "@/components/Wordmark";
 import { useProfile } from "@/hooks/useProfile";
+import AvatarWithBorder from "@/components/AvatarWithBorder";
 
 const WALLET_UPDATED_EVENT = "skillflow_wallet_updated";
 
@@ -154,17 +155,13 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
                   </svg>
                 </Link>
 
-                <Link
-                  href="/profile"
-                  className="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 sm:h-9 sm:w-9"
-                  aria-label="Profile"
-                >
-                  {profile.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={profile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-bold text-white">{avatarInitial}</span>
-                  )}
+                <Link href="/profile" className="flex-shrink-0" aria-label="Profile">
+                  <AvatarWithBorder
+                    src={profile.avatarUrl}
+                    fallbackInitial={avatarInitial}
+                    size="md"
+                    border={profile.equippedBorder}
+                  />
                 </Link>
               </>
             ) : (

@@ -4,6 +4,13 @@ import { useEffect, useState } from "react";
 import { getCurrentUser, getMyProfile } from "@/lib/api";
 import { getUserSPData, type RankTier } from "@/lib/skillpoints";
 import { markReturningUser } from "@/lib/auth-action";
+import { getEquippedCosmetics } from "@/lib/cases";
+import {
+  COSMETICS_UPDATED_EVENT,
+  dispatchCosmeticsUpdated,
+  type EquippedBadge,
+  type EquippedBorder,
+} from "@/lib/inventory-cosmetics";
 
 export type ProfileState = {
   id: string;
@@ -13,7 +20,11 @@ export type ProfileState = {
   balanceSp: number;
   rankTier: RankTier;
   isDevMode: boolean;
+  equippedBorder: EquippedBorder | null;
+  equippedBadges: EquippedBadge[];
 };
+
+export { dispatchCosmeticsUpdated };
 
 const FALLBACK_PROFILE: ProfileState = {
   id: "",
@@ -23,6 +34,8 @@ const FALLBACK_PROFILE: ProfileState = {
   balanceSp: 0,
   rankTier: "bronze",
   isDevMode: false,
+  equippedBorder: null,
+  equippedBadges: [],
 };
 
 export function useProfile() {
@@ -41,9 +54,10 @@ export function useProfile() {
         }
         markReturningUser();
 
-        const [rawProfile, spData] = await Promise.all([
+        const [rawProfile, spData, cosmetics] = await Promise.all([
           getMyProfile(),
           getUserSPData(user.id),
+          getEquippedCosmetics(user.id),
         ]);
 
         if (cancelled) return;
@@ -59,6 +73,8 @@ export function useProfile() {
           balanceSp: Number(spData?.balanceSp ?? 0),
           rankTier: (spData?.rankTier ?? "bronze") as RankTier,
           isDevMode: Boolean(user.isDevMode),
+          equippedBorder: cosmetics.border,
+          equippedBadges: cosmetics.badges,
         });
       } finally {
         if (!cancelled) setLoading(false);
@@ -66,8 +82,13 @@ export function useProfile() {
     }
 
     void load();
+
+    const onCosmeticsUpdated = () => void load();
+    window.addEventListener(COSMETICS_UPDATED_EVENT, onCosmeticsUpdated);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(COSMETICS_UPDATED_EVENT, onCosmeticsUpdated);
     };
   }, []);
 

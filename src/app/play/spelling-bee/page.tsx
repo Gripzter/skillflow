@@ -21,6 +21,7 @@ import {
 import { getUserSPData } from "@/lib/skillpoints";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
+import { useProfile } from "@/hooks/useProfile";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
@@ -80,6 +81,7 @@ function PlaySpellingBeePageContent() {
   >({ phase: "stake_select" });
 
   const { isPractice } = usePlayMode();
+  const { profile } = useProfile();
   const {
     status: realMatchStatus,
     match: realMatch,
@@ -393,6 +395,8 @@ function PlaySpellingBeePageContent() {
         stake={matchmakingState.stake}
         gameName={GAME_NAME}
         opponentName={matchmakingState.opponentName}
+        myAvatarUrl={profile.avatarUrl}
+        myBorder={profile.equippedBorder}
         onReady={handleMatchmakingReady}
       />
     );

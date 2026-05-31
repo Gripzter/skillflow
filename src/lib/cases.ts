@@ -1,5 +1,11 @@
 import { spendSP } from "@/lib/skillpoints";
 import { createClient } from "@/lib/supabase";
+import {
+  MAX_EQUIPPED_BADGES,
+  toEquippedBorder,
+  type EquippedBadge,
+  type EquippedBorder,
+} from "@/lib/inventory-cosmetics";
 
 export type CaseItemType = "sp" | "border" | "badge" | "multiplier";
 export type CaseItemRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
@@ -483,33 +489,167 @@ export async function getUserInventory(userId: string): Promise<PlayerInventoryR
   }
 }
 
-export async function equipItem(
+export type EquipItemResult =
+  | { success: true }
+  | { success: false; error: string; code?: "badge_limit" };
+
+export async function getEquippedCosmetics(userId: string): Promise<{
+  border: EquippedBorder | null;
+  badges: EquippedBadge[];
+}> {
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
+  if (!supabase) return { border: null, badges: [] };
+
+  const { data, error } = await supabase
+    .from("player_inventory")
+    .select("id, item_type, item_id, item_name, rarity, equipped")
+    .eq("user_id", resolvedUserId)
+    .eq("equipped", true);
+
+  if (error || !data) return { border: null, badges: [] };
+
+  const rows = data as PlayerInventoryRow[];
+  const borderRow = rows.find((r) => r.item_type === "border");
+  const badgeRows = rows.filter((r) => r.item_type === "badge").slice(0, MAX_EQUIPPED_BADGES);
+
+  return {
+    border: borderRow ? toEquippedBorder(borderRow) : null,
+    badges: badgeRows.map((row) => ({
+      id: row.id,
+      name: row.item_name,
+      rarity: row.rarity,
+      itemId: row.item_id,
+    })),
+  };
+}
+
+export async function unequipItem(
   userId: string,
-  itemId: string
+  inventoryRowId: string
 ): Promise<{ success: true } | { success: false; error: string }> {
   const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
   if (!supabase) return { success: false, error: "Supabase is not configured." };
-  const { data: selected, error: selectedError } = await supabase
-    .from("player_inventory")
-    .select("id, item_type")
-    .eq("user_id", resolvedUserId)
-    .eq("item_id", itemId)
-    .single();
-  if (selectedError || !selected) return { success: false, error: "Item not found in inventory." };
 
-  const { error: clearError } = await supabase
+  const { data: row, error: rowError } = await supabase
+    .from("player_inventory")
+    .select("id")
+    .eq("user_id", resolvedUserId)
+    .eq("id", inventoryRowId)
+    .maybeSingle();
+  if (rowError || !row) {
+    return { success: false, error: "Couldn't unequip this item. Please try again." };
+  }
+
+  const { error } = await supabase
     .from("player_inventory")
     .update({ equipped: false })
     .eq("user_id", resolvedUserId)
-    .eq("item_type", selected.item_type);
-  if (clearError) return { success: false, error: "Failed to unequip previous item." };
+    .eq("id", inventoryRowId);
+  if (error) return { success: false, error: "Couldn't unequip this item. Please try again." };
+
+  return { success: true };
+}
+
+export async function equipItem(
+  userId: string,
+  inventoryRowId: string
+): Promise<EquipItemResult> {
+  const { resolvedUserId, supabase } = await resolveCaseUserId(userId);
+  if (!supabase) return { success: false, error: "Supabase is not configured." };
+
+  const { data: selected, error: selectedError } = await supabase
+    .from("player_inventory")
+    .select("id, item_type, equipped")
+    .eq("user_id", resolvedUserId)
+    .eq("id", inventoryRowId)
+    .maybeSingle();
+  if (selectedError || !selected) {
+    return { success: false, error: "Couldn't equip this item. Please try again." };
+  }
+
+  if (selected.equipped) return { success: true };
+
+  if (selected.item_type === "border") {
+    const { error: clearError } = await supabase
+      .from("player_inventory")
+      .update({ equipped: false })
+      .eq("user_id", resolvedUserId)
+      .eq("item_type", "border");
+    if (clearError) {
+      return { success: false, error: "Couldn't equip this item. Please try again." };
+    }
+  } else if (selected.item_type === "badge") {
+    const { count, error: countError } = await supabase
+      .from("player_inventory")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", resolvedUserId)
+      .eq("item_type", "badge")
+      .eq("equipped", true);
+    if (countError) {
+      return { success: false, error: "Couldn't equip this item. Please try again." };
+    }
+    if ((count ?? 0) >= MAX_EQUIPPED_BADGES) {
+      return {
+        success: false,
+        error: "You can only display 3 badges. Unequip one first.",
+        code: "badge_limit",
+      };
+    }
+  }
 
   const { error: equipError } = await supabase
     .from("player_inventory")
     .update({ equipped: true })
     .eq("user_id", resolvedUserId)
-    .eq("item_id", itemId);
-  if (equipError) return { success: false, error: "Failed to equip item." };
+    .eq("id", inventoryRowId);
+  if (equipError) {
+    return { success: false, error: "Couldn't equip this item. Please try again." };
+  }
 
   return { success: true };
+}
+
+export type UserCosmeticsSnapshot = {
+  border: EquippedBorder | null;
+  badges: EquippedBadge[];
+};
+
+export async function getEquippedCosmeticsBatch(
+  userIds: string[]
+): Promise<Record<string, UserCosmeticsSnapshot>> {
+  const unique = [...new Set(userIds.filter(Boolean))];
+  const result: Record<string, UserCosmeticsSnapshot> = {};
+  if (!unique.length) return result;
+
+  const supabase = createClient();
+  if (!supabase) return result;
+
+  const { data, error } = await supabase
+    .from("player_inventory")
+    .select("id, user_id, item_type, item_id, item_name, rarity, equipped")
+    .in("user_id", unique)
+    .eq("equipped", true);
+
+  if (error || !data) return result;
+
+  for (const id of unique) {
+    result[id] = { border: null, badges: [] };
+  }
+
+  for (const row of data as PlayerInventoryRow[]) {
+    const snap = result[row.user_id];
+    if (!snap) continue;
+    if (row.item_type === "border" && !snap.border) {
+      snap.border = toEquippedBorder(row);
+    } else if (row.item_type === "badge" && snap.badges.length < MAX_EQUIPPED_BADGES) {
+      snap.badges.push({
+        id: row.id,
+        name: row.item_name,
+        rarity: row.rarity,
+        itemId: row.item_id,
+      });
+    }
+  }
+
+  return result;
 }

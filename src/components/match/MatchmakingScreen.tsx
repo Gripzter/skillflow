@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import AvatarWithBorder from "@/components/AvatarWithBorder";
+import type { EquippedBorder } from "@/lib/inventory-cosmetics";
 
 type Props = {
   stake: number;
   gameName: string;
   opponentName: string;
+  myAvatarUrl?: string | null;
+  myBorder?: EquippedBorder | null;
+  opponentAvatarUrl?: string | null;
+  opponentBorder?: EquippedBorder | null;
   onReady: () => void;
 };
 
@@ -16,7 +22,16 @@ const PHASES = [
   { ms: 2400, label: "Opponent found" },
 ];
 
-export default function MatchmakingScreen({ stake, gameName, opponentName, onReady }: Props) {
+export default function MatchmakingScreen({
+  stake,
+  gameName,
+  opponentName,
+  myAvatarUrl,
+  myBorder,
+  opponentAvatarUrl,
+  opponentBorder,
+  onReady,
+}: Props) {
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [showOpponent, setShowOpponent] = useState(false);
 
@@ -79,9 +94,13 @@ export default function MatchmakingScreen({ stake, gameName, opponentName, onRea
             transition={{ duration: 0.4 }}
             className="rounded-xl border border-[#FFFF00]/30 bg-[#FFFF00]/[0.04] px-6 py-4 flex items-center gap-4"
           >
-            <div className="w-10 h-10 rounded-full bg-[#16161C] border border-white/10 flex items-center justify-center text-white font-bold">
-              {opponentName.charAt(0).toUpperCase()}
-            </div>
+            <AvatarWithBorder
+              src={opponentAvatarUrl}
+              fallbackInitial={opponentName}
+              size="md"
+              border={opponentBorder}
+              className="!h-10 !w-10"
+            />
             <div>
               <div className="text-white font-semibold">{opponentName}</div>
               <div className="text-xs text-white/50">Matched · skill rating in range</div>

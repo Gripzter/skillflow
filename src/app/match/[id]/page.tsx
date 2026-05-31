@@ -40,6 +40,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
 import { pickOpponentName } from "@/lib/opponentNames";
+import { getEquippedCosmeticsBatch, type UserCosmeticsSnapshot } from "@/lib/cases";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -127,6 +128,8 @@ function MatchPageContent() {
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
+  const [matchAvatars, setMatchAvatars] = useState<Record<string, string | null>>({});
+  const [matchCosmetics, setMatchCosmetics] = useState<Record<string, UserCosmeticsSnapshot>>({});
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -299,6 +302,19 @@ function MatchPageContent() {
           return;
         }
         setMatch(m);
+        const playerIds = [m.player1Id, m.player2Id].filter((id): id is string => Boolean(id));
+        if (supabase && playerIds.length > 0) {
+          const [{ data: profileRows }, cosmetics] = await Promise.all([
+            supabase.from("profiles").select("id, avatar_url").in("id", playerIds),
+            getEquippedCosmeticsBatch(playerIds),
+          ]);
+          const avatars: Record<string, string | null> = {};
+          for (const row of profileRows ?? []) {
+            avatars[row.id] = (row.avatar_url as string | null) ?? null;
+          }
+          setMatchAvatars(avatars);
+          setMatchCosmetics(cosmetics);
+        }
         setMoveLog(Array.isArray(m.moveLog) ? m.moveLog : []);
         const matchStartMs = m.matchStartTime ? new Date(m.matchStartTime).getTime() : NaN;
         const createdAtMs = new Date(m.createdAt).getTime();
@@ -1059,6 +1075,8 @@ function MatchPageContent() {
     mode: (match.isPractice ? "practice" : "real") as "practice" | "real",
     player1: {
       username: displayedPlayer1.username,
+      avatar: match.player1Id ? matchAvatars[match.player1Id] ?? null : null,
+      border: match.player1Id ? matchCosmetics[match.player1Id]?.border ?? null : null,
       rating: displayedPlayer1.rating,
       score: matchUi?.scores.player1 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
@@ -1067,6 +1085,8 @@ function MatchPageContent() {
     },
     player2: {
       username: displayedPlayer2.username,
+      avatar: match.player2Id ? matchAvatars[match.player2Id] ?? null : null,
+      border: match.player2Id ? matchCosmetics[match.player2Id]?.border ?? null : null,
       rating: displayedPlayer2.rating,
       score: matchUi?.scores.player2 ?? 0,
       scoreLabel: matchUi?.scoreLabel,

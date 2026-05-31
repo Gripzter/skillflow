@@ -18,6 +18,8 @@ import {
   type LeaderboardTab,
 } from "@/lib/leaderboard-data";
 import { buildLeaderboard, getTopGameEmoji } from "@/lib/leaderboard-seeding";
+import { getEquippedCosmeticsBatch } from "@/lib/cases";
+import LeaderboardPlayerIdentity from "@/components/LeaderboardPlayerIdentity";
 import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 
@@ -55,23 +57,32 @@ export default function LeaderboardPage() {
       if (!supabase) return [];
       const { data } = await supabase
         .from("profiles")
-        .select("id, username, lifetime_sp, rank_tier")
+        .select("id, username, lifetime_sp, rank_tier, avatar_url")
         .order("lifetime_sp", { ascending: false })
         .limit(100);
 
-      const players: LeaderboardPlayer[] = (data ?? []).map((player) => ({
-        id: player.id,
-        username: player.username ?? "Player",
-        avatarGradient: "from-teal/40 to-purple/40",
-        skillRating: 1000,
-        totalMatches: 0,
-        winRate: 0,
-        totalEarnings: 0,
-        lifetimeSp: Number(player.lifetime_sp ?? 0),
-        rankTier: player.rank_tier ?? "bronze",
-        trend: "up",
-        isCurrentUser: player.id === currentUser.id,
-      }));
+      const rows = data ?? [];
+      const cosmeticsMap = await getEquippedCosmeticsBatch(rows.map((p) => p.id));
+
+      const players: LeaderboardPlayer[] = rows.map((player) => {
+        const cosmetics = cosmeticsMap[player.id];
+        return {
+          id: player.id,
+          username: player.username ?? "Player",
+          avatarGradient: "from-teal/40 to-purple/40",
+          avatarUrl: (player.avatar_url as string | null) ?? null,
+          equippedBorder: cosmetics?.border ?? null,
+          equippedBadges: cosmetics?.badges ?? [],
+          skillRating: 1000,
+          totalMatches: 0,
+          winRate: 0,
+          totalEarnings: 0,
+          lifetimeSp: Number(player.lifetime_sp ?? 0),
+          rankTier: player.rank_tier ?? "bronze",
+          trend: "up",
+          isCurrentUser: player.id === currentUser.id,
+        };
+      });
       return sortAndRankPlayers(players, tab);
     }
 
@@ -82,7 +93,16 @@ export default function LeaderboardPage() {
         ...p,
         isCurrentUser: p.id === currentUser.id,
       })) ?? [];
-    return sortAndRankPlayers(buildLeaderboard(basePlayers), tab);
+    const cosmeticsMap = await getEquippedCosmeticsBatch(basePlayers.map((p) => p.id));
+    const enriched = basePlayers.map((p) => {
+      const cosmetics = cosmeticsMap[p.id];
+      return {
+        ...p,
+        equippedBorder: cosmetics?.border ?? p.equippedBorder ?? null,
+        equippedBadges: cosmetics?.badges ?? p.equippedBadges ?? [],
+      };
+    });
+    return sortAndRankPlayers(buildLeaderboard(enriched), tab);
   }, []);
 
   useEffect(() => {
@@ -419,12 +439,7 @@ export default function LeaderboardPage() {
                         <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
-                            >
-                              {player.username.charAt(0)}
-                            </div>
-                            <span className="font-medium text-white">{player.username}</span>
+                            <LeaderboardPlayerIdentity player={player} />
                             {player.isCurrentUser && (
                               <span className="rounded px-2 py-0.5 text-xs bg-purple-500/20 text-purple-400">You</span>
                             )}
@@ -457,16 +472,10 @@ export default function LeaderboardPage() {
                       <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          {activeTab === "skillpoints" ? (
-                            <RankBadge tier={player.rankTier ?? "bronze"} />
-                          ) : (
-                            <div
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
-                            >
-                              {player.username.charAt(0)}
-                            </div>
-                          )}
-                          <span className="font-medium text-white">{player.username}</span>
+                          <LeaderboardPlayerIdentity
+                            player={player}
+                            showRankBadge={activeTab === "skillpoints"}
+                          />
                           {player.isCurrentUser && (
                             <span className="rounded px-2 py-0.5 text-xs bg-teal/20 text-teal">You</span>
                           )}
@@ -513,29 +522,24 @@ export default function LeaderboardPage() {
                   }`}
                 >
                   <p className="w-8 shrink-0 text-body-gray">#{rank}</p>
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    {activeTab === "skillpoints" ? (
-                      <RankBadge tier={player.rankTier ?? "bronze"} />
-                    ) : (
-                      <div
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${player.avatarGradient} text-sm font-bold text-white`}
-                      >
-                        {player.username.charAt(0)}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="font-medium text-white truncate">{player.username}</p>
-                      <p className="text-xs text-body-gray">
-                        {isPractice
-                          ? player.totalMatches > 0
-                            ? `${player.winRate.toFixed(1)}% win`
-                            : "0.0% win"
-                          : getSecondaryStat(player, activeTab)}
-                      </p>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <LeaderboardPlayerIdentity
+                        player={player}
+                        showRankBadge={activeTab === "skillpoints"}
+                        avatarSize="md"
+                      />
+                      {player.isCurrentUser && (
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
+                      )}
                     </div>
-                    {player.isCurrentUser && (
-                      <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
-                    )}
+                    <p className="text-xs text-body-gray pl-1">
+                      {isPractice
+                        ? player.totalMatches > 0
+                          ? `${player.winRate.toFixed(1)}% win`
+                          : "0.0% win"
+                        : getSecondaryStat(player, activeTab)}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-semibold text-white">

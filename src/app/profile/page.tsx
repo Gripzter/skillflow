@@ -10,7 +10,11 @@ import RankBadge from "@/components/RankBadge";
 import RankProgressBar from "@/components/RankProgressBar";
 import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { getCurrentUser, getMatches, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
+import { getCurrentUser, getMatches, getMyProfile, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
+import { getEquippedCosmetics } from "@/lib/cases";
+import AvatarWithBorder from "@/components/AvatarWithBorder";
+import EquippedBadgesRow from "@/components/EquippedBadgesRow";
+import type { EquippedBadge, EquippedBorder } from "@/lib/inventory-cosmetics";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
@@ -148,6 +152,9 @@ export default function ProfilePage() {
     balanceSp: 1000,
     rankTier: "bronze",
   });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [equippedBorder, setEquippedBorder] = useState<EquippedBorder | null>(null);
+  const [equippedBadges, setEquippedBadges] = useState<EquippedBadge[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -162,10 +169,12 @@ export default function ProfilePage() {
         if ("created_at" in user && user.created_at) {
           setMemberSince(new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
-        const [matchList, txs, userSpData] = await Promise.all([
+        const [matchList, txs, userSpData, rawProfile, cosmetics] = await Promise.all([
           getMatches(),
           getTransactions(),
           getUserSPData(user.id),
+          getMyProfile(),
+          getEquippedCosmetics(user.id),
         ]);
         setMatches(matchList);
         setTransactions(txs);
@@ -173,6 +182,11 @@ export default function ProfilePage() {
         if (userSpData) {
           setSpData(userSpData);
         }
+        if (rawProfile && "avatar_url" in rawProfile) {
+          setAvatarUrl((rawProfile.avatar_url as string | null) ?? null);
+        }
+        setEquippedBorder(cosmetics.border);
+        setEquippedBadges(cosmetics.badges);
       } catch {
         router.push("/login");
       } finally {
@@ -294,15 +308,12 @@ export default function ProfilePage() {
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-              <div
-                className={`h-20 w-20 shrink-0 rounded-full bg-gradient-to-br p-0.5 ring-2 ring-white/10 ${
-                  isPractice ? "from-purple-500/50 to-fuchsia-500/40" : "from-teal/60 to-[rgba(255,122,46,0.8)]"
-                }`}
-              >
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-charcoal">
-                  <span className="text-3xl font-bold text-white">{username.charAt(0).toUpperCase()}</span>
-                </div>
-              </div>
+              <AvatarWithBorder
+                src={avatarUrl}
+                fallbackInitial={username}
+                size="lg"
+                border={equippedBorder}
+              />
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-white sm:text-3xl">{username}</h1>
@@ -314,6 +325,7 @@ export default function ProfilePage() {
                     Level 1
                   </span>
                 </div>
+                <EquippedBadgesRow badges={equippedBadges} size="md" className="mt-2" />
                 <p className="mt-1 text-sm text-body-gray">Joined {memberSince}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold text-white">
                   {stats.rating} Rating

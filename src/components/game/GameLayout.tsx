@@ -8,6 +8,8 @@ import {
   useState,
 } from "react";
 import AfkCountdownRing from "@/components/game/AfkCountdownRing";
+import AvatarWithBorder from "@/components/AvatarWithBorder";
+import type { EquippedBorder } from "@/lib/inventory-cosmetics";
 
 export interface GameLayoutLogEntry {
   id: string;
@@ -25,6 +27,7 @@ export interface GameLayoutProps {
   player1: {
     username: string;
     avatar?: string | null;
+    border?: EquippedBorder | null;
     rating: number;
     score: number;
     scoreLabel?: string;
@@ -34,6 +37,7 @@ export interface GameLayoutProps {
   player2: {
     username: string;
     avatar?: string | null;
+    border?: EquippedBorder | null;
     rating: number;
     score: number;
     scoreLabel?: string;
@@ -130,20 +134,14 @@ function PlayerCard({
               totalMs={60_000}
             />
           ) : null}
-          {player.avatar ? (
-            <img
-              src={player.avatar}
-              alt=""
-              className="h-[26px] w-[26px] rounded-full object-cover md:h-[34px] md:w-[34px]"
-            />
-          ) : (
-            <div
-              className="flex h-[26px] w-[26px] items-center justify-center rounded-full text-xs font-semibold text-white md:h-[34px] md:w-[34px] md:text-sm"
-              style={{ background: avatarBg }}
-            >
-              {initial}
-            </div>
-          )}
+          <AvatarWithBorder
+            src={player.avatar}
+            fallbackInitial={initial}
+            size="sm"
+            border={player.border}
+            fallbackBg={avatarBg}
+            className="!h-[26px] !w-[26px] md:!h-[34px] md:!w-[34px]"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-medium text-white md:text-[13px]">
