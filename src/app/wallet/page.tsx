@@ -125,9 +125,6 @@ export default function WalletPage() {
     setLoggingOut(true);
     try {
       await apiLogout();
-      showToast("Logged out successfully", "success");
-      router.push("/login");
-      router.refresh();
     } catch {
       showToast("Something went wrong", "error");
       setLoggingOut(false);

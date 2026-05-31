@@ -205,8 +205,6 @@ export default function CS2LobbyPage() {
           try {
             const { logout } = await import("@/lib/api");
             await logout();
-            router.push("/login");
-            router.refresh();
           } catch {
             setLoggingOut(false);
           }

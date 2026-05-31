@@ -9,6 +9,7 @@ import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
 import CookieSettingsController from "@/components/CookieSettingsController";
+import AuthSessionGuard from "@/components/AuthSessionGuard";
 import "./globals.css";
 
 const inter = Inter({
@@ -96,7 +97,7 @@ if (typeof window !== 'undefined') {
             <PlayModeProvider>
               <ErrorBoundary>
                 <PracticeModeClassToggle />
-                {children}
+                <AuthSessionGuard>{children}</AuthSessionGuard>
                 <MobileTabBar />
                 <CookieConsentBanner />
                 <CookieSettingsController />

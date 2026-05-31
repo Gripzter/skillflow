@@ -9,6 +9,8 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import { logout as apiLogout } from "@/lib/api";
+import { clearClientSessionState } from "@/lib/client-session";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -267,13 +269,7 @@ export default function SettingsPage() {
   }
 
   async function handleLogout() {
-    const supabase = createClient();
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-    if (typeof window !== "undefined") {
-      window.location.href = "/";
-    }
+    await apiLogout();
   }
 
   async function handleConfirmDelete() {
@@ -287,6 +283,7 @@ export default function SettingsPage() {
       await supabase.from("profiles").delete().eq("id", userId);
       await supabase.auth.signOut();
       if (typeof window !== "undefined") {
+        clearClientSessionState();
         window.location.href = "/";
       }
     } catch (err: any) {

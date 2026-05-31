@@ -198,8 +198,6 @@ export default function LeaderboardPage() {
     setLoggingOut(true);
     try {
       await apiLogout();
-      router.push("/login");
-      router.refresh();
     } catch {
       setLoggingOut(false);
     }

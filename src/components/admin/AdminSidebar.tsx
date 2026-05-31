@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { adminLogout } from "@/lib/admin-auth";
 
 const NAV_ITEMS = [
@@ -72,11 +72,10 @@ const NAV_ITEMS = [
 
 export default function AdminSidebar() {
   const pathname = usePathname();
-  const router = useRouter();
 
   async function handleLogout() {
     await adminLogout();
-    router.replace("/login");
+    window.location.href = "/admin/login";
   }
 
   return (

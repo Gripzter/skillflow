@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { createClient } from "@/lib/supabase";
 import { getUserFriendlyError } from "@/lib/errorHandler";
 import { applyPendingLimitChanges, type ResponsibleGamingRow } from "@/lib/responsible-gaming";
+import { signOutAndRedirect } from "@/lib/client-session";
 
 const DAILY_OPTS = [null, 10, 25, 50, 100, 250] as const;
 const WEEKLY_OPTS = [null, 50, 100, 250, 500] as const;
@@ -214,9 +215,7 @@ export default function SettingsResponsibleGamingPage() {
       return;
     }
     showToast("You have been self-excluded. Logging out.", "success");
-    await supabase.auth.signOut();
-    router.push("/login?self_excluded=1");
-    router.refresh();
+    await signOutAndRedirect("/login?self_excluded=1");
     setSelfExcludeModal(null);
   }
 

@@ -1,27 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { checkAdminAccess } from "@/lib/admin-auth";
 import AdminSidebar from "@/components/admin/AdminSidebar";
-import LoadingRing from "@/components/LoadingRing";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     checkAdminAccess().then((ok) => {
+      if (cancelled) return;
       if (!ok) {
-        router.replace("/login");
+        window.location.href = "/admin/login";
         return;
       }
       setChecked(true);
     });
-  }, [router]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (!checked) {
-    return <LoadingRing />;
+    return null;
   }
 
   return (

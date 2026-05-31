@@ -34,6 +34,7 @@ import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
 import { incrementMatchCount } from "@/lib/cases";
 import { updateChallengeProgress } from "@/lib/daily-challenges";
 import { finishMatch } from "@/lib/matchActions";
+import { signOutAndRedirect } from "@/lib/client-session";
 
 const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "8-ball-pool": "8 Ball Pool",
@@ -978,13 +979,7 @@ export async function getCurrentUser(): Promise<{
 }
 
 export async function logout(): Promise<void> {
-  if (isDevMode()) {
-    localStorage.removeItem("skillflow_dev_mode");
-    localStorage.removeItem("skillflow_dev_user");
-    return;
-  }
-  const supabase = createClient();
-  if (supabase) await supabase.auth.signOut();
+  await signOutAndRedirect("/login");
 }
 
 // Re-export for pages that still need them

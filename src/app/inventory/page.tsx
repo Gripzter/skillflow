@@ -141,8 +141,6 @@ export default function InventoryPage() {
     setLoggingOut(true);
     try {
       await apiLogout();
-      router.push("/login");
-      router.refresh();
     } catch {
       setLoggingOut(false);
     }

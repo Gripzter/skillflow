@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase";
+import { clearClientSessionState } from "@/lib/client-session";
 
 export const ADMIN_EMAIL = "aras.axmas@gmail.com";
 
@@ -23,5 +24,11 @@ export async function getAdminSession(): Promise<{ user: { id: string; email: st
 
 export async function adminLogout(): Promise<void> {
   const supabase = createClient();
-  if (supabase) await supabase.auth.signOut();
+  try {
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+  } finally {
+    clearClientSessionState();
+  }
 }

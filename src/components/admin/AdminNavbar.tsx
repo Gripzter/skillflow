@@ -30,8 +30,8 @@ export default function AdminNavbar() {
     }
   }, [pathname]);
 
-  function handleLogout() {
-    adminLogout();
+  async function handleLogout() {
+    await adminLogout();
     window.location.href = "/admin/login";
   }
 
