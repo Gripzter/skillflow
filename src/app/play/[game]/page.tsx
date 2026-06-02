@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams, usePathname } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
@@ -54,6 +54,7 @@ const GAME_SLUG_TO_NAME: Record<string, string> = {
   trivia: "Trivia",
   "typing-race": "Typing Race",
   "last-touch": "Last Touch",
+  blockade: "Blockade",
 };
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,9 @@ export default function PlayGamePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const params = useParams();
-  const gameSlug = (params?.game as string) || "";
+  const pathname = usePathname();
+  const gameSlug =
+    (params?.game as string) || pathname?.split("/").filter(Boolean).pop() || "";
   const gameName = GAME_SLUG_TO_NAME[gameSlug] || gameSlug.replace(/-/g, " ");
 
   useEffect(() => {

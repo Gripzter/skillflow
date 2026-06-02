@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="240" viewBox="0 0 400 240">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0E0E12"/>
+      <stop offset="100%" style="stop-color:#1A3A4A"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="240" fill="url(#bg)" rx="12"/>
+  <g stroke="#2dd4bf" stroke-width="2" opacity="0.6">
+    <line x1="80" y1="60" x2="320" y2="60"/><line x1="80" y1="120" x2="320" y2="120"/><line x1="80" y1="180" x2="320" y2="180"/>
+    <line x1="120" y1="40" x2="120" y2="200"/><line x1="200" y1="40" x2="200" y2="200"/><line x1="280" y1="40" x2="280" y2="200"/>
+  </g>
+  <rect x="115" y="95" width="170" height="8" fill="#FFFF00" rx="2"/>
+  <rect x="195" y="75" width="8" height="90" fill="#FF6B6B" rx="2"/>
+  <circle cx="200" cy="170" r="18" fill="#FFFF00"/>
+  <circle cx="200" cy="70" r="18" fill="#FF6B6B"/>
+  <text x="200" y="220" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="28" font-weight="bold">Blockade</text>
+  <text x="200" y="28" text-anchor="middle" fill="#2dd4bf" font-family="system-ui,sans-serif" font-size="14">STRATEGY</text>
+</svg>

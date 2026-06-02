@@ -43,6 +43,7 @@ const GAME_TYPE_TO_DISPLAY_NAME: Record<string, string> = {
   "reaction-duel": "Reaction Duel",
   "memory-match": "Memory Match",
   checkers: "Checkers",
+  blockade: "Blockade",
   "spelling-bee": "Spelling Bee",
 };
 

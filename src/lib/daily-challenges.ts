@@ -51,6 +51,7 @@ const ACTIVE_GAMES = [
   { slug: "chess", name: "Chess" },
   { slug: "connect-4", name: "Connect 4" },
   { slug: "checkers", name: "Checkers" },
+  { slug: "blockade", name: "Blockade" },
   { slug: "reaction-duel", name: "Reaction Duel" },
   { slug: "memory-match", name: "Memory Match" },
   { slug: "typing-race", name: "Typing Race" },

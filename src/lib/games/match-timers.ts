@@ -6,6 +6,7 @@ const MATCH_TIME_LIMIT_MS_BY_GAME: Record<string, number> = {
   "reaction-duel": 10 * 60 * 1000,
   "memory-match": 20 * 60 * 1000,
   checkers: 20 * 60 * 1000,
+  blockade: 20 * 60 * 1000,
   "spelling-bee": 15 * 60 * 1000,
   trivia: 15 * 60 * 1000,
   "typing-race": 10 * 60 * 1000,

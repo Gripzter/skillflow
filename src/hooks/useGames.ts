@@ -14,6 +14,7 @@ const GAMES: PlayGameCard[] = [
   { name: "Chess", slug: "chess", image: "/images/chess-card.png", category: "strategy", waitSeconds: 12 },
   { name: "Connect 4", slug: "connect-4", image: "/images/connect4-card.png", category: "strategy", waitSeconds: 14 },
   { name: "Checkers", slug: "checkers", image: "/images/checkers-card.png", category: "strategy", waitSeconds: 16 },
+  { name: "Blockade", slug: "blockade", image: "/images/blockade-card.svg", category: "strategy", waitSeconds: 14 },
   { name: "Reaction Duel", slug: "reaction-duel", image: "/images/reaction-duel-card.png", category: "reflex", waitSeconds: 9 },
   { name: "Memory Match", slug: "memory-match", image: "/images/memory-match-card.png", category: "reflex", waitSeconds: 11 },
   { name: "Typing Race", slug: "typing-race", image: "/images/typing-race-card.png", category: "reflex", waitSeconds: 13 },

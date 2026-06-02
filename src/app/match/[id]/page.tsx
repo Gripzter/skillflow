@@ -28,6 +28,7 @@ import ReactionDuel from "@/components/games/ReactionDuel";
 import MemoryMatch from "@/components/games/MemoryMatch";
 import SpellingBee from "@/components/games/SpellingBee";
 import Checkers from "@/components/games/Checkers";
+import Blockade from "@/components/games/Blockade";
 import Trivia from "@/components/games/Trivia";
 import TypingRace from "@/components/games/TypingRace";
 import { type ChatMessage } from "@/components/GameChat";
@@ -70,6 +71,9 @@ function toMoveAction(gameType: string, event: Record<string, unknown>): Record<
   if (gameType === "checkers" && type === "checkers_move") {
     const lm = event.lastMove as { from?: unknown; to?: unknown } | undefined;
     return { type, from: lm?.from ?? null, to: lm?.to ?? null };
+  }
+  if (gameType === "blockade" && type === "blockade_state") {
+    return { type, turn: event.state?.currentTurn ?? null };
   }
   if (gameType === "trivia" && type === "trivia_answer") {
     return {
@@ -1040,6 +1044,7 @@ function MatchPageContent() {
     "reaction-duel",
     "memory-match",
     "checkers",
+    "blockade",
     "spelling-bee",
     "trivia",
     "typing-race",
@@ -1056,6 +1061,7 @@ function MatchPageContent() {
     "reaction-duel": "Reaction Duel",
     "memory-match": "Memory Match",
     checkers: "Checkers",
+    blockade: "Blockade",
     "spelling-bee": "Spelling Bee",
     trivia: "Trivia",
     "typing-race": "Typing Race",
@@ -1349,6 +1355,28 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isPractice={match.isPractice}
                 seed={matchId}
+                isMultiplayer={isRealMultiplayer}
+                myRole={myRole}
+                sendGameEvent={sendGameEventWithAfkReset}
+                onPlayerAction={handlePlayerAction}
+                incomingEvent={incomingEvent}
+                onEventProcessed={() => setIncomingEvent(null)}
+                onMatchUi={setMatchUi}
+              />
+            </GameLayout>
+          ) : null}
+        </main>
+      ) : !waitingForOpponent && match.gameType === "blockade" ? (
+        <main className="mx-auto flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden px-0 py-0">
+          {match.status === "in_progress" && !outcome ? (
+            <GameLayout {...gameLayoutProps}>
+              <Blockade
+                player1={{ username: displayedPlayer1.username, rating: displayedPlayer1.rating }}
+                player2={{ username: displayedPlayer2.username, rating: displayedPlayer2.rating }}
+                onGameEnd={handleGameEnd}
+                onGameDraw={handleDraw}
+                isPlayer2Bot={!isRealMultiplayer}
+                botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
                 sendGameEvent={sendGameEventWithAfkReset}
