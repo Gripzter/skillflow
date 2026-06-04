@@ -1,6 +1,7 @@
 import {
   BOARD_SIZE,
-  canReachGoalRow,
+  bfsHasPath,
+  buildBlockedEdgeSet,
   getAllMoveTargets,
   getBlockedEdges,
   isEdgeBlocked,
@@ -177,6 +178,51 @@ export function isValidMove(
   );
 }
 
+/**
+ * Core path contract: both players must reach their goal row with all walls applied.
+ * Uses the same edge set as movement (getBlockedEdges / isEdgeBlocked).
+ */
+export function canPlaceWallPathCheck(
+  newWall: BlockadeWall,
+  existingWalls: BlockadeWall[],
+  player1Pos: Pos,
+  player2Pos: Pos,
+  player1GoalRow: number = P1_GOAL_ROW,
+  player2GoalRow: number = P2_GOAL_ROW
+): { allowed: boolean; player1HasPath: boolean; player2HasPath: boolean } {
+  const allWalls = [...existingWalls, newWall];
+  const player1HasPath = bfsHasPath(player1Pos, player1GoalRow, allWalls);
+  const player2HasPath = bfsHasPath(player2Pos, player2GoalRow, allWalls);
+  return {
+    allowed: player1HasPath && player2HasPath,
+    player1HasPath,
+    player2HasPath,
+  };
+}
+
+function logWallPlacementCheck(
+  wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">,
+  p1: Pos,
+  p2: Pos,
+  player1HasPath: boolean,
+  player2HasPath: boolean,
+  allowed: boolean,
+  phase: "check" | "placed" | "rejected"
+) {
+  console.log("Wall placement check:", {
+    phase,
+    wallType: wall.type,
+    wallPosition: { row: wall.row, col: wall.col },
+    wallOrientation: wall.orientation,
+    rotation: wall.rotation,
+    player1Position: p1,
+    player2Position: p2,
+    player1HasPath,
+    player2HasPath,
+    allowed: player1HasPath && player2HasPath,
+  });
+}
+
 /** Temporarily adds a wall and verifies both players can still reach their goal row. */
 export function canPlaceWall(
   state: BlockadeGameState,
@@ -247,18 +293,28 @@ export function validateWallPlacement(
 
   for (const existing of state.walls) {
     if (wallsOverlap(candidate, existing)) {
+      logWallPlacementCheck(wall, state.players.player1.position, state.players.player2.position, false, false, false, "rejected");
       return { valid: false, error: "Wall overlaps existing wall" };
     }
   }
 
-  const trialWalls = [...activeWalls(state), candidate];
+  const existingActive = activeWalls(state);
+
   const p1 = state.players.player1.position;
   const p2 = state.players.player2.position;
+  const pathCheck = canPlaceWallPathCheck(candidate, existingActive, p1, p2);
 
-  if (!canReachGoalRow(p1, P1_GOAL_ROW, trialWalls, p2)) {
-    return { valid: false, error: "Invalid — would block a path" };
-  }
-  if (!canReachGoalRow(p2, P2_GOAL_ROW, trialWalls, p1)) {
+  logWallPlacementCheck(
+    wall,
+    p1,
+    p2,
+    pathCheck.player1HasPath,
+    pathCheck.player2HasPath,
+    pathCheck.allowed,
+    "check"
+  );
+
+  if (!pathCheck.allowed) {
     return { valid: false, error: "Invalid — would block a path" };
   }
 
@@ -312,7 +368,40 @@ export function applyWall(
   if (state.doubleMoveRemaining > 0) return null;
 
   const check = validateWallPlacement(state, role, wallInput);
-  if (!check.valid) return null;
+  if (!check.valid) {
+    console.log("Wall placement rejected by applyWall:", {
+      error: check.error,
+      wallType: wallInput.type,
+      wallPosition: { row: wallInput.row, col: wallInput.col },
+      wallOrientation: wallInput.orientation,
+    });
+    return null;
+  }
+
+  const preActive = activeWalls(state);
+  const preCandidate: BlockadeWall = {
+    ...wallInput,
+    id: "pre-apply-guard",
+    owner: role,
+    placedTurn: state.turnNumber,
+    isBomb: asBomb,
+    expiresAtTurn: asBomb ? state.turnNumber + 3 : undefined,
+  };
+  const guard = canPlaceWallPathCheck(
+    preCandidate,
+    preActive,
+    state.players.player1.position,
+    state.players.player2.position
+  );
+  if (!guard.allowed) {
+    console.error("Wall placement guard failed after validateWallPlacement:", {
+      wallType: wallInput.type,
+      wallPosition: { row: wallInput.row, col: wallInput.col },
+      player1HasPath: guard.player1HasPath,
+      player2HasPath: guard.player2HasPath,
+    });
+    return null;
+  }
 
   const next = cloneState(state);
   const wall: BlockadeWall = {
@@ -324,6 +413,22 @@ export function applyWall(
     expiresAtTurn: asBomb ? next.turnNumber + 3 : undefined,
   };
   next.walls.push(wall);
+
+  const allAfter = activeWalls(next);
+  const postP1 = bfsHasPath(next.players.player1.position, P1_GOAL_ROW, allAfter);
+  const postP2 = bfsHasPath(next.players.player2.position, P2_GOAL_ROW, allAfter);
+  console.log("Wall placement placed:", {
+    wallType: wall.type,
+    wallPosition: { row: wall.row, col: wall.col },
+    wallOrientation: wall.orientation,
+    rotation: wall.rotation,
+    player1Position: next.players.player1.position,
+    player2Position: next.players.player2.position,
+    player1HasPath: postP1,
+    player2HasPath: postP2,
+    allowed: postP1 && postP2,
+    blockedEdges: buildBlockedEdgeSet(allAfter).size,
+  });
 
   if (wall.type === "standard") next.players[role].walls.standard -= 1;
   if (wall.type === "lshape") next.players[role].walls.lshape -= 1;

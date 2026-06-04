@@ -10,6 +10,7 @@ import {
   goalRowFor,
   opponent,
   startAbility,
+  canPlaceWallPathCheck,
   validateWallPlacement,
   type BlockadeAbilityId,
   type BlockadeGameState,
@@ -227,7 +228,14 @@ function chooseBestWall(
   let bestScore = 0;
 
   for (const candidate of candidates) {
-    if (!validateWallPlacement(state, role, candidate).valid) continue;
+    const tmp: BlockadeWall = { ...candidate, id: "bot-tmp", owner: role, placedTurn: state.turnNumber };
+    const pathOk = canPlaceWallPathCheck(
+      tmp,
+      walls,
+      state.players.player1.position,
+      state.players.player2.position
+    );
+    if (!pathOk.allowed || !validateWallPlacement(state, role, candidate).valid) continue;
     const trial = [...walls, { ...candidate, id: "t", owner: role, placedTurn: 0 }];
     const newPlayerPath = shortestPathToGoal(opp, oppGoal, trial, me);
     const newBotPath = shortestPathToGoal(me, myGoal, trial, opp);

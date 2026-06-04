@@ -194,13 +194,11 @@ export function getAllMoveTargets(
   });
 }
 
-/** Cardinal BFS for wall-placement validation (no jumps). */
-export function canReachGoalRow(
-  start: Pos,
-  goalRow: number,
-  walls: BlockadeWall[],
-  opponentPos: Pos | null
-): boolean {
+/**
+ * Cardinal BFS for wall-placement legality (Quoridor rules).
+ * Other pawns are NOT obstacles — only walls block edges.
+ */
+export function bfsHasPath(start: Pos, goalRow: number, walls: BlockadeWall[]): boolean {
   const edgeSet = buildBlockedEdgeSet(walls);
   const visited = new Set<string>();
   const queue: Pos[] = [start];
@@ -213,7 +211,6 @@ export function canReachGoalRow(
     for (const d of CARDINAL) {
       const next = { x: cur.x + d.x, y: cur.y + d.y };
       if (!inBounds(next)) continue;
-      if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
       if (isEdgeBlockedInSet(cur, next, edgeSet)) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
@@ -222,6 +219,16 @@ export function canReachGoalRow(
     }
   }
   return false;
+}
+
+/** @deprecated Use bfsHasPath for wall validation; opponent is ignored for legality checks. */
+export function canReachGoalRow(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  _opponentPos: Pos | null
+): boolean {
+  return bfsHasPath(start, goalRow, walls);
 }
 
 /** Shortest path from start to any cell on goalRow (includes jumps). Returns full path or null. */
