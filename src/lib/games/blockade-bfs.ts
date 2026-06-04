@@ -224,6 +224,43 @@ export function canReachGoalRow(
   return false;
 }
 
+/** Shortest path from start to any cell on goalRow (includes jumps). Returns full path or null. */
+export function bfsShortestPath(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  opponentPos: Pos | null
+): Pos[] | null {
+  const visited = new Set<string>();
+  const parent = new Map<string, Pos>();
+  const queue: Pos[] = [start];
+  visited.add(posKey(start));
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur.y === goalRow) {
+      const path: Pos[] = [cur];
+      let key = posKey(cur);
+      while (parent.has(key)) {
+        const prev = parent.get(key)!;
+        path.unshift(prev);
+        key = posKey(prev);
+      }
+      return path;
+    }
+
+    for (const next of getAllMoveTargets(cur, walls, opponentPos)) {
+      if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
+      const key = posKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      parent.set(key, cur);
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
 /** Shortest path length to goal row (for bot; includes jumps). */
 export function shortestPathToGoal(
   start: Pos,

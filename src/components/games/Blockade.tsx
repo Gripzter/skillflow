@@ -41,6 +41,12 @@ import {
 
 const TURN_SEC = 15;
 
+type LogEntry = { id: string; text: string; timestamp: number };
+
+function formatLogLine(line: string, p1Name: string, p2Name: string): string {
+  return line.replace(/Player1/g, p1Name).replace(/Player2/g, p2Name);
+}
+
 export interface BlockadeProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
   player2: { username: string; rating: number };
@@ -74,7 +80,8 @@ export default function Blockade({
   const [hoveredEdge, setHoveredEdge] = useState<EdgeSlot | null>(null);
   const [turnSecLeft, setTurnSecLeft] = useState(TURN_SEC);
   const [abilityToast, setAbilityToast] = useState<string | null>(null);
-  const [feedOpen, setFeedOpen] = useState(false);
+  const [gameLog, setGameLog] = useState<LogEntry[]>([]);
+  const gameStartRef = useRef(Date.now());
   const gameOverRef = useRef(false);
   const lastEventRef = useRef<Record<string, unknown> | null>(null);
   const botScheduledRef = useRef(false);
@@ -86,9 +93,24 @@ export default function Blockade({
   const oppRole = opponent(myRole);
   const oppPlayer = state.players[oppRole];
 
+  const appendLog = useCallback(
+    (text: string) => {
+      const entry: LogEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        text,
+        timestamp: Date.now(),
+      };
+      setGameLog((prev) => [entry, ...prev].slice(0, 40));
+    },
+    []
+  );
+
   const syncState = useCallback(
     (next: BlockadeGameState, logLine?: string) => {
       setState(next);
+      if (logLine) {
+        appendLog(formatLogLine(logLine, player1.username, player2.username));
+      }
       if (isMultiplayer && sendGameEvent) {
         sendGameEvent({
           type: "blockade_state",
@@ -98,7 +120,7 @@ export default function Blockade({
         }).catch(() => {});
       }
     },
-    [isMultiplayer, sendGameEvent, myRole]
+    [isMultiplayer, sendGameEvent, myRole, appendLog, player1.username, player2.username]
   );
 
   const handleAbilityConfirm = useCallback(
@@ -109,8 +131,11 @@ export default function Blockade({
         next = setAbilities(next, "player2", pickBotAbilities(botDifficulty));
       }
       syncState(next, `${player1.username} is ready`);
+      if (next.phase === "in_progress") {
+        appendLog(`🧱 ${player1.username} vs ${player2.username} — Blockade begins!`);
+      }
     },
-    [myRole, isPlayer2Bot, botDifficulty, syncState, onPlayerAction, player1.username]
+    [myRole, isPlayer2Bot, botDifficulty, syncState, onPlayerAction, player1.username, player2.username, appendLog]
   );
 
   useEffect(() => {
@@ -154,6 +179,7 @@ export default function Blockade({
     setState(parsed);
     const logLine = incomingEvent.logLine as string | undefined;
     if (logLine) {
+      appendLog(formatLogLine(logLine, player1.username, player2.username));
       const m = logLine.match(/used (.+)!/i);
       if (m) setAbilityToast(`${player2.username} used ${m[1]}!`);
     }
@@ -162,7 +188,7 @@ export default function Blockade({
       onGameEnd(parsed.winner);
     }
     onEventProcessed();
-  }, [incomingEvent, onEventProcessed, myRole, onGameEnd, player2.username]);
+  }, [incomingEvent, onEventProcessed, myRole, onGameEnd, player2.username, appendLog, player1.username]);
 
   useEffect(() => {
     if (!isPlayer2Bot || isMultiplayer || state.phase !== "in_progress") return;
@@ -176,17 +202,18 @@ export default function Blockade({
         setState(skipTurn(stateRef.current, "player2"));
         return;
       }
-      const next = applyBotAction(stateRef.current, "player2", action);
-      if (next) {
-        setState(next);
-        if (next.winner) {
+      const result = applyBotAction(stateRef.current, "player2", action);
+      if (result) {
+        appendLog(formatLogLine(result.log, player1.username, player2.username));
+        setState(result.state);
+        if (result.state.winner) {
           gameOverRef.current = true;
-          onGameEnd(next.winner);
+          onGameEnd(result.state.winner);
         }
       }
     }, delay);
     return () => clearTimeout(timer);
-  }, [state, isPlayer2Bot, isMultiplayer, botDifficulty, onGameEnd]);
+  }, [state, isPlayer2Bot, isMultiplayer, botDifficulty, onGameEnd, appendLog, player1.username, player2.username]);
 
   const activeEdge = hoveredEdge;
 
@@ -302,14 +329,35 @@ export default function Blockade({
   useEffect(() => {
     if (!onMatchUi) return;
     const activeName = state.currentTurn === "player1" ? player1.username : player2.username;
+    const turnColor = state.currentTurn === "player1" ? "yellow" : "red";
+    const systemLogEntries: MatchUiState["systemLogEntries"] = [
+      {
+        id: "game-start",
+        text: `🧱 Blockade — ${player1.username} vs ${player2.username}${isPlayer2Bot ? " 🤖" : ""}`,
+        timestamp: gameStartRef.current,
+      },
+      ...gameLog,
+    ];
     onMatchUi({
       scores: { player1: 0, player2: 0 },
       currentTurn: state.currentTurn,
-      turnText: state.phase === "ability_selection" ? "Select abilities" : `${activeName}'s turn · ${turnSecLeft}s`,
+      turnText:
+        state.phase === "ability_selection"
+          ? "Select abilities"
+          : `${activeName}'s turn · ${turnSecLeft}s`,
+      turnTimerDisplay: turnColor,
       scoreLabel: "",
-      systemLogEntries: [],
+      systemLogEntries,
     });
-  }, [onMatchUi, state, player1.username, player2.username, turnSecLeft]);
+  }, [
+    onMatchUi,
+    state,
+    player1.username,
+    player2.username,
+    turnSecLeft,
+    gameLog,
+    isPlayer2Bot,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -473,6 +521,7 @@ export default function Blockade({
         wallPreviewValid={wallPreviewValid}
         wallMode={mode === "wall" && isMyTurn}
         wallType={wallType}
+        canHoverCells={isMyTurn && mode === "move"}
         onCellClick={handleCellClick}
         onEdgeHover={(slot) => {
           if (mode !== "wall" || !isMyTurn) return;
@@ -482,13 +531,19 @@ export default function Blockade({
         onEdgePlace={placeWallFromSlot}
       />
 
-      <button
-        type="button"
-        className="mx-auto text-xs text-body-gray md:hidden"
-        onClick={() => setFeedOpen((o) => !o)}
+      <p
+        className={`text-center text-sm font-bold md:text-base ${
+          p1Active ? "text-[#FFFF00]" : "text-[#FF6B6B]"
+        }`}
+        style={{
+          textShadow: p1Active
+            ? "0 0 12px rgba(255,255,0,0.45)"
+            : "0 0 12px rgba(255,107,107,0.45)",
+        }}
       >
-        {feedOpen ? "Hide" : "Show"} live feed
-      </button>
+        {state.currentTurn === "player1" ? player1.username : player2.username}&apos;s turn
+        <span className="ml-2 font-mono text-xs font-normal text-body-gray">{turnSecLeft}s</span>
+      </p>
     </div>
   );
 }
@@ -506,10 +561,14 @@ function PlayerPanel({
   walls: { standard: number; lshape: number; triple: number };
   isMe: boolean;
 }) {
-  const ring = color === "yellow" ? "ring-[#FFFF00]/60" : "ring-[#FF6B6B]/60";
+  const glow =
+    color === "yellow"
+      ? "0 0 0 2px rgba(255,255,0,0.35), 0 0 18px rgba(255,255,0,0.2)"
+      : "0 0 0 2px rgba(255,107,107,0.35), 0 0 18px rgba(255,107,107,0.2)";
   return (
     <div
-      className={`rounded-lg border border-white/10 bg-[#16161e] px-2 py-2 ${active ? `ring-2 ${ring}` : ""}`}
+      className="rounded-lg border border-white/10 bg-[#16161e] px-2 py-2 transition-shadow duration-300"
+      style={active ? { boxShadow: glow } : undefined}
     >
       <div className="flex items-center justify-between gap-1">
         <p className="truncate text-xs font-semibold text-white">
