@@ -1,13 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_SIZE,
-  type BlockadeRole,
+  P1_GOAL_ROW,
+  P2_GOAL_ROW,
   type BlockadeWall,
   type Pos,
 } from "@/lib/games/blockade-logic";
-import { getBlockedEdges } from "@/lib/games/blockade-bfs";
+import {
+  boardPixelSize,
+  edgeSlotHitRect,
+  getWallBarRects,
+  listPlaceableEdgeSlots,
+  wallThickness,
+  type BoardMetrics,
+  type EdgeSlot,
+} from "@/lib/games/blockade-wall-visual";
 
 type Props = {
   p1Pos: Pos;
@@ -17,9 +26,11 @@ type Props = {
   highlightMoves?: Pos[];
   wallPreview?: BlockadeWall | null;
   wallPreviewValid?: boolean;
+  wallMode?: boolean;
+  wallType?: "standard" | "lshape" | "triple";
   onCellClick?: (pos: Pos) => void;
-  onEdgeClick?: (row: number, col: number, orientation: "h" | "v") => void;
-  cellSize?: number;
+  onEdgePlace?: (slot: EdgeSlot) => void;
+  onEdgeHover?: (slot: EdgeSlot | null) => void;
 };
 
 const P1_COLOR = "#FFFF00";
@@ -33,12 +44,45 @@ export default function BlockadeBoard({
   highlightMoves = [],
   wallPreview,
   wallPreviewValid = true,
+  wallMode = false,
+  wallType = "standard",
   onCellClick,
-  cellSize = 44,
+  onEdgePlace,
+  onEdgeHover,
 }: Props) {
-  const gap = 4;
-  const pad = 12;
-  const size = BOARD_SIZE * cellSize + (BOARD_SIZE - 1) * gap + pad * 2;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(40);
+  const groove = cellSize >= 36 ? 8 : 6;
+  const pad = 10;
+
+  const metrics: BoardMetrics = useMemo(
+    () => ({ cellSize, groove, pad }),
+    [cellSize, groove, pad]
+  );
+
+  const { width, height } = useMemo(() => boardPixelSize(metrics), [metrics]);
+  const thick = wallThickness(metrics);
+  const step = cellSize + groove;
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w <= 0) return;
+      const inner = w - pad * 2;
+      const cs = Math.floor((inner - groove * (BOARD_SIZE - 1)) / BOARD_SIZE);
+      setCellSize(Math.max(28, Math.min(cs, 52)));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    window.addEventListener("resize", update);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [groove, pad]);
 
   const highlightSet = useMemo(
     () => new Set(highlightMoves.map((p) => `${p.x},${p.y}`)),
@@ -51,72 +95,151 @@ export default function BlockadeBoard({
     return list;
   }, [walls, wallPreview]);
 
-  return (
-    <div
-      className="relative rounded-lg border border-[#2A3A5C] bg-[#1A1A2E]"
-      style={{ width: size, height: size, padding: pad }}
-    >
-      {/* Goal row tints */}
-      <div
-        className="pointer-events-none absolute left-0 right-0 top-0 opacity-25"
-        style={{ height: cellSize + pad, background: P1_COLOR }}
-        title="Player 1 goal row"
-      />
-      <div
-        className="pointer-events-none absolute bottom-0 left-0 right-0 opacity-25"
-        style={{ height: cellSize + pad, background: P2_COLOR }}
-        title="Player 2 goal row"
-      />
+  const edgeSlots = useMemo(() => listPlaceableEdgeSlots(wallType), [wallType]);
 
-      <svg
-        className="pointer-events-none absolute inset-0"
-        width={size}
-        height={size}
-        style={{ padding: pad }}
+  const logicYToVisualRow = (logicY: number) => BOARD_SIZE - 1 - logicY;
+
+  return (
+    <div ref={containerRef} className="w-full max-w-full">
+      <div
+        className="relative mx-auto rounded-lg border border-[#2A3A5C] bg-[#1A1A2E]"
+        style={{ width, height, maxWidth: "100%" }}
       >
-        {displayWalls.map((wall) => (
-          <WallSegments
-            key={wall.id}
-            wall={wall}
-            cellSize={cellSize}
-            gap={gap}
-            turnNumber={turnNumber}
-            isPreview={wall.id === "preview"}
-            invalid={wall.id === "preview" && !wallPreviewValid}
+        {/* Cells */}
+        {Array.from({ length: BOARD_SIZE }, (_, logicY) =>
+          Array.from({ length: BOARD_SIZE }, (_, x) => {
+            const visualRow = logicYToVisualRow(logicY);
+            const key = `${x},${logicY}`;
+            const isP1 = p1Pos.x === x && p1Pos.y === logicY;
+            const isP2 = p2Pos.x === x && p2Pos.y === logicY;
+            const hl = highlightSet.has(key);
+            const isP1Goal = logicY === P1_GOAL_ROW;
+            const isP2Goal = logicY === P2_GOAL_ROW;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onCellClick?.({ x, y: logicY })}
+                className={`absolute rounded-sm border transition-colors ${
+                  isP1Goal
+                    ? "border-[#FFFF00]/50 bg-[#FFFF00]/15"
+                    : isP2Goal
+                      ? "border-[#FF6B6B]/50 bg-[#FF6B6B]/15"
+                      : "border-white/[0.08] bg-[#16161e]"
+                } ${hl ? "animate-pulse bg-[#FFFF00]/25 ring-1 ring-[#FFFF00]/40" : ""}`}
+                style={{
+                  left: pad + x * step,
+                  top: pad + visualRow * step,
+                  width: cellSize,
+                  height: cellSize,
+                  zIndex: 2,
+                }}
+              >
+                {isP1 && <Piece color={P1_COLOR} />}
+                {isP2 && <Piece color={P2_COLOR} />}
+              </button>
+            );
+          })
+        )}
+
+        {/* Groove grid lines (subtle) */}
+        {Array.from({ length: BOARD_SIZE - 1 }, (_, gi) => (
+          <div
+            key={`gh-${gi}`}
+            className="pointer-events-none absolute bg-white/[0.06]"
+            style={{
+              left: pad,
+              top: pad + (gi + 1) * step - groove / 2,
+              width: BOARD_SIZE * step - groove,
+              height: groove,
+              zIndex: 1,
+            }}
           />
         ))}
-      </svg>
+        {Array.from({ length: BOARD_SIZE - 1 }, (_, gi) => (
+          <div
+            key={`gv-${gi}`}
+            className="pointer-events-none absolute bg-white/[0.06]"
+            style={{
+              left: pad + (gi + 1) * step - groove / 2,
+              top: pad,
+              width: groove,
+              height: BOARD_SIZE * step - groove,
+              zIndex: 1,
+            }}
+          />
+        ))}
 
-      <div
-        className="grid"
-        style={{
-          gridTemplateColumns: `repeat(${BOARD_SIZE}, ${cellSize}px)`,
-          gap,
-        }}
-      >
-        {Array.from({ length: BOARD_SIZE * BOARD_SIZE }, (_, i) => {
-          const x = i % BOARD_SIZE;
-          const y = BOARD_SIZE - 1 - Math.floor(i / BOARD_SIZE);
-          const key = `${x},${y}`;
-          const isP1 = p1Pos.x === x && p1Pos.y === y;
-          const isP2 = p2Pos.x === x && p2Pos.y === y;
-          const hl = highlightSet.has(key);
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onCellClick?.({ x, y })}
-              className={`relative rounded-sm border border-white/10 transition-colors ${
-                hl ? "bg-[#FFFF00]/25 ring-1 ring-[#FFFF00]/60" : "bg-[#16161e]"
-              }`}
-              style={{ width: cellSize, height: cellSize }}
+        {/* Placed walls — edge bars */}
+        {displayWalls.map((wall) => {
+          const ownerColor = wall.owner === "player1" ? P1_COLOR : P2_COLOR;
+          const isPreview = wall.id === "preview";
+          const color = isPreview
+            ? wallPreviewValid
+              ? "#22c55e"
+              : "#ef4444"
+            : ownerColor;
+          const opacity = isPreview ? 0.85 : 0.7;
+          const countdown =
+            wall.isBomb && wall.expiresAtTurn !== undefined
+              ? Math.max(0, wall.expiresAtTurn - turnNumber)
+              : null;
+
+          return getWallBarRects(wall, metrics).map((bar, bi) => (
+            <div
+              key={`${wall.id}-${bi}`}
+              className={`pointer-events-none absolute rounded-sm ${wall.isBomb && !isPreview ? "animate-pulse" : ""}`}
+              style={{
+                left: bar.left,
+                top: bar.top,
+                width: bar.width,
+                height: bar.height,
+                background: color,
+                opacity,
+                boxShadow: `0 0 6px ${color}66`,
+                zIndex: 5,
+              }}
             >
-              {isP1 && <Piece color={P1_COLOR} />}
-              {isP2 && <Piece color={P2_COLOR} />}
-            </button>
-          );
+              {countdown !== null && countdown > 0 && bi === 0 && (
+                <span className="absolute -right-1 -top-3 text-[9px] font-bold text-white">
+                  {countdown}
+                </span>
+              )}
+            </div>
+          ));
         })}
+
+        {/* Edge hit zones (wall mode) */}
+        {wallMode &&
+          edgeSlots.map((slot) => {
+            const hit = edgeSlotHitRect(slot, metrics);
+            return (
+              <button
+                key={slot.key}
+                type="button"
+                className="absolute z-20 cursor-crosshair bg-transparent hover:bg-white/[0.06]"
+                style={{
+                  left: hit.left,
+                  top: hit.top,
+                  width: hit.width,
+                  height: hit.height,
+                }}
+                onMouseEnter={() => onEdgeHover?.(slot)}
+                onMouseLeave={() => onEdgeHover?.(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdgePlace?.(slot);
+                }}
+                aria-label={`Place wall ${slot.orientation} ${slot.row} ${slot.col}`}
+              />
+            );
+          })}
       </div>
+
+      {wallMode && wallPreview && !wallPreviewValid && (
+        <p className="mt-2 text-center text-xs font-medium text-red-400">Blocked — would trap a path</p>
+      )}
     </div>
   );
 }
@@ -124,79 +247,11 @@ export default function BlockadeBoard({
 function Piece({ color }: { color: string }) {
   return (
     <span
-      className="absolute inset-1 rounded-full"
+      className="absolute inset-[15%] rounded-full"
       style={{
         background: color,
-        boxShadow: `0 0 12px ${color}88`,
+        boxShadow: `0 0 10px ${color}99`,
       }}
     />
-  );
-}
-
-function WallSegments({
-  wall,
-  cellSize,
-  gap,
-  turnNumber,
-  isPreview,
-  invalid,
-}: {
-  wall: BlockadeWall;
-  cellSize: number;
-  gap: number;
-  turnNumber: number;
-  isPreview?: boolean;
-  invalid?: boolean;
-}) {
-  const edges = getBlockedEdges(wall);
-  const ownerColor = wall.owner === "player1" ? P1_COLOR : P2_COLOR;
-  const stroke = isPreview ? (invalid ? "#ef4444" : "#22c55e") : ownerColor;
-  const opacity = isPreview ? 0.55 : 0.95;
-  const countdown =
-    wall.isBomb && wall.expiresAtTurn !== undefined
-      ? Math.max(0, wall.expiresAtTurn - turnNumber)
-      : null;
-
-  const toPx = (p: { x: number; y: number }) => {
-    const gridY = BOARD_SIZE - 1 - p.y;
-    return {
-      cx: p.x * (cellSize + gap) + cellSize / 2,
-      cy: gridY * (cellSize + gap) + cellSize / 2,
-    };
-  };
-
-  return (
-    <g opacity={opacity}>
-      {edges.map(([a, b], i) => {
-        const p1 = toPx(a);
-        const p2 = toPx(b);
-        const mx = (p1.cx + p2.cx) / 2;
-        const my = (p1.cy + p2.cy) / 2;
-        return (
-          <line
-            key={`${wall.id}-${i}`}
-            x1={p1.cx}
-            y1={p1.cy}
-            x2={p2.cx}
-            y2={p2.cy}
-            stroke={stroke}
-            strokeWidth={wall.type === "triple" ? 6 : 4}
-            strokeLinecap="round"
-          />
-        );
-      })}
-      {countdown !== null && countdown > 0 && edges[0] && (
-        <text
-          x={toPx(edges[0][0]).cx}
-          y={toPx(edges[0][0]).cy}
-          fill="#fff"
-          fontSize={10}
-          textAnchor="middle"
-          className={wall.isBomb ? "animate-pulse" : ""}
-        >
-          {countdown}
-        </text>
-      )}
-    </g>
   );
 }

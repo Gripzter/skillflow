@@ -6,13 +6,14 @@ import type { MatchUiState } from "@/components/game/matchUi";
 import type { BotDifficulty } from "@/lib/games/bot-engine";
 import BlockadeBoard from "./BlockadeBoard";
 import BlockadeAbilitySelect from "./BlockadeAbilitySelect";
+import BlockadeWallPips from "./BlockadeWallPips";
 import {
   ABILITY_DEFS,
   applyGhostStep,
   applyMove,
   applyWall,
-  applyWallBreak,
   createInitialState,
+  getGhostStepTargets,
   getLegalMoves,
   opponent,
   parseState,
@@ -33,6 +34,10 @@ import {
   getBlockadeBotDelayMs,
   pickBotAbilities,
 } from "@/lib/games/blockade-bot";
+import {
+  type EdgeSlot,
+  wallFromEdgeSlot,
+} from "@/lib/games/blockade-wall-visual";
 
 const TURN_SEC = 15;
 
@@ -66,12 +71,15 @@ export default function Blockade({
   const [wallType, setWallType] = useState<"standard" | "lshape" | "triple">("standard");
   const [wallOrient, setWallOrient] = useState<"h" | "v">("h");
   const [wallRot, setWallRot] = useState(0);
-  const [wallAnchor, setWallAnchor] = useState<{ row: number; col: number } | null>(null);
+  const [hoveredEdge, setHoveredEdge] = useState<EdgeSlot | null>(null);
   const [turnSecLeft, setTurnSecLeft] = useState(TURN_SEC);
   const [abilityToast, setAbilityToast] = useState<string | null>(null);
+  const [feedOpen, setFeedOpen] = useState(false);
   const gameOverRef = useRef(false);
   const lastEventRef = useRef<Record<string, unknown> | null>(null);
   const botScheduledRef = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const isMyTurn = state.currentTurn === myRole && state.phase === "in_progress";
   const myPlayer = state.players[myRole];
@@ -96,13 +104,13 @@ export default function Blockade({
   const handleAbilityConfirm = useCallback(
     (chosen: BlockadeAbilityId[]) => {
       onPlayerAction?.();
-      let next = setAbilities(state, myRole, chosen);
+      let next = setAbilities(stateRef.current, myRole, chosen);
       if (isPlayer2Bot && !next.abilityReady.player2) {
         next = setAbilities(next, "player2", pickBotAbilities(botDifficulty));
       }
       syncState(next, `${player1.username} is ready`);
     },
-    [state, myRole, isPlayer2Bot, botDifficulty, syncState, onPlayerAction, player1.username]
+    [myRole, isPlayer2Bot, botDifficulty, syncState, onPlayerAction, player1.username]
   );
 
   useEffect(() => {
@@ -115,7 +123,7 @@ export default function Blockade({
     const interval = setInterval(() => {
       setTurnSecLeft((s) => {
         if (s <= 1) {
-          const skipped = skipTurn(state, myRole);
+          const skipped = skipTurn(stateRef.current, myRole);
           syncState(skipped, "Turn skipped (timeout)");
           return TURN_SEC;
         }
@@ -123,7 +131,7 @@ export default function Blockade({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [state.phase, state.currentTurn, isMyTurn, myRole, state, syncState]);
+  }, [state.phase, state.currentTurn, isMyTurn, myRole, syncState]);
 
   useEffect(() => {
     if (!incomingEvent || !onEventProcessed || incomingEvent === lastEventRef.current) return;
@@ -163,13 +171,12 @@ export default function Blockade({
     const delay = getBlockadeBotDelayMs(botDifficulty);
     const timer = setTimeout(() => {
       botScheduledRef.current = false;
-      const action = getBlockadeBotAction(state, "player2", botDifficulty);
+      const action = getBlockadeBotAction(stateRef.current, "player2", botDifficulty);
       if (!action) {
-        const skipped = skipTurn(state, "player2");
-        setState(skipped);
+        setState(skipTurn(stateRef.current, "player2"));
         return;
       }
-      const next = applyBotAction(state, "player2", action);
+      const next = applyBotAction(stateRef.current, "player2", action);
       if (next) {
         setState(next);
         if (next.winner) {
@@ -181,63 +188,74 @@ export default function Blockade({
     return () => clearTimeout(timer);
   }, [state, isPlayer2Bot, isMultiplayer, botDifficulty, onGameEnd]);
 
-  const highlightMoves = useMemo(() => {
-    if (!isMyTurn || mode !== "move" || state.pendingAbility) return [];
-    if (state.pendingAbility === "ghost_step" || state.doubleMoveRemaining > 0) {
-      return getLegalMoves(state, myRole);
-    }
-    if (state.doubleMoveRemaining > 0) return getLegalMoves(state, myRole);
-    return getLegalMoves(state, myRole);
-  }, [state, isMyTurn, mode, myRole]);
+  const activeEdge = hoveredEdge;
 
   const wallPreview = useMemo((): BlockadeWall | null => {
-    if (!wallAnchor || mode !== "wall") return null;
+    if (mode !== "wall" || !activeEdge) return null;
+    const orient = wallType === "lshape" ? activeEdge.orientation : wallOrient;
+    const base = wallFromEdgeSlot({ ...activeEdge, orientation: orient }, wallType, wallRot);
     return {
+      ...base,
+      orientation: orient,
       id: "preview",
-      type: wallType,
-      orientation: wallOrient,
-      row: wallAnchor.row,
-      col: wallAnchor.col,
-      rotation: wallType === "lshape" ? wallRot : undefined,
       owner: myRole,
       placedTurn: state.turnNumber,
       isBomb: state.pendingAbility === "wall_bomb",
     };
-  }, [wallAnchor, mode, wallType, wallOrient, wallRot, myRole, state.turnNumber, state.pendingAbility]);
+  }, [mode, activeEdge, wallType, wallOrient, wallRot, myRole, state.turnNumber, state.pendingAbility]);
 
   const wallPreviewValid = useMemo(() => {
     if (!wallPreview) return true;
     return validateWallPlacement(state, myRole, wallPreview).valid;
   }, [wallPreview, state, myRole]);
 
+  const highlightMoves = useMemo(() => {
+    if (!isMyTurn || mode !== "move") return [];
+    if (state.pendingAbility === "ghost_step") {
+      return getGhostStepTargets(state, myRole);
+    }
+    return getLegalMoves(state, myRole);
+  }, [state, isMyTurn, mode, myRole]);
+
+  const placeWallFromSlot = useCallback(
+    (slot: EdgeSlot) => {
+      if (!isMyTurn || gameOverRef.current || mode !== "wall") return;
+
+      const orient = wallType === "lshape" ? slot.orientation : wallOrient;
+      const w = {
+        ...wallFromEdgeSlot({ ...slot, orientation: orient }, wallType, wallRot),
+        orientation: orient,
+      };
+      const check = validateWallPlacement(state, myRole, w);
+      if (!check.valid) return;
+
+      onPlayerAction?.();
+      const asBomb = state.pendingAbility === "wall_bomb";
+      const res = applyWall(state, myRole, w, asBomb);
+      if (res) {
+        if (asBomb) setAbilityToast("Used Wall Bomb!");
+        syncState(res.state, res.log);
+        setMode("move");
+        setHoveredEdge(null);
+        if (res.state.winner) {
+          gameOverRef.current = true;
+          onGameEnd(res.state.winner);
+        }
+      }
+    },
+    [isMyTurn, mode, wallType, wallOrient, wallRot, state, myRole, onPlayerAction, syncState, onGameEnd]
+  );
+
   const handleCellClick = useCallback(
     (pos: Pos) => {
-      if (!isMyTurn || gameOverRef.current) return;
+      if (!isMyTurn || gameOverRef.current || mode !== "move") return;
       onPlayerAction?.();
 
       if (state.pendingAbility === "ghost_step") {
         const res = applyGhostStep(state, myRole, pos);
         if (res) {
-          setAbilityToast(`${player1.username} used Ghost Step!`);
+          setAbilityToast("Used Ghost Step!");
           syncState(res.state, res.log);
-          if (res.state.winner) {
-            gameOverRef.current = true;
-            onGameEnd(res.state.winner);
-          }
-        }
-        return;
-      }
-
-      if (mode === "wall" && wallAnchor) {
-        const w = wallPreview;
-        if (!w || !wallPreviewValid) return;
-        const asBomb = state.pendingAbility === "wall_bomb";
-        const res = applyWall(state, myRole, w, asBomb);
-        if (res) {
-          if (asBomb) setAbilityToast(`${player1.username} used Wall Bomb!`);
-          syncState(res.state, res.log);
-          setWallAnchor(null);
-          setMode("move");
           if (res.state.winner) {
             gameOverRef.current = true;
             onGameEnd(res.state.winner);
@@ -255,19 +273,7 @@ export default function Blockade({
         }
       }
     },
-    [
-      isMyTurn,
-      state,
-      myRole,
-      mode,
-      wallAnchor,
-      wallPreview,
-      wallPreviewValid,
-      onPlayerAction,
-      syncState,
-      onGameEnd,
-      player1.username,
-    ]
+    [isMyTurn, mode, state, myRole, onPlayerAction, syncState, onGameEnd]
   );
 
   const useAbility = (id: BlockadeAbilityId) => {
@@ -275,8 +281,9 @@ export default function Blockade({
     const next = startAbility(state, myRole, id);
     if (!next) return;
     onPlayerAction?.();
+    const name = ABILITY_DEFS.find((a) => a.id === id)?.name ?? id;
+    setAbilityToast(`Used ${name}!`);
     if (id === "double_move") {
-      setAbilityToast(`${myRole === "player1" ? player1.username : player2.username} used Double Move!`);
       syncState(next);
       setMode("move");
       return;
@@ -302,13 +309,34 @@ export default function Blockade({
     if (!onMatchUi) return;
     const activeName = state.currentTurn === "player1" ? player1.username : player2.username;
     onMatchUi({
-      scores: { player1: myPlayer.walls.standard, player2: oppPlayer.walls.standard },
+      scores: { player1: 0, player2: 0 },
       currentTurn: state.currentTurn,
       turnText: state.phase === "ability_selection" ? "Select abilities" : `${activeName}'s turn · ${turnSecLeft}s`,
-      scoreLabel: "walls left",
+      scoreLabel: "",
       systemLogEntries: [],
     });
-  }, [onMatchUi, state, player1.username, player2.username, turnSecLeft, myPlayer.walls.standard, oppPlayer.walls.standard]);
+  }, [onMatchUi, state, player1.username, player2.username, turnSecLeft]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "w" || e.key === "W") {
+        if (!isMyTurn || state.doubleMoveRemaining > 0) return;
+        setMode((m) => (m === "wall" ? "move" : "wall"));
+        setHoveredEdge(null);
+      }
+      if (e.key === "Escape" && mode === "wall") {
+        setMode("move");
+        setHoveredEdge(null);
+      }
+      if (e.key === "r" || e.key === "R") {
+        if (mode !== "wall") return;
+        if (wallType === "lshape") setWallRot((r) => (r + 1) % 4);
+        else setWallOrient((o) => (o === "h" ? "v" : "h"));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMyTurn, mode, wallType, state.doubleMoveRemaining]);
 
   if (state.phase === "ability_selection" && !state.abilityReady[myRole]) {
     return <BlockadeAbilitySelect onConfirm={handleAbilityConfirm} />;
@@ -322,29 +350,57 @@ export default function Blockade({
     );
   }
 
+  const p1Active = state.currentTurn === "player1";
+  const p2Active = state.currentTurn === "player2";
+
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
+    <div className="flex w-full min-w-0 flex-1 flex-col gap-2 px-2 py-2 md:gap-3 md:px-4">
       {abilityToast && (
-        <div className="rounded-lg border border-[#FFFF00]/40 bg-[#FFFF00]/10 px-4 py-2 text-sm text-[#FFFF00]">
+        <div className="rounded-lg border border-[#FFFF00]/40 bg-[#FFFF00]/10 px-3 py-1.5 text-center text-xs text-[#FFFF00]">
           {abilityToast}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      {/* Player panels */}
+      <div className="grid w-full grid-cols-2 gap-2">
+        <PlayerPanel
+          name={player1.username}
+          active={p1Active}
+          color="yellow"
+          walls={state.players.player1.walls}
+          isMe={myRole === "player1"}
+        />
+        <PlayerPanel
+          name={player2.username}
+          active={p2Active}
+          color="red"
+          walls={state.players.player2.walls}
+          isMe={myRole === "player2"}
+        />
+      </div>
+
+      {/* Action row */}
+      <div className="flex w-full flex-wrap items-center justify-center gap-1.5">
         <button
           type="button"
-          onClick={() => { setMode("move"); setWallAnchor(null); }}
-          className={`rounded px-3 py-1.5 text-xs font-semibold ${mode === "move" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"}`}
+          onClick={() => {
+            setMode("move");
+            setHoveredEdge(null);
+          }}
+          className={`rounded-md px-3 py-1.5 text-xs font-semibold ${mode === "move" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"}`}
         >
           Move
         </button>
         <button
           type="button"
-          onClick={() => setMode("wall")}
-          disabled={state.doubleMoveRemaining > 0}
-          className={`rounded px-3 py-1.5 text-xs font-semibold ${mode === "wall" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"}`}
+          onClick={() => {
+            setMode((m) => (m === "wall" ? "move" : "wall"));
+            setHoveredEdge(null);
+          }}
+          disabled={!isMyTurn || state.doubleMoveRemaining > 0}
+          className={`rounded-md px-3 py-1.5 text-xs font-semibold ${mode === "wall" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"} disabled:opacity-40`}
         >
-          Place Wall (W)
+          Wall {mode === "wall" ? "▲" : "▼"}
         </button>
         {myPlayer.abilities.chosen.map((id) => {
           const def = ABILITY_DEFS.find((a) => a.id === id);
@@ -355,36 +411,61 @@ export default function Blockade({
               type="button"
               disabled={!isMyTurn || used}
               onClick={() => useAbility(id)}
-              className="rounded border border-white/20 px-2 py-1 text-xs text-white disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-white/15 bg-white/5 px-2 py-1.5 text-xs text-white disabled:opacity-35"
             >
-              {def?.name}{used ? " (Used)" : ""}
+              <span aria-hidden>⚡</span>
+              <span>{def?.name}{used ? " · Used" : ""}</span>
             </button>
           );
         })}
+        {mode === "wall" && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode("move");
+              setHoveredEdge(null);
+            }}
+            className="rounded-md border border-white/20 px-2 py-1.5 text-xs text-body-gray"
+          >
+            Cancel
+          </button>
+        )}
       </div>
 
       {mode === "wall" && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          {(["standard", "lshape", "triple"] as const).map((t) => (
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {(
+            [
+              { t: "standard" as const, label: "Standard", n: myPlayer.walls.standard },
+              { t: "lshape" as const, label: "L-Shape", n: myPlayer.walls.lshape },
+              { t: "triple" as const, label: "Triple", n: myPlayer.walls.triple },
+            ] as const
+          ).map(({ t, label, n }) => (
             <button
               key={t}
               type="button"
-              disabled={myPlayer.walls[t] <= 0}
-              onClick={() => setWallType(t)}
-              className={`rounded px-2 py-1 ${wallType === t ? "bg-teal text-black" : "bg-white/10 text-white"}`}
+              disabled={n <= 0}
+              onClick={() => {
+                setWallType(t);
+                setHoveredEdge(null);
+              }}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                wallType === t ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"
+              } disabled:opacity-35`}
             >
-              {t} ({myPlayer.walls[t]})
+              {label} ({n})
             </button>
           ))}
-          <button type="button" onClick={() => setWallOrient(wallOrient === "h" ? "v" : "h")} className="rounded bg-white/10 px-2 py-1 text-white">
-            {wallOrient === "h" ? "Horizontal" : "Vertical"}
+          <button
+            type="button"
+            onClick={() => {
+              if (wallType === "lshape") setWallRot((r) => (r + 1) % 4);
+              else setWallOrient((o) => (o === "h" ? "v" : "h"));
+            }}
+            className="rounded-full border border-white/20 px-3 py-1 text-xs text-white"
+          >
+            Rotate
           </button>
-          {wallType === "lshape" && (
-            <button type="button" onClick={() => setWallRot((r) => (r + 1) % 4)} className="rounded bg-white/10 px-2 py-1 text-white">
-              Rotate L (R)
-            </button>
-          )}
-          <span className="text-body-gray">Click a square to anchor wall</span>
         </div>
       )}
 
@@ -396,20 +477,56 @@ export default function Blockade({
         highlightMoves={highlightMoves}
         wallPreview={wallPreview}
         wallPreviewValid={wallPreviewValid}
-        onCellClick={(pos) => {
-          if (mode === "wall" && !wallAnchor) {
-            setWallAnchor({ row: pos.y, col: pos.x });
-            return;
-          }
-          handleCellClick(pos);
+        wallMode={mode === "wall" && isMyTurn}
+        wallType={wallType}
+        onCellClick={handleCellClick}
+        onEdgeHover={(slot) => {
+          if (mode !== "wall" || !isMyTurn) return;
+          setHoveredEdge(slot);
+          if (slot) setWallOrient(slot.orientation);
         }}
+        onEdgePlace={placeWallFromSlot}
       />
 
-      <p className="text-xs text-body-gray">
-        P1 walls: {state.players.player1.walls.standard}S / {state.players.player1.walls.lshape}L /{" "}
-        {state.players.player1.walls.triple}T · P2: {state.players.player2.walls.standard}S /{" "}
-        {state.players.player2.walls.lshape}L / {state.players.player2.walls.triple}T
-      </p>
+      <button
+        type="button"
+        className="mx-auto text-xs text-body-gray md:hidden"
+        onClick={() => setFeedOpen((o) => !o)}
+      >
+        {feedOpen ? "Hide" : "Show"} live feed
+      </button>
+    </div>
+  );
+}
+
+function PlayerPanel({
+  name,
+  active,
+  color,
+  walls,
+  isMe,
+}: {
+  name: string;
+  active: boolean;
+  color: "yellow" | "red";
+  walls: { standard: number; lshape: number; triple: number };
+  isMe: boolean;
+}) {
+  const ring = color === "yellow" ? "ring-[#FFFF00]/60" : "ring-[#FF6B6B]/60";
+  return (
+    <div
+      className={`rounded-lg border border-white/10 bg-[#16161e] px-2 py-2 ${active ? `ring-2 ${ring}` : ""}`}
+    >
+      <div className="flex items-center justify-between gap-1">
+        <p className="truncate text-xs font-semibold text-white">
+          {name}
+          {isMe ? <span className="text-body-gray"> (you)</span> : null}
+        </p>
+        {active && <span className="h-2 w-2 shrink-0 rounded-full bg-green-500" />}
+      </div>
+      <div className="mt-1.5">
+        <BlockadeWallPips walls={walls} color={color} />
+      </div>
     </div>
   );
 }
