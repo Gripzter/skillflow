@@ -192,17 +192,15 @@ export default function Blockade({
 
   const wallPreview = useMemo((): BlockadeWall | null => {
     if (mode !== "wall" || !activeEdge) return null;
-    const orient = wallType === "lshape" ? activeEdge.orientation : wallOrient;
-    const base = wallFromEdgeSlot({ ...activeEdge, orientation: orient }, wallType, wallRot);
+    const base = wallFromEdgeSlot(activeEdge, wallType, wallRot);
     return {
       ...base,
-      orientation: orient,
       id: "preview",
       owner: myRole,
       placedTurn: state.turnNumber,
       isBomb: state.pendingAbility === "wall_bomb",
     };
-  }, [mode, activeEdge, wallType, wallOrient, wallRot, myRole, state.turnNumber, state.pendingAbility]);
+  }, [mode, activeEdge, wallType, wallRot, myRole, state.turnNumber, state.pendingAbility]);
 
   const wallPreviewValid = useMemo(() => {
     if (!wallPreview) return true;
@@ -221,11 +219,7 @@ export default function Blockade({
     (slot: EdgeSlot) => {
       if (!isMyTurn || gameOverRef.current || mode !== "wall") return;
 
-      const orient = wallType === "lshape" ? slot.orientation : wallOrient;
-      const w = {
-        ...wallFromEdgeSlot({ ...slot, orientation: orient }, wallType, wallRot),
-        orientation: orient,
-      };
+      const w = wallFromEdgeSlot(slot, wallType, wallRot);
       const check = validateWallPlacement(state, myRole, w);
       if (!check.valid) return;
 

@@ -238,7 +238,7 @@ export default function BlockadeBoard({
       </div>
 
       {wallMode && wallPreview && !wallPreviewValid && (
-        <p className="mt-2 text-center text-xs font-medium text-red-400">Blocked — would trap a path</p>
+        <p className="mt-2 text-center text-xs font-medium text-red-400">Invalid — would block a path</p>
       )}
     </div>
   );

@@ -14,30 +14,50 @@ function inBounds(p: Pos): boolean {
   return p.x >= 0 && p.x < BOARD_SIZE && p.y >= 0 && p.y < BOARD_SIZE;
 }
 
-/** True if movement between adjacent cells a→b is blocked by any wall (incl. bombs). */
-export function isEdgeBlocked(a: Pos, b: Pos, walls: BlockadeWall[]): boolean {
+/** Undirected edge key for two adjacent cell centers. */
+export function edgeKey(a: Pos, b: Pos): string {
+  const k1 = posKey(a);
+  const k2 = posKey(b);
+  return k1 < k2 ? `${k1}|${k2}` : `${k2}|${k1}`;
+}
+
+export function buildBlockedEdgeSet(walls: BlockadeWall[]): Set<string> {
+  const set = new Set<string>();
+  for (const wall of walls) {
+    for (const [e1, e2] of getBlockedEdges(wall)) {
+      set.add(edgeKey(e1, e2));
+    }
+  }
+  return set;
+}
+
+/** True if a wall segment blocks the edge between (x1,y1) and (x2,y2). */
+export function isEdgeBlocked(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  walls: BlockadeWall[]
+): boolean {
+  return isEdgeBlockedPos({ x: x1, y: y1 }, { x: x2, y: y2 }, walls);
+}
+
+export function isEdgeBlockedPos(a: Pos, b: Pos, walls: BlockadeWall[]): boolean {
   if (!inBounds(a) || !inBounds(b)) return true;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   if (Math.abs(dx) + Math.abs(dy) !== 1) return true;
-
-  for (const wall of walls) {
-    if (wallBlocksEdge(wall, a, b)) return true;
-  }
-  return false;
+  const key = edgeKey(a, b);
+  const set = buildBlockedEdgeSet(walls);
+  return set.has(key);
 }
 
-function wallBlocksEdge(wall: BlockadeWall, a: Pos, b: Pos): boolean {
-  const edges = getBlockedEdges(wall);
-  for (const [e1, e2] of edges) {
-    if (
-      (e1.x === a.x && e1.y === a.y && e2.x === b.x && e2.y === b.y) ||
-      (e2.x === a.x && e2.y === a.y && e1.x === b.x && e1.y === b.y)
-    ) {
-      return true;
-    }
-  }
-  return false;
+function isEdgeBlockedInSet(a: Pos, b: Pos, edgeSet: Set<string>): boolean {
+  if (!inBounds(a) || !inBounds(b)) return true;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  if (Math.abs(dx) + Math.abs(dy) !== 1) return true;
+  return edgeSet.has(edgeKey(a, b));
 }
 
 /** All undirected edges blocked by a wall (pairs of adjacent cell centers). */
@@ -75,7 +95,6 @@ export function getBlockedEdges(wall: BlockadeWall): [Pos, Pos][] {
     return out;
   }
 
-  // L-shape: 4 rotations (0=┐, 1=┘, 2=└, 3=┌ from top-left anchor at row,col)
   const r = wall.row;
   const c = wall.col;
   const rot = wall.rotation ?? 0;
@@ -106,12 +125,17 @@ const CARDINAL: Pos[] = [
   { x: -1, y: 0 },
 ];
 
-export function getReachableNeighbors(from: Pos, walls: BlockadeWall[], opponentPos: Pos | null): Pos[] {
+export function getReachableNeighbors(
+  from: Pos,
+  walls: BlockadeWall[],
+  opponentPos: Pos | null
+): Pos[] {
+  const edgeSet = buildBlockedEdgeSet(walls);
   const neighbors: Pos[] = [];
   for (const d of CARDINAL) {
     const next = { x: from.x + d.x, y: from.y + d.y };
     if (!inBounds(next)) continue;
-    if (isEdgeBlocked(from, next, walls)) continue;
+    if (isEdgeBlockedInSet(from, next, edgeSet)) continue;
     if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
     neighbors.push(next);
   }
@@ -121,11 +145,15 @@ export function getReachableNeighbors(from: Pos, walls: BlockadeWall[], opponent
 /** Quoridor-style jump when adjacent to opponent. */
 export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: BlockadeWall[]): Pos[] {
   if (Math.abs(from.x - opponentPos.x) + Math.abs(from.y - opponentPos.y) !== 1) return [];
+  if (isEdgeBlockedPos(from, opponentPos, walls)) return [];
 
-  const behind = { x: opponentPos.x + (opponentPos.x - from.x), y: opponentPos.y + (opponentPos.y - from.y) };
+  const behind = {
+    x: opponentPos.x + (opponentPos.x - from.x),
+    y: opponentPos.y + (opponentPos.y - from.y),
+  };
   const results: Pos[] = [];
 
-  if (inBounds(behind) && !isEdgeBlocked(opponentPos, behind, walls)) {
+  if (inBounds(behind) && !isEdgeBlockedPos(opponentPos, behind, walls)) {
     results.push(behind);
     return results;
   }
@@ -138,7 +166,7 @@ export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: Blockade
   }
   for (const p of perp) {
     if (!inBounds(p)) continue;
-    if (isEdgeBlocked(opponentPos, p, walls)) continue;
+    if (isEdgeBlockedPos(opponentPos, p, walls)) continue;
     results.push(p);
   }
   return results;
@@ -166,13 +194,14 @@ export function getAllMoveTargets(
   });
 }
 
-/** BFS: can `start` reach any cell in `goalRow`? */
+/** Cardinal BFS for wall-placement validation (no jumps). */
 export function canReachGoalRow(
   start: Pos,
   goalRow: number,
   walls: BlockadeWall[],
   opponentPos: Pos | null
 ): boolean {
+  const edgeSet = buildBlockedEdgeSet(walls);
   const visited = new Set<string>();
   const queue: Pos[] = [start];
   visited.add(posKey(start));
@@ -181,27 +210,21 @@ export function canReachGoalRow(
     const cur = queue.shift()!;
     if (cur.y === goalRow) return true;
 
-    const candidates = getAllMoveTargets(cur, walls, opponentPos);
-    for (const next of candidates) {
+    for (const d of CARDINAL) {
+      const next = { x: cur.x + d.x, y: cur.y + d.y };
+      if (!inBounds(next)) continue;
+      if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
+      if (isEdgeBlockedInSet(cur, next, edgeSet)) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
-      if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
       visited.add(key);
       queue.push(next);
-    }
-
-    for (const n of getReachableNeighbors(cur, walls, null)) {
-      const key = posKey(n);
-      if (visited.has(key)) continue;
-      if (opponentPos && n.x === opponentPos.x && n.y === opponentPos.y) continue;
-      visited.add(key);
-      queue.push(n);
     }
   }
   return false;
 }
 
-/** Shortest path length to goal row (for bot). */
+/** Shortest path length to goal row (for bot; includes jumps). */
 export function shortestPathToGoal(
   start: Pos,
   goalRow: number,
@@ -218,6 +241,7 @@ export function shortestPathToGoal(
 
     const moves = getAllMoveTargets(cur, walls, opponentPos);
     for (const next of moves) {
+      if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
       visited.set(key, d + 1);

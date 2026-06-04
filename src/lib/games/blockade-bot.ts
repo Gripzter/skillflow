@@ -1,5 +1,6 @@
 import type { BotDifficulty } from "./bot-engine";
 import {
+  activeWalls,
   applyMove,
   applyWall,
   getLegalMoves,
@@ -48,7 +49,7 @@ export function getBlockadeBotAction(
 
   const me = state.players[role].position;
   const opp = state.players[opponent(role)].position;
-  const walls = state.walls;
+  const walls = activeWalls(state);
   const myGoal = goalRowFor(role);
   const oppGoal = goalRowFor(opponent(role));
 

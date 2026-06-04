@@ -165,6 +165,26 @@ export function getLegalMoves(
   return getAllMoveTargets(me, activeWalls(state), opp);
 }
 
+export function isValidMove(
+  from: Pos,
+  to: Pos,
+  state: BlockadeGameState,
+  role: BlockadeRole
+): boolean {
+  const opp = state.players[opponent(role)].position;
+  return getAllMoveTargets(from, activeWalls(state), opp).some(
+    (p) => p.x === to.x && p.y === to.y
+  );
+}
+
+/** Temporarily adds a wall and verifies both players can still reach their goal row. */
+export function canPlaceWall(
+  state: BlockadeGameState,
+  wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">
+): boolean {
+  return validateWallPlacement(state, state.currentTurn, wall).valid;
+}
+
 export function wallsOverlap(a: BlockadeWall, b: BlockadeWall): boolean {
   const ea = getBlockedEdges(a);
   const eb = getBlockedEdges(b);
@@ -236,10 +256,10 @@ export function validateWallPlacement(
   const p2 = state.players.player2.position;
 
   if (!canReachGoalRow(p1, P1_GOAL_ROW, trialWalls, p2)) {
-    return { valid: false, error: "Invalid — would block a path to the goal" };
+    return { valid: false, error: "Invalid — would block a path" };
   }
   if (!canReachGoalRow(p2, P2_GOAL_ROW, trialWalls, p1)) {
-    return { valid: false, error: "Invalid — would block a path to the goal" };
+    return { valid: false, error: "Invalid — would block a path" };
   }
 
   return { valid: true };
@@ -251,8 +271,7 @@ export function applyMove(
   to: Pos
 ): { state: BlockadeGameState; log: string } | null {
   if (state.phase !== "in_progress" || state.currentTurn !== role) return null;
-  const legal = getLegalMoves(state, role);
-  if (!legal.some((p) => p.x === to.x && p.y === to.y)) return null;
+  if (!isValidMove(state.players[role].position, to, state, role)) return null;
 
   const next = cloneState(state);
   next.players[role].position = { ...to };
