@@ -19,11 +19,7 @@ import {
   type BlockadeRole,
   type Pos,
 } from "@/lib/games/blockade-logic";
-import {
-  applyBotAction,
-  getBlockadeBotAction,
-  getBlockadeBotDelayMs,
-} from "@/lib/games/blockade-bot";
+import { executeBotTurn, getBlockadeBotDelayMs } from "@/lib/games/blockade-bot";
 import type { EdgeSlot } from "@/lib/games/blockade-wall-visual";
 
 const TURN_SEC = 15;
@@ -70,7 +66,8 @@ export default function Blockade({
   const gameStartRef = useRef(Date.now());
   const gameOverRef = useRef(false);
   const lastEventRef = useRef<Record<string, unknown> | null>(null);
-  const botScheduledRef = useRef(false);
+  const botTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const botHandledTurnRef = useRef<number>(-1);
   const stateRef = useRef(state);
   const previewSlotRef = useRef<EdgeSlot | null>(null);
   const placingWallRef = useRef(false);
@@ -156,27 +153,56 @@ export default function Blockade({
 
   useEffect(() => {
     if (!isPlayer2Bot || isMultiplayer || state.phase !== "in_progress") return;
-    if (state.currentTurn !== "player2" || botScheduledRef.current) return;
-    botScheduledRef.current = true;
-    const timer = setTimeout(() => {
-      botScheduledRef.current = false;
-      const action = getBlockadeBotAction(stateRef.current, "player2", botDifficulty);
-      if (!action) {
-        setState(skipTurn(stateRef.current, "player2"));
-        return;
+
+    console.log("Turn switched to:", state.currentTurn);
+
+    if (state.currentTurn !== "player2") {
+      if (botTimerRef.current) {
+        clearTimeout(botTimerRef.current);
+        botTimerRef.current = null;
       }
-      const result = applyBotAction(stateRef.current, "player2", action);
-      if (result) {
-        appendLog(formatLogLine(result.log, player1.username, player2.username));
-        setState(result.state);
-        if (result.state.winner) {
-          gameOverRef.current = true;
-          onGameEnd(result.state.winner);
-        }
+      return;
+    }
+
+    if (botHandledTurnRef.current >= state.turnNumber) return;
+
+    console.log("Scheduling bot turn...", "turnNumber:", state.turnNumber);
+
+    if (botTimerRef.current) clearTimeout(botTimerRef.current);
+
+    const turnToHandle = state.turnNumber;
+    botTimerRef.current = setTimeout(() => {
+      console.log("Executing bot turn NOW");
+      botTimerRef.current = null;
+      botHandledTurnRef.current = turnToHandle;
+
+      const result = executeBotTurn(stateRef.current, "player2");
+      appendLog(formatLogLine(result.log, player1.username, player2.username));
+      setState(result.state);
+      if (result.state.winner) {
+        gameOverRef.current = true;
+        onGameEnd(result.state.winner);
       }
     }, getBlockadeBotDelayMs(botDifficulty));
-    return () => clearTimeout(timer);
-  }, [state, isPlayer2Bot, isMultiplayer, botDifficulty, onGameEnd, appendLog, player1.username, player2.username]);
+
+    return () => {
+      if (botTimerRef.current) {
+        clearTimeout(botTimerRef.current);
+        botTimerRef.current = null;
+      }
+    };
+  }, [
+    state.currentTurn,
+    state.turnNumber,
+    state.phase,
+    isPlayer2Bot,
+    isMultiplayer,
+    botDifficulty,
+    onGameEnd,
+    appendLog,
+    player1.username,
+    player2.username,
+  ]);
 
   const wallPreview = useMemo(() => {
     if (mode !== "wall" || !previewSlotRef.current) return null;

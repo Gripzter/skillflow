@@ -5,6 +5,7 @@ import {
   getLegalMoves,
   goalRowFor,
   opponent,
+  skipTurn,
   wallInBounds,
   type BlockadeGameState,
   type BlockadeRole,
@@ -13,13 +14,11 @@ import {
 import { bfsHasPathToGoal, bfsPathLength, bfsShortestPath } from "./blockade-bfs";
 import type { Wall } from "./blockade-collision";
 
-export function getBlockadeBotDelayMs(_difficulty: BotDifficulty): number {
-  return 800 + Math.random() * 700;
-}
+const MAX_WALL_CANDIDATES = 50;
 
-type BotAction =
-  | { kind: "move"; to: Pos }
-  | { kind: "wall"; wall: Wall };
+export function getBlockadeBotDelayMs(_difficulty: BotDifficulty): number {
+  return 1000;
+}
 
 type BotDecision =
   | { action: "move" }
@@ -68,8 +67,9 @@ function botChooseWallPlacement(
 
   let bestWall: Wall | null = null;
   let bestScore = 0;
+  let candidatesChecked = 0;
 
-  for (let i = 0; i < playerPath.length - 1; i++) {
+  outer: for (let i = 0; i < playerPath.length - 1; i++) {
     const from = playerPath[i];
     const to = playerPath[i + 1];
     const dx = to.x - from.x;
@@ -91,6 +91,12 @@ function botChooseWallPlacement(
     }
 
     for (const candidate of candidates) {
+      candidatesChecked++;
+      if (candidatesChecked > MAX_WALL_CANDIDATES) {
+        console.warn("BOT: Hit candidate limit, stopping search");
+        break outer;
+      }
+
       if (wallOverlapsAny(candidate, walls)) continue;
       if (!wallInBounds(candidate)) continue;
 
@@ -119,7 +125,7 @@ function botChooseWallPlacement(
       "Player path:",
       currentPlayerPathLen,
       "→",
-      currentPlayerPathLen + (bestScore > 0 ? bestScore : 0)
+      currentPlayerPathLen + bestScore
     );
     return bestWall;
   }
@@ -172,96 +178,115 @@ function botDecideAction(
   return { action: "move" };
 }
 
-function chooseMove(
+/** Crash-safe bot turn — always produces a state change (move, wall, or skip). */
+export function executeBotTurn(
   state: BlockadeGameState,
-  role: BlockadeRole
-): Pos | null {
-  const walls = state.walls;
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const myGoal = goalRowFor(role);
+  role: BlockadeRole = "player2"
+): { state: BlockadeGameState; log: string } {
+  try {
+    console.log("=== BOT TURN START ===");
+    const botPos = state.players[role].position;
+    const playerPos = state.players[opponent(role)].position;
+    const botGoalRow = goalRowFor(role);
+    const playerGoalRow = goalRowFor(opponent(role));
+    const walls = state.walls;
 
-  const path = bfsShortestPath(me, myGoal, walls, opp);
-  console.log("BOT PATH:", path);
-  console.log("BOT NEXT MOVE:", path?.[1]);
+    console.log("Bot position:", botPos);
+    console.log("Bot goal row:", botGoalRow);
+    console.log("Walls on board:", walls.length);
 
-  if (path && path.length > 1) {
-    const next = path[1];
-    const legal = getLegalMoves(state, role);
-    if (legal.some((p) => p.x === next.x && p.y === next.y)) {
-      return next;
+    if (state.phase !== "in_progress" || state.currentTurn !== role) {
+      console.warn("BOT: Not active turn, skipping");
+      return { state: skipTurn(state, role), log: "Bot skipped (inactive turn)" };
+    }
+
+    const decision = botDecideAction(
+      botPos,
+      playerPos,
+      botGoalRow,
+      playerGoalRow,
+      walls,
+      state.players[role].wallsRemaining
+    );
+    console.log("Bot decision:", decision);
+
+    if (decision.action === "wall" && decision.wall) {
+      const wallResult = applyWall(state, role, decision.wall);
+      if (wallResult) return wallResult;
+      console.warn("BOT: Wall placement failed, falling back to move");
+    }
+
+    const opp = state.players[opponent(role)].position;
+    const path = bfsShortestPath(botPos, botGoalRow, walls, opp);
+    console.log("Bot BFS path:", path);
+
+    if (path && path.length > 1) {
+      const moveResult = applyMove(state, role, path[1]);
+      if (moveResult) return moveResult;
+    }
+
+    console.warn("BOT FALLBACK: BFS returned no path, trying any valid move");
+    const validMoves = getLegalMoves(state, role);
+    if (validMoves.length > 0) {
+      const moveResult = applyMove(state, role, validMoves[0]);
+      if (moveResult) return moveResult;
+    }
+
+    console.error("BOT: No valid moves at all — skipping turn");
+    return {
+      state: skipTurn(state, role),
+      log: `${role === "player1" ? "Player1" : "Player2"} skipped turn`,
+    };
+  } catch (error) {
+    console.error("BOT TURN CRASHED:", error);
+    try {
+      const validMoves = getLegalMoves(state, role);
+      if (validMoves.length > 0) {
+        const moveResult = applyMove(state, role, validMoves[0]);
+        if (moveResult) return moveResult;
+      }
+      return {
+        state: skipTurn(state, role),
+        log: `${role === "player1" ? "Player1" : "Player2"} skipped turn`,
+      };
+    } catch (e) {
+      console.error("BOT FALLBACK ALSO CRASHED:", e);
+      return {
+        state: skipTurn(state, role),
+        log: `${role === "player1" ? "Player1" : "Player2"} skipped turn`,
+      };
     }
   }
-
-  const moves = getLegalMoves(state, role);
-  if (moves.length === 0) return null;
-
-  let best = moves[0];
-  let bestLen = bfsPathLength(best, myGoal, walls, opp);
-  for (const m of moves) {
-    const len = bfsPathLength(m, myGoal, walls, opp);
-    if (len < bestLen) {
-      bestLen = len;
-      best = m;
-    }
-  }
-  return best;
 }
 
+/** @deprecated use executeBotTurn */
 export function getBlockadeBotAction(
   state: BlockadeGameState,
   role: BlockadeRole,
   _difficulty: BotDifficulty
-): BotAction | null {
+): { kind: "move"; to: Pos } | { kind: "wall"; wall: Wall } | null {
   if (state.phase !== "in_progress" || state.currentTurn !== role) return null;
-
-  const walls = state.walls;
+  const result = executeBotTurn(state, role);
+  const next = result.state;
+  if (next.currentTurn === role && next.phase === "in_progress") return null;
   const botPos = state.players[role].position;
-  const playerPos = state.players[opponent(role)].position;
-  const botGoalRow = goalRowFor(role);
-  const playerGoalRow = goalRowFor(opponent(role));
-  const botWallsRemaining = state.players[role].wallsRemaining;
-
-  const playerPath = bfsShortestPath(playerPos, playerGoalRow, walls, null);
-  console.log("PLAYER PATH:", playerPath);
-
-  const decision = botDecideAction(
-    botPos,
-    playerPos,
-    botGoalRow,
-    playerGoalRow,
-    walls,
-    botWallsRemaining
-  );
-
-  if (decision.action === "wall") {
-    return { kind: "wall", wall: decision.wall };
+  const newPos = next.players[role].position;
+  if (newPos.x !== botPos.x || newPos.y !== botPos.y) {
+    return { kind: "move", to: newPos };
   }
-
-  const to = chooseMove(state, role);
-  if (to) return { kind: "move", to };
-
-  const fallbackWall = botChooseWallPlacement(
-    botPos,
-    playerPos,
-    botGoalRow,
-    playerGoalRow,
-    walls,
-    botWallsRemaining
-  );
-  if (fallbackWall) return { kind: "wall", wall: fallbackWall };
-
+  if (next.walls.length > state.walls.length) {
+    return { kind: "wall", wall: next.walls[next.walls.length - 1] };
+  }
   return null;
 }
 
+/** @deprecated use executeBotTurn */
 export function applyBotAction(
   state: BlockadeGameState,
   role: BlockadeRole,
-  action: BotAction
+  action: { kind: "move"; to: Pos } | { kind: "wall"; wall: Wall }
 ): { state: BlockadeGameState; log: string } | null {
-  if (action.kind === "move") {
-    return applyMove(state, role, action.to);
-  }
+  if (action.kind === "move") return applyMove(state, role, action.to);
   return applyWall(state, role, action.wall);
 }
 
