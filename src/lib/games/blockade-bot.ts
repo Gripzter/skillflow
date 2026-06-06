@@ -5,13 +5,12 @@ import {
   getLegalMoves,
   goalRowFor,
   opponent,
-  validateWallPlacement,
+  wallInBounds,
   type BlockadeGameState,
   type BlockadeRole,
-  type BlockadeWall,
   type Pos,
 } from "./blockade-logic";
-import { bfsPathLength, bfsShortestPath } from "./blockade-bfs";
+import { bfsHasPathToGoal, bfsPathLength, bfsShortestPath } from "./blockade-bfs";
 import type { Wall } from "./blockade-collision";
 
 export function getBlockadeBotDelayMs(_difficulty: BotDifficulty): number {
@@ -22,95 +21,191 @@ type BotAction =
   | { kind: "move"; to: Pos }
   | { kind: "wall"; wall: Wall };
 
-function wallKey(w: Wall): string {
-  return `${w.orientation}:${w.x}:${w.y}`;
+type BotDecision =
+  | { action: "move" }
+  | { action: "wall"; wall: Wall };
+
+function wallsOverlap(a: Wall, b: Wall): boolean {
+  if (a.orientation === "horizontal" && b.orientation === "horizontal") {
+    return a.y === b.y && (a.x === b.x || a.x === b.x + 1 || a.x === b.x - 1);
+  }
+  if (a.orientation === "vertical" && b.orientation === "vertical") {
+    return a.x === b.x && (a.y === b.y || a.y === b.y + 1 || a.y === b.y - 1);
+  }
+  if (a.orientation === "horizontal" && b.orientation === "vertical") {
+    return (
+      (a.x === b.x || a.x + 1 === b.x) &&
+      (a.y === b.y || a.y === b.y + 1)
+    );
+  }
+  if (a.orientation === "vertical" && b.orientation === "horizontal") {
+    return (
+      (b.x === a.x || b.x + 1 === a.x) &&
+      (b.y === a.y || b.y === a.y + 1)
+    );
+  }
+  return false;
 }
 
-/** Walls that would block a single step on the opponent's path. */
-function wallsBlockingStep(from: Pos, to: Pos): Wall[] {
-  const out: Wall[] = [];
-  if (from.x === to.x && from.y !== to.y) {
-    if (to.y < from.y) {
-      out.push({ x: from.x, y: from.y, orientation: "horizontal" });
-      if (from.x > 0) out.push({ x: from.x - 1, y: from.y, orientation: "horizontal" });
-    } else {
-      out.push({ x: from.x, y: to.y, orientation: "horizontal" });
-      if (from.x > 0) out.push({ x: from.x - 1, y: to.y, orientation: "horizontal" });
-    }
-  }
-  if (from.y === to.y && from.x !== to.x) {
-    if (to.x < from.x) {
-      out.push({ x: from.x, y: from.y, orientation: "vertical" });
-      if (from.y > 0) out.push({ x: from.x, y: from.y - 1, orientation: "vertical" });
-    } else {
-      out.push({ x: to.x, y: from.y, orientation: "vertical" });
-      if (from.y > 0) out.push({ x: to.x, y: from.y - 1, orientation: "vertical" });
-    }
-  }
-  return out;
+function wallOverlapsAny(candidate: Wall, walls: Wall[]): boolean {
+  return walls.some((w) => wallsOverlap(candidate, w));
 }
 
-function findBestWall(
-  state: BlockadeGameState,
-  role: BlockadeRole
-): { wall: Wall | null; score: number; playerPath: Pos[] | null } {
-  const oppRole = opponent(role);
-  const walls = state.walls;
-  const oppPos = state.players[oppRole].position;
-  const botPos = state.players[role].position;
-  const oppGoal = goalRowFor(oppRole);
-  const botGoal = goalRowFor(role);
+function botChooseWallPlacement(
+  botPos: Pos,
+  playerPos: Pos,
+  botGoalRow: number,
+  playerGoalRow: number,
+  walls: Wall[],
+  botWallsRemaining: number
+): Wall | null {
+  if (botWallsRemaining <= 0) return null;
 
-  const playerPath = bfsShortestPath(oppPos, oppGoal, walls, botPos);
-  console.log("PLAYER PATH:", playerPath);
+  const playerPath = bfsShortestPath(playerPos, playerGoalRow, walls, null);
+  if (!playerPath || playerPath.length <= 2) return null;
 
-  const currentOppLen = bfsPathLength(oppPos, oppGoal, walls, botPos);
-  const currentBotLen = bfsPathLength(botPos, botGoal, walls, oppPos);
+  const currentPlayerPathLen = playerPath.length - 1;
 
-  const seen = new Set<string>();
-  const candidates: Wall[] = [];
+  let bestWall: Wall | null = null;
+  let bestScore = 0;
 
-  if (playerPath) {
-    for (let i = 0; i < playerPath.length - 1; i++) {
-      for (const w of wallsBlockingStep(playerPath[i], playerPath[i + 1])) {
-        const k = wallKey(w);
-        if (!seen.has(k)) {
-          seen.add(k);
-          candidates.push(w);
-        }
+  for (let i = 0; i < playerPath.length - 1; i++) {
+    const from = playerPath[i];
+    const to = playerPath[i + 1];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const candidates: Wall[] = [];
+
+    if (dy !== 0) {
+      const wallY = dy > 0 ? to.y : from.y;
+      for (let wx = Math.max(0, from.x - 1); wx <= Math.min(7, from.x); wx++) {
+        candidates.push({ x: wx, y: wallY, orientation: "horizontal" });
+      }
+    }
+
+    if (dx !== 0) {
+      const wallX = dx > 0 ? to.x : from.x;
+      for (let wy = Math.max(0, from.y - 1); wy <= Math.min(7, from.y); wy++) {
+        candidates.push({ x: wallX, y: wy, orientation: "vertical" });
+      }
+    }
+
+    for (const candidate of candidates) {
+      if (wallOverlapsAny(candidate, walls)) continue;
+      if (!wallInBounds(candidate)) continue;
+
+      const testWalls = [...walls, candidate];
+      if (!bfsHasPathToGoal(playerPos, playerGoalRow, testWalls)) continue;
+      if (!bfsHasPathToGoal(botPos, botGoalRow, testWalls)) continue;
+
+      const newPlayerPathLen = bfsPathLength(playerPos, playerGoalRow, testWalls, null);
+      const newBotPathLen = bfsPathLength(botPos, botGoalRow, testWalls, null);
+      const score =
+        newPlayerPathLen - currentPlayerPathLen - (newBotPathLen - currentBotPathLen);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestWall = candidate;
       }
     }
   }
 
-  let best: Wall | null = null;
-  let bestScore = 0;
+  if (bestWall && bestScore > 0) {
+    console.log(
+      "BOT WALL:",
+      bestWall,
+      "SCORE:",
+      bestScore,
+      "Player path:",
+      currentPlayerPathLen,
+      "→",
+      currentPlayerPathLen + (bestScore > 0 ? bestScore : 0)
+    );
+    return bestWall;
+  }
 
-  for (const candidate of candidates) {
-    if (!validateWallPlacement(state, role, candidate).valid) continue;
-    const trial: BlockadeWall[] = [...walls, { ...candidate, id: "t", owner: role }];
-    const newOppLen = bfsPathLength(oppPos, oppGoal, trial, botPos);
-    const newBotLen = bfsPathLength(botPos, botGoal, trial, oppPos);
-    const score = newOppLen - currentOppLen - (newBotLen - currentBotLen);
-    if (score > bestScore) {
-      bestScore = score;
-      best = candidate;
+  console.log("BOT: No good wall found, will move instead");
+  return null;
+}
+
+function botDecideAction(
+  botPos: Pos,
+  playerPos: Pos,
+  botGoalRow: number,
+  playerGoalRow: number,
+  walls: Wall[],
+  botWallsRemaining: number
+): BotDecision {
+  const botPathLen = bfsPathLength(botPos, botGoalRow, walls, null);
+  const playerPathLen = bfsPathLength(playerPos, playerGoalRow, walls, null);
+
+  if (botPathLen <= 2) return { action: "move" };
+
+  if (playerPathLen < botPathLen && botWallsRemaining > 0) {
+    const wall = botChooseWallPlacement(
+      botPos,
+      playerPos,
+      botGoalRow,
+      playerGoalRow,
+      walls,
+      botWallsRemaining
+    );
+    if (wall) return { action: "wall", wall };
+  }
+
+  if (
+    playerPathLen === botPathLen &&
+    botWallsRemaining > 0 &&
+    Math.random() < 0.3
+  ) {
+    const wall = botChooseWallPlacement(
+      botPos,
+      playerPos,
+      botGoalRow,
+      playerGoalRow,
+      walls,
+      botWallsRemaining
+    );
+    if (wall) return { action: "wall", wall };
+  }
+
+  return { action: "move" };
+}
+
+function chooseMove(
+  state: BlockadeGameState,
+  role: BlockadeRole
+): Pos | null {
+  const walls = state.walls;
+  const me = state.players[role].position;
+  const opp = state.players[opponent(role)].position;
+  const myGoal = goalRowFor(role);
+
+  const path = bfsShortestPath(me, myGoal, walls, opp);
+  console.log("BOT PATH:", path);
+  console.log("BOT NEXT MOVE:", path?.[1]);
+
+  if (path && path.length > 1) {
+    const next = path[1];
+    const legal = getLegalMoves(state, role);
+    if (legal.some((p) => p.x === next.x && p.y === next.y)) {
+      return next;
     }
   }
 
-  console.log("BOT WALL CHOICE:", best, "SCORE:", bestScore);
-  return { wall: bestScore > 0 ? best : null, score: bestScore, playerPath };
-}
+  const moves = getLegalMoves(state, role);
+  if (moves.length === 0) return null;
 
-function shouldPlaceWall(
-  botPath: number,
-  playerPath: number,
-  wallsLeft: number,
-  wallScore: number
-): boolean {
-  if (wallsLeft <= 0 || wallScore <= 0) return false;
-  if (playerPath <= botPath) return true;
-  if (wallScore >= 2) return true;
-  return false;
+  let best = moves[0];
+  let bestLen = bfsPathLength(best, myGoal, walls, opp);
+  for (const m of moves) {
+    const len = bfsPathLength(m, myGoal, walls, opp);
+    if (len < bestLen) {
+      bestLen = len;
+      best = m;
+    }
+  }
+  return best;
 }
 
 export function getBlockadeBotAction(
@@ -121,48 +216,40 @@ export function getBlockadeBotAction(
   if (state.phase !== "in_progress" || state.currentTurn !== role) return null;
 
   const walls = state.walls;
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const myGoal = goalRowFor(role);
-  const oppGoal = goalRowFor(opponent(role));
+  const botPos = state.players[role].position;
+  const playerPos = state.players[opponent(role)].position;
+  const botGoalRow = goalRowFor(role);
+  const playerGoalRow = goalRowFor(opponent(role));
+  const botWallsRemaining = state.players[role].wallsRemaining;
 
-  const path = bfsShortestPath(me, myGoal, walls, opp);
-  console.log("BOT PATH:", path);
-  console.log("BOT NEXT MOVE:", path?.[1]);
-  console.log("BOT GOAL ROW:", myGoal, "OPP GOAL ROW:", oppGoal);
+  const playerPath = bfsShortestPath(playerPos, playerGoalRow, walls, null);
+  console.log("PLAYER PATH:", playerPath);
 
-  const botPathLen = path ? path.length - 1 : 999;
-  const playerPathLen = bfsPathLength(opp, oppGoal, walls, me);
+  const decision = botDecideAction(
+    botPos,
+    playerPos,
+    botGoalRow,
+    playerGoalRow,
+    walls,
+    botWallsRemaining
+  );
 
-  const { wall: bestWall, score: wallScore } = findBestWall(state, role);
-
-  if (shouldPlaceWall(botPathLen, playerPathLen, state.players[role].wallsRemaining, wallScore)) {
-    if (bestWall) return { kind: "wall", wall: bestWall };
+  if (decision.action === "wall") {
+    return { kind: "wall", wall: decision.wall };
   }
 
-  if (path && path.length > 1) {
-    const next = path[1];
-    const legal = getLegalMoves(state, role);
-    if (legal.some((p) => p.x === next.x && p.y === next.y)) {
-      return { kind: "move", to: next };
-    }
-  }
+  const to = chooseMove(state, role);
+  if (to) return { kind: "move", to };
 
-  const moves = getLegalMoves(state, role);
-  if (moves.length > 0) {
-    let best = moves[0];
-    let bestLen = bfsPathLength(best, myGoal, walls, opp);
-    for (const m of moves) {
-      const len = bfsPathLength(m, myGoal, walls, opp);
-      if (len < bestLen) {
-        bestLen = len;
-        best = m;
-      }
-    }
-    return { kind: "move", to: best };
-  }
-
-  if (bestWall) return { kind: "wall", wall: bestWall };
+  const fallbackWall = botChooseWallPlacement(
+    botPos,
+    playerPos,
+    botGoalRow,
+    playerGoalRow,
+    walls,
+    botWallsRemaining
+  );
+  if (fallbackWall) return { kind: "wall", wall: fallbackWall };
 
   return null;
 }
