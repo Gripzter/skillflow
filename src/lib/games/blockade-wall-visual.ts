@@ -94,3 +94,33 @@ export function edgeSlotHitRect(slot: EdgeSlot, m: BoardMetrics): WallBarRect {
 export function wallFromSlot(slot: EdgeSlot): Wall {
   return { x: slot.x, y: slot.y, orientation: slot.orientation };
 }
+
+export function edgeSlotCenter(slot: EdgeSlot, m: BoardMetrics): { cx: number; cy: number } {
+  const bar = edgeSlotHitRect(slot, m);
+  return { cx: bar.left + bar.width / 2, cy: bar.top + bar.height / 2 };
+}
+
+/** Snap pointer to nearest valid edge for the chosen orientation (no interpolation). */
+export function findNearestEdgeSlot(
+  localX: number,
+  localY: number,
+  m: BoardMetrics,
+  orientation: "horizontal" | "vertical",
+  slots?: EdgeSlot[]
+): EdgeSlot | null {
+  const all = slots ?? listPlaceableEdgeSlots();
+  const candidates = all.filter((s) => s.orientation === orientation);
+  if (candidates.length === 0) return null;
+
+  let best: EdgeSlot | null = null;
+  let bestDist = Infinity;
+  for (const slot of candidates) {
+    const { cx, cy } = edgeSlotCenter(slot, m);
+    const d = (localX - cx) ** 2 + (localY - cy) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = slot;
+    }
+  }
+  return best;
+}

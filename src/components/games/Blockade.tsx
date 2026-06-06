@@ -11,7 +11,6 @@ import {
   applyWall,
   createInitialState,
   getLegalMoves,
-  opponent,
   parseState,
   serializeState,
   skipTurn,
@@ -63,15 +62,20 @@ export default function Blockade({
   const [state, setState] = useState<BlockadeGameState>(() => createInitialState());
   const [mode, setMode] = useState<Mode>("move");
   const [wallOrient, setWallOrient] = useState<"horizontal" | "vertical">("horizontal");
-  const [hoveredEdge, setHoveredEdge] = useState<EdgeSlot | null>(null);
-  const [lastEdgeKey, setLastEdgeKey] = useState<string | null>(null);
+  const [previewSlotKey, setPreviewSlotKey] = useState<string | null>(null);
   const [turnSecLeft, setTurnSecLeft] = useState(TURN_SEC);
   const [gameLog, setGameLog] = useState<LogEntry[]>([]);
+  const [placementLocked, setPlacementLocked] = useState(false);
+
   const gameStartRef = useRef(Date.now());
   const gameOverRef = useRef(false);
   const lastEventRef = useRef<Record<string, unknown> | null>(null);
   const botScheduledRef = useRef(false);
   const stateRef = useRef(state);
+  const previewSlotRef = useRef<EdgeSlot | null>(null);
+  const placingWallRef = useRef(false);
+  const transitioningRef = useRef(false);
+
   stateRef.current = state;
 
   const isMyTurn = state.currentTurn === myRole && state.phase === "in_progress";
@@ -85,6 +89,8 @@ export default function Blockade({
 
   const syncState = useCallback(
     (next: BlockadeGameState, logLine?: string) => {
+      transitioningRef.current = true;
+      setPlacementLocked(true);
       setState(next);
       if (logLine) appendLog(formatLogLine(logLine, player1.username, player2.username));
       if (isMultiplayer && sendGameEvent) {
@@ -95,6 +101,10 @@ export default function Blockade({
           logLine,
         }).catch(() => {});
       }
+      window.setTimeout(() => {
+        transitioningRef.current = false;
+        setPlacementLocked(false);
+      }, 150);
     },
     [isMultiplayer, sendGameEvent, myRole, appendLog, player1.username, player2.username]
   );
@@ -169,13 +179,14 @@ export default function Blockade({
   }, [state, isPlayer2Bot, isMultiplayer, botDifficulty, onGameEnd, appendLog, player1.username, player2.username]);
 
   const wallPreview = useMemo(() => {
-    if (mode !== "wall" || !hoveredEdge) return null;
+    if (mode !== "wall" || !previewSlotRef.current) return null;
+    const slot = previewSlotRef.current;
     return {
-      x: hoveredEdge.x,
-      y: hoveredEdge.y,
+      x: slot.x,
+      y: slot.y,
       orientation: wallOrient,
     };
-  }, [mode, hoveredEdge, wallOrient]);
+  }, [mode, previewSlotKey, wallOrient]);
 
   const wallPreviewValid = useMemo(() => {
     if (!wallPreview) return true;
@@ -187,16 +198,25 @@ export default function Blockade({
     return getLegalMoves(state, myRole);
   }, [state, isMyTurn, mode, myRole]);
 
+  const handleEdgeHover = useCallback((slot: EdgeSlot | null) => {
+    if (slot === null) {
+      if (previewSlotRef.current !== null) {
+        previewSlotRef.current = null;
+        setPreviewSlotKey(null);
+      }
+      return;
+    }
+    if (previewSlotRef.current?.key === slot.key) return;
+    previewSlotRef.current = slot;
+    setPreviewSlotKey(slot.key);
+  }, []);
+
   const placeWallFromSlot = useCallback(
     (slot: EdgeSlot) => {
+      if (placingWallRef.current || transitioningRef.current || placementLocked) return;
       if (!isMyTurn || gameOverRef.current || mode !== "wall") return;
 
-      if (lastEdgeKey === slot.key) {
-        setWallOrient((o) => (o === "horizontal" ? "vertical" : "horizontal"));
-        setLastEdgeKey(slot.key);
-        return;
-      }
-
+      placingWallRef.current = true;
       const w = {
         x: slot.x,
         y: slot.y,
@@ -205,7 +225,7 @@ export default function Blockade({
 
       const check = validateWallPlacement(state, myRole, w);
       if (!check.valid) {
-        setLastEdgeKey(slot.key);
+        placingWallRef.current = false;
         return;
       }
 
@@ -214,20 +234,31 @@ export default function Blockade({
       if (res) {
         syncState(res.state, res.log);
         setMode("move");
-        setHoveredEdge(null);
-        setLastEdgeKey(null);
+        previewSlotRef.current = null;
+        setPreviewSlotKey(null);
         if (res.state.winner) {
           gameOverRef.current = true;
           onGameEnd(res.state.winner);
         }
       }
+      placingWallRef.current = false;
     },
-    [isMyTurn, mode, wallOrient, lastEdgeKey, state, myRole, onPlayerAction, syncState, onGameEnd]
+    [
+      placementLocked,
+      isMyTurn,
+      mode,
+      wallOrient,
+      state,
+      myRole,
+      onPlayerAction,
+      syncState,
+      onGameEnd,
+    ]
   );
 
   const handleCellClick = useCallback(
     (pos: Pos) => {
-      if (!isMyTurn || gameOverRef.current || mode !== "move") return;
+      if (!isMyTurn || gameOverRef.current || mode !== "move" || transitioningRef.current) return;
       onPlayerAction?.();
       const res = applyMove(state, myRole, pos);
       if (res) {
@@ -265,15 +296,16 @@ export default function Blockade({
       if (e.key === "w" || e.key === "W") {
         if (!isMyTurn) return;
         setMode((m) => (m === "wall" ? "move" : "wall"));
-        setHoveredEdge(null);
+        previewSlotRef.current = null;
+        setPreviewSlotKey(null);
       }
       if (e.key === "Escape" && mode === "wall") {
         setMode("move");
-        setHoveredEdge(null);
+        previewSlotRef.current = null;
+        setPreviewSlotKey(null);
       }
-      if ((e.key === "r" || e.key === "R") && mode === "wall") {
-        setWallOrient((o) => (o === "horizontal" ? "vertical" : "horizontal"));
-      }
+      if ((e.key === "h" || e.key === "H") && mode === "wall") setWallOrient("horizontal");
+      if ((e.key === "v" || e.key === "V") && mode === "wall") setWallOrient("vertical");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -306,7 +338,8 @@ export default function Blockade({
           type="button"
           onClick={() => {
             setMode("move");
-            setHoveredEdge(null);
+            previewSlotRef.current = null;
+            setPreviewSlotKey(null);
           }}
           className={`rounded-md px-3 py-1.5 text-xs font-semibold ${mode === "move" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"}`}
         >
@@ -316,28 +349,45 @@ export default function Blockade({
           type="button"
           onClick={() => {
             setMode((m) => (m === "wall" ? "move" : "wall"));
-            setHoveredEdge(null);
+            previewSlotRef.current = null;
+            setPreviewSlotKey(null);
             setWallOrient("horizontal");
           }}
           disabled={!isMyTurn || state.players[myRole].wallsRemaining <= 0}
           className={`rounded-md px-3 py-1.5 text-xs font-semibold ${mode === "wall" ? "bg-[#FFFF00] text-black" : "bg-white/10 text-white"} disabled:opacity-40`}
         >
-          Wall {mode === "wall" ? "▲" : "▼"}
+          Wall
         </button>
         {mode === "wall" && (
           <>
             <button
               type="button"
-              onClick={() => setWallOrient((o) => (o === "horizontal" ? "vertical" : "horizontal"))}
-              className="rounded-md border border-white/20 px-2 py-1.5 text-xs text-white"
+              onClick={() => {
+                setWallOrient("horizontal");
+                previewSlotRef.current = null;
+                setPreviewSlotKey(null);
+              }}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${wallOrient === "horizontal" ? "bg-[#00FFD0] text-black" : "border border-white/20 text-white"}`}
             >
-              Flip {wallOrient === "horizontal" ? "↔" : "↕"}
+              H
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setWallOrient("vertical");
+                previewSlotRef.current = null;
+                setPreviewSlotKey(null);
+              }}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${wallOrient === "vertical" ? "bg-[#00FFD0] text-black" : "border border-white/20 text-white"}`}
+            >
+              V
             </button>
             <button
               type="button"
               onClick={() => {
                 setMode("move");
-                setHoveredEdge(null);
+                previewSlotRef.current = null;
+                setPreviewSlotKey(null);
               }}
               className="rounded-md border border-white/20 px-2 py-1.5 text-xs text-body-gray"
             >
@@ -349,7 +399,7 @@ export default function Blockade({
 
       {mode === "wall" && (
         <p className="text-center text-xs text-body-gray">
-          Hover an edge · click to place · click same edge again to flip orientation
+          Choose H or V, hover an edge, then click to place
         </p>
       )}
 
@@ -361,12 +411,10 @@ export default function Blockade({
         wallPreview={wallPreview}
         wallPreviewValid={wallPreviewValid}
         wallMode={mode === "wall" && isMyTurn}
+        wallOrient={wallOrient}
+        placementLocked={placementLocked}
         onCellClick={handleCellClick}
-        onEdgeHover={(slot) => {
-          if (mode !== "wall" || !isMyTurn) return;
-          setHoveredEdge(slot);
-          setWallOrient(slot.orientation);
-        }}
+        onEdgeHover={handleEdgeHover}
         onEdgePlace={placeWallFromSlot}
       />
 

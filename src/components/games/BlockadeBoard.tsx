@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   BOARD_SIZE,
   P1_GOAL_ROW,
@@ -10,10 +10,9 @@ import {
 } from "@/lib/games/blockade-logic";
 import {
   boardPixelSize,
-  edgeSlotHitRect,
+  findNearestEdgeSlot,
   getWallBarRect,
   listPlaceableEdgeSlots,
-  wallThickness,
   type BoardMetrics,
   type EdgeSlot,
 } from "@/lib/games/blockade-wall-visual";
@@ -26,9 +25,11 @@ type Props = {
   wallPreview?: { x: number; y: number; orientation: "horizontal" | "vertical" } | null;
   wallPreviewValid?: boolean;
   wallMode?: boolean;
+  wallOrient?: "horizontal" | "vertical";
+  placementLocked?: boolean;
   onCellClick?: (pos: Pos) => void;
-  onEdgePlace?: (slot: EdgeSlot) => void;
   onEdgeHover?: (slot: EdgeSlot | null) => void;
+  onEdgePlace?: (slot: EdgeSlot) => void;
 };
 
 const P1_COLOR = "#FFFF00";
@@ -42,11 +43,16 @@ export default function BlockadeBoard({
   wallPreview,
   wallPreviewValid = true,
   wallMode = false,
+  wallOrient = "horizontal",
+  placementLocked = false,
   onCellClick,
-  onEdgePlace,
   onEdgeHover,
+  onEdgePlace,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const lastSlotKeyRef = useRef<string | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [cellSize, setCellSize] = useState(40);
   const groove = cellSize >= 36 ? 8 : 6;
   const pad = 10;
@@ -58,6 +64,7 @@ export default function BlockadeBoard({
 
   const { width, height } = useMemo(() => boardPixelSize(metrics), [metrics]);
   const step = cellSize + groove;
+  const edgeSlots = useMemo(() => listPlaceableEdgeSlots(), []);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -90,11 +97,71 @@ export default function BlockadeBoard({
     return list;
   }, [walls, wallPreview]);
 
-  const edgeSlots = useMemo(() => listPlaceableEdgeSlots(), []);
+  const updatePreviewAt = useCallback(
+    (clientX: number, clientY: number, force = false) => {
+      if (!wallMode || placementLocked || !boardRef.current) return;
+      lastPointerRef.current = { x: clientX, y: clientY };
+      const rect = boardRef.current.getBoundingClientRect();
+      const localX = clientX - rect.left;
+      const localY = clientY - rect.top;
+      const slot = findNearestEdgeSlot(localX, localY, metrics, wallOrient, edgeSlots);
+      const key = slot?.key ?? null;
+      if (!force && key === lastSlotKeyRef.current) return;
+      lastSlotKeyRef.current = key;
+      onEdgeHover?.(slot);
+    },
+    [wallMode, placementLocked, metrics, wallOrient, edgeSlots, onEdgeHover]
+  );
+
+  useEffect(() => {
+    lastSlotKeyRef.current = null;
+    const ptr = lastPointerRef.current;
+    if (ptr && wallMode) updatePreviewAt(ptr.x, ptr.y, true);
+  }, [wallOrient, wallMode, updatePreviewAt]);
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      updatePreviewAt(e.clientX, e.clientY);
+    },
+    [updatePreviewAt]
+  );
+
+  const handlePointerLeave = useCallback(() => {
+    if (lastSlotKeyRef.current !== null) {
+      lastSlotKeyRef.current = null;
+      onEdgeHover?.(null);
+    }
+  }, [onEdgeHover]);
+
+  const handleWallPlace = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!wallMode || placementLocked || !boardRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = boardRef.current.getBoundingClientRect();
+      const slot = findNearestEdgeSlot(
+        e.clientX - rect.left,
+        e.clientY - rect.top,
+        metrics,
+        wallOrient,
+        edgeSlots
+      );
+      if (slot) onEdgePlace?.(slot);
+    },
+    [wallMode, placementLocked, metrics, wallOrient, edgeSlots, onEdgePlace]
+  );
+
+  useEffect(() => {
+    if (!wallMode) {
+      lastSlotKeyRef.current = null;
+      onEdgeHover?.(null);
+    }
+  }, [wallMode, onEdgeHover]);
 
   return (
     <div ref={containerRef} className="w-full max-w-full">
       <div
+        ref={boardRef}
         className="relative mx-auto overflow-hidden rounded-xl"
         style={{
           width,
@@ -133,14 +200,15 @@ export default function BlockadeBoard({
               <button
                 key={key}
                 type="button"
-                onClick={() => onCellClick?.({ x, y })}
-                className="absolute rounded-sm border transition-colors duration-150"
+                onClick={() => !wallMode && onCellClick?.({ x, y })}
+                className="absolute rounded-sm border"
                 style={{
                   left: pad + x * step,
                   top: pad + y * step,
                   width: cellSize,
                   height: cellSize,
                   zIndex: 2,
+                  pointerEvents: wallMode ? "none" : "auto",
                   borderColor: isP1Goal
                     ? "rgba(255,255,0,0.35)"
                     : isP2Goal
@@ -184,29 +252,15 @@ export default function BlockadeBoard({
           );
         })}
 
-        {wallMode &&
-          edgeSlots.map((slot) => {
-            const hit = edgeSlotHitRect(slot, metrics);
-            return (
-              <button
-                key={slot.key}
-                type="button"
-                className="absolute z-20 cursor-crosshair bg-transparent hover:bg-[#00FFD0]/10"
-                style={{
-                  left: hit.left,
-                  top: hit.top,
-                  width: hit.width,
-                  height: hit.height,
-                }}
-                onMouseEnter={() => onEdgeHover?.(slot)}
-                onMouseLeave={() => onEdgeHover?.(null)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdgePlace?.(slot);
-                }}
-              />
-            );
-          })}
+        {wallMode && (
+          <div
+            className="absolute inset-0 z-20 touch-none"
+            style={{ cursor: placementLocked ? "not-allowed" : "crosshair" }}
+            onPointerMove={handlePointerMove}
+            onPointerLeave={handlePointerLeave}
+            onPointerDown={handleWallPlace}
+          />
+        )}
       </div>
 
       {wallMode && wallPreview && !wallPreviewValid && (
