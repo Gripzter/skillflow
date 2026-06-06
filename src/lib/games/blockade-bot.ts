@@ -21,6 +21,7 @@ import {
   type Pos,
   type WallSupply,
 } from "./blockade-logic";
+import { rebuildBlockedEdges } from "./blockade-edges";
 import {
   bfsShortestPath,
   BOARD_SIZE,
@@ -78,7 +79,16 @@ function bfsPathLength(
   walls: BlockadeWall[],
   opponentPos: Pos
 ): number {
-  return shortestPathToGoal(start, goalRow, walls, opponentPos);
+  return shortestPathToGoal(start, goalRow, rebuildBlockedEdges(walls), opponentPos);
+}
+
+function bfsPath(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  opponentPos: Pos
+): Pos[] | null {
+  return bfsShortestPath(start, goalRow, rebuildBlockedEdges(walls), opponentPos);
 }
 
 function buildBotView(state: BlockadeGameState, role: BlockadeRole): BotView {
@@ -179,7 +189,7 @@ function findBestWallPlacement(
 ): { wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">; score: number } | null {
   const { botPosition, playerPosition, walls, botGoalRow, playerGoalRow } = view;
 
-  const playerPath = bfsShortestPath(playerPosition, playerGoalRow, walls, botPosition);
+  const playerPath = bfsPath(playerPosition, playerGoalRow, walls, botPosition);
   const currentPlayerPathLen = playerPath ? playerPath.length - 1 : 999;
   const currentBotPathLen = bfsPathLength(botPosition, botGoalRow, walls, playerPosition);
 
@@ -271,7 +281,7 @@ function evaluateWallBreak(
   const walls = view.walls;
   const myGoal = view.botGoalRow;
   const baseline = bfsPathLength(me, myGoal, walls, opp);
-  const botPath = bfsShortestPath(me, myGoal, walls, opp);
+  const botPath = bfsPath(me, myGoal, walls, opp);
 
   let bestId: string | null = null;
   let bestGain = 0;
@@ -310,7 +320,7 @@ function pickMoveAlongPath(
   const legal = getLegalMoves(state, role);
   if (legal.length === 0) return null;
 
-  const path = bfsShortestPath(view.botPosition, view.botGoalRow, view.walls, view.playerPosition);
+  const path = bfsPath(view.botPosition, view.botGoalRow, view.walls, view.playerPosition);
   if (path && path.length > 1) {
     let next = path[1];
     const last = lastBotPositions[role];
@@ -351,7 +361,7 @@ function botTakeTurn(state: BlockadeGameState, role: BlockadeRole): BotAction | 
   }
 
   if (botPathLen === 1) {
-    const path = bfsShortestPath(botPosition, botGoalRow, walls, playerPosition);
+    const path = bfsPath(botPosition, botGoalRow, walls, playerPosition);
     if (path && path.length > 1) {
       return { kind: "move", to: path[1] };
     }

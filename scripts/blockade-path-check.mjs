@@ -78,8 +78,42 @@ function buildBlockedEdgeSet(walls) {
   return set;
 }
 
+function wallToBlockedEdges(wall) {
+  const edges = [];
+  const add = (x1, y1, x2, y2) => edges.push({ x1, y1, x2, y2 });
+  if (wall.type === "standard") {
+    if (wall.orientation === "h") {
+      add(wall.col, wall.row, wall.col, wall.row + 1);
+      add(wall.col + 1, wall.row, wall.col + 1, wall.row + 1);
+    } else {
+      add(wall.col, wall.row, wall.col + 1, wall.row);
+      add(wall.col, wall.row + 1, wall.col + 1, wall.row + 1);
+    }
+    return edges;
+  }
+  return edges;
+}
+
+function rebuildBlockedEdges(walls) {
+  const out = [];
+  for (const w of walls) out.push(...wallToBlockedEdges(w));
+  return out;
+}
+
+function isMovementBlocked(fromX, fromY, toX, toY, blockedEdges) {
+  for (const edge of blockedEdges) {
+    if (
+      (edge.x1 === fromX && edge.y1 === fromY && edge.x2 === toX && edge.y2 === toY) ||
+      (edge.x1 === toX && edge.y1 === toY && edge.x2 === fromX && edge.y2 === fromY)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function bfsHasPath(start, goalRow, walls) {
-  const edgeSet = buildBlockedEdgeSet(walls);
+  const blockedEdges = rebuildBlockedEdges(walls);
   const visited = new Set([posKey(start)]);
   const queue = [start];
   const CARDINAL = [
@@ -94,7 +128,7 @@ function bfsHasPath(start, goalRow, walls) {
     for (const d of CARDINAL) {
       const next = { x: cur.x + d.x, y: cur.y + d.y };
       if (next.x < 0 || next.x >= BOARD_SIZE || next.y < 0 || next.y >= BOARD_SIZE) continue;
-      if (edgeSet.has(edgeKey(cur, next))) continue;
+      if (isMovementBlocked(cur.x, cur.y, next.x, next.y, blockedEdges)) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
       visited.add(key);
@@ -127,10 +161,18 @@ const P2_GOAL = 0;
 // Test 1: P1 at (4,0) reaches row 8 with no walls
 assert("empty board P1 path", bfsHasPath({ x: 4, y: 0 }, P1_GOAL, []));
 
-// Test 2: wall across column 4 between y=0 and y=1 blocks direct path
+// Test 2: horizontal wall at row 0 col 4 blocks (4,0)↔(4,1)
 const blockStart = { type: "standard", orientation: "h", row: 0, col: 4 };
 const withBlock = [blockStart];
-assert("wall blocks step up from (4,0)", !bfsHasPath({ x: 4, y: 0 }, P1_GOAL, withBlock) === false || bfsHasPath({ x: 4, y: 1 }, P1_GOAL, withBlock));
+const blockEdges = rebuildBlockedEdges(withBlock);
+assert(
+  "wall blocks direct step (4,0)→(4,1)",
+  isMovementBlocked(4, 0, 4, 1, blockEdges)
+);
+assert(
+  "detour (4,0)→(3,0) not blocked",
+  !isMovementBlocked(4, 0, 3, 0, blockEdges)
+);
 
 // Can still reach via detour from (4,0)?
 const canDetour = bfsHasPath({ x: 4, y: 0 }, P1_GOAL, withBlock);

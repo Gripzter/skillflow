@@ -4,10 +4,14 @@ import {
   buildBlockedEdgeSet,
   getAllMoveTargets,
   getBlockedEdges,
-  isEdgeBlocked,
-  posKey,
   type Pos,
 } from "./blockade-bfs";
+import {
+  isMovementBlocked,
+  rebuildBlockedEdges,
+  wallToBlockedEdges,
+  type BlockedEdge,
+} from "./blockade-edges";
 
 export type { Pos };
 export { BOARD_SIZE };
@@ -50,6 +54,8 @@ export type PlayerState = {
 export type BlockadeGameState = {
   phase: GamePhase;
   walls: BlockadeWall[];
+  /** Flat list of every blocked cell-edge from active walls. Rebuilt on wall changes. */
+  blockedEdges: BlockedEdge[];
   players: {
     player1: PlayerState;
     player2: PlayerState;
@@ -83,10 +89,23 @@ export const ABILITY_DEFS: {
 
 export const DEFAULT_ABILITIES: BlockadeAbilityId[] = ["double_move", "wall_break"];
 
+export function syncBlockedEdges(state: BlockadeGameState): BlockadeGameState {
+  state.blockedEdges = rebuildBlockedEdges(activeWalls(state));
+  return state;
+}
+
+/** Active blocked edges — always rebuilt from active walls (source of truth). */
+export function getBlockedEdgesForState(state: BlockadeGameState): BlockedEdge[] {
+  const edges = rebuildBlockedEdges(activeWalls(state));
+  state.blockedEdges = edges;
+  return edges;
+}
+
 export function createInitialState(): BlockadeGameState {
   return {
     phase: "ability_selection",
     walls: [],
+    blockedEdges: [],
     players: {
       player1: {
         position: { ...P1_START },
@@ -133,7 +152,8 @@ export function expireBombs(state: BlockadeGameState): BlockadeGameState {
     (w) => !w.isBomb || w.expiresAtTurn === undefined || w.expiresAtTurn > state.turnNumber
   );
   if (walls.length === before) return state;
-  return { ...state, walls };
+  const next = { ...state, walls };
+  return syncBlockedEdges(next);
 }
 
 function cloneState(s: BlockadeGameState): BlockadeGameState {
@@ -163,7 +183,8 @@ export function getLegalMoves(
 ): Pos[] {
   const me = state.players[role].position;
   const opp = state.players[opponent(role)].position;
-  return getAllMoveTargets(me, activeWalls(state), opp);
+  const blockedEdges = getBlockedEdgesForState(state);
+  return getAllMoveTargets(me, blockedEdges, opp);
 }
 
 export function isValidMove(
@@ -172,10 +193,23 @@ export function isValidMove(
   state: BlockadeGameState,
   role: BlockadeRole
 ): boolean {
+  const walls = activeWalls(state);
+  const blockedEdges = getBlockedEdgesForState(state);
   const opp = state.players[opponent(role)].position;
-  return getAllMoveTargets(from, activeWalls(state), opp).some(
-    (p) => p.x === to.x && p.y === to.y
-  );
+
+  console.log("=== MOVE VALIDATION ===");
+  console.log("Moving from:", from, "to:", to);
+  console.log("All walls on board:", JSON.stringify(walls, null, 2));
+  console.log("Blocked edges count:", blockedEdges.length);
+  console.log("Blocked edges:", JSON.stringify(blockedEdges, null, 2));
+
+  const directBlocked = isMovementBlocked(from.x, from.y, to.x, to.y, blockedEdges);
+  console.log("Direct edge blocked:", directBlocked);
+
+  const legal = getAllMoveTargets(from, blockedEdges, opp);
+  const allowed = legal.some((p) => p.x === to.x && p.y === to.y);
+  console.log("Move allowed:", allowed, "legal targets:", legal);
+  return allowed;
 }
 
 /**
@@ -190,9 +224,12 @@ export function canPlaceWallPathCheck(
   player1GoalRow: number = P1_GOAL_ROW,
   player2GoalRow: number = P2_GOAL_ROW
 ): { allowed: boolean; player1HasPath: boolean; player2HasPath: boolean } {
-  const allWalls = [...existingWalls, newWall];
-  const player1HasPath = bfsHasPath(player1Pos, player1GoalRow, allWalls);
-  const player2HasPath = bfsHasPath(player2Pos, player2GoalRow, allWalls);
+  const trialEdges = [
+    ...rebuildBlockedEdges(existingWalls),
+    ...wallToBlockedEdges(newWall),
+  ];
+  const player1HasPath = bfsHasPath(player1Pos, player1GoalRow, trialEdges);
+  const player2HasPath = bfsHasPath(player2Pos, player2GoalRow, trialEdges);
   return {
     allowed: player1HasPath && player2HasPath,
     player1HasPath,
@@ -413,10 +450,13 @@ export function applyWall(
     expiresAtTurn: asBomb ? next.turnNumber + 3 : undefined,
   };
   next.walls.push(wall);
+  syncBlockedEdges(next);
+
+  console.log("Wall placed — new blocked edges:", JSON.stringify(next.blockedEdges, null, 2));
 
   const allAfter = activeWalls(next);
-  const postP1 = bfsHasPath(next.players.player1.position, P1_GOAL_ROW, allAfter);
-  const postP2 = bfsHasPath(next.players.player2.position, P2_GOAL_ROW, allAfter);
+  const postP1 = bfsHasPath(next.players.player1.position, P1_GOAL_ROW, next.blockedEdges);
+  const postP2 = bfsHasPath(next.players.player2.position, P2_GOAL_ROW, next.blockedEdges);
   console.log("Wall placement placed:", {
     wallType: wall.type,
     wallPosition: { row: wall.row, col: wall.col },
@@ -451,6 +491,7 @@ export function applyWallBreak(
 
   const next = cloneState(state);
   next.walls.splice(idx, 1);
+  syncBlockedEdges(next);
   markAbilityUsed(next, role, "wall_break");
   const name = role === "player1" ? "Player1" : "Player2";
   return finishTurn(next, `${name} used Wall Break!`);
@@ -458,7 +499,7 @@ export function applyWallBreak(
 
 export function getGhostStepTargets(state: BlockadeGameState, role: BlockadeRole): Pos[] {
   const me = state.players[role].position;
-  const walls = activeWalls(state);
+  const blockedEdges = getBlockedEdgesForState(state);
   const targets: Pos[] = [];
   const dirs = [{ x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }];
 
@@ -466,8 +507,8 @@ export function getGhostStepTargets(state: BlockadeGameState, role: BlockadeRole
     const adj = { x: me.x + d.x, y: me.y + d.y };
     const beyond = { x: me.x + d.x * 2, y: me.y + d.y * 2 };
     if (beyond.x < 0 || beyond.x >= BOARD_SIZE || beyond.y < 0 || beyond.y >= BOARD_SIZE) continue;
-    if (!isEdgeBlocked(me, adj, walls)) continue;
-    if (isEdgeBlocked(adj, beyond, walls)) continue;
+    if (!isMovementBlocked(me.x, me.y, adj.x, adj.y, blockedEdges)) continue;
+    if (isMovementBlocked(adj.x, adj.y, beyond.x, beyond.y, blockedEdges)) continue;
     const opp = state.players[opponent(role)].position;
     if (beyond.x === opp.x && beyond.y === opp.y) continue;
     targets.push(beyond);
@@ -538,7 +579,11 @@ export function serializeState(state: BlockadeGameState): Record<string, unknown
 export function parseState(raw: Record<string, unknown> | null): BlockadeGameState | null {
   if (!raw || typeof raw !== "object") return null;
   try {
-    return raw as unknown as BlockadeGameState;
+    const state = raw as unknown as BlockadeGameState;
+    if (!Array.isArray(state.blockedEdges)) {
+      state.blockedEdges = [];
+    }
+    return syncBlockedEdges(state);
   } catch {
     return null;
   }

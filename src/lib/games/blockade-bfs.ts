@@ -1,8 +1,14 @@
 /**
- * BFS pathfinding for Blockade (9×9 grid, walls on edges between cells).
+ * BFS pathfinding for Blockade — uses flat blockedEdges array for collision.
  */
 
 import type { BlockadeWall, Pos } from "./blockade-logic";
+import {
+  isMovementBlocked,
+  rebuildBlockedEdges,
+  wallToBlockedEdges,
+  type BlockedEdge,
+} from "./blockade-edges";
 
 export const BOARD_SIZE = 9;
 
@@ -14,7 +20,14 @@ function inBounds(p: Pos): boolean {
   return p.x >= 0 && p.x < BOARD_SIZE && p.y >= 0 && p.y < BOARD_SIZE;
 }
 
-/** Undirected edge key for two adjacent cell centers. */
+/** Decompose wall to edge pairs (for overlap checks). */
+export function getBlockedEdges(wall: BlockadeWall): [Pos, Pos][] {
+  return wallToBlockedEdges(wall).map((e) => [
+    { x: e.x1, y: e.y1 },
+    { x: e.x2, y: e.y2 },
+  ]);
+}
+
 export function edgeKey(a: Pos, b: Pos): string {
   const k1 = posKey(a);
   const k2 = posKey(b);
@@ -23,99 +36,33 @@ export function edgeKey(a: Pos, b: Pos): string {
 
 export function buildBlockedEdgeSet(walls: BlockadeWall[]): Set<string> {
   const set = new Set<string>();
-  for (const wall of walls) {
-    for (const [e1, e2] of getBlockedEdges(wall)) {
-      set.add(edgeKey(e1, e2));
-    }
+  for (const e of rebuildBlockedEdges(walls)) {
+    set.add(edgeKey({ x: e.x1, y: e.y1 }, { x: e.x2, y: e.y2 }));
   }
   return set;
 }
 
-/** True if a wall segment blocks the edge between (x1,y1) and (x2,y2). */
 export function isEdgeBlocked(
   x1: number,
   y1: number,
   x2: number,
   y2: number,
-  walls: BlockadeWall[]
+  blockedEdges: BlockedEdge[]
 ): boolean {
-  return isEdgeBlockedPos({ x: x1, y: y1 }, { x: x2, y: y2 }, walls);
+  return isMovementBlocked(x1, y1, x2, y2, blockedEdges);
 }
 
-export function isEdgeBlockedPos(a: Pos, b: Pos, walls: BlockadeWall[]): boolean {
+export function isEdgeBlockedPos(a: Pos, b: Pos, blockedEdges: BlockedEdge[]): boolean {
   if (!inBounds(a) || !inBounds(b)) return true;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   if (Math.abs(dx) + Math.abs(dy) !== 1) return true;
-  const key = edgeKey(a, b);
-  const set = buildBlockedEdgeSet(walls);
-  return set.has(key);
+  return isMovementBlocked(a.x, a.y, b.x, b.y, blockedEdges);
 }
 
-function isEdgeBlockedInSet(a: Pos, b: Pos, edgeSet: Set<string>): boolean {
-  if (!inBounds(a) || !inBounds(b)) return true;
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  if (Math.abs(dx) + Math.abs(dy) !== 1) return true;
-  return edgeSet.has(edgeKey(a, b));
-}
-
-/** All undirected edges blocked by a wall (pairs of adjacent cell centers). */
-export function getBlockedEdges(wall: BlockadeWall): [Pos, Pos][] {
-  const out: [Pos, Pos][] = [];
-  const add = (x1: number, y1: number, x2: number, y2: number) => {
-    out.push([{ x: x1, y: y1 }, { x: x2, y: y2 }]);
-  };
-
-  if (wall.type === "standard") {
-    if (wall.orientation === "h") {
-      const r = wall.row;
-      const c = wall.col;
-      add(c, r, c, r + 1);
-      add(c + 1, r, c + 1, r + 1);
-    } else {
-      const r = wall.row;
-      const c = wall.col;
-      add(c, r, c + 1, r);
-      add(c, r + 1, c + 1, r + 1);
-    }
-    return out;
-  }
-
-  if (wall.type === "triple") {
-    if (wall.orientation === "h") {
-      const r = wall.row;
-      const c = wall.col;
-      for (let i = 0; i < 3; i++) add(c + i, r, c + i, r + 1);
-    } else {
-      const r = wall.row;
-      const c = wall.col;
-      for (let i = 0; i < 3; i++) add(c, r + i, c + 1, r + i);
-    }
-    return out;
-  }
-
-  const r = wall.row;
-  const c = wall.col;
-  const rot = wall.rotation ?? 0;
-  if (rot === 0) {
-    add(c, r, c + 1, r);
-    add(c + 1, r, c + 1, r + 1);
-    add(c, r, c, r + 1);
-  } else if (rot === 1) {
-    add(c, r, c, r + 1);
-    add(c, r + 1, c + 1, r + 1);
-    add(c + 1, r, c + 1, r + 1);
-  } else if (rot === 2) {
-    add(c, r + 1, c + 1, r + 1);
-    add(c, r, c + 1, r);
-    add(c, r, c, r + 1);
-  } else {
-    add(c, r, c + 1, r);
-    add(c, r, c, r + 1);
-    add(c, r + 1, c + 1, r + 1);
-  }
-  return out;
+/** @deprecated Use blockedEdges. */
+export function isEdgeBlockedFromWalls(a: Pos, b: Pos, walls: BlockadeWall[]): boolean {
+  return isEdgeBlockedPos(a, b, rebuildBlockedEdges(walls));
 }
 
 const CARDINAL: Pos[] = [
@@ -127,25 +74,27 @@ const CARDINAL: Pos[] = [
 
 export function getReachableNeighbors(
   from: Pos,
-  walls: BlockadeWall[],
+  blockedEdges: BlockedEdge[],
   opponentPos: Pos | null
 ): Pos[] {
-  const edgeSet = buildBlockedEdgeSet(walls);
   const neighbors: Pos[] = [];
   for (const d of CARDINAL) {
     const next = { x: from.x + d.x, y: from.y + d.y };
     if (!inBounds(next)) continue;
-    if (isEdgeBlockedInSet(from, next, edgeSet)) continue;
+    if (isMovementBlocked(from.x, from.y, next.x, next.y, blockedEdges)) continue;
     if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
     neighbors.push(next);
   }
   return neighbors;
 }
 
-/** Quoridor-style jump when adjacent to opponent. */
-export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: BlockadeWall[]): Pos[] {
+export function getJumpDestinations(
+  from: Pos,
+  opponentPos: Pos,
+  blockedEdges: BlockedEdge[]
+): Pos[] {
   if (Math.abs(from.x - opponentPos.x) + Math.abs(from.y - opponentPos.y) !== 1) return [];
-  if (isEdgeBlockedPos(from, opponentPos, walls)) return [];
+  if (isMovementBlocked(from.x, from.y, opponentPos.x, opponentPos.y, blockedEdges)) return [];
 
   const behind = {
     x: opponentPos.x + (opponentPos.x - from.x),
@@ -153,7 +102,7 @@ export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: Blockade
   };
   const results: Pos[] = [];
 
-  if (inBounds(behind) && !isEdgeBlockedPos(opponentPos, behind, walls)) {
+  if (inBounds(behind) && !isMovementBlocked(opponentPos.x, opponentPos.y, behind.x, behind.y, blockedEdges)) {
     results.push(behind);
     return results;
   }
@@ -166,7 +115,7 @@ export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: Blockade
   }
   for (const p of perp) {
     if (!inBounds(p)) continue;
-    if (isEdgeBlockedPos(opponentPos, p, walls)) continue;
+    if (isMovementBlocked(opponentPos.x, opponentPos.y, p.x, p.y, blockedEdges)) continue;
     results.push(p);
   }
   return results;
@@ -174,7 +123,7 @@ export function getJumpDestinations(from: Pos, opponentPos: Pos, walls: Blockade
 
 export function getAllMoveTargets(
   from: Pos,
-  walls: BlockadeWall[],
+  blockedEdges: BlockedEdge[],
   opponentPos: Pos | null
 ): Pos[] {
   const set = new Set<string>();
@@ -182,10 +131,10 @@ export function getAllMoveTargets(
     if (inBounds(p)) set.add(posKey(p));
   };
 
-  for (const n of getReachableNeighbors(from, walls, opponentPos)) add(n);
+  for (const n of getReachableNeighbors(from, blockedEdges, opponentPos)) add(n);
 
   if (opponentPos) {
-    for (const j of getJumpDestinations(from, opponentPos, walls)) add(j);
+    for (const j of getJumpDestinations(from, opponentPos, blockedEdges)) add(j);
   }
 
   return Array.from(set).map((k) => {
@@ -194,12 +143,7 @@ export function getAllMoveTargets(
   });
 }
 
-/**
- * Cardinal BFS for wall-placement legality (Quoridor rules).
- * Other pawns are NOT obstacles — only walls block edges.
- */
-export function bfsHasPath(start: Pos, goalRow: number, walls: BlockadeWall[]): boolean {
-  const edgeSet = buildBlockedEdgeSet(walls);
+export function bfsHasPath(start: Pos, goalRow: number, blockedEdges: BlockedEdge[]): boolean {
   const visited = new Set<string>();
   const queue: Pos[] = [start];
   visited.add(posKey(start));
@@ -211,7 +155,7 @@ export function bfsHasPath(start: Pos, goalRow: number, walls: BlockadeWall[]): 
     for (const d of CARDINAL) {
       const next = { x: cur.x + d.x, y: cur.y + d.y };
       if (!inBounds(next)) continue;
-      if (isEdgeBlockedInSet(cur, next, edgeSet)) continue;
+      if (isMovementBlocked(cur.x, cur.y, next.x, next.y, blockedEdges)) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
       visited.add(key);
@@ -221,21 +165,20 @@ export function bfsHasPath(start: Pos, goalRow: number, walls: BlockadeWall[]): 
   return false;
 }
 
-/** @deprecated Use bfsHasPath for wall validation; opponent is ignored for legality checks. */
+/** @deprecated */
 export function canReachGoalRow(
   start: Pos,
   goalRow: number,
   walls: BlockadeWall[],
   _opponentPos: Pos | null
 ): boolean {
-  return bfsHasPath(start, goalRow, walls);
+  return bfsHasPath(start, goalRow, rebuildBlockedEdges(walls));
 }
 
-/** Shortest path from start to any cell on goalRow (includes jumps). Returns full path or null. */
 export function bfsShortestPath(
   start: Pos,
   goalRow: number,
-  walls: BlockadeWall[],
+  blockedEdges: BlockedEdge[],
   opponentPos: Pos | null
 ): Pos[] | null {
   const visited = new Set<string>();
@@ -256,7 +199,7 @@ export function bfsShortestPath(
       return path;
     }
 
-    for (const next of getAllMoveTargets(cur, walls, opponentPos)) {
+    for (const next of getAllMoveTargets(cur, blockedEdges, opponentPos)) {
       if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
@@ -268,11 +211,10 @@ export function bfsShortestPath(
   return null;
 }
 
-/** Shortest path length to goal row (for bot; includes jumps). */
 export function shortestPathToGoal(
   start: Pos,
   goalRow: number,
-  walls: BlockadeWall[],
+  blockedEdges: BlockedEdge[],
   opponentPos: Pos | null
 ): number {
   const visited = new Map<string, number>();
@@ -283,8 +225,7 @@ export function shortestPathToGoal(
     const { p: cur, d } = queue.shift()!;
     if (cur.y === goalRow) return d;
 
-    const moves = getAllMoveTargets(cur, walls, opponentPos);
-    for (const next of moves) {
+    for (const next of getAllMoveTargets(cur, blockedEdges, opponentPos)) {
       if (opponentPos && next.x === opponentPos.x && next.y === opponentPos.y) continue;
       const key = posKey(next);
       if (visited.has(key)) continue;
@@ -293,4 +234,27 @@ export function shortestPathToGoal(
     }
   }
   return 999;
+}
+
+/** Convenience: pathfinding from wall objects (rebuilds edges). */
+export function bfsHasPathFromWalls(start: Pos, goalRow: number, walls: BlockadeWall[]): boolean {
+  return bfsHasPath(start, goalRow, rebuildBlockedEdges(walls));
+}
+
+export function bfsShortestPathFromWalls(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  opponentPos: Pos | null
+): Pos[] | null {
+  return bfsShortestPath(start, goalRow, rebuildBlockedEdges(walls), opponentPos);
+}
+
+export function shortestPathToGoalFromWalls(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  opponentPos: Pos | null
+): number {
+  return shortestPathToGoal(start, goalRow, rebuildBlockedEdges(walls), opponentPos);
 }
