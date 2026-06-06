@@ -364,9 +364,49 @@ export function applyMove(
   to: Pos
 ): { state: BlockadeGameState; log: string } | null {
   if (state.phase !== "in_progress" || state.currentTurn !== role) return null;
-  if (!isValidMove(state.players[role].position, to, state, role)) return null;
+
+  const from = state.players[role].position;
+  const fromX = from.x;
+  const fromY = from.y;
+  const toX = to.x;
+  const toY = to.y;
+
+  console.log("[TRACE 4] applyMove — walls count:", state.walls.length);
+  getBlockedEdgesForState(state);
+  console.log(
+    "[TRACE 4] applyMove — blockedEdges length:",
+    state.blockedEdges?.length,
+    "edges:",
+    JSON.stringify(state.blockedEdges)
+  );
+
+  // WALL COLLISION CHECK — DO NOT REMOVE
+  const blocked = state.blockedEdges?.some(
+    (edge) =>
+      (edge.x1 === fromX && edge.y1 === fromY && edge.x2 === toX && edge.y2 === toY) ||
+      (edge.x1 === toX && edge.y1 === toY && edge.x2 === fromX && edge.y2 === fromY)
+  );
+  if (blocked) {
+    console.error("BLOCKED BY WALL — move rejected:", { fromX, fromY, toX, toY });
+    return null;
+  }
+
+  if (!isValidMove(from, to, state, role)) return null;
 
   const next = cloneState(state);
+
+  // WALL COLLISION CHECK — DO NOT REMOVE (second gate on cloned state)
+  getBlockedEdgesForState(next);
+  const blockedAgain = next.blockedEdges?.some(
+    (edge) =>
+      (edge.x1 === fromX && edge.y1 === fromY && edge.x2 === toX && edge.y2 === toY) ||
+      (edge.x1 === toX && edge.y1 === toY && edge.x2 === fromX && edge.y2 === fromY)
+  );
+  if (blockedAgain) {
+    console.error("BLOCKED BY WALL — move rejected at position update:", { fromX, fromY, toX, toY });
+    return null;
+  }
+
   next.players[role].position = { ...to };
   const name = role === "player1" ? "Player1" : "Player2";
 
@@ -389,6 +429,8 @@ export function applyMove(
 function finishTurn(state: BlockadeGameState, log: string): { state: BlockadeGameState; log: string } {
   let next = expireBombs(state);
   next = { ...next, currentTurn: opponent(next.currentTurn), turnNumber: next.turnNumber + 1 };
+  syncBlockedEdges(next);
+  console.log("[TRACE finishTurn] walls:", next.walls.length, "blockedEdges:", next.blockedEdges?.length);
   next.consecutiveSkips[next.currentTurn] = 0;
   next.pendingAbility = null;
   next.doubleMoveRemaining = 0;
@@ -450,9 +492,14 @@ export function applyWall(
     expiresAtTurn: asBomb ? next.turnNumber + 3 : undefined,
   };
   next.walls.push(wall);
-  syncBlockedEdges(next);
 
-  console.log("Wall placed — new blocked edges:", JSON.stringify(next.blockedEdges, null, 2));
+  console.log("[TRACE 1] Wall placed:", JSON.stringify(wall, null, 2));
+  const edgesFromWall = wallToBlockedEdges(wall);
+  console.log("[TRACE 2] wallToBlockedEdges returned:", edgesFromWall.length, JSON.stringify(edgesFromWall));
+  syncBlockedEdges(next);
+  console.log("[TRACE 3] stored in gameState.blockedEdges, length:", next.blockedEdges?.length);
+  console.log("Wall placed. Total blocked edges:", next.blockedEdges?.length);
+  console.log("Blocked edges:", JSON.stringify(next.blockedEdges));
 
   const allAfter = activeWalls(next);
   const postP1 = bfsHasPath(next.players.player1.position, P1_GOAL_ROW, next.blockedEdges);

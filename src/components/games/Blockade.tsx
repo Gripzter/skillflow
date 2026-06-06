@@ -254,6 +254,7 @@ export default function Blockade({
       const asBomb = state.pendingAbility === "wall_bomb";
       const res = applyWall(state, myRole, w, asBomb);
       if (res) {
+        console.log("[TRACE UI] wall applyWall ok — walls:", res.state.walls.length, "blockedEdges:", res.state.blockedEdges?.length);
         if (asBomb) setAbilityToast("Used Wall Bomb!");
         syncState(res.state, res.log);
         setMode("move");
@@ -285,7 +286,9 @@ export default function Blockade({
         return;
       }
 
+      console.log("[TRACE UI] click move", pos, "state walls:", state.walls.length, "blockedEdges:", state.blockedEdges?.length);
       const res = applyMove(state, myRole, pos);
+      console.log("[TRACE UI] applyMove result:", res ? "MOVED" : "REJECTED");
       if (res) {
         syncState(res.state, res.log);
         if (res.state.winner) {
