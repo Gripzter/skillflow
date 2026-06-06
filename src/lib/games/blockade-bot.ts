@@ -5,32 +5,33 @@ import {
   applyMove,
   applyWall,
   applyWallBreak,
+  canPlaceWallPathCheck,
   getGhostStepTargets,
   getLegalMoves,
   goalRowFor,
   opponent,
   startAbility,
-  canPlaceWallPathCheck,
   validateWallPlacement,
+  wallInBounds,
+  wallsOverlap,
   type BlockadeAbilityId,
   type BlockadeGameState,
   type BlockadeRole,
   type BlockadeWall,
   type Pos,
   type WallSupply,
-  type WallType,
 } from "./blockade-logic";
 import {
   bfsShortestPath,
   BOARD_SIZE,
-  posKey,
+  edgeKey,
+  getBlockedEdges,
   shortestPathToGoal,
 } from "./blockade-bfs";
 
-export function getBlockadeBotDelayMs(difficulty: BotDifficulty): number {
-  if (difficulty === "rookie") return 2000 + Math.random() * 1000;
-  if (difficulty === "professional") return 800 + Math.random() * 700;
-  return 1200 + Math.random() * 900;
+/** Human-like think delay before the bot acts. */
+export function getBlockadeBotDelayMs(_difficulty: BotDifficulty): number {
+  return 800 + Math.random() * 700;
 }
 
 const ALL_ABILITIES: BlockadeAbilityId[] = ["double_move", "wall_break", "ghost_step", "wall_bomb"];
@@ -47,52 +48,283 @@ export function pickBotAbilities(difficulty: BotDifficulty): BlockadeAbilityId[]
 
 type BotAction =
   | { kind: "move"; to: Pos }
-  | { kind: "wall"; wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">; asBomb?: boolean }
+  | { kind: "wall"; wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn"> }
   | { kind: "wall_break"; wallId: string }
   | { kind: "ghost_step"; to: Pos }
   | { kind: "start_double_move" };
+
+type BotView = {
+  botPosition: Pos;
+  playerPosition: Pos;
+  walls: BlockadeWall[];
+  botGoalRow: number;
+  playerGoalRow: number;
+  botWallsRemaining: WallSupply;
+  botAbilities: {
+    doubleMoveAvailable: boolean;
+    ghostStepAvailable: boolean;
+    wallBreakAvailable: boolean;
+  };
+  doubleMoveActive: boolean;
+};
 
 function wallsRemainingTotal(supply: WallSupply): number {
   return supply.standard + supply.lshape + supply.triple;
 }
 
-export function botChooseMove(
+function bfsPathLength(
+  start: Pos,
+  goalRow: number,
+  walls: BlockadeWall[],
+  opponentPos: Pos
+): number {
+  return shortestPathToGoal(start, goalRow, walls, opponentPos);
+}
+
+function buildBotView(state: BlockadeGameState, role: BlockadeRole): BotView {
+  const oppRole = opponent(role);
+  const ab = state.players[role].abilities;
+  return {
+    botPosition: state.players[role].position,
+    playerPosition: state.players[oppRole].position,
+    walls: activeWalls(state),
+    botGoalRow: goalRowFor(role),
+    playerGoalRow: goalRowFor(oppRole),
+    botWallsRemaining: state.players[role].walls,
+    botAbilities: {
+      doubleMoveAvailable:
+        ab.chosen.includes("double_move") &&
+        !ab.used.includes("double_move") &&
+        state.doubleMoveRemaining === 0,
+      ghostStepAvailable: ab.chosen.includes("ghost_step") && !ab.used.includes("ghost_step"),
+      wallBreakAvailable: ab.chosen.includes("wall_break") && !ab.used.includes("wall_break"),
+    },
+    doubleMoveActive: state.doubleMoveRemaining > 0,
+  };
+}
+
+function wallKey(w: Omit<BlockadeWall, "id" | "owner" | "placedTurn">): string {
+  return `${w.type}:${w.orientation}:${w.row}:${w.col}:${w.rotation ?? 0}`;
+}
+
+function wallOverlapsExisting(
+  candidate: Omit<BlockadeWall, "id" | "owner" | "placedTurn">,
+  walls: BlockadeWall[]
+): boolean {
+  const tmp: BlockadeWall = { ...candidate, id: "tmp", owner: "player1", placedTurn: 0 };
+  return walls.some((w) => wallsOverlap(tmp, w));
+}
+
+/** Walls adjacent to a cell the opponent must cross. */
+function generateWallCandidatesNearCell(
+  cell: Pos,
+  wallsRemaining: WallSupply
+): Omit<BlockadeWall, "id" | "owner" | "placedTurn">[] {
+  const { x, y } = cell;
+  const out: Omit<BlockadeWall, "id" | "owner" | "placedTurn">[] = [];
+  const seen = new Set<string>();
+  const push = (w: Omit<BlockadeWall, "id" | "owner" | "placedTurn">) => {
+    if (!wallInBounds(w as BlockadeWall)) return;
+    const k = wallKey(w);
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(w);
+  };
+
+  if (wallsRemaining.standard > 0) {
+    for (const dx of [-1, 0]) {
+      if (y < BOARD_SIZE - 1) push({ type: "standard", orientation: "h", row: y, col: x + dx });
+      if (y > 0) push({ type: "standard", orientation: "h", row: y - 1, col: x + dx });
+    }
+    for (const dy of [-1, 0]) {
+      if (x < BOARD_SIZE - 1) push({ type: "standard", orientation: "v", row: y + dy, col: x });
+      if (x > 0) push({ type: "standard", orientation: "v", row: y + dy, col: x - 1 });
+    }
+  }
+
+  if (wallsRemaining.lshape > 0) {
+    for (let rotation = 0; rotation < 4; rotation++) {
+      push({ type: "lshape", orientation: "h", row: y, col: x, rotation });
+      if (x > 0) push({ type: "lshape", orientation: "h", row: y, col: x - 1, rotation });
+      if (y > 0) push({ type: "lshape", orientation: "h", row: y - 1, col: x, rotation });
+    }
+  }
+
+  if (wallsRemaining.triple > 0) {
+    for (const dx of [-2, -1, 0]) {
+      if (y < BOARD_SIZE - 1) push({ type: "triple", orientation: "h", row: y, col: x + dx });
+      if (y > 0) push({ type: "triple", orientation: "h", row: y - 1, col: x + dx });
+    }
+    for (const dy of [-2, -1, 0]) {
+      if (x < BOARD_SIZE - 1) push({ type: "triple", orientation: "v", row: y + dy, col: x });
+      if (x > 0) push({ type: "triple", orientation: "v", row: y + dy, col: x - 1 });
+    }
+  }
+
+  return out;
+}
+
+function decideShouldPlaceWall(botPathLen: number, playerPathLen: number, view: BotView): boolean {
+  if (wallsRemainingTotal(view.botWallsRemaining) === 0) return false;
+  if (view.doubleMoveActive) return false;
+  if (playerPathLen < botPathLen) return Math.random() < 0.8;
+  if (playerPathLen === botPathLen) return Math.random() < 0.4;
+  return Math.random() < 0.15;
+}
+
+function findBestWallPlacement(
+  view: BotView,
   state: BlockadeGameState,
   role: BlockadeRole
+): { wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">; score: number } | null {
+  const { botPosition, playerPosition, walls, botGoalRow, playerGoalRow } = view;
+
+  const playerPath = bfsShortestPath(playerPosition, playerGoalRow, walls, botPosition);
+  const currentPlayerPathLen = playerPath ? playerPath.length - 1 : 999;
+  const currentBotPathLen = bfsPathLength(botPosition, botGoalRow, walls, playerPosition);
+
+  const pathCells = playerPath ? playerPath.slice(0, Math.min(playerPath.length, 6)) : [];
+
+  let bestWall: Omit<BlockadeWall, "id" | "owner" | "placedTurn"> | null = null;
+  let bestScore = 0;
+
+  for (const cell of pathCells) {
+    const candidates = generateWallCandidatesNearCell(cell, view.botWallsRemaining);
+
+    for (const candidate of candidates) {
+      if (wallOverlapsExisting(candidate, walls)) continue;
+
+      const tmp: BlockadeWall = {
+        ...candidate,
+        id: "bot-eval",
+        owner: role,
+        placedTurn: state.turnNumber,
+      };
+      const pathOk = canPlaceWallPathCheck(
+        tmp,
+        walls,
+        state.players.player1.position,
+        state.players.player2.position
+      );
+      if (!pathOk.allowed) continue;
+      if (!validateWallPlacement(state, role, candidate).valid) continue;
+
+      const testWalls = [...walls, tmp];
+      const newPlayerPathLen = bfsPathLength(playerPosition, playerGoalRow, testWalls, botPosition);
+      const newBotPathLen = bfsPathLength(botPosition, botGoalRow, testWalls, playerPosition);
+
+      const playerSlowdown = newPlayerPathLen - currentPlayerPathLen;
+      const botSlowdown = newBotPathLen - currentBotPathLen;
+      const score = playerSlowdown - botSlowdown;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestWall = candidate;
+      }
+    }
+  }
+
+  return bestWall && bestScore > 0 ? { wall: bestWall, score: bestScore } : null;
+}
+
+function evaluateGhostStep(
+  view: BotView,
+  state: BlockadeGameState,
+  role: BlockadeRole
+): { saving: number; target: Pos } | null {
+  const baseline = bfsPathLength(view.botPosition, view.botGoalRow, view.walls, view.playerPosition);
+  const targets = getGhostStepTargets(state, role);
+  let bestTarget: Pos | null = null;
+  let bestSaving = 0;
+
+  for (const t of targets) {
+    const len = bfsPathLength(t, view.botGoalRow, view.walls, view.playerPosition);
+    const saving = baseline - len;
+    if (saving > bestSaving) {
+      bestSaving = saving;
+      bestTarget = t;
+    }
+  }
+
+  if (bestSaving >= 3 && bestTarget) {
+    return { saving: bestSaving, target: bestTarget };
+  }
+  return null;
+}
+
+function pathUsesWallEdges(path: Pos[] | null, wall: BlockadeWall): boolean {
+  if (!path || path.length < 2) return false;
+  const blocked = new Set(getBlockedEdges(wall).map(([a, b]) => edgeKey(a, b)));
+  for (let i = 0; i < path.length - 1; i++) {
+    if (blocked.has(edgeKey(path[i], path[i + 1]))) return true;
+  }
+  return false;
+}
+
+function evaluateWallBreak(
+  view: BotView,
+  state: BlockadeGameState,
+  role: BlockadeRole
+): string | null {
+  const me = view.botPosition;
+  const opp = view.playerPosition;
+  const walls = view.walls;
+  const myGoal = view.botGoalRow;
+  const baseline = bfsPathLength(me, myGoal, walls, opp);
+  const botPath = bfsShortestPath(me, myGoal, walls, opp);
+
+  let bestId: string | null = null;
+  let bestGain = 0;
+
+  for (const w of state.walls) {
+    const without = walls.filter((x) => x.id !== w.id);
+    const newLen = bfsPathLength(me, myGoal, without, opp);
+    const gain = baseline - newLen;
+    if (gain < 2) continue;
+
+    const isOpponentWall = w.owner === opponent(role);
+    const onBotPath = isOpponentWall && pathUsesWallEdges(botPath, w);
+    const ownWallHurting = w.owner === role && gain >= 2;
+
+    if (onBotPath || ownWallHurting || (isOpponentWall && gain >= 2)) {
+      if (gain > bestGain) {
+        bestGain = gain;
+        bestId = w.id;
+      }
+    }
+  }
+
+  return bestId;
+}
+
+function getAnyValidMove(state: BlockadeGameState, role: BlockadeRole): Pos | null {
+  const legal = getLegalMoves(state, role);
+  return legal.length > 0 ? legal[0] : null;
+}
+
+function pickMoveAlongPath(
+  state: BlockadeGameState,
+  role: BlockadeRole,
+  view: BotView
 ): Pos | null {
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const walls = activeWalls(state);
-  const goal = goalRowFor(role);
   const legal = getLegalMoves(state, role);
   if (legal.length === 0) return null;
 
-  const path = bfsShortestPath(me, goal, walls, opp);
+  const path = bfsShortestPath(view.botPosition, view.botGoalRow, view.walls, view.playerPosition);
   if (path && path.length > 1) {
     let next = path[1];
     const last = lastBotPositions[role];
     if (last && next.x === last.x && next.y === last.y && legal.length > 1) {
-      const alt = pickBestMoveAmong(legal.filter((p) => p.x !== last.x || p.y !== last.y), me, goal, walls, opp);
+      const alt = legal.find((p) => p.x !== last.x || p.y !== last.y);
       if (alt) next = alt;
     }
     if (legal.some((p) => p.x === next.x && p.y === next.y)) return next;
   }
 
-  return pickBestMoveAmong(legal, me, goal, walls, opp);
-}
-
-function pickBestMoveAmong(
-  moves: Pos[],
-  me: Pos,
-  goal: number,
-  walls: BlockadeWall[],
-  opp: Pos
-): Pos | null {
-  if (moves.length === 0) return null;
-  let best = moves[0];
+  let best = legal[0];
   let bestLen = Infinity;
-  for (const m of moves) {
-    const len = shortestPathToGoal(m, goal, walls, opp);
+  for (const m of legal) {
+    const len = bfsPathLength(m, view.botGoalRow, view.walls, view.playerPosition);
     if (len < bestLen) {
       bestLen = len;
       best = m;
@@ -101,273 +333,67 @@ function pickBestMoveAmong(
   return best;
 }
 
-function nearPositions(center: Pos, radius: number): Set<string> {
-  const set = new Set<string>();
-  for (let dx = -radius; dx <= radius; dx++) {
-    for (let dy = -radius; dy <= radius; dy++) {
-      const x = center.x + dx;
-      const y = center.y + dy;
-      if (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE) {
-        set.add(posKey({ x, y }));
-      }
-    }
+/** Master bot decision — every choice driven by BFS path length. */
+function botTakeTurn(state: BlockadeGameState, role: BlockadeRole): BotAction | null {
+  const view = buildBotView(state, role);
+  const { botPosition, playerPosition, walls, botGoalRow, playerGoalRow } = view;
+
+  if (view.doubleMoveActive) {
+    const to = pickMoveAlongPath(state, role, view);
+    return to ? { kind: "move", to } : null;
   }
-  return set;
-}
 
-function getPathNeighborhood(state: BlockadeGameState, role: BlockadeRole): Set<string> {
-  const oppRole = opponent(role);
-  const oppPos = state.players[oppRole].position;
-  const oppGoal = goalRowFor(oppRole);
-  const walls = activeWalls(state);
-  const mePos = state.players[role].position;
-  const path = bfsShortestPath(oppPos, oppGoal, walls, mePos);
-  const zone = nearPositions(oppPos, 3);
-  if (path) {
-    for (const p of path) zone.add(posKey(p));
+  const botPathLen = bfsPathLength(botPosition, botGoalRow, walls, playerPosition);
+  const playerPathLen = bfsPathLength(playerPosition, playerGoalRow, walls, botPosition);
+
+  if (botPathLen === 2 && view.botAbilities.doubleMoveAvailable) {
+    return { kind: "start_double_move" };
   }
-  return zone;
-}
 
-function wallTouchesZone(
-  wall: Omit<BlockadeWall, "id" | "owner" | "placedTurn">,
-  zone: Set<string>
-): boolean {
-  const r = wall.row;
-  const c = wall.col;
-  const cells: Pos[] = [{ x: c, y: r }, { x: c + 1, y: r }, { x: c, y: r + 1 }, { x: c + 1, y: r + 1 }];
-  if (wall.type === "triple") {
-    if (wall.orientation === "h") {
-      for (let i = 0; i < 3; i++) cells.push({ x: c + i, y: r }, { x: c + i, y: r + 1 });
-    } else {
-      for (let i = 0; i < 3; i++) cells.push({ x: c, y: r + i }, { x: c + 1, y: r + i });
-    }
-  }
-  return cells.some((p) => zone.has(posKey(p)));
-}
-
-function getWallCandidates(
-  supply: WallSupply,
-  zone: Set<string>,
-  limit: number
-): Omit<BlockadeWall, "id" | "owner" | "placedTurn">[] {
-  const out: Omit<BlockadeWall, "id" | "owner" | "placedTurn">[] = [];
-
-  const pushStandard = () => {
-    for (let r = 0; r < BOARD_SIZE - 1; r++) {
-      for (let c = 0; c < BOARD_SIZE - 1; c++) {
-        for (const orientation of ["h", "v"] as const) {
-          const w = { type: "standard" as const, orientation, row: r, col: c };
-          if (wallTouchesZone(w, zone)) out.push(w);
-        }
-      }
-    }
-  };
-
-  const pushTriple = () => {
-    for (let r = 0; r < BOARD_SIZE - 1; r++) {
-      for (let c = 0; c <= BOARD_SIZE - 3; c++) {
-        const w = { type: "triple" as const, orientation: "h" as const, row: r, col: c };
-        if (wallTouchesZone(w, zone)) out.push(w);
-      }
-    }
-    for (let r = 0; r <= BOARD_SIZE - 3; r++) {
-      for (let c = 0; c < BOARD_SIZE - 1; c++) {
-        const w = { type: "triple" as const, orientation: "v" as const, row: r, col: c };
-        if (wallTouchesZone(w, zone)) out.push(w);
-      }
-    }
-  };
-
-  const pushLshape = () => {
-    for (let r = 0; r < BOARD_SIZE - 1; r++) {
-      for (let c = 0; c < BOARD_SIZE - 1; c++) {
-        for (let rotation = 0; rotation < 4; rotation++) {
-          for (const orientation of ["h", "v"] as const) {
-            const w = { type: "lshape" as const, orientation, row: r, col: c, rotation };
-            if (wallTouchesZone(w, zone)) out.push(w);
-          }
-        }
-      }
-    }
-  };
-
-  if (supply.standard > 0) pushStandard();
-  if (supply.triple > 0) pushTriple();
-  if (supply.lshape > 0) pushLshape();
-
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out.slice(0, limit);
-}
-
-function chooseBestWall(
-  state: BlockadeGameState,
-  role: BlockadeRole,
-  difficulty: BotDifficulty
-): BotAction | null {
-  const supply = state.players[role].walls;
-  if (wallsRemainingTotal(supply) <= 0) return null;
-
-  const zone = getPathNeighborhood(state, role);
-  const limit = difficulty === "professional" ? 120 : difficulty === "gamer" ? 80 : 40;
-  const candidates = getWallCandidates(supply, zone, limit);
-
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const walls = activeWalls(state);
-  const myGoal = goalRowFor(role);
-  const oppGoal = goalRowFor(opponent(role));
-
-  const oldPlayerPath = shortestPathToGoal(opp, oppGoal, walls, me);
-  const oldBotPath = shortestPathToGoal(me, myGoal, walls, opp);
-
-  let bestWall: Omit<BlockadeWall, "id" | "owner" | "placedTurn"> | null = null;
-  let bestScore = 0;
-
-  for (const candidate of candidates) {
-    const tmp: BlockadeWall = { ...candidate, id: "bot-tmp", owner: role, placedTurn: state.turnNumber };
-    const pathOk = canPlaceWallPathCheck(
-      tmp,
-      walls,
-      state.players.player1.position,
-      state.players.player2.position
-    );
-    if (!pathOk.allowed || !validateWallPlacement(state, role, candidate).valid) continue;
-    const trial = [...walls, { ...candidate, id: "t", owner: role, placedTurn: 0 }];
-    const newPlayerPath = shortestPathToGoal(opp, oppGoal, trial, me);
-    const newBotPath = shortestPathToGoal(me, myGoal, trial, opp);
-    const score = newPlayerPath - oldPlayerPath - (newBotPath - oldBotPath);
-    if (score > bestScore) {
-      bestScore = score;
-      bestWall = candidate;
+  if (botPathLen === 1) {
+    const path = bfsShortestPath(botPosition, botGoalRow, walls, playerPosition);
+    if (path && path.length > 1) {
+      return { kind: "move", to: path[1] };
     }
   }
 
-  if (bestWall && bestScore > 0) {
-    return { kind: "wall", wall: bestWall };
-  }
-  return null;
-}
-
-function tryAbilityAction(
-  state: BlockadeGameState,
-  role: BlockadeRole,
-  difficulty: BotDifficulty
-): BotAction | null {
-  const ab = state.players[role].abilities;
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const walls = activeWalls(state);
-  const myGoal = goalRowFor(role);
-  const myDist = shortestPathToGoal(me, myGoal, walls, opp);
-
-  if (!ab.used.includes("double_move") && ab.chosen.includes("double_move") && state.doubleMoveRemaining === 0) {
-    if (myDist <= 2 && myDist > 0) {
-      const path = bfsShortestPath(me, myGoal, walls, opp);
-      if (path && path.length <= 3) {
-        return { kind: "start_double_move" };
-      }
+  if (decideShouldPlaceWall(botPathLen, playerPathLen, view)) {
+    const best = findBestWallPlacement(view, state, role);
+    if (best) {
+      return { kind: "wall", wall: best.wall };
     }
   }
 
-  if (!ab.used.includes("ghost_step") && ab.chosen.includes("ghost_step")) {
-    const targets = getGhostStepTargets(state, role);
-    if (targets.length > 0) {
-      let best = targets[0];
-      let bestLen = shortestPathToGoal(best, myGoal, walls, opp);
-      const baseline = myDist;
-      for (const t of targets) {
-        const len = shortestPathToGoal(t, myGoal, walls, opp);
-        if (len + 3 <= baseline && len < bestLen) {
-          bestLen = len;
-          best = t;
-        }
-      }
-      if (baseline - bestLen >= 3 || (difficulty !== "rookie" && bestLen < baseline)) {
-        return { kind: "ghost_step", to: best };
-      }
+  if (view.botAbilities.wallBreakAvailable) {
+    const breakId = evaluateWallBreak(view, state, role);
+    if (breakId) {
+      return { kind: "wall_break", wallId: breakId };
     }
   }
 
-  if (!ab.used.includes("wall_break") && ab.chosen.includes("wall_break")) {
-    const oppRole = opponent(role);
-    const oppWalls = state.walls.filter((w) => w.owner === oppRole);
-    let bestId: string | null = null;
-    let bestGain = 0;
-    for (const w of oppWalls) {
-      const without = walls.filter((x) => x.id !== w.id);
-      const newLen = shortestPathToGoal(me, myGoal, without, opp);
-      const gain = myDist - newLen;
-      if (gain > bestGain) {
-        bestGain = gain;
-        bestId = w.id;
-      }
-    }
-    if (bestId && bestGain >= 2) {
-      return { kind: "wall_break", wallId: bestId };
+  if (view.botAbilities.ghostStepAvailable) {
+    const ghost = evaluateGhostStep(view, state, role);
+    if (ghost) {
+      return { kind: "ghost_step", to: ghost.target };
     }
   }
 
-  if (!ab.used.includes("wall_bomb") && ab.chosen.includes("wall_bomb") && state.players[role].walls.standard > 0) {
-    const wall = chooseBestWall(state, role, difficulty);
-    if (wall?.kind === "wall") {
-      return { ...wall, asBomb: true };
-    }
+  const to = pickMoveAlongPath(state, role, view);
+  if (to) {
+    return { kind: "move", to };
   }
 
-  return null;
+  const fallback = getAnyValidMove(state, role);
+  return fallback ? { kind: "move", to: fallback } : null;
 }
 
 export function getBlockadeBotAction(
   state: BlockadeGameState,
   role: BlockadeRole,
-  difficulty: BotDifficulty
+  _difficulty: BotDifficulty
 ): BotAction | null {
   if (state.phase !== "in_progress" || state.currentTurn !== role) return null;
-
-  if (difficulty === "rookie" && Math.random() < 0.2) {
-    const move = botChooseMove(state, role);
-    if (move) return { kind: "move", to: move };
-  }
-
-  const ability = tryAbilityAction(state, role, difficulty);
-  if (ability) return ability;
-
-  const me = state.players[role].position;
-  const opp = state.players[opponent(role)].position;
-  const walls = activeWalls(state);
-  const myGoal = goalRowFor(role);
-  const oppGoal = goalRowFor(opponent(role));
-  const botPath = shortestPathToGoal(me, myGoal, walls, opp);
-  const playerPath = shortestPathToGoal(opp, oppGoal, walls, me);
-  const supply = state.players[role].walls;
-  const hasWalls = wallsRemainingTotal(supply) > 0;
-
-  const mustMove = getLegalMoves(state, role).length > 0;
-  const preferWall =
-    hasWalls &&
-    ((playerPath < botPath && Math.random() < 0.7) ||
-      (botPath <= playerPath && Math.random() < 0.2));
-
-  if (preferWall && state.doubleMoveRemaining === 0) {
-    const wallAction = chooseBestWall(state, role, difficulty);
-    if (wallAction) return wallAction;
-  }
-
-  if (mustMove) {
-    const to = botChooseMove(state, role);
-    if (to) return { kind: "move", to };
-  }
-
-  if (hasWalls && state.doubleMoveRemaining === 0) {
-    const wallAction = chooseBestWall(state, role, difficulty);
-    if (wallAction) return wallAction;
-  }
-
-  return null;
+  return botTakeTurn(state, role);
 }
 
 export function applyBotAction(
@@ -394,5 +420,5 @@ export function applyBotAction(
     const name = role === "player1" ? "Player1" : "Player2";
     return { state: next, log: `${name} used Double Move!` };
   }
-  return applyWall(state, role, action.wall, action.asBomb ?? false);
+  return applyWall(state, role, action.wall);
 }
