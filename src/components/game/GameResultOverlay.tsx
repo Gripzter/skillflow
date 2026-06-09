@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 
-const AUTO_REDIRECT_SEC = 30;
+const AUTO_REDIRECT_SEC = 8;
 
 interface GameResultOverlayProps {
   outcome: "victory" | "defeat" | "draw";

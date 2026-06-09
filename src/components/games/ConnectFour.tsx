@@ -86,10 +86,10 @@ export default function ConnectFour({
     const availW = Math.max(120, w - 8);
     const availH = Math.max(120, h - 8);
     const maxByWidth = (availW - (COLS - 1) * 4 - 16) / COLS;
-    const maxByHeight = (availH - (ROWS - 1) * 4 - 28) / (ROWS + 1);
+    const maxByHeight = (availH - (ROWS - 1) * 4 - 16) / (ROWS + 1);
     const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
     if (!Number.isFinite(raw) || raw <= 0) return;
-    setCellSize(Math.max(28, Math.min(raw, 75)));
+    setCellSize(Math.max(28, Math.min(raw, 96)));
   }, []);
 
   useLayoutEffect(() => {
