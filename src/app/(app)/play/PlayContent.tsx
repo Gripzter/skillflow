@@ -36,23 +36,88 @@ function PlayGameCard({
   challenges,
   isAuthenticated,
 }: {
-  game: { slug: string; name: string; image: string; waitSeconds: number };
+  game: {
+    slug: string;
+    name: string;
+    image: string;
+    waitSeconds: number;
+    status?: "active" | "coming_soon";
+    description?: string;
+  };
   index: number;
   onlineCount: number;
   challenges: DailyChallengeRow[];
   isAuthenticated: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
+  const isComingSoon = game.status === "coming_soon";
   const scopedChallenges = useMemo(
     () => challenges.filter((challenge) => challenge.game_slug === game.slug || challenge.game_slug == null),
     [challenges, game.slug]
   );
 
   const handleClick: MouseEventHandler<HTMLAnchorElement> = (event) => {
+    if (isComingSoon) {
+      event.preventDefault();
+      return;
+    }
     if (isAuthenticated) return;
     event.preventDefault();
     redirectToAuthAction();
   };
+
+  const cardContent = (
+    <>
+      <Image
+        src={game.image}
+        alt={`${game.name} artwork`}
+        fill
+        className={`object-cover ${isComingSoon ? "grayscale-[30%]" : ""}`}
+        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
+        priority={index < 2}
+      />
+      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-[40%] bg-gradient-to-t from-black/80 via-black/45 to-transparent" />
+
+      {isComingSoon ? (
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-white/10 text-white/80 text-[9px] sm:text-[11px] font-bold uppercase tracking-wide rounded">
+          Coming Soon
+        </div>
+      ) : index === 0 ? (
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#FFFF00] text-black text-[9px] sm:text-[11px] font-bold uppercase tracking-wide rounded">
+          HOT
+        </div>
+      ) : null}
+
+      {!isComingSoon ? <GameCardChallenges challenges={scopedChallenges} visible={hovered} /> : null}
+
+      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+        <h3 className="text-base sm:text-lg lg:text-xl font-black text-white mb-0.5 sm:mb-1 leading-tight">
+          {game.name}
+        </h3>
+        {isComingSoon && game.description ? (
+          <p className="text-[10px] sm:text-xs text-white/60 leading-tight line-clamp-2">{game.description}</p>
+        ) : (
+          <>
+            <div className="text-[11px] sm:text-[13px] text-[#FFFF00] font-medium leading-tight">
+              {onlineCount.toLocaleString()} online
+            </div>
+            <div className="text-[10px] sm:text-xs text-white/60 leading-tight">~{game.waitSeconds}s wait</div>
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  if (isComingSoon) {
+    return (
+      <div
+        aria-disabled
+        className="group relative block aspect-[2/3] overflow-hidden rounded-xl border border-[#1F1F26] bg-[#16161C] opacity-80 cursor-not-allowed"
+      >
+        {cardContent}
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -64,33 +129,7 @@ function PlayGameCard({
       onBlur={() => setHovered(false)}
       className="group relative block aspect-[2/3] overflow-hidden rounded-xl border border-[#1F1F26] bg-[#16161C] transition duration-150 hover:scale-[1.02] hover:border-[#FFFF00]"
     >
-      <Image
-        src={game.image}
-        alt={`${game.name} artwork`}
-        fill
-        className="object-cover"
-        sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 25vw"
-        priority={index < 2}
-      />
-      <div className="pointer-events-none absolute bottom-0 inset-x-0 h-[40%] bg-gradient-to-t from-black/80 via-black/45 to-transparent" />
-
-      {index === 0 ? (
-        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-10 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-[#FFFF00] text-black text-[9px] sm:text-[11px] font-bold uppercase tracking-wide rounded">
-          HOT
-        </div>
-      ) : null}
-
-      <GameCardChallenges challenges={scopedChallenges} visible={hovered} />
-
-      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
-        <h3 className="text-base sm:text-lg lg:text-xl font-black text-white mb-0.5 sm:mb-1 leading-tight">
-          {game.name}
-        </h3>
-        <div className="text-[11px] sm:text-[13px] text-[#FFFF00] font-medium leading-tight">
-          {onlineCount.toLocaleString()} online
-        </div>
-        <div className="text-[10px] sm:text-xs text-white/60 leading-tight">~{game.waitSeconds}s wait</div>
-      </div>
+      {cardContent}
     </Link>
   );
 }

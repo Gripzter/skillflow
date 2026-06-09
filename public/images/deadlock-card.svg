@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0E0E12"/>
+      <stop offset="100%" style="stop-color:#3A1A0A"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#bg)" rx="12"/>
+  <rect x="140" y="200" width="120" height="140" rx="16" fill="none" stroke="#FF6B35" stroke-width="6"/>
+  <path d="M200 260 L200 320 M170 290 L230 290" stroke="#FFFF00" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="200" cy="380" r="24" fill="#FF3333"/>
+  <text x="200" y="480" text-anchor="middle" fill="#fff" font-family="system-ui,sans-serif" font-size="36" font-weight="bold">Deadlock</text>
+  <text x="200" y="520" text-anchor="middle" fill="#FF6B35" font-family="system-ui,sans-serif" font-size="14">COMING SOON</text>
+</svg>

@@ -8,6 +8,9 @@ export type PlayGameCard = {
   image: string;
   category: GameCategory;
   waitSeconds: number;
+  status?: "active" | "coming_soon";
+  description?: string;
+  icon?: string;
 };
 
 const GAMES: PlayGameCard[] = [
@@ -20,6 +23,26 @@ const GAMES: PlayGameCard[] = [
   { name: "Typing Race", slug: "typing-race", image: "/images/typing-race-card.png", category: "reflex", waitSeconds: 13 },
   { name: "Spelling Bee", slug: "spelling-bee", image: "/images/spelling-bee-card.png", category: "knowledge", waitSeconds: 12 },
   { name: "Trivia", slug: "trivia", image: "/images/trivia-card.png", category: "knowledge", waitSeconds: 15 },
+  {
+    name: "Deadlock",
+    slug: "deadlock",
+    image: "/images/deadlock-card.svg",
+    category: "strategy",
+    waitSeconds: 0,
+    status: "coming_soon",
+    description: "Crack the code faster than your opponent. Pure logic, zero luck.",
+    icon: "🔐",
+  },
+  {
+    name: "Chromo",
+    slug: "chromo",
+    image: "/images/chromo-card.svg",
+    category: "reflex",
+    waitSeconds: 0,
+    status: "coming_soon",
+    description: "Memorize the color. Recreate it perfectly. Your eyes vs theirs.",
+    icon: "🎨",
+  },
 ];
 
 export function useGames() {

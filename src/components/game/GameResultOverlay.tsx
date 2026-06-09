@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import SkilliesIcon from "@/components/SkilliesIcon";
 
 const AUTO_REDIRECT_SEC = 30;
 
@@ -28,7 +27,6 @@ export default function GameResultOverlay({
   winnerPayout,
   payoutOverride,
   stakeLostOverride,
-  newBalance,
   opponentUsername,
   wonByForfeit,
   onPlayAgain,
@@ -39,32 +37,16 @@ export default function GameResultOverlay({
 
   useEffect(() => {
     if (outcome !== "victory") return;
-    const duration = 2200;
-    const end = Date.now() + duration;
 
-    function burst() {
-      confetti({
-        particleCount: 10,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0, y: 0.65 },
-        colors: ["#FFFF00", "#FFD700", "#FF9900", "#FFFFFF", "#FF4444"],
-        zIndex: 60,
-      });
-      confetti({
-        particleCount: 10,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1, y: 0.65 },
-        colors: ["#FFFF00", "#FFD700", "#FF9900", "#FFFFFF", "#44BBFF"],
-        zIndex: 60,
-      });
-      if (Date.now() < end) {
-        requestAnimationFrame(burst);
-      }
-    }
-
-    burst();
+    confetti({
+      particleCount: 80,
+      spread: 60,
+      origin: { y: 0.6 },
+      colors: ["#FFFF00", "#ffffff", "#aaaaaa"],
+      scalar: 0.9,
+      gravity: 1.4,
+      zIndex: 60,
+    });
   }, [outcome]);
 
   useEffect(() => {
@@ -97,110 +79,140 @@ export default function GameResultOverlay({
   const isDraw = outcome === "draw";
 
   let headline: string;
-  let headlineColor: string;
-  let amountValue: number | null = null;
-  let subtext: string;
+  let headlineClass: string;
+  let resultLine: string;
 
   if (isVictory) {
-    headline = "VICTORY";
-    headlineColor = "#FFFF00";
-    if (!isPractice) amountValue = payoutOverride ?? winnerPayout;
-    subtext = wonByForfeit
-      ? "Opponent forfeited. You win!"
-      : isPractice
-        ? "Nice work!"
-        : `You defeated ${opponentUsername}`;
+    headline = "YOU WIN";
+    headlineClass = "game-result-you-win";
+    if (isPractice) {
+      resultLine = wonByForfeit ? "You won · opponent forfeited" : "You won";
+    } else {
+      const amount = payoutOverride ?? winnerPayout;
+      resultLine = wonByForfeit
+        ? `You won · +${amount.toLocaleString()} SP · opponent forfeited`
+        : `You won · +${amount.toLocaleString()} SP`;
+    }
   } else if (isDefeat) {
-    headline = "DEFEAT";
-    headlineColor = "rgba(255,255,255,0.9)";
-    if (!isPractice) amountValue = -(stakeLostOverride ?? stakeAmount);
-    subtext = `${opponentUsername} won this one`;
+    headline = "SKILL ISSUE";
+    headlineClass = "game-result-skill-issue";
+    if (isPractice) {
+      resultLine = `You lost · ${opponentUsername} won`;
+    } else {
+      const lost = stakeLostOverride ?? stakeAmount;
+      resultLine = `You lost · −${lost.toLocaleString()} SP`;
+    }
   } else {
     headline = "DRAW";
-    headlineColor = "#60A5FA";
-    if (!isPractice) amountValue = 0;
-    subtext = isPractice ? "Even match!" : `${stakeAmount.toLocaleString()} Skillies returned to your wallet`;
+    headlineClass = "game-result-draw";
+    resultLine = isPractice
+      ? "Even match"
+      : `${stakeAmount.toLocaleString()} SP returned to your wallet`;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center px-6" style={{ background: "rgba(10,10,14,0.97)" }}>
-      {/* Background glow */}
+    <>
+      <style jsx global>{`
+        @keyframes gameResultFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
+        @keyframes skillIssueSlam {
+          0% {
+            transform: translateY(-120%);
+            opacity: 0;
+          }
+          75% {
+            transform: translateY(0);
+            opacity: 1;
+          }
+          90% {
+            transform: translateY(-8px);
+          }
+          100% {
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes youWinPop {
+          0% {
+            transform: scale(0);
+            opacity: 0;
+          }
+          70% {
+            transform: scale(1.08);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
+        }
+
+        .game-result-overlay {
+          animation: gameResultFadeIn 150ms ease-out forwards;
+        }
+
+        .game-result-skill-issue {
+          animation: skillIssueSlam 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        .game-result-you-win {
+          animation: youWinPop 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        .game-result-draw {
+          animation: youWinPop 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+      `}</style>
+
       <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: isVictory
-            ? "radial-gradient(ellipse at 50% 60%, rgba(255, 255, 0, 0.12) 0%, transparent 70%)"
-            : isDraw
-              ? "radial-gradient(ellipse at 50% 60%, rgba(96,165,250,0.08) 0%, transparent 70%)"
-              : "radial-gradient(ellipse at 50% 60%, rgba(107,114,128,0.06) 0%, transparent 70%)",
-        }}
-        aria-hidden
-      />
-
-      <div className="relative flex flex-col items-center text-center">
-        {/* Headline */}
-        <h1
-          className="text-6xl font-black tracking-wide sm:text-7xl"
-          style={{ color: headlineColor, letterSpacing: "0.06em" }}
-        >
-          {headline}
-        </h1>
-
-        {/* Amount */}
-        {amountValue !== null && (
-          <p
-            className="mt-4 text-4xl font-bold tabular-nums sm:text-5xl"
+        className="game-result-overlay fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden px-6"
+        style={{ background: "#0E0E12" }}
+      >
+        <div className="relative flex w-full max-w-md flex-col items-center text-center">
+          <h1
+            className={`${headlineClass} font-bold uppercase tracking-widest leading-none`}
             style={{
-              color: isVictory ? "#FFFF00" : isDraw ? "#60A5FA" : "#FFFFFF",
+              color: isVictory ? "#FFFF00" : isDefeat ? "#FF3333" : "#60A5FA",
+              fontSize: "clamp(3rem, 10vw, 7rem)",
             }}
           >
-            {isDraw ? (
-              "Stake returned"
-            ) : (
-              <span className="inline-flex items-center gap-2">
-                {amountValue >= 0 ? "+" : "-"} {Math.abs(amountValue).toLocaleString()} Skillies <SkilliesIcon size={24} />
-              </span>
-            )}
-          </p>
-        )}
+            {headline}
+          </h1>
 
-        {/* Subtext */}
-        {(isVictory || isDefeat) && typeof newBalance === "number" ? (
-          <p className="mt-2 text-sm text-white/50">
-            New balance: {newBalance.toLocaleString()} Skillies
-          </p>
-        ) : null}
+          <p className="mt-4 text-sm text-white/60">{resultLine}</p>
 
-        <p className="mt-3 text-[15px]" style={{ color: isDefeat ? "rgba(255,255,255,0.6)" : "#888" }}>
-          {subtext}
-        </p>
+          <div className="mt-10 flex w-full flex-col gap-3">
+            <button
+              type="button"
+              onClick={handlePlayAgain}
+              className="w-full rounded-xl py-3.5 text-[15px] font-bold uppercase tracking-wide text-black transition-opacity hover:opacity-90"
+              style={{ background: "#FFFF00" }}
+            >
+              Rematch
+            </button>
+            <button
+              type="button"
+              onClick={handleLeave}
+              className="w-full rounded-xl border border-white py-3.5 text-[15px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-white/5"
+            >
+              Back to Lobby
+            </button>
+          </div>
 
-        {/* Buttons */}
-        <div className="mt-10 flex w-full max-w-xs flex-col gap-3">
-          <button
-            type="button"
-            onClick={handlePlayAgain}
-            className="w-full rounded-xl py-3.5 text-[15px] font-bold text-black transition-opacity hover:opacity-90"
-            style={{ background: "#FFFF00" }}
-          >
-            Play Again
-          </button>
-          <button
-            type="button"
-            onClick={handleLeave}
-            className="w-full rounded-xl border py-3.5 text-[15px] font-semibold transition-colors hover:bg-white/5"
-            style={{ borderColor: "#2A3A5C", color: "#aaa" }}
-          >
-            Leave
-          </button>
+          {countdown > 0 && (
+            <p className="mt-6 text-[12px] tabular-nums text-white/30">
+              Returning to lobby in {countdown}s…
+            </p>
+          )}
         </div>
-
-        {countdown > 0 && (
-          <p className="mt-6 text-[12px] tabular-nums text-[#555]">
-            Returning to lobby in {countdown}s…
-          </p>
-        )}
       </div>
-    </div>
+    </>
   );
 }
