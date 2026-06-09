@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
+import Wordmark from "@/components/Wordmark";
 
 const AUTO_REDIRECT_SEC = 8;
 
@@ -176,6 +177,9 @@ export default function GameResultOverlay({
         style={{ background: "#0E0E12" }}
       >
         <div className="relative flex w-full max-w-md flex-col items-center text-center">
+          <div className="mb-8">
+            <Wordmark href="" size="sm" />
+          </div>
           <h1
             className={`${headlineClass} font-bold uppercase tracking-widest leading-none`}
             style={{
