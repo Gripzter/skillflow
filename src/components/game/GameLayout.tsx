@@ -324,7 +324,7 @@ export default function GameLayout({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
 
           {/* Player cards */}
-          <div className="mx-auto flex w-full max-w-[600px] shrink-0 gap-2 px-2 py-1 md:gap-2.5 md:px-5 md:py-2">
+          <div className="mx-auto flex w-full max-w-[680px] shrink-0 gap-2 px-2 py-1 md:gap-2.5 md:px-5 md:py-2">
             <PlayerCard
               playerKey="player1"
               player={player1}
@@ -344,7 +344,7 @@ export default function GameLayout({
           </div>
 
           {/* Board — flex:1 fills all remaining vertical space */}
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-1 py-0 md:px-5 md:py-1">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden px-1 py-0 md:px-2 md:py-0">
             <div
               id="game-scaling-root"
               ref={gameScalingRootRef}

@@ -89,7 +89,7 @@ export default function ConnectFour({
     const maxByHeight = (availH - (ROWS - 1) * 4 - 16) / (ROWS + 1);
     const raw = Math.floor(Math.min(maxByWidth, maxByHeight));
     if (!Number.isFinite(raw) || raw <= 0) return;
-    setCellSize(Math.max(28, Math.min(raw, 96)));
+    setCellSize(Math.max(28, Math.min(raw, 108)));
   }, []);
 
   useLayoutEffect(() => {
@@ -116,12 +116,16 @@ export default function ConnectFour({
       const result = dropDisc(board, col, turn);
       if (!result) return;
       onPlayerAction?.();
+      const win = checkWin(result.board);
+      const full = isBoardFull(result.board);
+      if (!win && !full) {
+        setTurn(turn === 1 ? 2 : 1);
+      }
       const playerName = turn === 1 ? player1.username : player2.username;
       setDropping({ col, row: result.row, player: turn });
       setBoard(result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: turn, playerName, col, ts }]);
-      const win = checkWin(result.board);
       if (win) {
         setTimeout(() => {
           setWinResult(win);
@@ -130,14 +134,12 @@ export default function ConnectFour({
             onGameEnd(win.player === 1 ? "player1" : "player2");
           }, 1500);
         }, 520);
-      } else if (isBoardFull(result.board)) {
+      } else if (full) {
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
           onGameDraw();
         }, 520);
-      } else {
-        setTurn(turn === 1 ? 2 : 1);
       }
       if (isMultiplayer && sendGameEvent) {
         sendGameEvent({ type: "connect4_move", column: col, byRole: myRole }).catch(() => {});
@@ -178,12 +180,16 @@ export default function ConnectFour({
         onEventProcessed();
         return;
       }
+      const win = checkWin(result.board);
+      const full = isBoardFull(result.board);
+      if (!win && !full) {
+        setTurn(turn === 1 ? 2 : 1);
+      }
       const playerName = turn === 1 ? player1.username : player2.username;
       setDropping({ col: column, row: result.row, player: turn });
       setBoard(result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: turn, playerName, col: column, ts }]);
-      const win = checkWin(result.board);
       if (win) {
         setTimeout(() => {
           setWinResult(win);
@@ -192,14 +198,12 @@ export default function ConnectFour({
             onGameEnd(win.player === 1 ? "player1" : "player2");
           }, 1500);
         }, 520);
-      } else if (isBoardFull(result.board)) {
+      } else if (full) {
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
           onGameDraw();
         }, 520);
-      } else {
-        setTurn(turn === 1 ? 2 : 1);
       }
       onEventProcessed();
       return;
@@ -229,11 +233,15 @@ export default function ConnectFour({
         setBotThinking(false);
         return;
       }
+      const win = checkWin(result.board);
+      const full = isBoardFull(result.board);
+      if (!win && !full) {
+        setTurn(1);
+      }
       setDropping({ col, row: result.row, player: 2 });
       setBoard(result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: 2, playerName: player2.username, col, ts }]);
-      const win = checkWin(result.board);
       if (win) {
         setTimeout(() => {
           setWinResult(win);
@@ -242,14 +250,12 @@ export default function ConnectFour({
             onGameEnd("player2");
           }, 1500);
         }, 520);
-      } else if (isBoardFull(result.board)) {
+      } else if (full) {
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
           onGameDraw();
         }, 520);
-      } else {
-        setTurn(1);
       }
       setBotThinking(false);
     }, delay);
@@ -272,7 +278,16 @@ export default function ConnectFour({
   const PAD = 8;
   const boardWidth = COLS * cellSize + (COLS - 1) * GAP + PAD * 2;
   const boardHeight = ROWS * cellSize + (ROWS - 1) * GAP + PAD * 2;
-  const isMyTurn = (turn === 1 && myRole === "player1") || (turn === 2 && myRole === "player2");
+  const uiCurrentTurn: "player1" | "player2" = dropping
+    ? dropping.player === 1
+      ? "player2"
+      : "player1"
+    : turn === 1
+      ? "player1"
+      : "player2";
+  const isMyTurn =
+    (uiCurrentTurn === "player1" && myRole === "player1") ||
+    (uiCurrentTurn === "player2" && myRole === "player2");
 
   useEffect(() => {
     if (!onMatchUi) return;
@@ -312,14 +327,16 @@ export default function ConnectFour({
     onMatchUi({
       scores: { player1: 0, player2: 0 },
       scoreLabel: "Score",
-      currentTurn: turn === 1 ? "player1" : "player2",
-      requiresAction: !winResult && !isDraw,
+      currentTurn: uiCurrentTurn,
+      requiresAction: !winResult && !isDraw && !dropping,
       turnText,
       systemLogEntries,
     });
   }, [
     onMatchUi,
     turn,
+    uiCurrentTurn,
+    dropping,
     moveHistory,
     winResult,
     isDraw,
