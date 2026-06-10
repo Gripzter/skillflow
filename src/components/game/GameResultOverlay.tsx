@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import Wordmark from "@/components/Wordmark";
+import SPIcon from "@/components/SPIcon";
 
 const AUTO_REDIRECT_SEC = 8;
 
@@ -28,6 +28,7 @@ export default function GameResultOverlay({
   winnerPayout,
   payoutOverride,
   stakeLostOverride,
+  newBalance,
   opponentUsername,
   wonByForfeit,
   onPlayAgain,
@@ -79,144 +80,144 @@ export default function GameResultOverlay({
   const isDefeat = outcome === "defeat";
   const isDraw = outcome === "draw";
 
-  let headline: string;
-  let headlineClass: string;
-  let resultLine: string;
+  const bgSrc = isVictory ? "/results/victory-bg.png" : "/results/defeat-bg.png";
+  const textSrc = isVictory
+    ? "/results/victory-text.png"
+    : isDefeat
+      ? "/results/defeat-text.png"
+      : null;
 
-  if (isVictory) {
-    headline = "YOU WIN";
-    headlineClass = "game-result-you-win";
-    if (isPractice) {
-      resultLine = wonByForfeit ? "You won · opponent forfeited" : "You won";
-    } else {
-      const amount = payoutOverride ?? winnerPayout;
-      resultLine = wonByForfeit
-        ? `You won · +${amount.toLocaleString()} SP · opponent forfeited`
-        : `You won · +${amount.toLocaleString()} SP`;
-    }
-  } else if (isDefeat) {
-    headline = "SKILL ISSUE";
-    headlineClass = "game-result-skill-issue";
-    if (isPractice) {
-      resultLine = `You lost · ${opponentUsername} won`;
-    } else {
-      const lost = stakeLostOverride ?? stakeAmount;
-      resultLine = `You lost · −${lost.toLocaleString()} SP`;
-    }
-  } else {
-    headline = "DRAW";
-    headlineClass = "game-result-draw";
-    resultLine = isPractice
-      ? "Even match"
-      : `${stakeAmount.toLocaleString()} SP returned to your wallet`;
-  }
+  const payoutAmount = payoutOverride ?? winnerPayout;
+  const lostAmount = stakeLostOverride ?? stakeAmount;
+  const previousBalanceVictory =
+    typeof newBalance === "number" && !isPractice ? newBalance - payoutAmount : null;
+  const previousBalanceDefeat =
+    typeof newBalance === "number" && !isPractice ? newBalance + lostAmount : null;
+
+  const subtitle = isVictory
+    ? wonByForfeit
+      ? "Opponent forfeited — you win"
+      : "You outplayed your opponent"
+    : isDefeat
+      ? wonByForfeit
+        ? "You lost the match"
+        : "You lost the match"
+      : isPractice
+        ? "Even match"
+        : "Stake returned";
 
   return (
-    <>
-      <style jsx global>{`
-        @keyframes gameResultFadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={bgSrc}
+        alt=""
+        className="absolute inset-0 z-0 h-full w-full object-cover object-center"
+      />
 
-        @keyframes skillIssueSlam {
-          0% {
-            transform: translateY(-120%);
-            opacity: 0;
-          }
-          75% {
-            transform: translateY(0);
-            opacity: 1;
-          }
-          90% {
-            transform: translateY(-8px);
-          }
-          100% {
-            transform: translateY(0);
-          }
-        }
+      {textSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={textSrc}
+          alt=""
+          className="absolute left-1/2 top-0 z-10 w-[140%] max-w-[900px] -translate-x-1/2 object-contain md:w-full"
+        />
+      ) : null}
 
-        @keyframes youWinPop {
-          0% {
-            transform: scale(0);
-            opacity: 0;
-          }
-          70% {
-            transform: scale(1.08);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
+      <div className="relative z-20 flex h-full w-full flex-col items-center justify-end overflow-x-hidden px-6 pb-[10vh]">
+        <p className="mb-4 text-center text-base text-white/60">{subtitle}</p>
 
-        .game-result-overlay {
-          animation: gameResultFadeIn 150ms ease-out forwards;
-        }
-
-        .game-result-skill-issue {
-          animation: skillIssueSlam 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-
-        .game-result-you-win {
-          animation: youWinPop 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-
-        .game-result-draw {
-          animation: youWinPop 350ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        }
-      `}</style>
-
-      <div
-        className="game-result-overlay fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden px-6"
-        style={{ background: "#0E0E12" }}
-      >
-        <div className="relative flex w-full max-w-md flex-col items-center text-center">
-          <div className="mb-8">
-            <Wordmark href="" size="sm" />
-          </div>
-          <h1
-            className={`${headlineClass} font-bold uppercase tracking-widest leading-none`}
-            style={{
-              color: isVictory ? "#FFFF00" : isDefeat ? "#FF3333" : "#60A5FA",
-              fontSize: "clamp(3rem, 10vw, 7rem)",
-            }}
-          >
-            {headline}
-          </h1>
-
-          <p className="mt-4 text-sm text-white/60">{resultLine}</p>
-
-          <div className="mt-10 flex w-full flex-col gap-3">
-            <button
-              type="button"
-              onClick={handlePlayAgain}
-              className="w-full rounded-xl py-3.5 text-[15px] font-bold uppercase tracking-wide text-black transition-opacity hover:opacity-90"
-              style={{ background: "#FFFF00" }}
-            >
-              Rematch
-            </button>
-            <button
-              type="button"
-              onClick={handleLeave}
-              className="w-full rounded-xl border border-white py-3.5 text-[15px] font-semibold uppercase tracking-wide text-white transition-colors hover:bg-white/5"
-            >
-              Back to Lobby
-            </button>
-          </div>
-
-          {countdown > 0 && (
-            <p className="mt-6 text-[12px] tabular-nums text-white/30">
-              Returning to lobby in {countdown}s…
+        {!isPractice && isVictory ? (
+          <div className="mb-4 w-full max-w-md rounded-xl border border-yellow-900/40 bg-black/60 px-8 py-5 backdrop-blur-sm">
+            <p className="mb-2 text-xs tracking-widest text-yellow-400">SP EARNED</p>
+            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+              <span>+{payoutAmount.toLocaleString()}</span>
+              <span className="text-lg text-yellow-400">SP</span>
+              <SPIcon size={22} />
             </p>
-          )}
-        </div>
+            {typeof newBalance === "number" && previousBalanceVictory !== null ? (
+              <p className="mt-2 flex items-center justify-center gap-1 text-sm text-gray-400">
+                Balance: {previousBalanceVictory.toLocaleString()} SP
+                <SPIcon size={14} />
+                <span className="mx-1">→</span>
+                {newBalance.toLocaleString()} SP
+                <SPIcon size={14} />
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isPractice && isDefeat ? (
+          <div className="mb-4 w-full max-w-md rounded-xl border border-red-900/40 bg-black/60 px-8 py-5 backdrop-blur-sm">
+            <p className="mb-2 text-xs tracking-widest text-red-500">ENTRY LOST</p>
+            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+              <span>−{lostAmount.toLocaleString()}</span>
+              <span className="text-lg text-red-500">SP</span>
+              <SPIcon size={22} />
+            </p>
+            {typeof newBalance === "number" && previousBalanceDefeat !== null ? (
+              <p className="mt-2 flex items-center justify-center gap-1 text-sm text-gray-400">
+                Balance: {previousBalanceDefeat.toLocaleString()} SP
+                <SPIcon size={14} />
+                <span className="mx-1">→</span>
+                {newBalance.toLocaleString()} SP
+                <SPIcon size={14} />
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isPractice && isDraw ? (
+          <div className="mb-4 w-full max-w-md rounded-xl border border-white/20 bg-black/60 px-8 py-5 backdrop-blur-sm">
+            <p className="mb-2 text-xs tracking-widest text-white/60">STAKE RETURNED</p>
+            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+              <span>{stakeAmount.toLocaleString()}</span>
+              <span className="text-lg text-white/60">SP</span>
+              <SPIcon size={22} />
+            </p>
+          </div>
+        ) : null}
+
+        {isPractice ? (
+          <div className="mb-4 w-full max-w-md rounded-xl border border-white/20 bg-black/60 px-8 py-5 text-center backdrop-blur-sm">
+            <p className="text-sm text-white/70">
+              {isVictory
+                ? wonByForfeit
+                  ? "Practice win — opponent forfeited"
+                  : "Practice win"
+                : isDefeat
+                  ? `${opponentUsername} won this one`
+                  : "Practice draw"}
+            </p>
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={handlePlayAgain}
+          className={`mb-3 w-full max-w-md rounded-xl py-4 text-base font-bold transition-colors ${
+            isVictory
+              ? "border border-yellow-400 bg-yellow-400 text-black hover:bg-yellow-300"
+              : "border border-red-400 bg-red-600 text-white hover:bg-red-500"
+          }`}
+        >
+          REMATCH
+        </button>
+
+        <button
+          type="button"
+          onClick={handleLeave}
+          className="mb-3 w-full max-w-md rounded-xl border border-white/20 bg-transparent py-4 text-base font-bold text-white transition-colors hover:bg-white/5"
+        >
+          BACK TO LOBBY
+        </button>
+
+        {countdown > 0 ? (
+          <p className="text-center text-xs tabular-nums text-gray-500">
+            Returning to lobby in {countdown}s…
+          </p>
+        ) : null}
       </div>
-    </>
+    </div>
   );
 }
