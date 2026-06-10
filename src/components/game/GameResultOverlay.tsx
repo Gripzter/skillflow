@@ -175,11 +175,13 @@ export default function GameResultOverlay({
             top: 0,
             left: 0,
             right: 0,
-            height: "52%",
             zIndex: 1,
             display: "flex",
             alignItems: "flex-start",
             justifyContent: "center",
+            height: isDefeat ? "48vw" : "30vw",
+            maxHeight: isDefeat ? "52%" : "38%",
+            minHeight: isDefeat ? "220px" : "140px",
             overflow: "hidden",
           }}
         >
@@ -188,7 +190,7 @@ export default function GameResultOverlay({
             alt=""
             style={{
               width: "100%",
-              maxWidth: "860px",
+              maxWidth: isDefeat ? "860px" : "760px",
               height: "100%",
               objectFit: "contain",
               objectPosition: "center top",
@@ -204,7 +206,7 @@ export default function GameResultOverlay({
           left: 0,
           right: 0,
           bottom: 0,
-          top: "44%",
+          top: isDefeat ? "42%" : "32%",
           zIndex: 10,
           display: "flex",
           flexDirection: "column",
