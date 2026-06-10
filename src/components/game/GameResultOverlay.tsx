@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import confetti from "canvas-confetti";
 import SPIcon from "@/components/SPIcon";
 
@@ -36,6 +36,19 @@ export default function GameResultOverlay({
 }: GameResultOverlayProps) {
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_SEC);
   const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    const imgs = [
+      "/results/defeat-bg.png",
+      "/results/defeat-text.png",
+      "/results/victory-bg.png",
+      "/results/victory-text.png",
+    ];
+    imgs.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
 
   useEffect(() => {
     if (outcome !== "victory") return;
@@ -89,58 +102,139 @@ export default function GameResultOverlay({
 
   const payoutAmount = payoutOverride ?? winnerPayout;
   const lostAmount = stakeLostOverride ?? stakeAmount;
-  const previousBalanceVictory =
-    typeof newBalance === "number" && !isPractice ? newBalance - payoutAmount : null;
-  const previousBalanceDefeat =
-    typeof newBalance === "number" && !isPractice ? newBalance + lostAmount : null;
 
   const subtitle = isVictory
     ? wonByForfeit
       ? "Opponent forfeited — you win"
       : "You outplayed your opponent"
     : isDefeat
-      ? wonByForfeit
-        ? "You lost the match"
-        : "You lost the match"
+      ? "You lost the match"
       : isPractice
         ? "Even match"
         : "Stake returned";
 
+  const contentWidth: CSSProperties = {
+    width: "100%",
+    maxWidth: "420px",
+    marginLeft: "auto",
+    marginRight: "auto",
+  };
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={bgSrc}
-        alt=""
-        className="absolute inset-0 z-0 h-full w-full object-cover object-center"
-      />
-
-      {textSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={textSrc}
+          src={bgSrc}
           alt=""
-          className="absolute left-1/2 top-0 z-10 w-[140%] max-w-[900px] -translate-x-1/2 object-contain md:w-full"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
         />
-      ) : null}
+        {textSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={textSrc}
+            alt=""
+            style={{
+              position: "absolute",
+              top: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "100%",
+              maxWidth: "900px",
+              height: "50%",
+              objectFit: "contain",
+              objectPosition: "center top",
+            }}
+          />
+        ) : null}
+      </div>
 
-      <div className="relative z-20 flex h-full w-full flex-col items-center justify-end overflow-x-hidden px-6 pb-[10vh]">
-        <p className="mb-4 text-center text-base text-white/60">{subtitle}</p>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          paddingBottom: "48px",
+          paddingLeft: "24px",
+          paddingRight: "24px",
+          gap: "12px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            marginBottom: "4px",
+            textAlign: "center",
+            fontSize: "15px",
+            color: "rgba(255,255,255,0.6)",
+          }}
+        >
+          {subtitle}
+        </p>
 
         {!isPractice && isVictory ? (
-          <div className="mb-4 w-full max-w-md rounded-xl border border-yellow-900/40 bg-black/60 px-8 py-5 backdrop-blur-sm">
-            <p className="mb-2 text-xs tracking-widest text-yellow-400">SP EARNED</p>
-            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+          <div
+            style={{
+              ...contentWidth,
+              borderRadius: "12px",
+              border: "1px solid rgba(234, 179, 8, 0.4)",
+              background: "rgba(0,0,0,0.6)",
+              padding: "20px 32px",
+              textAlign: "center",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "8px",
+                fontSize: "12px",
+                letterSpacing: "0.15em",
+                color: "#facc15",
+              }}
+            >
+              — SP EARNED —
+            </p>
+            <p
+              style={{
+                margin: 0,
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "center",
+                gap: "8px",
+                fontSize: "36px",
+                fontWeight: 700,
+                color: "#ffffff",
+              }}
+            >
               <span>+{payoutAmount.toLocaleString()}</span>
-              <span className="text-lg text-yellow-400">SP</span>
+              <span style={{ fontSize: "18px", color: "#facc15" }}>SP</span>
               <SPIcon size={22} />
             </p>
-            {typeof newBalance === "number" && previousBalanceVictory !== null ? (
-              <p className="mt-2 flex items-center justify-center gap-1 text-sm text-gray-400">
-                Balance: {previousBalanceVictory.toLocaleString()} SP
-                <SPIcon size={14} />
-                <span className="mx-1">→</span>
-                {newBalance.toLocaleString()} SP
+            {typeof newBalance === "number" ? (
+              <p
+                style={{
+                  margin: 0,
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "4px",
+                  fontSize: "14px",
+                  color: "#9ca3af",
+                }}
+              >
+                Balance: {newBalance.toLocaleString()} SP
                 <SPIcon size={14} />
               </p>
             ) : null}
@@ -148,19 +242,58 @@ export default function GameResultOverlay({
         ) : null}
 
         {!isPractice && isDefeat ? (
-          <div className="mb-4 w-full max-w-md rounded-xl border border-red-900/40 bg-black/60 px-8 py-5 backdrop-blur-sm">
-            <p className="mb-2 text-xs tracking-widest text-red-500">ENTRY LOST</p>
-            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+          <div
+            style={{
+              ...contentWidth,
+              borderRadius: "12px",
+              border: "1px solid rgba(127, 29, 29, 0.4)",
+              background: "rgba(0,0,0,0.6)",
+              padding: "20px 32px",
+              textAlign: "center",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "8px",
+                fontSize: "12px",
+                letterSpacing: "0.15em",
+                color: "#ef4444",
+              }}
+            >
+              — ENTRY LOST —
+            </p>
+            <p
+              style={{
+                margin: 0,
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "center",
+                gap: "8px",
+                fontSize: "36px",
+                fontWeight: 700,
+                color: "#ffffff",
+              }}
+            >
               <span>−{lostAmount.toLocaleString()}</span>
-              <span className="text-lg text-red-500">SP</span>
+              <span style={{ fontSize: "18px", color: "#ef4444" }}>SP</span>
               <SPIcon size={22} />
             </p>
-            {typeof newBalance === "number" && previousBalanceDefeat !== null ? (
-              <p className="mt-2 flex items-center justify-center gap-1 text-sm text-gray-400">
-                Balance: {previousBalanceDefeat.toLocaleString()} SP
-                <SPIcon size={14} />
-                <span className="mx-1">→</span>
-                {newBalance.toLocaleString()} SP
+            {typeof newBalance === "number" ? (
+              <p
+                style={{
+                  margin: 0,
+                  marginTop: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "4px",
+                  fontSize: "14px",
+                  color: "#9ca3af",
+                }}
+              >
+                Balance: {newBalance.toLocaleString()} SP
                 <SPIcon size={14} />
               </p>
             ) : null}
@@ -168,19 +301,60 @@ export default function GameResultOverlay({
         ) : null}
 
         {!isPractice && isDraw ? (
-          <div className="mb-4 w-full max-w-md rounded-xl border border-white/20 bg-black/60 px-8 py-5 backdrop-blur-sm">
-            <p className="mb-2 text-xs tracking-widest text-white/60">STAKE RETURNED</p>
-            <p className="flex items-baseline justify-center gap-2 text-4xl font-bold text-white">
+          <div
+            style={{
+              ...contentWidth,
+              borderRadius: "12px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(0,0,0,0.6)",
+              padding: "20px 32px",
+              textAlign: "center",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                marginBottom: "8px",
+                fontSize: "12px",
+                letterSpacing: "0.15em",
+                color: "rgba(255,255,255,0.6)",
+              }}
+            >
+              — STAKE RETURNED —
+            </p>
+            <p
+              style={{
+                margin: 0,
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "center",
+                gap: "8px",
+                fontSize: "36px",
+                fontWeight: 700,
+                color: "#ffffff",
+              }}
+            >
               <span>{stakeAmount.toLocaleString()}</span>
-              <span className="text-lg text-white/60">SP</span>
+              <span style={{ fontSize: "18px", color: "rgba(255,255,255,0.6)" }}>SP</span>
               <SPIcon size={22} />
             </p>
           </div>
         ) : null}
 
         {isPractice ? (
-          <div className="mb-4 w-full max-w-md rounded-xl border border-white/20 bg-black/60 px-8 py-5 text-center backdrop-blur-sm">
-            <p className="text-sm text-white/70">
+          <div
+            style={{
+              ...contentWidth,
+              borderRadius: "12px",
+              border: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(0,0,0,0.6)",
+              padding: "20px 32px",
+              textAlign: "center",
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: "14px", color: "rgba(255,255,255,0.7)" }}>
               {isVictory
                 ? wonByForfeit
                   ? "Practice win — opponent forfeited"
@@ -195,11 +369,17 @@ export default function GameResultOverlay({
         <button
           type="button"
           onClick={handlePlayAgain}
-          className={`mb-3 w-full max-w-md rounded-xl py-4 text-base font-bold transition-colors ${
-            isVictory
-              ? "border border-yellow-400 bg-yellow-400 text-black hover:bg-yellow-300"
-              : "border border-red-400 bg-red-600 text-white hover:bg-red-500"
-          }`}
+          style={{
+            ...contentWidth,
+            borderRadius: "12px",
+            padding: "16px",
+            fontSize: "16px",
+            fontWeight: 700,
+            cursor: "pointer",
+            border: isVictory ? "1px solid #facc15" : "1px solid #f87171",
+            background: isVictory ? "#facc15" : "#dc2626",
+            color: isVictory ? "#000000" : "#ffffff",
+          }}
         >
           REMATCH
         </button>
@@ -207,13 +387,31 @@ export default function GameResultOverlay({
         <button
           type="button"
           onClick={handleLeave}
-          className="mb-3 w-full max-w-md rounded-xl border border-white/20 bg-transparent py-4 text-base font-bold text-white transition-colors hover:bg-white/5"
+          style={{
+            ...contentWidth,
+            borderRadius: "12px",
+            padding: "16px",
+            fontSize: "16px",
+            fontWeight: 700,
+            cursor: "pointer",
+            border: "1px solid rgba(255,255,255,0.2)",
+            background: "transparent",
+            color: "#ffffff",
+          }}
         >
           BACK TO LOBBY
         </button>
 
         {countdown > 0 ? (
-          <p className="text-center text-xs tabular-nums text-gray-500">
+          <p
+            style={{
+              margin: 0,
+              textAlign: "center",
+              fontSize: "12px",
+              fontVariantNumeric: "tabular-nums",
+              color: "#6b7280",
+            }}
+          >
             Returning to lobby in {countdown}s…
           </p>
         ) : null}
