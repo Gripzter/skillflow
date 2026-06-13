@@ -1,5 +1,6 @@
 const PROTECTED_ROUTE_PREFIXES = [
   "/admin",
+  "/creator",
   "/dashboard",
   "/external/match",
   "/last-touch",
@@ -41,9 +42,15 @@ export function isProtectedPath(pathname: string) {
     return false;
   }
 
+  if (matchesPrefix(pathname, "/creator/not-found")) {
+    return false;
+  }
+
   return PROTECTED_ROUTE_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix));
 }
 
 export function getAuthRedirectPath(pathname: string) {
-  return matchesPrefix(pathname, "/admin") ? "/admin/login" : "/login";
+  if (matchesPrefix(pathname, "/admin")) return "/admin/login";
+  if (matchesPrefix(pathname, "/creator")) return "/login";
+  return "/login";
 }
