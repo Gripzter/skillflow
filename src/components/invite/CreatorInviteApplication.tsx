@@ -10,6 +10,9 @@ type InviteDetails = {
   reason?: string;
 };
 
+const PASSWORD_EXISTING_ACCOUNT_HINT =
+  "already have a SkillFlow account? use that password.";
+
 const VALUE_PROPS = [
   {
     title: "earn on every match.",
@@ -30,6 +33,7 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPasswordHint, setShowPasswordHint] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -62,6 +66,7 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setShowPasswordHint(false);
     setSubmitting(true);
 
     try {
@@ -84,6 +89,10 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
 
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
+        if (res.status === 409) {
+          setShowPasswordHint(true);
+          return;
+        }
         setError(data.error ?? "Something went wrong.");
         return;
       }
@@ -189,10 +198,20 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
                   required
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={invite.email ? undefined : (e) => setEmail(e.target.value)}
                   readOnly={!!invite.email}
-                  className={`${inputClass} ${invite.email ? "opacity-70" : ""}`}
+                  tabIndex={invite.email ? -1 : undefined}
+                  className={`${inputClass} ${
+                    invite.email
+                      ? "cursor-not-allowed border-[#FFFF00]/25 bg-[#0E0E12]/90 text-[#C8C8D4] opacity-80 focus:border-[#FFFF00]/25 focus:ring-0"
+                      : ""
+                  }`}
                 />
+                {invite.email ? (
+                  <p className="mt-1.5 text-xs lowercase text-[#7A7A8E]">
+                    this invite is locked to this email address.
+                  </p>
+                ) : null}
               </label>
             </div>
 
@@ -200,10 +219,18 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
               <span className="mb-1.5 block text-xs lowercase text-[#7A7A8E]">password</span>
               <PasswordInput
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setShowPasswordHint(false);
+                }}
                 placeholder="min. 8 characters"
                 required
               />
+              {showPasswordHint ? (
+                <p className="mt-1.5 text-xs lowercase text-[#7A7A8E]">
+                  {PASSWORD_EXISTING_ACCOUNT_HINT}
+                </p>
+              ) : null}
             </label>
 
             <label className="block">
@@ -212,8 +239,20 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
             </label>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs lowercase text-[#7A7A8E]">game url</span>
-              <input required type="url" value={gameUrl} onChange={(e) => setGameUrl(e.target.value)} className={inputClass} />
+              <span className="mb-1.5 block text-xs lowercase text-[#7A7A8E]">
+                where can we play your game?
+              </span>
+              <input
+                required
+                type="url"
+                value={gameUrl}
+                onChange={(e) => setGameUrl(e.target.value)}
+                placeholder="itch.io, your website, app store link, etc."
+                className={inputClass}
+              />
+              <p className="mt-1.5 text-xs lowercase text-[#7A7A8E]">
+                for review only — players will never leave SkillFlow
+              </p>
             </label>
 
             <label className="block">

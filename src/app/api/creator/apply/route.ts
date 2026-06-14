@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { jsonOk } from "@/lib/admin-api";
 import { sendCreatorEmail } from "@/lib/send-creator-email";
@@ -15,6 +16,15 @@ type ApplyBody = {
   skillConfirmed: boolean;
   termsAccepted: boolean;
 };
+
+function createAnonClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) return null;
+  return createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
 
 export async function POST(req: NextRequest) {
   const admin = createAdminClient();
@@ -53,41 +63,73 @@ export async function POST(req: NextRequest) {
     return jsonOk({ error: "You must confirm skill-based gameplay and accept the terms." }, 400);
   }
 
-  const { data: inviteDetails } = await admin.rpc("get_invite_details", {
-    p_token: body.token,
-  });
+  const { data: inviteRow, error: inviteError } = await admin
+    .from("creator_invites")
+    .select("email, status, expires_at")
+    .eq("token", body.token)
+    .maybeSingle();
 
-  const invite = inviteDetails as { valid?: boolean; email?: string; reason?: string };
-  if (!invite?.valid) {
-    return jsonOk({ error: "Invalid or expired invite.", reason: invite?.reason }, 400);
+  if (inviteError || !inviteRow) {
+    return jsonOk({ error: "Invalid or expired invite." }, 400);
   }
 
-  if (invite.email && invite.email.toLowerCase() !== body.email.trim().toLowerCase()) {
-    return jsonOk({ error: "This invite is reserved for a different email address." }, 400);
+  if (inviteRow.status !== "pending") {
+    return jsonOk({ error: "Invalid or expired invite." }, 400);
+  }
+
+  if (new Date(inviteRow.expires_at as string) < new Date()) {
+    return jsonOk({ error: "Invalid or expired invite." }, 400);
+  }
+
+  if (inviteRow.email != null && String(inviteRow.email).trim() !== "") {
+    if (String(inviteRow.email).trim().toLowerCase() !== body.email.trim().toLowerCase()) {
+      return jsonOk({ error: "this invite was issued for a different email address" }, 400);
+    }
   }
 
   const username = body.name.trim().replace(/\s+/g, "_").slice(0, 30);
+  const email = body.email.trim().toLowerCase();
 
-  const { data: authData, error: authError } = await admin.auth.admin.createUser({
-    email: body.email.trim().toLowerCase(),
-    password: body.password,
-    email_confirm: true,
-    user_metadata: {
-      username,
-      display_name: body.name.trim(),
-      is_creator: true,
-    },
-  });
+  const anon = createAnonClient();
+  let userId: string | null = null;
+  let createdNewUser = false;
 
-  if (authError || !authData.user) {
-    const msg = authError?.message ?? "Failed to create account.";
-    if (msg.toLowerCase().includes("already")) {
-      return jsonOk({ error: "An account with this email already exists. Try logging in." }, 409);
+  if (anon) {
+    const { data: signInData } = await anon.auth.signInWithPassword({
+      email,
+      password: body.password,
+    });
+    if (signInData.user) {
+      userId = signInData.user.id;
     }
-    return jsonOk({ error: msg }, 400);
   }
 
-  const userId = authData.user.id;
+  if (!userId) {
+    const { data: authData, error: authError } = await admin.auth.admin.createUser({
+      email,
+      password: body.password,
+      email_confirm: true,
+      user_metadata: {
+        username,
+        display_name: body.name.trim(),
+        is_creator: true,
+      },
+    });
+
+    if (authError || !authData.user) {
+      const msg = authError?.message ?? "Failed to create account.";
+      if (msg.toLowerCase().includes("already")) {
+        return jsonOk(
+          { error: "if you already have a SkillFlow account, use that password." },
+          400
+        );
+      }
+      return jsonOk({ error: msg }, 400);
+    }
+
+    userId = authData.user.id;
+    createdNewUser = true;
+  }
 
   await admin.from("profiles").upsert({
     id: userId,
@@ -105,13 +147,15 @@ export async function POST(req: NextRequest) {
   });
 
   if (gameError) {
-    await admin.auth.admin.deleteUser(userId);
+    if (createdNewUser) {
+      await admin.auth.admin.deleteUser(userId);
+    }
     return jsonOk({ error: gameError.message }, 400);
   }
 
   void sendCreatorEmail({
     type: "application_received",
-    to: body.email.trim().toLowerCase(),
+    to: email,
     creatorName: body.name.trim(),
   });
 

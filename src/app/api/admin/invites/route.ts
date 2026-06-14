@@ -43,13 +43,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await requireAdmin(req);
   if ("error" in ctx) return ctx.error;
-  const { admin } = ctx;
+  const { admin, userId } = ctx;
 
   const body = (await req.json()) as { email?: string; gameNameHint?: string };
 
   const { data, error } = await admin.rpc("generate_invite_token", {
     p_email: body.email ?? null,
     p_game_hint: body.gameNameHint ?? null,
+    p_admin_id: userId,
   });
 
   if (error) return jsonOk({ error: error.message }, 400);
