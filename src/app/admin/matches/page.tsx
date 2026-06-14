@@ -137,8 +137,11 @@ export default function AdminMatchesPage() {
         >
           <option value="all">all statuses</option>
           <option value="in_progress">in progress</option>
+          <option value="timed_out">timed out</option>
           <option value="completed">completed</option>
           <option value="voided">voided</option>
+          <option value="forfeited">forfeited</option>
+          <option value="cancelled">cancelled</option>
         </select>
         <input
           value={game === "all" ? "" : game}

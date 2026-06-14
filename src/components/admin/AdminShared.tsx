@@ -98,11 +98,20 @@ export function statusBadgeClass(status: string): string {
   if (status === "active" || status === "completed") {
     return "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
   }
-  if (status === "pending" || status === "in_progress") {
+  if (status === "in_progress") {
     return "bg-[#FFFF00]/15 text-[#FFFF00] border-[#FFFF00]/30";
   }
-  if (status === "suspended" || status === "voided") {
+  if (status === "forfeited") {
+    return "bg-orange-500/15 text-orange-400 border-orange-500/30";
+  }
+  if (status === "voided") {
     return "bg-red-500/15 text-red-400 border-red-500/30";
+  }
+  if (status === "timed_out" || status === "cancelled") {
+    return "bg-white/5 text-[#7A7A8E] border-white/10";
+  }
+  if (status === "pending" || status === "suspended") {
+    return "bg-[#FFFF00]/15 text-[#FFFF00] border-[#FFFF00]/30";
   }
   return "bg-white/5 text-[#C8C8D4] border-white/10";
 }

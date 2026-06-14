@@ -23,6 +23,60 @@ export function calcMatchEconomics(stakeSp: number) {
   return { potSK, rakeSK, creatorCutSK, skillflowNetSK };
 }
 
+export type MatchDisplayStatus =
+  | "completed"
+  | "in_progress"
+  | "voided"
+  | "timed_out"
+  | "forfeited"
+  | "cancelled";
+
+const STALE_MATCH_MS = 10 * 60 * 1000;
+
+export function resolveAdminMatchStatus(m: {
+  state?: string | null;
+  status?: string | null;
+  sdk_phase?: string | null;
+  created_at?: string | null;
+}): MatchDisplayStatus {
+  if (m.status === "voided" || m.state === "voided" || m.sdk_phase === "voided") return "voided";
+  if (m.status === "cancelled") return "cancelled";
+  if (m.status === "forfeited") return "forfeited";
+  if (m.status === "timed_out") return "timed_out";
+  if (m.state === "settled" || m.status === "completed") return "completed";
+
+  const createdAt = m.created_at ? new Date(m.created_at).getTime() : Date.now();
+  if (Date.now() - createdAt > STALE_MATCH_MS) {
+    return "timed_out";
+  }
+  return "in_progress";
+}
+
+export function resolvePlayerLabel(
+  playerId: string | null | undefined,
+  profileMap: Map<string, string>
+): string {
+  if (!playerId) return "bot";
+  return profileMap.get(playerId) ?? "bot";
+}
+
+export function resolveWinnerLabel(
+  winnerId: string | null | undefined,
+  status: MatchDisplayStatus,
+  profileMap: Map<string, string>
+): string {
+  if (status !== "completed") return "—";
+  if (!winnerId) return "bot";
+  return profileMap.get(winnerId) ?? "bot";
+}
+
+export function matchRakeSK(m: { rake_amount?: number | null; stake_sp?: number | null }) {
+  if (m.rake_amount != null && Number(m.rake_amount) >= 0) {
+    return Number(m.rake_amount);
+  }
+  return Math.floor(Number(m.stake_sp ?? 0) * 2 * RAKE_RATE);
+}
+
 export function truncateId(id: string, head = 8, tail = 4): string {
   if (id.length <= head + tail + 1) return id;
   return `${id.slice(0, head)}…${id.slice(-tail)}`;

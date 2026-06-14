@@ -1,17 +1,21 @@
 import { NextRequest } from "next/server";
-import { jsonOk, requireAdmin, skToUsd, SKILLIES_PER_USD } from "@/lib/admin-api";
+import { jsonOk, matchRakeSK, requireAdmin, skToUsd } from "@/lib/admin-api";
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin(req);
   if ("error" in ctx) return ctx.error;
   const { admin } = ctx;
 
-  const [{ data: profiles }, { data: earnings }, { data: deposits }, { data: withdrawals }] =
+  const [{ data: profiles }, { data: earnings }, { data: deposits }, { data: withdrawals }, { data: completedMatches }] =
     await Promise.all([
       admin.from("profiles").select("balance_sp"),
       admin.from("creator_earnings").select("earned_sk, earned_usd, paid_out, creator_id, created_at"),
       admin.from("transactions").select("amount, created_at").eq("type", "deposit"),
       admin.from("transactions").select("amount, created_at").eq("type", "withdrawal"),
+      admin
+        .from("matches")
+        .select("rake_amount, stake_sp, completed_at, settled_at, created_at")
+        .eq("status", "completed"),
     ]);
 
   const poolBalanceSK = (profiles ?? []).reduce((s, p) => s + Number(p.balance_sp ?? 0), 0);
@@ -21,8 +25,7 @@ export async function GET(req: NextRequest) {
     0
   );
 
-  const totalCreatorEarnedSK = (earnings ?? []).reduce((s, e) => s + Number(e.earned_sk), 0);
-  const totalRakeSK = Math.floor(totalCreatorEarnedSK / 0.2);
+  const totalRakeSK = (completedMatches ?? []).reduce((s, m) => s + matchRakeSK(m), 0);
   const pendingCreatorUSD = (earnings ?? [])
     .filter((e) => !e.paid_out)
     .reduce((s, e) => s + Number(e.earned_usd), 0);
@@ -31,37 +34,45 @@ export async function GET(req: NextRequest) {
     .reduce((s, e) => s + Number(e.earned_usd), 0);
 
   const xsollaFeesUSD = totalDepositedUSD * 0.05;
-  const skillflowNetUSD = skToUsd(Math.floor(totalRakeSK * 0.8)) - paidCreatorUSD;
+  const totalRakeUSD = skToUsd(totalRakeSK);
+  const netPlatformRevenueUSD = totalRakeUSD - paidCreatorUSD;
 
   const monthlyMap = new Map<
     string,
-    { deposits: number; withdrawals: number; creatorPayouts: number }
+    { deposits: number; withdrawals: number; creatorPayouts: number; rakeSK: number }
   >();
 
   for (const d of deposits ?? []) {
     const key = (d.created_at as string).slice(0, 7);
-    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0 };
+    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0, rakeSK: 0 };
     row.deposits += Number(d.amount);
     monthlyMap.set(key, row);
   }
   for (const w of withdrawals ?? []) {
     const key = (w.created_at as string).slice(0, 7);
-    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0 };
+    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0, rakeSK: 0 };
     row.withdrawals += Math.abs(Number(w.amount));
     monthlyMap.set(key, row);
   }
   for (const e of earnings ?? []) {
     if (!e.paid_out) continue;
     const key = (e.created_at as string).slice(0, 7);
-    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0 };
+    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0, rakeSK: 0 };
     row.creatorPayouts += Number(e.earned_usd);
+    monthlyMap.set(key, row);
+  }
+  for (const m of completedMatches ?? []) {
+    const ts = (m.completed_at ?? m.settled_at ?? m.created_at) as string;
+    const key = ts.slice(0, 7);
+    const row = monthlyMap.get(key) ?? { deposits: 0, withdrawals: 0, creatorPayouts: 0, rakeSK: 0 };
+    row.rakeSK += matchRakeSK(m);
     monthlyMap.set(key, row);
   }
 
   const monthlyPnL = Array.from(monthlyMap.entries())
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([month, row]) => {
-      const rakeUSD = row.deposits * 0.12 * 0.8;
+      const rakeUSD = skToUsd(row.rakeSK);
       const xsolla = row.deposits * 0.05;
       const net = rakeUSD - row.creatorPayouts - xsolla;
       return {
@@ -105,11 +116,11 @@ export async function GET(req: NextRequest) {
       totalDepositedUSD,
       totalWithdrawnUSD,
       totalRakeSK,
-      totalRakeUSD: skToUsd(totalRakeSK),
+      totalRakeUSD,
       pendingCreatorPayoutsUSD: pendingCreatorUSD,
       paidCreatorPayoutsUSD: paidCreatorUSD,
       xsollaFeesUSD,
-      netPlatformRevenueUSD: skillflowNetUSD,
+      netPlatformRevenueUSD,
     },
     monthlyPnL,
     pendingPayouts,

@@ -3,19 +3,12 @@ import {
   calcMatchEconomics,
   jsonOk,
   requireAdmin,
+  resolveAdminMatchStatus,
+  resolvePlayerLabel,
+  resolveWinnerLabel,
   SKILLIES_PER_USD,
   skToUsd,
 } from "@/lib/admin-api";
-
-function matchStatus(m: {
-  state?: string | null;
-  status?: string | null;
-  sdk_phase?: string | null;
-}): "in_progress" | "completed" | "voided" {
-  if (m.state === "voided" || m.sdk_phase === "voided") return "voided";
-  if (m.state === "settled" || m.status === "completed") return "completed";
-  return "in_progress";
-}
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin(req);
@@ -88,12 +81,10 @@ export async function GET(req: NextRequest) {
   }
 
   const playerIds = new Set<string>();
-  const winnerIds = new Set<string>();
   for (const m of recentMatches ?? []) {
     for (const id of [m.player1_id, m.player2_id, m.player_a, m.player_b, m.winner_id]) {
       if (id) playerIds.add(id as string);
     }
-    if (m.winner_id) winnerIds.add(m.winner_id as string);
   }
 
   const { data: profiles } = playerIds.size
@@ -109,20 +100,21 @@ export async function GET(req: NextRequest) {
 
   const liveFeed = (recentMatches ?? []).map((m) => {
     const stake = Number(m.stake_sp ?? m.stake_amount ?? 0);
-    const p1 = (m.player1_id ?? m.player_a) as string | null;
-    const p2 = (m.player2_id ?? m.player_b) as string | null;
-    const status = matchStatus(m);
+    const p1Id = (m.player1_id ?? m.player_a) as string | null;
+    const p2Id = (m.player2_id ?? m.player_b) as string | null;
+    const status = resolveAdminMatchStatus(m);
+    const winnerId = m.winner_id as string | null;
     return {
       id: m.id,
       gameName:
         (m.creator_game_id ? gameMap.get(m.creator_game_id as string) : null) ??
         m.game_type,
-      player1: profileMap.get(p1 ?? "") ?? "player 1",
-      player2: profileMap.get(p2 ?? "") ?? "player 2",
+      player1: resolvePlayerLabel(p1Id, profileMap),
+      player2: resolvePlayerLabel(p2Id, profileMap),
       entrySK: stake,
       potSK: stake * 2,
       status,
-      winner: m.winner_id ? profileMap.get(m.winner_id as string) ?? "—" : "—",
+      winner: resolveWinnerLabel(winnerId, status, profileMap),
       timestamp: m.completed_at ?? m.settled_at ?? m.created_at,
     };
   });

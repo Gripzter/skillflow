@@ -2,20 +2,14 @@ import { NextRequest } from "next/server";
 import {
   calcMatchEconomics,
   jsonOk,
+  matchRakeSK,
   requireAdmin,
+  resolveAdminMatchStatus,
+  resolvePlayerLabel,
+  resolveWinnerLabel,
   skToUsd,
   truncateId,
 } from "@/lib/admin-api";
-
-function matchStatus(m: {
-  state?: string | null;
-  status?: string | null;
-  sdk_phase?: string | null;
-}): string {
-  if (m.state === "voided" || m.sdk_phase === "voided") return "voided";
-  if (m.state === "settled" || m.status === "completed") return "completed";
-  return "in_progress";
-}
 
 function matchDurationSec(m: {
   created_at?: string;
@@ -95,10 +89,12 @@ export async function GET(req: NextRequest) {
     const creatorCutSK = earningMap.get(m.id as string) ?? econ.creatorCutSK;
     const skillflowNetSK =
       creatorCutSK > 0 ? Math.floor(creatorCutSK / 0.2) - creatorCutSK : econ.skillflowNetSK;
-    const st = matchStatus(m);
+    const st = resolveAdminMatchStatus(m);
     const durationSec = matchDurationSec(m);
     const gameKey = (m.creator_game_id as string) || (m.game_type as string);
     const winnerId = m.winner_id as string | null;
+    const p1Id = (m.player1_id ?? m.player_a) as string | null;
+    const p2Id = (m.player2_id ?? m.player_b) as string | null;
 
     if (winnerId && st === "completed") {
       if (!winStreaks[winnerId]) winStreaks[winnerId] = {};
@@ -116,15 +112,15 @@ export async function GET(req: NextRequest) {
       id: m.id,
       idShort: truncateId(m.id as string),
       game: gameMap.get(m.creator_game_id as string) ?? m.game_type,
-      player1: profileMap.get((m.player1_id ?? m.player_a) as string) ?? "—",
-      player2: profileMap.get((m.player2_id ?? m.player_b) as string) ?? "—",
+      player1: resolvePlayerLabel(p1Id, profileMap),
+      player2: resolvePlayerLabel(p2Id, profileMap),
       entrySK: stake,
       potSK: econ.potSK,
       rakeSK: econ.rakeSK,
       creatorCutSK,
       skillflowNetSK,
       skillflowNetUSD: skToUsd(skillflowNetSK),
-      winner: winnerId ? profileMap.get(winnerId) ?? "—" : "—",
+      winner: resolveWinnerLabel(winnerId, st, profileMap),
       winnerId,
       status: st,
       durationSec,
