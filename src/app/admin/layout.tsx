@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     checkAdminAccess().then((ok) => {
       if (cancelled) return;
       if (!ok) {
-        window.location.href = "/admin/login";
+        window.location.href = "/";
         return;
       }
       setChecked(true);
@@ -25,14 +25,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, []);
 
   if (!checked) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0E0E12]">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#333] border-t-[#FFFF00]" />
+      </div>
+    );
   }
 
   return (
-    <div className="flex min-h-screen bg-admin-bg">
+    <div className="min-h-screen bg-[#0E0E12] text-[#F0F0F4]">
       <AdminSidebar />
-      <main className="ml-56 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1400px] p-8">{children}</div>
+      <main className="min-h-screen lg:ml-60">
+        <div className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:py-8">{children}</div>
       </main>
     </div>
   );

@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const ADMIN_EMAIL = "aras.axmas@gmail.com";
-
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key);
-}
+import { createAdminClient } from "@/lib/supabase-admin";
+import { ADMIN_OWNER_ID } from "@/lib/admin-api";
 
 export async function GET(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -17,17 +9,16 @@ export async function GET(req: NextRequest) {
   }
 
   const token = auth.slice(7);
-  const supabase = getSupabaseAdmin();
+  const supabase = createAdminClient();
   if (!supabase) {
     return NextResponse.json({ error: "Service not configured" }, { status: 503 });
   }
 
-  // Verify the token belongs to the admin account
   const {
     data: { user },
     error: authErr,
   } = await supabase.auth.getUser(token);
-  if (authErr || !user || user.email !== ADMIN_EMAIL) {
+  if (authErr || !user || user.id !== ADMIN_OWNER_ID) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

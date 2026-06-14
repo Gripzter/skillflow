@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase";
 import { clearClientSessionState } from "@/lib/client-session";
+import { ADMIN_OWNER_ID } from "@/lib/admin-api";
 
-export const ADMIN_EMAIL = "aras.axmas@gmail.com";
+export const ADMIN_OWNER_USER_ID = ADMIN_OWNER_ID;
 
 export async function checkAdminAccess(): Promise<boolean> {
   const supabase = createClient();
@@ -9,7 +10,7 @@ export async function checkAdminAccess(): Promise<boolean> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  return user?.email === ADMIN_EMAIL;
+  return user?.id === ADMIN_OWNER_USER_ID;
 }
 
 export async function getAdminSession(): Promise<{ user: { id: string; email: string } } | null> {
@@ -18,7 +19,7 @@ export async function getAdminSession(): Promise<{ user: { id: string; email: st
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session || session.user.email !== ADMIN_EMAIL) return null;
+  if (!session || session.user.id !== ADMIN_OWNER_USER_ID) return null;
   return session as { user: { id: string; email: string } };
 }
 

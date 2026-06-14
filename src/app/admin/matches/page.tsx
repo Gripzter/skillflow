@@ -1,287 +1,269 @@
 "use client";
 
-import { Fragment, useEffect, useState, useMemo } from "react";
-import { createClient } from "@/lib/supabase";
-import ChessReplayViewer from "@/components/admin/ChessReplayViewer";
-import LoadingRing from "@/components/LoadingRing";
+import { useCallback, useEffect, useState } from "react";
+import {
+  AdminPageHeader,
+  AdminStatusBadge,
+  AdminTableShell,
+  MoneyPair,
+} from "@/components/admin/AdminShared";
+import { adminFetch } from "@/lib/admin-client";
 
-interface MatchRow {
+type MatchRow = {
   id: string;
-  game_type: string;
-  player1_id: string | null;
-  player2_id: string | null;
-  player1_username?: string | null;
-  player2_username?: string | null;
-  player1Name: string;
-  player2Name: string;
-  stake_amount: number;
-  platform_fee: number;
-  total_pot: number;
-  winner_payout: number;
+  idShort: string;
+  game: string;
+  player1: string;
+  player2: string;
+  entrySK: number;
+  potSK: number;
+  rakeSK: number;
+  creatorCutSK: number;
+  skillflowNetSK: number;
+  skillflowNetUSD: number;
+  winner: string;
   status: string;
-  result: string | null;
-  created_at: string;
-  bot_difficulty: string | null;
-  move_log: Array<{
-    player_id: string;
-    action: Record<string, unknown>;
-    timestamp_ms: number;
-  }> | null;
+  durationSec: number | null;
+  timestamp: string;
+  suspicious: boolean;
+  suspiciousReasons: string[];
+};
+
+function downloadCsv(rows: MatchRow[]) {
+  const header = [
+    "match id",
+    "game",
+    "player 1",
+    "player 2",
+    "entry sk",
+    "pot sk",
+    "rake sk",
+    "creator cut sk",
+    "skillflow net sk",
+    "skillflow net usd",
+    "winner",
+    "status",
+    "duration sec",
+    "timestamp",
+    "suspicious",
+  ];
+  const data = rows.map((r) => [
+    r.id,
+    r.game,
+    r.player1,
+    r.player2,
+    String(r.entrySK),
+    String(r.potSK),
+    String(r.rakeSK),
+    String(r.creatorCutSK),
+    String(r.skillflowNetSK),
+    String(r.skillflowNetUSD),
+    r.winner,
+    r.status,
+    r.durationSec == null ? "" : String(r.durationSec),
+    r.timestamp,
+    r.suspicious ? r.suspiciousReasons.join(";") : "",
+  ]);
+  const csv = [header, ...data]
+    .map((line) => line.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `admin-matches-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
-
-type DateRange = "today" | "week" | "month" | "all";
-type StakeRange = "all" | "low" | "mid" | "high" | "vhigh";
-
-const GAMES = ["all", "chess", "checkers", "connect-four", "pool", "memory", "reaction", "spelling", "last-touch"];
-const STATUSES = ["all", "completed", "in_progress", "waiting", "draw"];
-const DATE_LABELS: Record<DateRange, string> = { today: "Today", week: "This Week", month: "This Month", all: "All Time" };
-const STAKE_LABELS: Record<StakeRange, string> = { all: "Any Stake", low: "$1–$5", mid: "$5–$25", high: "$25–$100", vhigh: "$100+" };
-
-function gameLabel(s: string) {
-  const m: Record<string, string> = {
-    chess: "Chess", checkers: "Checkers", "connect-four": "Connect 4", "connect-4": "Connect 4",
-    pool: "8-Ball Pool", memory: "Memory", reaction: "Reaction", spelling: "Spelling", "last-touch": "Last Touch",
-    "memory-match": "Memory Match", "reaction-duel": "Reaction Duel", "spelling-bee": "Spelling Bee", "typing-race": "Typing Race",
-  };
-  return m[s] ?? s;
-}
-
-function outcomeLabel(m: MatchRow): string {
-  if (!m.result) return "—";
-  if (m.result === "draw") return "Draw";
-  const winnerName = m.result === "player1_win" ? m.player1Name : m.player2Name;
-  return `${winnerName} wins`;
-}
-
-const PER_PAGE = 25;
 
 export default function AdminMatchesPage() {
   const [matches, setMatches] = useState<MatchRow[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [game, setGame] = useState("all");
   const [status, setStatus] = useState("all");
-  const [dateRange, setDateRange] = useState<DateRange>("all");
-  const [stakeRange, setStakeRange] = useState<StakeRange>("all");
-  const [page, setPage] = useState(0);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [game, setGame] = useState("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [minPot, setMinPot] = useState("");
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      if (!supabase) { setLoading(false); return; }
-
-      const { data: raw, error } = await supabase
-        .from("matches")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(2000);
-
-      if (error) {
-        console.error("[AdminMatches] Failed to load matches:", error);
-        setLoading(false);
-        return;
-      }
-
-      if (!raw || raw.length === 0) { setLoading(false); return; }
-
-      // Collect player IDs
-      const pids = Array.from(new Set(raw.flatMap((m) => [m.player1_id, m.player2_id].filter(Boolean))));
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, username")
-        .in("id", pids);
-      const profileMap = new Map(profiles?.map((p) => [p.id, p.username]) ?? []);
-
-      setMatches(
-        raw.map((m) => ({
-          ...(m as MatchRow),
-          player1Name:
-            (m.player1_username as string | null) ||
-            (m.player1_id ? profileMap.get(m.player1_id) : null) ||
-            "Player 1",
-          player2Name: m.player2_id
-            ? ((m.player2_username as string | null) || profileMap.get(m.player2_id) || "Player 2")
-            : `Bot (${m.bot_difficulty ?? "?"})`,
-        }))
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page) });
+      if (status !== "all") params.set("status", status);
+      if (game !== "all") params.set("game", game);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (minPot) params.set("minPot", minPot);
+      const res = await adminFetch<{ matches: MatchRow[]; pagination: { total: number } }>(
+        `/api/admin/matches?${params}`
       );
+      setMatches(res.matches);
+      setTotal(res.pagination.total);
+    } finally {
       setLoading(false);
     }
-    load();
-  }, []);
+  }, [page, status, game, dateFrom, dateTo, minPot]);
 
-  const filtered = useMemo(() => {
-    const now = Date.now();
-    return matches.filter((m) => {
-      if (game !== "all" && m.game_type !== game) return false;
-      if (status !== "all" && m.status !== status) return false;
-      if (dateRange === "today") {
-        const start = new Date(); start.setHours(0, 0, 0, 0);
-        if (new Date(m.created_at).getTime() < start.getTime()) return false;
-      } else if (dateRange === "week" && now - new Date(m.created_at).getTime() > 7 * 86400_000) return false;
-      else if (dateRange === "month" && now - new Date(m.created_at).getTime() > 30 * 86400_000) return false;
-      if (stakeRange !== "all") {
-        const s = m.stake_amount;
-        if (stakeRange === "low" && (s < 1 || s >= 5)) return false;
-        if (stakeRange === "mid" && (s < 5 || s >= 25)) return false;
-        if (stakeRange === "high" && (s < 25 || s >= 100)) return false;
-        if (stakeRange === "vhigh" && s < 100) return false;
-      }
-      return true;
-    });
-  }, [matches, game, status, dateRange, stakeRange]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-  const curPage = Math.min(page, totalPages - 1);
-  const pageMatches = filtered.slice(curPage * PER_PAGE, (curPage + 1) * PER_PAGE);
-
-  const stats = useMemo(() => ({
-    total: filtered.length,
-    completed: filtered.filter((m) => m.status === "completed").length,
-    inProgress: filtered.filter((m) => m.status === "in_progress").length,
-    fees: filtered.filter((m) => m.status === "completed").reduce((s, m) => s + (m.platform_fee || 0), 0),
-  }), [filtered]);
-
-  const selectCls = "rounded-lg border border-white/10 bg-admin-card px-3 py-2 text-sm text-white focus:border-[#FFFF00] focus:outline-none";
-
-  if (loading) {
-    return <LoadingRing />;
-  }
+  const totalPages = Math.max(1, Math.ceil(total / 50));
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Matches</h1>
-
-      {/* Quick stats */}
-      <div className="flex flex-wrap gap-6 rounded-xl border border-white/5 bg-admin-card px-6 py-4 text-sm">
-        <span className="text-[#9CA3AF]">Showing <strong className="text-white">{filtered.length}</strong></span>
-        <span className="text-[#9CA3AF]">Completed <strong className="text-white">{stats.completed}</strong></span>
-        <span className="text-[#9CA3AF]">In Progress <strong className="text-yellow-400">{stats.inProgress}</strong></span>
-        <span className="text-[#9CA3AF]">Fees <strong className="text-admin-success">${stats.fees.toFixed(2)}</strong></span>
+    <div>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <AdminPageHeader title="matches" />
+        <button
+          type="button"
+          onClick={() => downloadCsv(matches)}
+          className="rounded-lg px-4 py-2 text-sm font-medium lowercase text-black"
+          style={{ background: "#FFFF00" }}
+        >
+          export csv
+        </button>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <select value={game} onChange={(e) => { setGame(e.target.value); setPage(0); }} className={selectCls}>
-          {GAMES.map((g) => <option key={g} value={g}>{g === "all" ? "All Games" : gameLabel(g)}</option>)}
+      <div className="mb-6 flex flex-wrap gap-3 rounded-xl border border-white/5 bg-[#1A1A1F] p-4">
+        <select
+          value={status}
+          onChange={(e) => {
+            setPage(1);
+            setStatus(e.target.value);
+          }}
+          className="rounded border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+        >
+          <option value="all">all statuses</option>
+          <option value="in_progress">in progress</option>
+          <option value="completed">completed</option>
+          <option value="voided">voided</option>
         </select>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(0); }} className={selectCls}>
-          {STATUSES.map((s) => <option key={s} value={s}>{s === "all" ? "All Statuses" : s}</option>)}
-        </select>
-        <select value={dateRange} onChange={(e) => { setDateRange(e.target.value as DateRange); setPage(0); }} className={selectCls}>
-          {(Object.keys(DATE_LABELS) as DateRange[]).map((k) => <option key={k} value={k}>{DATE_LABELS[k]}</option>)}
-        </select>
-        <select value={stakeRange} onChange={(e) => { setStakeRange(e.target.value as StakeRange); setPage(0); }} className={selectCls}>
-          {(Object.keys(STAKE_LABELS) as StakeRange[]).map((k) => <option key={k} value={k}>{STAKE_LABELS[k]}</option>)}
-        </select>
+        <input
+          value={game === "all" ? "" : game}
+          onChange={(e) => {
+            setPage(1);
+            setGame(e.target.value || "all");
+          }}
+          placeholder="game filter"
+          className="rounded border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+        />
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => {
+            setPage(1);
+            setDateFrom(e.target.value);
+          }}
+          className="rounded border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => {
+            setPage(1);
+            setDateTo(e.target.value);
+          }}
+          className="rounded border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+        />
+        <input
+          type="number"
+          value={minPot}
+          onChange={(e) => {
+            setPage(1);
+            setMinPot(e.target.value);
+          }}
+          placeholder="min pot sk"
+          className="rounded border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+        />
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-xl border border-white/5 bg-admin-card">
-        <table className="w-full min-w-[900px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-white/5 text-[#9CA3AF]">
-              <th className="px-4 py-3 font-medium">ID</th>
-              <th className="px-4 py-3 font-medium">Game</th>
-              <th className="px-4 py-3 font-medium">Player 1</th>
-              <th className="px-4 py-3 font-medium">Player 2</th>
-              <th className="px-4 py-3 font-medium">Stake</th>
-              <th className="px-4 py-3 font-medium">Fee</th>
-              <th className="px-4 py-3 font-medium">Outcome</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pageMatches.map((m) => (
-              <Fragment key={m.id}>
-                <tr
-                  className="cursor-pointer border-b border-white/5 last:border-0 hover:bg-white/[0.03]"
-                  onClick={() => setExpandedId(expandedId === m.id ? null : m.id)}
-                >
-                  <td className="px-4 py-3 font-mono text-xs text-[#9CA3AF]">{m.id.slice(0, 8)}</td>
-                  <td className="px-4 py-3 text-white">{gameLabel(m.game_type)}</td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">{m.player1Name}</td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">{m.player2Name}</td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">${(m.stake_amount || 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-admin-success">${(m.platform_fee || 0).toFixed(2)}</td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">{outcomeLabel(m)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      m.status === "completed" ? "bg-green-500/10 text-green-400"
-                      : m.status === "in_progress" ? "bg-yellow-500/10 text-yellow-400"
-                      : "bg-white/5 text-[#9CA3AF]"
-                    }`}>
-                      {m.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-[#9CA3AF]">
-                    {new Date(m.created_at).toLocaleDateString()}
-                  </td>
+      {loading ? (
+        <div className="flex min-h-[200px] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#333] border-t-[#FFFF00]" />
+        </div>
+      ) : (
+        <>
+          <AdminTableShell>
+            <table className="w-full min-w-[1200px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-white/5 text-xs lowercase text-[#7A7A8E]">
+                  <th className="px-3 py-3">match id</th>
+                  <th className="px-3 py-3">game</th>
+                  <th className="px-3 py-3">player 1</th>
+                  <th className="px-3 py-3">player 2</th>
+                  <th className="px-3 py-3">entry</th>
+                  <th className="px-3 py-3">pot</th>
+                  <th className="px-3 py-3">rake</th>
+                  <th className="px-3 py-3">creator cut</th>
+                  <th className="px-3 py-3">skillflow net</th>
+                  <th className="px-3 py-3">winner</th>
+                  <th className="px-3 py-3">status</th>
+                  <th className="px-3 py-3">duration</th>
+                  <th className="px-3 py-3">time</th>
                 </tr>
-                {expandedId === m.id && (
-                  <tr className="border-b border-white/5 bg-white/[0.02]">
-                    <td colSpan={9} className="px-6 py-4">
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-                        <div>
-                          <p className="text-xs text-[#6B7280]">Match ID</p>
-                          <p className="mt-0.5 font-mono text-xs text-white">{m.id}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-[#6B7280]">Total Pot</p>
-                          <p className="mt-0.5 text-white">${(m.total_pot || 0).toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-[#6B7280]">Winner Payout</p>
-                          <p className="mt-0.5 text-admin-success">${(m.winner_payout || 0).toFixed(2)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-[#6B7280]">Bot Difficulty</p>
-                          <p className="mt-0.5 text-white capitalize">{m.bot_difficulty ?? "—"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-[#6B7280]">Move Log Entries</p>
-                          <p className="mt-0.5 text-white">{Array.isArray(m.move_log) ? m.move_log.length : 0}</p>
-                        </div>
-                      </div>
-                      {m.game_type === "chess" && Array.isArray(m.move_log) && m.move_log.length > 0 && (
-                        <div className="mt-4">
-                          <p className="mb-2 text-xs font-medium text-[#9CA3AF]">Replay (Admin only)</p>
-                          <ChessReplayViewer moveLog={m.move_log} />
-                        </div>
-                      )}
+              </thead>
+              <tbody>
+                {matches.map((m, i) => (
+                  <tr
+                    key={m.id}
+                    className={`${i % 2 === 0 ? "bg-[#1A1A1F]" : "bg-[#0E0E12]"} ${
+                      m.suspicious ? "outline outline-1 outline-orange-500/40" : ""
+                    }`}
+                  >
+                    <td className="px-3 py-3 font-mono text-xs">{m.idShort}</td>
+                    <td className="px-3 py-3">{m.game}</td>
+                    <td className="px-3 py-3">{m.player1}</td>
+                    <td className="px-3 py-3">{m.player2}</td>
+                    <td className="px-3 py-3 text-[#FFFF00]">{m.entrySK}</td>
+                    <td className="px-3 py-3 text-[#FFFF00]">{m.potSK}</td>
+                    <td className="px-3 py-3">{m.rakeSK}</td>
+                    <td className="px-3 py-3">{m.creatorCutSK}</td>
+                    <td className="px-3 py-3">
+                      <MoneyPair sk={m.skillflowNetSK} usd={m.skillflowNetUSD} />
+                    </td>
+                    <td className="px-3 py-3">{m.winner}</td>
+                    <td className="px-3 py-3">
+                      <AdminStatusBadge status={m.status} />
+                    </td>
+                    <td className="px-3 py-3 text-[#C8C8D4]">
+                      {m.durationSec == null ? "—" : `${m.durationSec.toFixed(1)}s`}
+                    </td>
+                    <td className="px-3 py-3 text-[#C8C8D4]">
+                      {new Date(m.timestamp).toLocaleString()}
                     </td>
                   </tr>
-                )}
-              </Fragment>
-            ))}
-            {pageMatches.length === 0 && (
-              <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-sm text-[#9CA3AF]">
-                  No matches match the current filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </AdminTableShell>
 
-      {/* Pagination */}
-      <div className="flex items-center justify-between text-sm text-[#9CA3AF]">
-        <span>
-          {filtered.length === 0 ? "No results"
-            : `${curPage * PER_PAGE + 1}–${Math.min((curPage + 1) * PER_PAGE, filtered.length)} of ${filtered.length}`}
-        </span>
-        <div className="flex gap-2">
-          <button type="button" disabled={curPage === 0} onClick={() => setPage((p) => p - 1)}
-            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5">
-            ← Prev
-          </button>
-          <button type="button" disabled={curPage >= totalPages - 1} onClick={() => setPage((p) => p + 1)}
-            className="rounded border border-white/10 px-3 py-1 disabled:cursor-not-allowed disabled:opacity-30 hover:bg-white/5">
-            Next →
-          </button>
-        </div>
-      </div>
+          <div className="mt-4 flex items-center justify-between text-sm text-[#7A7A8E]">
+            <span>
+              page {page} of {totalPages} ({total} matches)
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="rounded border border-white/10 px-3 py-1 disabled:opacity-40"
+              >
+                previous
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="rounded border border-white/10 px-3 py-1 disabled:opacity-40"
+              >
+                next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
