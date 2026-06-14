@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { jsonOk, requireAdmin, skToUsd } from "@/lib/admin-api";
+import { getCreatorEmailByUserId, sendCreatorEmail } from "@/lib/send-creator-email";
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin(req);
@@ -89,6 +90,12 @@ export async function PATCH(req: NextRequest) {
     updates.revenue_share_pct = Math.min(30, Math.max(20, body.revenueSharePct));
   }
 
+  const { data: existing } = await admin
+    .from("creator_games")
+    .select("status, creator_id, game_name")
+    .eq("game_id", body.gameId)
+    .single();
+
   const { data, error } = await admin
     .from("creator_games")
     .update(updates)
@@ -97,5 +104,17 @@ export async function PATCH(req: NextRequest) {
     .single();
 
   if (error) return jsonOk({ error: error.message }, 400);
+
+  if (body.status === "active" && existing?.status === "pending" && data) {
+    const email = await getCreatorEmailByUserId(data.creator_id as string);
+    if (email) {
+      void sendCreatorEmail({
+        type: "approved",
+        to: email,
+        gameName: data.game_name as string,
+      });
+    }
+  }
+
   return jsonOk({ game: data });
 }
