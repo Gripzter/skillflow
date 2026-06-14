@@ -91,20 +91,21 @@ export async function POST(req: NextRequest) {
   const email = body.email.trim().toLowerCase();
 
   const anon = createAnonClient();
-  let userId: string | null = null;
-  let createdNewUser = false;
-
-  if (anon) {
-    const { data: signInData } = await anon.auth.signInWithPassword({
-      email,
-      password: body.password,
-    });
-    if (signInData.user) {
-      userId = signInData.user.id;
-    }
+  if (!anon) {
+    return jsonOk({ error: "Service unavailable" }, 503);
   }
 
-  if (!userId) {
+  const { data: signInData } = await anon.auth.signInWithPassword({
+    email,
+    password: body.password,
+  });
+
+  let userId: string;
+  let createdNewUser = false;
+
+  if (signInData.user) {
+    userId = signInData.user.id;
+  } else {
     const { data: authData, error: authError } = await admin.auth.admin.createUser({
       email,
       password: body.password,
@@ -117,14 +118,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (authError || !authData.user) {
-      const msg = authError?.message ?? "Failed to create account.";
-      if (msg.toLowerCase().includes("already")) {
-        return jsonOk(
-          { error: "if you already have a SkillFlow account, use that password." },
-          400
-        );
-      }
-      return jsonOk({ error: msg }, 400);
+      return jsonOk(
+        {
+          error:
+            "Incorrect password. If you already have a SkillFlow account, use your existing password.",
+        },
+        401
+      );
     }
 
     userId = authData.user.id;

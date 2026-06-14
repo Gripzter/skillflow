@@ -10,9 +10,6 @@ type InviteDetails = {
   reason?: string;
 };
 
-const PASSWORD_EXISTING_ACCOUNT_HINT =
-  "already have a SkillFlow account? use that password.";
-
 const VALUE_PROPS = [
   {
     title: "earn on every match.",
@@ -33,7 +30,6 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showPasswordHint, setShowPasswordHint] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -66,7 +62,6 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setShowPasswordHint(false);
     setSubmitting(true);
 
     try {
@@ -89,10 +84,6 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
 
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        if (res.status === 409) {
-          setShowPasswordHint(true);
-          return;
-        }
         setError(data.error ?? "Something went wrong.");
         return;
       }
@@ -219,18 +210,13 @@ export default function CreatorInviteApplication({ token }: { token: string }) {
               <span className="mb-1.5 block text-xs lowercase text-[#7A7A8E]">password</span>
               <PasswordInput
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setShowPasswordHint(false);
-                }}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="min. 8 characters"
                 required
               />
-              {showPasswordHint ? (
-                <p className="mt-1.5 text-xs lowercase text-[#7A7A8E]">
-                  {PASSWORD_EXISTING_ACCOUNT_HINT}
-                </p>
-              ) : null}
+              <p className="mt-1.5 text-xs lowercase text-[#7A7A8E]">
+                already have a SkillFlow account? use your existing password
+              </p>
             </label>
 
             <label className="block">
