@@ -104,6 +104,45 @@ export default function AdminCreatorDetailPage({
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-white/5 bg-[#1A1A1F] p-5">
+          <h2 className="mb-4 text-sm lowercase text-[#7A7A8E]">game health</h2>
+          <dl className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <dt className="text-[#7A7A8E]">completion rate</dt>
+              <dd>{Number((data as { gameHealth?: { completionRate?: number } })?.gameHealth?.completionRate ?? 0).toFixed(1)}%</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-[#7A7A8E]">avg duration</dt>
+              <dd>{Number((data as { gameHealth?: { avgDurationMin?: number } })?.gameHealth?.avgDurationMin ?? 0).toFixed(1)} min</dd>
+            </div>
+            <div className="flex justify-between">
+              <dt className="text-[#7A7A8E]">void rate</dt>
+              <dd className={(data as { gameHealth?: { voidRate?: number } })?.gameHealth?.voidRate && (data as { gameHealth?: { voidRate?: number } }).gameHealth!.voidRate! > 15 ? "text-orange-400" : ""}>
+                {Number((data as { gameHealth?: { voidRate?: number } })?.gameHealth?.voidRate ?? 0).toFixed(1)}%
+              </dd>
+            </div>
+          </dl>
+          {(data as { gameHealth?: { investigate?: boolean } })?.gameHealth?.investigate ? (
+            <p className="mt-3 text-xs text-orange-400">⚠ investigate game mechanics — void rate &gt; 15%</p>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl border border-white/5 bg-[#1A1A1F] p-5">
+          <h2 className="mb-4 text-sm lowercase text-[#7A7A8E]">key rotation history</h2>
+          <ul className="max-h-32 space-y-2 overflow-y-auto text-xs text-[#C8C8D4]">
+            {((data as { keyRotations?: Array<{ created_at: string; key_last4: string }> })?.keyRotations ?? []).map((r) => (
+              <li key={r.created_at}>
+                {new Date(r.created_at).toLocaleString()} — ••••{r.key_last4}
+              </li>
+            ))}
+            {!(data as { keyRotations?: unknown[] })?.keyRotations?.length ? (
+              <li className="text-[#7A7A8E]">no rotations yet</li>
+            ) : null}
+          </ul>
+        </div>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/5 bg-[#1A1A1F] p-5">
           <h2 className="mb-4 text-sm lowercase text-[#7A7A8E]">creator info</h2>
           <dl className="space-y-2 text-sm">
             <div className="flex justify-between">

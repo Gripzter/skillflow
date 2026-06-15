@@ -25,6 +25,12 @@ const YELLOW_EDGE = "#CCAA00";
 
 import type { GameMultiplayerProps } from "./Chess";
 import type { MatchUiState } from "@/components/game/matchUi";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 interface ConnectFourProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -46,6 +52,10 @@ export default function ConnectFour({
   botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -65,6 +75,35 @@ export default function ConnectFour({
   const boardSlotRef = useRef<HTMLDivElement>(null);
   const [cellSize, setCellSize] = useState(48);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
+  const moveCountRef = useRef(0);
+
+  useEffect(() => {
+    logMatchStartOnce(matchId, playerId, { board: createEmptyBoard() });
+  }, [matchId, playerId]);
+
+  const logDrop = useCallback(
+    (col: number, row: number, droppingPlayer: Player, boardState: Board) => {
+      moveCountRef.current += 1;
+      const role: "player1" | "player2" = droppingPlayer === 1 ? "player1" : "player2";
+      logPlayerMove(matchId, playerIdForRole(role, player1Id, player2Id), {
+        column: col,
+        row,
+        board_state: boardState,
+      });
+    },
+    [matchId, player1Id, player2Id]
+  );
+
+  const logGameEnd = useCallback(
+    (result: "four_in_a_row" | "draw", winner: "player1" | "player2" | null) => {
+      logMatchEndOnce(matchId, playerId, {
+        result,
+        winner_id: winner ? playerIdForRole(winner, player1Id, player2Id) : null,
+        total_moves: moveCountRef.current,
+      });
+    },
+    [matchId, playerId, player1Id, player2Id]
+  );
 
   const validColumns = useMemo(() => getValidColumns(board), [board]);
   const isColumnFull = useCallback(
@@ -124,6 +163,7 @@ export default function ConnectFour({
       const playerName = turn === 1 ? player1.username : player2.username;
       setDropping({ col, row: result.row, player: turn });
       setBoard(result.board);
+      logDrop(col, result.row, turn, result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: turn, playerName, col, ts }]);
       if (win) {
@@ -131,6 +171,7 @@ export default function ConnectFour({
           setWinResult(win);
           setTimeout(() => {
             gameOverRef.current = true;
+            logGameEnd("four_in_a_row", win.player === 1 ? "player1" : "player2");
             onGameEnd(win.player === 1 ? "player1" : "player2");
           }, 1500);
         }, 520);
@@ -138,6 +179,7 @@ export default function ConnectFour({
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
+          logGameEnd("draw", null);
           onGameDraw();
         }, 520);
       }
@@ -145,7 +187,7 @@ export default function ConnectFour({
         sendGameEvent({ type: "connect4_move", column: col, byRole: myRole }).catch(() => {});
       }
     },
-    [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent, onPlayerAction]
+    [board, turn, myRole, player1.username, player2.username, onGameEnd, onGameDraw, isMultiplayer, sendGameEvent, onPlayerAction, logDrop, logGameEnd]
   );
 
   // Incoming multiplayer events: apply opponent move or handle resign
@@ -188,6 +230,7 @@ export default function ConnectFour({
       const playerName = turn === 1 ? player1.username : player2.username;
       setDropping({ col: column, row: result.row, player: turn });
       setBoard(result.board);
+      logDrop(column, result.row, turn, result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: turn, playerName, col: column, ts }]);
       if (win) {
@@ -195,6 +238,7 @@ export default function ConnectFour({
           setWinResult(win);
           setTimeout(() => {
             gameOverRef.current = true;
+            logGameEnd("four_in_a_row", win.player === 1 ? "player1" : "player2");
             onGameEnd(win.player === 1 ? "player1" : "player2");
           }, 1500);
         }, 520);
@@ -202,6 +246,7 @@ export default function ConnectFour({
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
+          logGameEnd("draw", null);
           onGameDraw();
         }, 520);
       }
@@ -211,10 +256,15 @@ export default function ConnectFour({
     if (type === "resign") {
       lastProcessedEventRef.current = incomingEvent;
       gameOverRef.current = true;
+      logMatchEndOnce(matchId, playerId, {
+        result: "four_in_a_row",
+        winner_id: playerIdForRole(myRole, player1Id, player2Id),
+        total_moves: moveCountRef.current,
+      });
       onGameEnd(myRole);
       onEventProcessed();
     }
-  }, [incomingEvent, onEventProcessed, board, turn, player1.username, player2.username, myRole, onGameEnd, onGameDraw]);
+  }, [incomingEvent, onEventProcessed, board, turn, player1.username, player2.username, myRole, onGameEnd, onGameDraw, logDrop, logGameEnd, matchId, playerId, player1Id, player2Id]);
 
   const boardKey = board.map((r) => r.join("")).join("|");
   useEffect(() => {
@@ -240,6 +290,7 @@ export default function ConnectFour({
       }
       setDropping({ col, row: result.row, player: 2 });
       setBoard(result.board);
+      logDrop(col, result.row, 2, result.board);
       const ts = (Date.now() - gameStartTimeRef.current) / 1000;
       setMoveHistory((prev) => [...prev, { player: 2, playerName: player2.username, col, ts }]);
       if (win) {
@@ -247,6 +298,7 @@ export default function ConnectFour({
           setWinResult(win);
           setTimeout(() => {
             gameOverRef.current = true;
+            logGameEnd("four_in_a_row", "player2");
             onGameEnd("player2");
           }, 1500);
         }, 520);
@@ -254,13 +306,14 @@ export default function ConnectFour({
         setTimeout(() => {
           setIsDraw(true);
           gameOverRef.current = true;
+          logGameEnd("draw", null);
           onGameDraw();
         }, 520);
       }
       setBotThinking(false);
     }, delay);
     return () => clearTimeout(t);
-  }, [boardKey, turn, isPlayer2Bot, botDifficulty, isMultiplayer, board, player2.username, onGameEnd, onGameDraw, dropping]);
+  }, [boardKey, turn, isPlayer2Bot, botDifficulty, isMultiplayer, board, player2.username, onGameEnd, onGameDraw, dropping, logDrop, logGameEnd]);
 
   useEffect(() => {
     if (dropping) {

@@ -7,13 +7,14 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AppNavbar from "@/components/AppNavbar";
 import GameCardChallenges from "@/components/play/GameCardChallenges";
+import DailyChallenges from "@/components/DailyChallenges";
 import PromoCarousel from "@/components/play/PromoCarousel";
 import { useDailyChallenges } from "@/hooks/useDailyChallenges";
 import { useGames, type GameCategory } from "@/hooks/useGames";
 import { useGameOrder } from "@/hooks/useGameOrder";
 import { useProfile } from "@/hooks/useProfile";
 import { useRecentMatches } from "@/hooks/useRecentMatches";
-import type { DailyChallengeRow } from "@/lib/daily-challenges";
+import { toLegacyChallengeRow, type DailyChallengeRow } from "@/lib/daily-challenges";
 import { redirectToAuthAction } from "@/lib/auth-action";
 
 const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
@@ -142,7 +143,11 @@ export default function PlayContent() {
   const isAuthenticated = !!profile.id;
   const { games } = useGames();
   const orderedGames = useGameOrder(games, profile.id || null);
-  const { challenges } = useDailyChallenges(isAuthenticated ? profile.id : "", 10);
+  const { challenges, refresh } = useDailyChallenges(isAuthenticated);
+  const legacyChallenges = useMemo(
+    () => challenges.map(toLegacyChallengeRow),
+    [challenges]
+  );
   const { matches } = useRecentMatches({
     limit: 1,
     username: profile.username,
@@ -176,6 +181,12 @@ export default function PlayContent() {
       <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
         <PromoCarousel isAuthenticated={isAuthenticated} />
 
+        {isAuthenticated && challenges.length > 0 ? (
+          <div className="mt-6">
+            <DailyChallenges challenges={challenges} onRefresh={refresh} />
+          </div>
+        ) : null}
+
         <h1 className="mt-8 text-[32px] font-black tracking-[-0.03em] text-white">
           Play smarter. Match faster. Earn more.
         </h1>
@@ -208,7 +219,7 @@ export default function PlayContent() {
               game={game}
               index={index}
               onlineCount={onlineCountBySlug[game.slug] ?? 0}
-              challenges={isAuthenticated ? challenges : []}
+              challenges={isAuthenticated ? legacyChallenges : []}
               isAuthenticated={isAuthenticated}
             />
           ))}

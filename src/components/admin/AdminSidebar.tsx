@@ -5,10 +5,15 @@ import { adminLogout } from "@/lib/admin-auth";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "overview", exact: true },
-  { href: "/admin/creators", label: "creators" },
   { href: "/admin/matches", label: "matches" },
+  { href: "/admin/challenges", label: "challenges" },
   { href: "/admin/players", label: "players" },
+  { href: "/admin/creators", label: "creators" },
+  { href: "/admin/disputes", label: "disputes" },
+  { href: "/admin/intelligence", label: "intelligence" },
   { href: "/admin/financials", label: "financials" },
+  { href: "/admin/broadcast", label: "broadcast" },
+  { href: "/admin/settings", label: "settings" },
 ];
 
 export default function AdminSidebar() {

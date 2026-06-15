@@ -7,6 +7,12 @@ import { getCheckersBotDelayMs, getCheckersBotTurnMove } from "@/lib/games/check
 import type { BotDifficulty } from "@/lib/games/bot-engine";
 import Link from "next/link";
 import type { MatchUiState } from "@/components/game/matchUi";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 
 const BOARD_LIGHT = "#1A1A22";
@@ -62,6 +68,10 @@ export default function Checkers({
   botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -81,6 +91,10 @@ export default function Checkers({
   const gameOverRef = useRef(false);
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   const lastSentMoveIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    logMatchStartOnce(matchId, playerId, {});
+  }, [matchId, playerId]);
 
   // Accumulate meta across a whole turn (multi-jumps).
   const turnMetaRef = useRef<{ didCapture: boolean; didKing: boolean; capturedCount: number; finalTo: Pos | null }>(
@@ -158,6 +172,17 @@ export default function Checkers({
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn as Player, message: turnLogText }]);
       }
 
+      const moverRole: "player1" | "player2" = currentTurn === 1 ? "player1" : "player2";
+      const isLocalMove = !isMultiplayer || moverRole === myRole;
+      if (isLocalMove) {
+        logPlayerMove(matchId, playerIdForRole(moverRole, player1Id, player2Id), {
+          from: lastStepFrom,
+          to: lastStepTo,
+          captured: moveMeta.didCapture,
+          kinged: moveMeta.didKing,
+        });
+      }
+
       if (end?.kind === "win") {
         const winnerRole = winnerRoleFromPlayer(end.winner);
         setWinnerP1OrP2(winnerRole);
@@ -165,6 +190,10 @@ export default function Checkers({
         // If we are in a multiplayer match, rely on game settlement, but log a win entry locally too.
         const winnerName = end.winner === 1 ? player1.username : player2.username;
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: end.winner, message: `${winnerName} wins!` }]);
+        logMatchEndOnce(matchId, playerId, {
+          result: "pieces_eliminated",
+          winner_id: playerIdForRole(winnerRole, player1Id, player2Id),
+        });
         onGameEnd(winnerRole);
         return;
       }
@@ -173,6 +202,10 @@ export default function Checkers({
         setWinnerP1OrP2("draw");
         gameOverRef.current = true;
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: currentTurn, message: "Draw!" }]);
+        logMatchEndOnce(matchId, playerId, {
+          result: "no_moves",
+          winner_id: null,
+        });
         onGameDraw();
         return;
       }
@@ -196,7 +229,7 @@ export default function Checkers({
         }).catch(() => {});
       }
     },
-    [currentTurn, noProgressCount, isMultiplayer, sendGameEvent, onGameEnd, onGameDraw, myRole, player1.username, player2.username]
+    [currentTurn, noProgressCount, isMultiplayer, sendGameEvent, onGameEnd, onGameDraw, myRole, player1.username, player2.username, matchId, player1Id, player2Id, playerId]
   );
 
   // Incoming multiplayer events.
@@ -272,6 +305,16 @@ export default function Checkers({
         // Actor side is inferred from the turn completion (we only receive the currentTurn after the move).
         const movedBy: Player = nextTurn === 1 ? 2 : 1;
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: movedBy, message: logText }]);
+        const moverRole: "player1" | "player2" = movedBy === 1 ? "player1" : "player2";
+        const moveMeta = payload.moveMeta as { didCapture?: boolean; didKing?: boolean } | undefined;
+        if (lm?.from && lm?.to) {
+          logPlayerMove(matchId, playerIdForRole(moverRole, player1Id, player2Id), {
+            from: lm.from,
+            to: lm.to,
+            captured: moveMeta?.didCapture ?? false,
+            kinged: moveMeta?.didKing ?? false,
+          });
+        }
       }
 
       // End conditions.
@@ -282,17 +325,25 @@ export default function Checkers({
         gameOverRef.current = true;
         const winnerName = end.winner === 1 ? player1.username : player2.username;
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: end.winner, message: `${winnerName} wins!` }]);
+        logMatchEndOnce(matchId, playerId, {
+          result: "pieces_eliminated",
+          winner_id: playerIdForRole(winnerRole, player1Id, player2Id),
+        });
         onGameEnd(winnerRole);
       } else if (end?.kind === "draw") {
         setWinnerP1OrP2("draw");
         gameOverRef.current = true;
         setLog((prev) => [...prev, { id: crypto.randomUUID(), side: 1, message: "Draw!" }]);
+        logMatchEndOnce(matchId, playerId, {
+          result: "no_moves",
+          winner_id: null,
+        });
         onGameDraw();
       }
 
       onEventProcessed();
     }
-  }, [incomingEvent, onEventProcessed, myRole, onGameEnd, onGameDraw]);
+  }, [incomingEvent, onEventProcessed, myRole, onGameEnd, onGameDraw, matchId, playerId, player1Id, player2Id]);
 
   // Local bot logic (practice mode).
   useEffect(() => {

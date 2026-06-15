@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
+import AdminConfirmModal, {
   AdminPageHeader,
   AdminStatusBadge,
   AdminTableShell,
   MoneyPair,
+  RelativeTime,
 } from "@/components/admin/AdminShared";
 import { adminFetch } from "@/lib/admin-client";
 
@@ -86,6 +87,9 @@ export default function AdminMatchesPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [minPot, setMinPot] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkVoidOpen, setBulkVoidOpen] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,18 +116,70 @@ export default function AdminMatchesPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / 50));
 
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === matches.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(matches.map((m) => m.id)));
+    }
+  }
+
+  async function bulkVoid() {
+    if (selected.size === 0) return;
+    setBulkLoading(true);
+    try {
+      await adminFetch("/api/admin/matches/bulk", {
+        method: "POST",
+        body: JSON.stringify({ action: "void", matchIds: Array.from(selected) }),
+      });
+      setSelected(new Set());
+      setBulkVoidOpen(false);
+      void load();
+    } finally {
+      setBulkLoading(false);
+    }
+  }
+
+  function formatDuration(sec: number | null) {
+    if (sec == null) return "—";
+    if (sec < 60) return `${sec.toFixed(0)}s`;
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    return `${m}m ${s}s`;
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <AdminPageHeader title="matches" />
-        <button
-          type="button"
-          onClick={() => downloadCsv(matches)}
-          className="rounded-lg px-4 py-2 text-sm font-medium lowercase text-black"
-          style={{ background: "#FFFF00" }}
-        >
-          export csv
-        </button>
+        <div className="flex gap-2">
+          {selected.size > 0 ? (
+            <button
+              type="button"
+              onClick={() => setBulkVoidOpen(true)}
+              className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm lowercase text-red-400"
+            >
+              void selected ({selected.size})
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => downloadCsv(matches)}
+            className="rounded-lg px-4 py-2 text-sm font-medium lowercase text-black"
+            style={{ background: "#FFFF00" }}
+          >
+            export csv
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-3 rounded-xl border border-white/5 bg-[#1A1A1F] p-4">
@@ -189,22 +245,30 @@ export default function AdminMatchesPage() {
       ) : (
         <>
           <AdminTableShell>
-            <table className="w-full min-w-[1200px] text-left text-sm">
+            <table className="w-full min-w-[1300px] text-left text-sm">
               <thead>
                 <tr className="border-b border-white/5 text-xs lowercase text-[#7A7A8E]">
+                  <th className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={matches.length > 0 && selected.size === matches.length}
+                      onChange={toggleAll}
+                      className="accent-[#FFFF00]"
+                    />
+                  </th>
+                  <th className="px-3 py-3">⚠</th>
                   <th className="px-3 py-3">match id</th>
                   <th className="px-3 py-3">game</th>
                   <th className="px-3 py-3">player 1</th>
                   <th className="px-3 py-3">player 2</th>
                   <th className="px-3 py-3">entry</th>
                   <th className="px-3 py-3">pot</th>
-                  <th className="px-3 py-3">rake</th>
-                  <th className="px-3 py-3">creator cut</th>
                   <th className="px-3 py-3">skillflow net</th>
                   <th className="px-3 py-3">winner</th>
                   <th className="px-3 py-3">status</th>
                   <th className="px-3 py-3">duration</th>
                   <th className="px-3 py-3">time</th>
+                  <th className="px-3 py-3">replay</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,14 +279,27 @@ export default function AdminMatchesPage() {
                       m.suspicious ? "outline outline-1 outline-orange-500/40" : ""
                     }`}
                   >
+                    <td className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(m.id)}
+                        onChange={() => toggleSelect(m.id)}
+                        className="accent-[#FFFF00]"
+                      />
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      {m.suspicious ? (
+                        <span className="text-orange-400" title={m.suspiciousReasons.join(", ")}>
+                          ⚠
+                        </span>
+                      ) : null}
+                    </td>
                     <td className="px-3 py-3 font-mono text-xs">{m.idShort}</td>
                     <td className="px-3 py-3">{m.game}</td>
                     <td className="px-3 py-3">{m.player1}</td>
                     <td className="px-3 py-3">{m.player2}</td>
                     <td className="px-3 py-3 text-[#FFFF00]">{m.entrySK}</td>
                     <td className="px-3 py-3 text-[#FFFF00]">{m.potSK}</td>
-                    <td className="px-3 py-3">{m.rakeSK}</td>
-                    <td className="px-3 py-3">{m.creatorCutSK}</td>
                     <td className="px-3 py-3">
                       <MoneyPair sk={m.skillflowNetSK} usd={m.skillflowNetUSD} />
                     </td>
@@ -230,11 +307,20 @@ export default function AdminMatchesPage() {
                     <td className="px-3 py-3">
                       <AdminStatusBadge status={m.status} />
                     </td>
+                    <td className="px-3 py-3 text-[#C8C8D4]">{formatDuration(m.durationSec)}</td>
                     <td className="px-3 py-3 text-[#C8C8D4]">
-                      {m.durationSec == null ? "—" : `${m.durationSec.toFixed(1)}s`}
+                      <RelativeTime iso={m.timestamp} />
                     </td>
-                    <td className="px-3 py-3 text-[#C8C8D4]">
-                      {new Date(m.timestamp).toLocaleString()}
+                    <td className="px-3 py-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.location.href = `/admin/matches/${m.id}`;
+                        }}
+                        className="rounded border border-white/10 px-2 py-1 text-xs lowercase text-[#FFFF00] hover:bg-white/5"
+                      >
+                        view replay
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -267,6 +353,17 @@ export default function AdminMatchesPage() {
           </div>
         </>
       )}
+
+      <AdminConfirmModal
+        open={bulkVoidOpen}
+        title="bulk void matches"
+        message={`Void ${selected.size} selected match(es)? Stakes will be refunded.`}
+        confirmLabel="void all"
+        confirmTone="danger"
+        loading={bulkLoading}
+        onCancel={() => setBulkVoidOpen(false)}
+        onConfirm={() => void bulkVoid()}
+      />
     </div>
   );
 }

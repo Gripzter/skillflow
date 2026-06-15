@@ -31,6 +31,12 @@ function reactionLabel(ms: number): { text: string; color: string } {
 
 import type { GameMultiplayerProps } from "./Chess";
 import type { MatchUiState } from "@/components/game/matchUi";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 interface ReactionDuelProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -66,6 +72,10 @@ export default function ReactionDuel({
   botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -104,6 +114,27 @@ export default function ReactionDuel({
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
   const p1ReactionRef = useRef<Reaction | null>(null);
   const p2ReactionRef = useRef<Reaction | null>(null);
+
+  useEffect(() => {
+    if (phase === "get_ready" && round === 1) {
+      logMatchStartOnce(matchId, playerId, { target_count: TOTAL_ROUNDS });
+    }
+  }, [phase, round, matchId, playerId]);
+
+  const logReactionMove = useCallback(
+    (role: "player1" | "player2", targetNumber: number, hit: boolean, reactionMs?: number) => {
+      logPlayerMove(
+        matchId,
+        playerIdForRole(role, player1Id, player2Id),
+        { target_number: targetNumber, hit },
+        {
+          reactionTimeMs: typeof reactionMs === "number" ? reactionMs : undefined,
+          usePayloadReactionTime: true,
+        }
+      );
+    },
+    [matchId, player1Id, player2Id]
+  );
 
   const baseTargetSize = isMobile ? TARGET_BASE_MOBILE : TARGET_BASE;
 
@@ -287,6 +318,7 @@ export default function ReactionDuel({
         botTimeoutRef.current = setTimeout(() => {
           botTimeoutRef.current = null;
           setP2Reaction((prev) => (prev === null ? botMs : prev));
+          logReactionMove("player2", round, true, botMs);
           if (p1ReactionRef.current !== null) {
             setPhase("tapped");
           }
@@ -323,6 +355,19 @@ export default function ReactionDuel({
             const totalP1 = p1TotalMs + (typeof p1 === "number" ? p1 : 0);
             const totalP2 = p2TotalMs + (typeof p2 === "number" ? p2 : 0);
             const matchWinner = getMatchWinner(newP1Wins, newP2Wins, totalP1, totalP2);
+            const allRounds = [...roundHistory, { p1, p2, winner }];
+            const p1Times = allRounds.filter((h) => typeof h.p1 === "number").map((h) => h.p1 as number);
+            const p2Times = allRounds.filter((h) => typeof h.p2 === "number").map((h) => h.p2 as number);
+            const p1Avg = p1Times.length ? Math.round(p1Times.reduce((a, b) => a + b, 0) / p1Times.length) : null;
+            const p2Avg = p2Times.length ? Math.round(p2Times.reduce((a, b) => a + b, 0) / p2Times.length) : null;
+            logMatchEndOnce(matchId, playerId, {
+              player1_avg_ms: p1Avg,
+              player2_avg_ms: p2Avg,
+              winner_id:
+                matchWinner === "draw"
+                  ? null
+                  : playerIdForRole(matchWinner, player1Id, player2Id),
+            });
             if (matchWinner === "draw") onGameDraw();
             else onGameEnd(matchWinner);
           }, 500);
@@ -332,7 +377,7 @@ export default function ReactionDuel({
         return r + 1;
       });
     },
-    [p1Wins, p2Wins, p1TotalMs, p2TotalMs, onGameEnd, onGameDraw]
+    [p1Wins, p2Wins, p1TotalMs, p2TotalMs, onGameEnd, onGameDraw, roundHistory, matchId, playerId, player1Id, player2Id]
   );
 
   const handleGameAreaTap = useCallback(
@@ -347,6 +392,7 @@ export default function ReactionDuel({
         if (isMultiplayer && sendGameEvent) {
           sendGameEvent({ type: "reaction_result", round, reactionTime: -1 }).catch(() => {});
         }
+        logReactionMove(myRole, round, false);
         return;
       }
       const myReactionAlreadySet = isMultiplayer ? (myRole === "player1" ? p1Reaction !== null : p2Reaction !== null) : p1Reaction !== null;
@@ -379,8 +425,9 @@ export default function ReactionDuel({
       if (isMultiplayer && sendGameEvent) {
         sendGameEvent({ type: "reaction_result", round, reactionTime: sendValue }).catch(() => {});
       }
+      logReactionMove(myRole, round, hit, typeof value === "number" ? value : undefined);
     },
-    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, onPlayerAction]
+    [phase, p1Reaction, p2Reaction, myRole, targetPos, targetDiameter, round, isMultiplayer, sendGameEvent, onPlayerAction, logReactionMove]
   );
 
   function toReaction(t: number): Reaction {

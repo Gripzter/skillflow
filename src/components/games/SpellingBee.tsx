@@ -28,6 +28,12 @@ import {
 } from "@/lib/games/spelling-speech";
 import type { GameMultiplayerProps } from "./Chess";
 import type { MatchUiState } from "@/components/game/matchUi";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 type Phase =
   | "pre_round"
@@ -73,6 +79,10 @@ export default function SpellingBee({
   botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -124,6 +134,12 @@ export default function SpellingBee({
   const pronunciationStartedRef = useRef<string | null>(null);
   const gameStartRef = useRef(Date.now());
   inputValueRef.current = inputValue;
+
+  useEffect(() => {
+    logMatchStartOnce(matchId, playerId, { word_count: TOTAL_ROUNDS });
+  }, [matchId, playerId]);
+
+  const shouldLogEvents = !isMultiplayer || myRole === "player1";
 
   const isRoundActive =
     phase === "round_active" || phase === "tiebreaker_active";
@@ -410,6 +426,21 @@ export default function SpellingBee({
       const p2T = p2TimeMs >= 0 ? p2TimeMs : ROUND_TIME_MS;
       const score = scoreRound(p1Correct, p2Correct, p1T, p2T);
 
+      if (shouldLogEvents) {
+        logPlayerMove(
+          matchId,
+          playerIdForRole("player1", player1Id, player2Id),
+          { word: correct, correct: p1Correct, score_delta: score.p1Points },
+          { reactionTimeMs: p1T, usePayloadReactionTime: true }
+        );
+        logPlayerMove(
+          matchId,
+          playerIdForRole("player2", player1Id, player2Id),
+          { word: correct, correct: p2Correct, score_delta: score.p2Points },
+          { reactionTimeMs: p2T, usePayloadReactionTime: true }
+        );
+      }
+
       setRoundHistory((prev) => [
         ...prev,
         {
@@ -464,6 +495,14 @@ export default function SpellingBee({
           } else {
             setPhase("match_over");
             setTimeout(() => {
+              const winner = newP1 > newP2 ? "player1" : "player2";
+              if (shouldLogEvents) {
+                logMatchEndOnce(matchId, playerId, {
+                  player1_score: newP1,
+                  player2_score: newP2,
+                  winner_id: playerIdForRole(winner, player1Id, player2Id),
+                });
+              }
               if (newP1 > newP2) onGameEnd("player1");
               else onGameEnd("player2");
             }, 500);
@@ -490,6 +529,11 @@ export default function SpellingBee({
     p2Score,
     onGameEnd,
     onGameDraw,
+    shouldLogEvents,
+    matchId,
+    playerId,
+    player1Id,
+    player2Id,
   ]);
 
   // Between rounds countdown

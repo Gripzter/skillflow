@@ -5,6 +5,7 @@ import AdminConfirmModal, {
   AdminPageHeader,
   AdminTableShell,
   MoneyPair,
+  RelativeTime,
 } from "@/components/admin/AdminShared";
 import { adminFetch } from "@/lib/admin-client";
 
@@ -19,6 +20,11 @@ type PlayerRow = {
   balanceSK: number;
   balanceUSD: number;
   country: string;
+  countryFlag: string;
+  lastActive: string;
+  winRate: number;
+  totalWageredSK: number;
+  suspicious: boolean;
   banned: boolean;
 };
 
@@ -128,66 +134,74 @@ export default function AdminPlayersPage() {
         </div>
       ) : (
         <AdminTableShell>
-          <table className="w-full min-w-[1100px] text-left text-sm">
+          <table className="w-full min-w-[1300px] text-left text-sm">
             <thead>
               <tr className="border-b border-white/5 text-xs lowercase text-[#7A7A8E]">
+                <th className="px-4 py-3 w-8" />
                 <th className="px-4 py-3">username</th>
                 <th className="px-4 py-3">email</th>
-                <th className="px-4 py-3">joined</th>
-                <th className="px-4 py-3">matches</th>
-                <th className="px-4 py-3">deposited</th>
-                <th className="px-4 py-3">withdrawn</th>
-                <th className="px-4 py-3">balance</th>
                 <th className="px-4 py-3">country</th>
+                <th className="px-4 py-3">last active</th>
+                <th className="px-4 py-3">matches</th>
+                <th className="px-4 py-3">win rate</th>
+                <th className="px-4 py-3">wagered</th>
+                <th className="px-4 py-3">balance</th>
                 <th className="px-4 py-3">status</th>
                 <th className="px-4 py-3">actions</th>
               </tr>
             </thead>
             <tbody>
               {players.map((p, i) => (
-                <tr key={p.id} className={i % 2 === 0 ? "bg-[#1A1A1F]" : "bg-[#0E0E12]"}>
+                <tr
+                  key={p.id}
+                  onClick={() => {
+                    window.location.href = `/admin/players/${p.id}`;
+                  }}
+                  className={`cursor-pointer ${i % 2 === 0 ? "bg-[#1A1A1F]" : "bg-[#0E0E12]"} hover:bg-white/5`}
+                >
+                  <td className="px-4 py-3">
+                    {p.suspicious ? (
+                      <span
+                        className="inline-block h-2.5 w-2.5 rounded-full bg-orange-400"
+                        title="suspicious"
+                      />
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">{p.username}</td>
                   <td className="px-4 py-3 text-[#C8C8D4]">{p.email}</td>
+                  <td className="px-4 py-3">
+                    <span title={p.country}>
+                      {p.countryFlag} {p.country}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-[#C8C8D4]">
-                    {new Date(p.joinedAt).toLocaleDateString()}
+                    <RelativeTime iso={p.lastActive} />
                   </td>
                   <td className="px-4 py-3">{p.totalMatches}</td>
-                  <td className="px-4 py-3">${p.totalDepositedUSD.toFixed(2)}</td>
-                  <td className="px-4 py-3">${p.totalWithdrawnUSD.toFixed(2)}</td>
+                  <td className="px-4 py-3">{p.winRate}%</td>
+                  <td className="px-4 py-3 text-[#FFFF00]">{p.totalWageredSK} sk</td>
                   <td className="px-4 py-3">
                     <MoneyPair sk={p.balanceSK} usd={p.balanceUSD} />
                   </td>
-                  <td className="px-4 py-3">{p.country}</td>
                   <td className="px-4 py-3">{p.banned ? "banned" : "active"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          window.location.href = `/admin/players/${p.id}`;
-                        }}
-                        className="rounded border border-white/10 px-2 py-1 text-xs lowercase"
-                      >
-                        view
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPendingBan({
-                            id: p.id,
-                            username: p.username,
-                            ban: !p.banned,
-                          })
-                        }
-                        className={`rounded px-2 py-1 text-xs lowercase ${
-                          p.banned
-                            ? "bg-[#FFFF00]/20 text-[#FFFF00]"
-                            : "bg-red-500/20 text-red-400"
-                        }`}
-                      >
-                        {p.banned ? "unban" : "ban"}
-                      </button>
-                    </div>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPendingBan({
+                          id: p.id,
+                          username: p.username,
+                          ban: !p.banned,
+                        })
+                      }
+                      className={`rounded px-2 py-1 text-xs lowercase ${
+                        p.banned
+                          ? "bg-[#FFFF00]/20 text-[#FFFF00]"
+                          : "bg-red-500/20 text-red-400"
+                      }`}
+                    >
+                      {p.banned ? "unban" : "ban"}
+                    </button>
                   </td>
                 </tr>
               ))}

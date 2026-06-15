@@ -28,24 +28,24 @@ export default function GameCardChallenges({ challenges, visible }: Props) {
         {challenges.map((challenge) => {
           const done = challenge.progress >= challenge.target;
           return (
-            <li key={challenge.id} className="flex items-center gap-2 text-[12px]">
+            <li key={challenge.id} className="flex items-start gap-2 text-[12px]">
               <span
                 className={`
                   inline-flex items-center justify-center
-                  w-3.5 h-3.5 rounded-full shrink-0
+                  mt-0.5 w-3.5 h-3.5 rounded-full shrink-0
                   ${done ? "bg-[#FFFF00] text-black" : "border border-white/30 bg-transparent"}
                 `}
               >
                 {done && <span className="text-[8px] leading-none font-black">✓</span>}
               </span>
-              <span className={`flex-1 truncate ${done ? "text-white/50 line-through" : "text-white/90"}`}>
+              <span className={`flex-1 whitespace-normal break-words leading-snug ${done ? "text-white/50 line-through" : "text-white/90"}`}>
                 {challenge.description}
               </span>
               <span className="shrink-0 text-[11px] text-white/50">
                 {challenge.progress}/{challenge.target}
               </span>
               <span className="shrink-0 text-[11px] font-semibold text-[#FFFF00]">
-                +{challenge.reward_sp} SP
+                +{challenge.reward_sp} SK
               </span>
             </li>
           );

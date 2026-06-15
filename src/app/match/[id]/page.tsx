@@ -1281,6 +1281,10 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
@@ -1310,6 +1314,10 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
@@ -1332,6 +1340,10 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
@@ -1357,6 +1369,10 @@ function MatchPageContent() {
                 seed={matchId}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
@@ -1401,6 +1417,10 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}
@@ -1424,6 +1444,10 @@ function MatchPageContent() {
                 botDifficulty={match.botDifficulty ?? "gamer"}
                 isMultiplayer={isRealMultiplayer}
                 myRole={myRole}
+                matchId={matchId}
+                playerId={userId}
+                player1Id={match.player1Id}
+                player2Id={match.player2Id}
                 sendGameEvent={sendGameEventWithAfkReset}
                 onPlayerAction={handlePlayerAction}
                 incomingEvent={incomingEvent}

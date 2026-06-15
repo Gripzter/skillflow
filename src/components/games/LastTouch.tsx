@@ -26,6 +26,11 @@ import {
   markSessionCompleted,
   type LastTouchSession,
 } from "@/lib/games/last-touch-sessions";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+} from "@/lib/match-events";
 
 const START_COUNTDOWN_SEC = 3;
 const RELEASE_GRACE_MS = 1000;
@@ -54,6 +59,7 @@ interface Props {
   session: LastTouchSession | null;
   userId: string;
   username: string;
+  matchId?: string;
   onJoinRequest: (fee: number) => Promise<boolean>;
   onWin: (amount: number) => void;
   onEliminated: (rank: number, total: number) => void;
@@ -104,6 +110,7 @@ export default function LastTouch({
   session,
   userId,
   username,
+  matchId,
   onJoinRequest,
   onWin,
   onEliminated,
@@ -364,6 +371,10 @@ export default function LastTouch({
       setNextChallengeAtMs(
         Date.now() + (CHALLENGE_MIN_MS + Math.random() * (CHALLENGE_MAX_MS - CHALLENGE_MIN_MS))
       );
+      logMatchStartOnce(matchId, userId, {
+        player_count: dbPlayerCountRef.current,
+        session_id: sess?.id ?? null,
+      });
       return;
     }
     const t = setTimeout(() => setStartCountdownNum((n) => (n != null ? n - 1 : null)), 1000);
@@ -420,9 +431,13 @@ export default function LastTouch({
           .eq("session_id", liveSessionRef.current.id)
           .eq("user_id", userId);
       }
+      logPlayerMove(matchId, userId, {
+        action: "eliminated",
+        player_id: userId,
+      });
       if (navigator.vibrate) navigator.vibrate(50);
     },
-    [isEliminated, userId]
+    [isEliminated, userId, matchId]
   );
 
   // Win detection
@@ -435,11 +450,12 @@ export default function LastTouch({
     }
     if (!simState.realPlayerEliminated && simState.gameStartMs != null) {
       onWinCalledRef.current = true;
+      logMatchEndOnce(matchId, userId, { winner_id: userId });
       onWin(netPool);
       const supabase = createClient();
       if (supabase && liveSession) markSessionCompleted(supabase, liveSession.id);
     }
-  }, [simState, dbAliveCount, netPool, onWin, liveSession]);
+  }, [simState, dbAliveCount, netPool, onWin, liveSession, matchId, userId]);
 
   // Elimination callback
   useEffect(() => {
@@ -460,9 +476,10 @@ export default function LastTouch({
       const now = Date.now();
       setHoldStartMs(now);
       setSimState((s) => (s ? setRealPlayerHolding(s, now) : s));
+      logPlayerMove(matchId, userId, { action: "hold", timestamp: now });
       if (navigator.vibrate) navigator.vibrate(10);
     },
-    [canHoldNow, isEliminated]
+    [canHoldNow, isEliminated, matchId, userId]
   );
 
   const handlePointerUp = useCallback(
@@ -472,6 +489,7 @@ export default function LastTouch({
       setActiveTouchCount(activePointersRef.current.size);
       if (isEliminated || activePointersRef.current.size > 0) return;
       setIsHolding(false);
+      logPlayerMove(matchId, userId, { action: "release", timestamp: Date.now() });
       if (!isGameActive) {
         setReleaseGraceDeadline(null);
         if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
@@ -482,7 +500,7 @@ export default function LastTouch({
       if (releaseTimeoutRef.current) clearTimeout(releaseTimeoutRef.current);
       releaseTimeoutRef.current = setTimeout(() => eliminateMe("lift"), RELEASE_GRACE_MS);
     },
-    [isEliminated, isGameActive, eliminateMe]
+    [isEliminated, isGameActive, eliminateMe, matchId, userId]
   );
 
   const handlePointerLeave = useCallback(() => {

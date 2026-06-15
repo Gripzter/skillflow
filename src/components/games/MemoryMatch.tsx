@@ -19,6 +19,12 @@ import {
 import { getMemoryMatchBotMove, getMemoryMatchBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 import type { GameMultiplayerProps } from "@/components/games/Chess";
 import type { MatchUiState } from "@/components/game/matchUi";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 interface MemoryMatchProps extends GameMultiplayerProps {
   player1: { username: string; rating: number };
@@ -56,6 +62,10 @@ export default function MemoryMatch({
   seed,
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -74,6 +84,12 @@ export default function MemoryMatch({
   const [cardSize, setCardSize] = useState(60);
   const [isProcessing, setIsProcessing] = useState(false);
   const gameStartRef = useRef(Date.now());
+
+  useEffect(() => {
+    logMatchStartOnce(matchId, playerId, { grid_size: "6x6" });
+  }, [matchId, playerId]);
+
+  const localPlayerNum: MemoryMatchPlayer = isMultiplayer && myRole === "player2" ? 2 : 1;
 
   const boardSlotRef = useRef<HTMLDivElement | null>(null);
   const resolvingRef = useRef(false);
@@ -182,6 +198,14 @@ export default function MemoryMatch({
 
       const isMatch = ca.icon === cb.icon;
 
+      const shouldLogPair = !isMultiplayer || player === localPlayerNum;
+      if (shouldLogPair) {
+        logPlayerMove(matchId, playerIdForRole(player === 1 ? "player1" : "player2", player1Id, player2Id), {
+          cards: [ca.icon, cb.icon],
+          matched: isMatch,
+        });
+      }
+
       if (isMatch) {
         setTimeout(() => {
           setCards((prev) => {
@@ -240,6 +264,12 @@ export default function MemoryMatch({
                 return;
               }
               setGameOver(true);
+              const winner = p1 > p2 ? "player1" : "player2";
+              logMatchEndOnce(matchId, playerId, {
+                player1_pairs: p1,
+                player2_pairs: p2,
+                winner_id: playerIdForRole(winner, player1Id, player2Id),
+              });
               if (p1 > p2) onGameEnd("player1");
               else onGameEnd("player2");
             } else {
@@ -286,7 +316,7 @@ export default function MemoryMatch({
         }, 1200);
       }
     },
-    [addLog, onGameEnd, player2.username]
+    [addLog, onGameEnd, player2.username, matchId, playerId, player1Id, player2Id, isMultiplayer, localPlayerNum]
   );
 
   const cardsRef = useRef<MemoryCard[]>(cards);

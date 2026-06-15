@@ -1,34 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDailyChallenges, type DailyChallengeRow } from "@/lib/daily-challenges";
+import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase";
+import type { PlayerDailyChallenge } from "@/lib/challengeProgress";
 
-export function useDailyChallenges(userId: string, limit = 3) {
-  const [challenges, setChallenges] = useState<DailyChallengeRow[]>([]);
+export function useDailyChallenges(enabled = true) {
+  const [challenges, setChallenges] = useState<PlayerDailyChallenge[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      if (!userId) {
-        setChallenges([]);
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      const rows = await getDailyChallenges(userId);
-      if (!cancelled) {
-        setChallenges(rows.slice(0, limit));
-        setLoading(false);
-      }
+  const load = useCallback(async () => {
+    if (!enabled) {
+      setChallenges([]);
+      setLoading(false);
+      return;
     }
 
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, limit]);
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const headers: Record<string, string> = {};
+      if (supabase) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+      }
 
-  return { challenges, loading };
+      const res = await fetch("/api/challenges", { headers });
+      if (!res.ok) {
+        setChallenges([]);
+        return;
+      }
+      const data = (await res.json()) as { challenges?: PlayerDailyChallenge[] };
+      setChallenges(data.challenges ?? []);
+    } catch {
+      setChallenges([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { challenges, loading, refresh: load };
 }

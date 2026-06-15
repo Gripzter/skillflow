@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { jsonOk, matchRakeSK, requireAdmin, skToUsd } from "@/lib/admin-api";
+import { jsonOk, matchRakeSK, requireAdmin, skToUsd, usdToSk } from "@/lib/admin-api";
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin(req);
   if ("error" in ctx) return ctx.error;
   const { admin } = ctx;
 
-  const [{ data: profiles }, { data: earnings }, { data: deposits }, { data: withdrawals }, { data: completedMatches }] =
+  const [{ data: profiles }, { data: earnings }, { data: deposits }, { data: withdrawals }, { data: completedMatches }, { data: settings }] =
     await Promise.all([
       admin.from("profiles").select("balance_sp"),
       admin.from("creator_earnings").select("earned_sk, earned_usd, paid_out, creator_id, created_at"),
@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
         .from("matches")
         .select("rake_amount, stake_sp, completed_at, settled_at, created_at")
         .eq("status", "completed"),
+      admin.from("platform_settings").select("value").eq("key", "fixed_costs_usd").maybeSingle(),
     ]);
 
   const poolBalanceSK = (profiles ?? []).reduce((s, p) => s + Number(p.balance_sp ?? 0), 0);
@@ -109,6 +110,36 @@ export async function GET(req: NextRequest) {
     pendingSK: pendingByCreator.get(id)!.earnedSK,
   }));
 
+  const profilesBalanceSK = poolBalanceSK;
+  const expectedPoolSK = usdToSk(totalDepositedUSD - totalWithdrawnUSD);
+  const poolDeltaSK = profilesBalanceSK - expectedPoolSK;
+  const poolDeltaPct =
+    expectedPoolSK > 0 ? Math.round((poolDeltaSK / expectedPoolSK) * 1000) / 10 : 0;
+  const poolHealthLevel =
+    Math.abs(poolDeltaPct) <= 2 ? "green" : Math.abs(poolDeltaPct) <= 10 ? "yellow" : "red";
+
+  const fixedCostsUSD = Number(settings?.value ?? 0);
+
+  const dailyMap = new Map<string, number>();
+  const today = new Date();
+  for (let i = 29; i >= 0; i -= 1) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dailyMap.set(d.toISOString().slice(0, 10), 0);
+  }
+  for (const m of completedMatches ?? []) {
+    const ts = (m.completed_at ?? m.settled_at ?? m.created_at) as string;
+    const day = ts.slice(0, 10);
+    if (!dailyMap.has(day)) continue;
+    dailyMap.set(day, (dailyMap.get(day) ?? 0) + skToUsd(matchRakeSK(m)));
+  }
+  const dailyRevenue30 = Array.from(dailyMap.entries()).map(([date, revenueUSD]) => ({
+    date,
+    label: date.slice(5),
+    revenueUSD,
+    amount: revenueUSD,
+  }));
+
   return jsonOk({
     summary: {
       poolBalanceSK,
@@ -122,6 +153,18 @@ export async function GET(req: NextRequest) {
       xsollaFeesUSD,
       netPlatformRevenueUSD,
     },
+    poolHealth: {
+      profilesBalanceSK,
+      profilesBalanceUSD: skToUsd(profilesBalanceSK),
+      expectedPoolSK,
+      expectedPoolUSD: skToUsd(expectedPoolSK),
+      deltaSK: poolDeltaSK,
+      deltaUSD: skToUsd(poolDeltaSK),
+      deltaPct: poolDeltaPct,
+      level: poolHealthLevel,
+    },
+    dailyRevenue30,
+    fixedCostsUSD,
     monthlyPnL,
     pendingPayouts,
   });
@@ -133,6 +176,15 @@ export async function POST(req: NextRequest) {
   const { admin } = ctx;
 
   const body = (await req.json()) as { creatorId?: string; action?: string };
+  if (body.action === "pay_all") {
+    const { error } = await admin
+      .from("creator_earnings")
+      .update({ paid_out: true })
+      .eq("paid_out", false);
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ success: true });
+  }
+
   if (body.action !== "mark_paid" || !body.creatorId) {
     return jsonOk({ error: "Invalid request" }, 400);
   }

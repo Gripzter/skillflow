@@ -32,7 +32,7 @@ import {
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
 import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
 import { incrementMatchCount } from "@/lib/cases";
-import { updateChallengeProgress } from "@/lib/daily-challenges";
+import { notifyChallengeProgressFromClient } from "@/lib/challengeProgress";
 import { finishMatch } from "@/lib/matchActions";
 import { signOutAndRedirect } from "@/lib/client-session";
 
@@ -767,8 +767,7 @@ export async function completeMatchAndSettle(
           });
         }
 
-        const challengeEventType = target.won ? "match_win" : "match_complete";
-        await updateChallengeProgress(target.userId, challengeEventType, match.gameType);
+        await notifyChallengeProgressFromClient(target.userId, match.gameType, target.won);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("[SP] Unexpected SP award error", {

@@ -140,6 +140,25 @@ serve(async (req) => {
       return json({ error: mapRpcError(error.message), message: error.message }, 400);
     }
 
+    const eventTypeMap: Record<EventType, string> = {
+      init: "match_init",
+      start: "match_start",
+      report_winner: "report_winner",
+      end: "match_end",
+    };
+
+    const { error: logError } = await admin.from("match_events").insert({
+      match_id: matchId,
+      event_type: eventTypeMap[eventType],
+      player_id: body.winnerId ?? null,
+      payload: body as unknown as Record<string, unknown>,
+      reaction_time_ms: null,
+    });
+
+    if (logError) {
+      console.warn("[SDK_MATCH_EVENT_LOG]", logError.message);
+    }
+
     console.log("[SDK_MATCH_EVENT_OK]", { eventType, gameId, matchId });
     return json(data, 200);
   } catch (err) {

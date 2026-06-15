@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 type AdminConfirmModalProps = {
   open: boolean;
   title: string;
@@ -123,5 +125,99 @@ export function AdminStatusBadge({ status }: { status: string }) {
     >
       {status.replace(/_/g, " ")}
     </span>
+  );
+}
+
+export function HealthDot({ level }: { level: "green" | "yellow" | "red" }) {
+  const colors = {
+    green: "bg-emerald-400",
+    yellow: "bg-[#FFFF00]",
+    red: "bg-red-500",
+  };
+  return <span className={`inline-block h-2.5 w-2.5 rounded-full ${colors[level]}`} />;
+}
+
+export function RelativeTime({ iso }: { iso: string }) {
+  const full = new Date(iso).toLocaleString();
+  const diff = Date.now() - new Date(iso).getTime();
+  const sec = Math.floor(diff / 1000);
+  let label = `${sec}s ago`;
+  if (sec >= 60) label = `${Math.floor(sec / 60)}m ago`;
+  if (sec >= 3600) label = `${Math.floor(sec / 3600)}h ago`;
+  if (sec >= 86400) label = `${Math.floor(sec / 86400)}d ago`;
+  return (
+    <time dateTime={iso} title={full} className="cursor-default">
+      {label}
+    </time>
+  );
+}
+
+export function RiskBadge({ level }: { level: "low" | "medium" | "high" }) {
+  const cls =
+    level === "high"
+      ? "bg-red-500/15 text-red-400 border-red-500/30"
+      : level === "medium"
+        ? "bg-orange-500/15 text-orange-400 border-orange-500/30"
+        : "bg-[#FFFF00]/15 text-[#FFFF00] border-[#FFFF00]/30";
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs lowercase ${cls}`}>
+      {level}
+    </span>
+  );
+}
+
+type TypedConfirmModalProps = AdminConfirmModalProps & {
+  confirmText?: string;
+  typedValue?: string;
+};
+
+export function TypedConfirmModal({
+  confirmText = "confirm",
+  typedValue = "",
+  onConfirm,
+  ...props
+}: TypedConfirmModalProps) {
+  const [typed, setTyped] = useState("");
+
+  if (!props.open) return null;
+
+  const canConfirm = !typedValue || typed === typedValue;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1A1A1F] p-6">
+        <h3 className="text-lg font-semibold lowercase text-white">{props.title}</h3>
+        <p className="mt-3 text-sm text-[#C8C8D4]">{props.message}</p>
+        {typedValue ? (
+          <div className="mt-4">
+            <p className="mb-2 text-xs lowercase text-[#7A7A8E]">
+              type <span className="text-white">{typedValue}</span> to confirm
+            </p>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-[#0E0E12] px-3 py-2 text-sm text-white"
+            />
+          </div>
+        ) : null}
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={props.onCancel}
+            className="rounded-lg border border-white/10 px-4 py-2 text-sm lowercase text-[#C8C8D4]"
+          >
+            cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm || props.loading}
+            onClick={onConfirm}
+            className="rounded-lg bg-red-500 px-4 py-2 text-sm lowercase text-white disabled:opacity-40"
+          >
+            {props.loading ? "working…" : confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

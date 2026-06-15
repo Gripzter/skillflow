@@ -13,10 +13,20 @@ import {
 import { getChessBotMove, getChessBotDelayMs, type BotDifficulty } from "@/lib/games/bot-engine";
 import type { MatchUiState } from "@/components/game/matchUi";
 import { CHESS_INITIAL_CLOCK_MS } from "@/lib/games/match-timers";
+import {
+  logMatchEndOnce,
+  logMatchStartOnce,
+  logPlayerMove,
+  playerIdForRole,
+} from "@/lib/match-events";
 
 export interface GameMultiplayerProps {
   isMultiplayer?: boolean;
   myRole?: "player1" | "player2";
+  matchId?: string;
+  playerId?: string;
+  player1Id?: string;
+  player2Id?: string;
   sendGameEvent?: (event: Record<string, unknown>) => Promise<void>;
   onPlayerAction?: () => void;
   incomingEvent?: Record<string, unknown> | null;
@@ -76,6 +86,10 @@ export default function Chess({
   botDifficulty = "gamer",
   isMultiplayer = false,
   myRole = "player1",
+  matchId,
+  playerId,
+  player1Id,
+  player2Id,
   sendGameEvent,
   onPlayerAction,
   incomingEvent,
@@ -115,6 +129,12 @@ export default function Chess({
   const gameOverRef = useRef(false);
   const gameStartTimeRef = useRef(Date.now());
   const lastProcessedEventRef = useRef<Record<string, unknown> | null>(null);
+  const moveCountRef = useRef(0);
+  const startingFenRef = useRef(new ChessEngine().fen());
+
+  useEffect(() => {
+    logMatchStartOnce(matchId, playerId, { fen: startingFenRef.current });
+  }, [matchId, playerId]);
 
   const resolveClockRemainingMs = useCallback(
     (player: "player1" | "player2", nowMs: number) => {
@@ -224,6 +244,14 @@ export default function Chess({
             (result as { flags?: string }).flags
           );
           setMoveHistory((prev) => [...prev, { player, playerName, description, san: result.san, ts }]);
+          moveCountRef.current += 1;
+          logPlayerMove(matchId, playerIdForRole(moverRole, player1Id, player2Id), {
+            from: result.from,
+            to: result.to,
+            piece: result.piece,
+            fen: next.fen(),
+            move_number: moveCountRef.current,
+          });
           if (isMultiplayer && sendGameEvent) {
             sendGameEvent({
               type: "chess_move",
@@ -239,7 +267,7 @@ export default function Chess({
         console.log("[Chess] move", { from, to, success: false, error: e, fen: game.fen() });
       }
     },
-    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole, onTurnClockUpdate, onPlayerAction]
+    [game, player1.username, player2.username, isMultiplayer, sendGameEvent, turn, myColor, myRole, onTurnClockUpdate, onPlayerAction, matchId, player1Id, player2Id]
   );
 
   const handleSquareClick = useCallback(
@@ -319,8 +347,14 @@ export default function Chess({
     if (isMultiplayer && sendGameEvent) {
       sendGameEvent({ type: "chess_timeout", loserRole: active }).catch(() => {});
     }
-    onGameEnd(active === "player1" ? "player2" : "player1");
-  }, [clockNowMs, clockState.activeTurn, isMultiplayer, onGameEnd, resolveClockRemainingMs, sendGameEvent]);
+    const winner = active === "player1" ? "player2" : "player1";
+    logMatchEndOnce(matchId, playerId, {
+      result: "timeout",
+      winner_id: playerIdForRole(winner, player1Id, player2Id),
+      total_moves: moveCountRef.current,
+    });
+    onGameEnd(winner);
+  }, [clockNowMs, clockState.activeTurn, isMultiplayer, onGameEnd, resolveClockRemainingMs, sendGameEvent, matchId, playerId, player1Id, player2Id]);
 
   const handlePromotionChoose = useCallback(
     (piece: PieceType) => {
@@ -335,16 +369,26 @@ export default function Chess({
     if (inCheckmate) {
       gameOverRef.current = true;
       const winner = turn === "w" ? "player2" : "player1";
+      logMatchEndOnce(matchId, playerId, {
+        result: "checkmate",
+        winner_id: playerIdForRole(winner, player1Id, player2Id),
+        total_moves: moveCountRef.current,
+      });
       onGameEnd(winner);
     }
-  }, [inCheckmate, turn, onGameEnd]);
+  }, [inCheckmate, turn, onGameEnd, matchId, playerId, player1Id, player2Id]);
 
   useEffect(() => {
     if (inStalemate || inDraw || inThreefold || insufficientMaterial) {
       gameOverRef.current = true;
+      logMatchEndOnce(matchId, playerId, {
+        result: "stalemate",
+        winner_id: null,
+        total_moves: moveCountRef.current,
+      });
       onGameDraw();
     }
-  }, [inStalemate, inDraw, inThreefold, insufficientMaterial, onGameDraw]);
+  }, [inStalemate, inDraw, inThreefold, insufficientMaterial, onGameDraw, matchId, playerId]);
 
   // Incoming multiplayer events: apply opponent move, handle resign, draw
   useEffect(() => {
@@ -426,6 +470,11 @@ export default function Chess({
       gameOverRef.current = true;
       const loserRole = (incomingEvent.loserRole as "player1" | "player2" | undefined) ?? "player1";
       const winner = loserRole === "player1" ? "player2" : "player1";
+      logMatchEndOnce(matchId, playerId, {
+        result: "timeout",
+        winner_id: playerIdForRole(winner, player1Id, player2Id),
+        total_moves: moveCountRef.current,
+      });
       onGameEnd(winner);
       onEventProcessed();
       return;
@@ -433,6 +482,11 @@ export default function Chess({
     if (type === "resign") {
       lastProcessedEventRef.current = incomingEvent;
       gameOverRef.current = true;
+      logMatchEndOnce(matchId, playerId, {
+        result: "resignation",
+        winner_id: playerIdForRole(myRole, player1Id, player2Id),
+        total_moves: moveCountRef.current,
+      });
       onGameEnd(myRole);
       onEventProcessed();
       return;
