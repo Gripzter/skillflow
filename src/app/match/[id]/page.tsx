@@ -42,6 +42,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
 import { AnonymousWinClaimBanner } from "@/components/AnonymousWinClaim";
+import AnonymousLossSettle from "@/components/AnonymousLossSettle";
 import { getAnonymousGuestId, getOrCreateAnonymousToken } from "@/lib/qr-match";
 import { pickOpponentName } from "@/lib/opponentNames";
 import { getEquippedCosmeticsBatch, type UserCosmeticsSnapshot } from "@/lib/cases";
@@ -328,6 +329,9 @@ function MatchPageContent() {
           return;
         }
         setMatch(m);
+        if (isGuestMode) {
+          setUsername(m.player2.username || "Guest Driver");
+        }
         const playerIds = [m.player1Id, m.player2Id].filter((id): id is string => Boolean(id));
         const supabaseForProfiles = createClient();
         if (supabaseForProfiles && playerIds.length > 0) {
@@ -354,7 +358,7 @@ function MatchPageContent() {
         if (m.status === "completed") {
           // In practice / bot matches the current user is always player1.
           // In real-multiplayer matches resolve by comparing stored player IDs.
-          const iAmPlayer1 = isQrGuest
+          const iAmPlayer1 = isGuestMode
             ? false
             : !m.isRealMultiplayer
               ? true
@@ -1667,7 +1671,7 @@ function MatchPageContent() {
       ) : null}
 
       {/* Game result overlay — victory, defeat, or draw */}
-      {outcome && (
+      {outcome && !isQrGuest && (
         <GameResultOverlay
           outcome={outcome}
           isPractice={match.isPractice}
@@ -1685,18 +1689,21 @@ function MatchPageContent() {
       )}
 
       {isQrGuest && outcome === "victory" ? (
-        <div className="fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] overflow-y-auto bg-[#0E0E12]/95 px-4 pb-8 pt-4 backdrop-blur">
-          <AnonymousWinClaimBanner amountSk={match.stakeAmount * 2} />
-        </div>
+        <AnonymousWinClaimBanner
+          amountSk={match.stakeAmount * 2}
+          onSkip={() => {
+            window.location.href = "/";
+          }}
+        />
       ) : null}
 
       {isQrGuest && outcome === "defeat" ? (
-        <div className="fixed inset-x-0 bottom-6 z-[60] px-4 text-center">
-          <p className="text-sm text-[#9CA3AF]">Play more — sign up free on SkillFlow</p>
-          <a href="/signup" className="mt-2 inline-block text-sm font-semibold text-[#FFFF00] hover:underline">
-            Create account
-          </a>
-        </div>
+        <AnonymousLossSettle
+          amountSk={match.stakeAmount}
+          onSkip={() => {
+            window.location.href = "/";
+          }}
+        />
       ) : null}
 
       {showFirstMatchCelebration ? (

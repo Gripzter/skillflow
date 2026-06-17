@@ -184,6 +184,14 @@ export default function QRStakeNegotiation({ qrMatchId, isGuest, balanceSp = 0 }
             size="lg"
           />
         </div>
+        {isGuest && state.opponent_username ? (
+          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-[#6B7280]">
+              you&apos;re playing as
+            </p>
+            <p className="mt-1 text-base font-black text-white">{state.opponent_username}</p>
+          </div>
+        ) : null}
         <p className="mt-6 max-w-xs text-sm text-[#6B7280]">
           hang tight — match starts the moment they pick an amount.
         </p>
@@ -211,7 +219,7 @@ export default function QRStakeNegotiation({ qrMatchId, isGuest, balanceSp = 0 }
                 size="lg"
               />
               <p className="mt-3 text-base font-semibold">
-                {state.opponent_username ?? "Anonymous Player"}
+                {state.opponent_username ?? "Guest Driver"}
               </p>
             </div>
 

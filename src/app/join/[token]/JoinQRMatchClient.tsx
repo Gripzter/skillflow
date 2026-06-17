@@ -11,6 +11,7 @@ import {
   storeAnonymousGuestId,
   type QRMatchPublic,
 } from "@/lib/qr-match";
+import { generateAnonymousName } from "@/lib/generateAnonymousName";
 
 type Props = {
   token: string;
@@ -54,15 +55,18 @@ export default function JoinQRMatchClient({ token, initialMatch }: Props) {
 
       let opponentUserId: string | null = sessionUserId;
       let anonymousToken: string | null = null;
+      let anonymousDisplayName: string | null = null;
 
       if (!opponentUserId) {
         anonymousToken = getOrCreateAnonymousToken();
+        anonymousDisplayName = generateAnonymousName();
         opponentUserId = null;
       }
 
       const result = await acceptQRMatch(token, {
         opponentUserId,
         anonymousSessionToken: anonymousToken,
+        anonymousDisplayName,
       });
 
       if (result.anonymous_guest_id) {

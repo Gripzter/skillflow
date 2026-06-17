@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import AuthLayout from "@/components/AuthLayout";
 import PasswordInput from "@/components/PasswordInput";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
@@ -20,15 +18,17 @@ import {
 type Props = {
   amountSk: number;
   onClaimed?: (balance: number) => void;
+  onSkip?: () => void;
 };
 
-export function AnonymousWinClaimBanner({ amountSk, onClaimed }: Props) {
+export function AnonymousWinClaimBanner({ amountSk, onClaimed, onSkip }: Props) {
   const router = useRouter();
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [claimed, setClaimed] = useState(false);
 
   const handleSignupAndClaim = useCallback(
     async (e: React.FormEvent) => {
@@ -51,13 +51,14 @@ export function AnonymousWinClaimBanner({ amountSk, onClaimed }: Props) {
 
         if (data.session) {
           const result = await claimAnonymousPayout(anonToken);
-          showToast(`Claimed ${result.amount_sk} SK!`, "success");
+          showToast(`claimed ${result.amount_sk} SK`, "success");
+          setClaimed(true);
           onClaimed?.(result.balance_sp);
-          router.push("/play");
+          window.setTimeout(() => router.push("/play"), 900);
           return;
         }
 
-        showToast("Check your email to verify, then sign in to claim your winnings.", "info");
+        showToast("check your email to verify, then return here to claim.", "info");
       } catch (err) {
         showToast(getUserFriendlyError(err), "error");
       } finally {
@@ -67,59 +68,76 @@ export function AnonymousWinClaimBanner({ amountSk, onClaimed }: Props) {
     [email, password, username, onClaimed, router, showToast]
   );
 
+  if (claimed) {
+    return (
+      <div className="fixed inset-0 z-[70] flex min-h-screen items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
+        <div className="w-full max-w-md rounded-3xl border border-[#FFFF00]/30 bg-[#16161C] p-8 shadow-2xl">
+          <p className="text-3xl font-black text-[#FFFF00]">collected.</p>
+          <p className="mt-2 text-sm text-[#9CA3AF]">your SkillPoints are waiting in your account.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto mt-6 max-w-md rounded-2xl border border-[#FFFF00]/30 bg-[#FFFF00]/5 p-5">
-      <p className="text-center text-lg font-black text-white">
-        You won{" "}
-        <span className="inline-flex items-center gap-1 text-[#FFFF00]">
-          {amountSk} <SkilliesIcon className="h-5 w-5" />
-        </span>
-        !
-      </p>
-      <p className="mt-1 text-center text-sm text-[#9CA3AF]">Sign up free to claim your winnings.</p>
+    <div className="fixed inset-0 z-[70] min-h-screen overflow-y-auto bg-[#0E0E12] px-4 py-8 text-white">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-md flex-col justify-center">
+        <div className="rounded-3xl border border-[#FFFF00]/30 bg-[#16161C] p-6 shadow-2xl sm:p-8">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#9CA3AF]">collect</p>
+          <h1 className="mt-3 text-3xl font-black leading-tight">
+            you won{" "}
+            <span className="inline-flex items-center gap-1 text-[#FFFF00]">
+              {amountSk} <SkilliesIcon className="h-7 w-7" />
+            </span>
+            .
+          </h1>
+          <p className="mt-3 text-sm text-[#9CA3AF]">sign up to collect your winnings.</p>
 
-      <form onSubmit={(e) => void handleSignupAndClaim(e)} className="mt-4 space-y-3">
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-          minLength={3}
-          className="w-full rounded-xl border border-[#1F1F26] bg-[#16161C] px-4 py-2.5 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
-        />
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full rounded-xl border border-[#1F1F26] bg-[#16161C] px-4 py-2.5 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
-        />
-        <PasswordInput
-          value={password}
-          onChange={setPassword}
-          placeholder="Password"
-          required
-          minLength={8}
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFFF00] py-3 text-sm font-bold text-black disabled:opacity-50"
-        >
-          {loading ? <LoadingRing size={18} /> : null}
-          Sign up &amp; claim
-        </button>
-      </form>
+          <form onSubmit={(e) => void handleSignupAndClaim(e)} className="mt-6 space-y-3">
+            <input
+              type="text"
+              placeholder="Username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              minLength={3}
+              className="w-full rounded-xl border border-[#1F1F26] bg-[#0E0E12] px-4 py-3 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="w-full rounded-xl border border-[#1F1F26] bg-[#0E0E12] px-4 py-3 text-sm text-white focus:border-[#FFFF00] focus:outline-none"
+            />
+            <PasswordInput
+              value={password}
+              onChange={setPassword}
+              placeholder="Password"
+              required
+              minLength={8}
+              className="rounded-xl border-[#1F1F26] bg-[#0E0E12] focus:border-[#FFFF00] focus:ring-[#FFFF00]"
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFFF00] py-3.5 text-sm font-black text-black disabled:opacity-50"
+            >
+              {loading ? <LoadingRing size={18} /> : null}
+              Sign up &amp; collect
+            </button>
+          </form>
 
-      <p className="mt-3 text-center text-xs text-[#6B7280]">
-        Already have an account?{" "}
-        <Link href="/login" className="text-[#FFFF00] hover:underline">
-          Sign in
-        </Link>{" "}
-        — your win will be waiting.
-      </p>
+          <button
+            type="button"
+            onClick={onSkip ?? (() => { window.location.href = "/"; })}
+            className="mt-5 w-full text-center text-xs font-semibold text-[#6B7280] hover:text-[#9CA3AF]"
+          >
+            Maybe later
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -147,9 +165,5 @@ export function useAnonymousPendingPayout() {
 }
 
 export default function AnonymousWinClaim({ amountSk }: { amountSk: number }) {
-  return (
-    <AuthLayout title="Claim your win">
-      <AnonymousWinClaimBanner amountSk={amountSk} />
-    </AuthLayout>
-  );
+  return <AnonymousWinClaimBanner amountSk={amountSk} />;
 }

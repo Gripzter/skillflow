@@ -26,6 +26,7 @@ export type QRMatchPublic = {
   host_avatar_url?: string | null;
   short_code?: string;
   match_id?: string | null;
+  anonymous_display_name?: string | null;
 };
 
 export type CreateQRMatchResult = {
@@ -42,6 +43,7 @@ export type AcceptQRMatchResult = {
   host_user_id: string;
   opponent_is_anonymous: boolean;
   anonymous_guest_id?: string;
+  anonymous_display_name?: string;
   status: string;
 };
 
@@ -54,6 +56,7 @@ export type QRNegotiationState = {
   stake_sk?: number | null;
   match_id?: string | null;
   opponent_is_anonymous?: boolean;
+  anonymous_display_name?: string | null;
   host_username?: string;
   host_avatar_url?: string | null;
   opponent_username?: string;
@@ -135,7 +138,11 @@ export async function expireQRMatch(id: string): Promise<void> {
 
 export async function acceptQRMatch(
   token: string,
-  options: { opponentUserId?: string | null; anonymousSessionToken?: string | null }
+  options: {
+    opponentUserId?: string | null;
+    anonymousSessionToken?: string | null;
+    anonymousDisplayName?: string | null;
+  }
 ): Promise<AcceptQRMatchResult> {
   const supabase = createClient();
   if (!supabase) throw new Error("Supabase not configured");
@@ -143,6 +150,7 @@ export async function acceptQRMatch(
     p_token: token,
     p_anonymous_session_token: options.anonymousSessionToken ?? null,
     p_opponent_user_id: options.opponentUserId ?? null,
+    p_anonymous_display_name: options.anonymousDisplayName ?? null,
   });
   if (error) throw new Error(error.message);
   return data as AcceptQRMatchResult;
