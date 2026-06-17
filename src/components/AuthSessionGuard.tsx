@@ -10,6 +10,11 @@ type AuthSessionGuardProps = {
   children: ReactNode;
 };
 
+function getSearchParams() {
+  if (typeof window === "undefined") return new URLSearchParams();
+  return new URLSearchParams(window.location.search);
+}
+
 export default function AuthSessionGuard({ children }: AuthSessionGuardProps) {
   const pathname = usePathname();
   const [checking, setChecking] = useState(() => isProtectedPath(pathname));
@@ -17,7 +22,8 @@ export default function AuthSessionGuard({ children }: AuthSessionGuardProps) {
 
   useEffect(() => {
     let cancelled = false;
-    const protectedPath = isProtectedPath(pathname);
+    const searchParams = getSearchParams();
+    const protectedPath = isProtectedPath(pathname, searchParams);
 
     if (!protectedPath) {
       setAuthenticated(true);
@@ -53,7 +59,8 @@ export default function AuthSessionGuard({ children }: AuthSessionGuardProps) {
     };
   }, [pathname]);
 
-  if (isProtectedPath(pathname) && (checking || !authenticated)) {
+  const searchParams = typeof window !== "undefined" ? getSearchParams() : new URLSearchParams();
+  if (isProtectedPath(pathname, searchParams) && (checking || !authenticated)) {
     return (
       <div style={{
         position: 'fixed',

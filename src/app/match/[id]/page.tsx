@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
@@ -329,9 +329,10 @@ function MatchPageContent() {
         }
         setMatch(m);
         const playerIds = [m.player1Id, m.player2Id].filter((id): id is string => Boolean(id));
-        if (supabase && playerIds.length > 0) {
+        const supabaseForProfiles = createClient();
+        if (supabaseForProfiles && playerIds.length > 0) {
           const [{ data: profileRows }, cosmetics] = await Promise.all([
-            supabase.from("profiles").select("id, avatar_url").in("id", playerIds),
+            supabaseForProfiles.from("profiles").select("id, avatar_url").in("id", playerIds),
             getEquippedCosmeticsBatch(playerIds),
           ]);
           const avatars: Record<string, string | null> = {};
@@ -1844,7 +1845,9 @@ function MatchPageContent() {
 export default function MatchPage() {
   return (
     <ErrorBoundary>
-      <MatchPageContent />
+      <Suspense>
+        <MatchPageContent />
+      </Suspense>
     </ErrorBoundary>
   );
 }
