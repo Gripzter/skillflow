@@ -53,7 +53,7 @@ export function AnonymousWinClaimBanner({ amountSk, onClaimed, onSkip }: Props) 
           const result = await claimAnonymousPayout(anonToken);
           showToast(`claimed ${result.amount_sk} SK`, "success");
           setClaimed(true);
-          onClaimed?.(result.balance_sp);
+          onClaimed?.(result.balance_sk);
           window.setTimeout(() => router.push("/play"), 900);
           return;
         }
@@ -73,7 +73,7 @@ export function AnonymousWinClaimBanner({ amountSk, onClaimed, onSkip }: Props) 
       <div className="fixed inset-0 z-[70] flex min-h-screen items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
         <div className="w-full max-w-md rounded-3xl border border-[#FFFF00]/30 bg-[#16161C] p-8 shadow-2xl">
           <p className="text-3xl font-black text-[#FFFF00]">collected.</p>
-          <p className="mt-2 text-sm text-[#9CA3AF]">your SkillPoints are waiting in your account.</p>
+          <p className="mt-2 text-sm text-[#9CA3AF]">your Skillies are waiting in your account.</p>
         </div>
       </div>
     );

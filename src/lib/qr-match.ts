@@ -192,14 +192,14 @@ export async function fetchNegotiationState(
   return data as QRNegotiationState;
 }
 
-export async function claimAnonymousPayout(token: string): Promise<{ amount_sk: number; balance_sp: number }> {
+export async function claimAnonymousPayout(token: string): Promise<{ amount_sk: number; balance_sk: number }> {
   const supabase = createClient();
   if (!supabase) throw new Error("Supabase not configured");
   const { data, error } = await supabase.rpc("claim_anonymous_payout", {
     p_anonymous_session_token: token,
   });
   if (error) throw new Error(error.message);
-  return data as { amount_sk: number; balance_sp: number };
+  return data as { amount_sk: number; balance_sk: number };
 }
 
 export async function getAnonymousPendingPayout(token: string) {

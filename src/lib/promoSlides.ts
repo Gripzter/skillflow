@@ -50,17 +50,8 @@ export const PROMO_SLIDES: PromoSlide[] = [
     image: "/images/promo/founders.jpg",
     accent: "BETA EXCLUSIVE",
     headline: "Become a Founder",
-    subline: "Reach Platinum before the beta window closes.",
+    subline: "Compete early. Help shape the arena.",
     cta: "See Rewards",
     href: "/founders",
-  },
-  {
-    id: "case-drop",
-    image: "/images/promo/case-drop.jpg",
-    accent: "NEW",
-    headline: "Diamond Cases Live",
-    subline: "Higher tier drops, legendary cosmetics.",
-    cta: "Open a Case",
-    href: "/cases",
   },
 ];

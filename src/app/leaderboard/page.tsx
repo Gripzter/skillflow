@@ -5,11 +5,8 @@ import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
 import LoadingRing from "@/components/LoadingRing";
-import RankBadge from "@/components/RankBadge";
-import SPIcon from "@/components/SPIcon";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import { getCurrentUser, getLeaderboard, getPracticeMatches, logout as apiLogout } from "@/lib/api";
-import { createClient } from "@/lib/supabase";
 import {
   sortAndRankPlayers,
   getMainStat,
@@ -17,18 +14,16 @@ import {
   type LeaderboardPlayer,
   type LeaderboardTab,
 } from "@/lib/leaderboard-data";
-import { buildLeaderboard, getTopGameEmoji } from "@/lib/leaderboard-seeding";
-import { getEquippedCosmeticsBatch } from "@/lib/cases";
+import { buildLeaderboard } from "@/lib/leaderboard-seeding";
 import LeaderboardPlayerIdentity from "@/components/LeaderboardPlayerIdentity";
 import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
 import { formatCurrency } from "@/lib/formatCurrency";
 
 const TABS: { id: LeaderboardTab; label: string }[] = [
-  { id: "skillpoints", label: "SkillPoints" },
+  { id: "rating", label: "Glicko Rating" },
   { id: "earnings", label: "Top Earners" },
   { id: "matches", label: "Most Matches" },
   { id: "winRate", label: "Highest Win Rate" },
-  { id: "rating", label: "Skill Rating" },
 ];
 const PAGE_SIZE = 20;
 
@@ -46,63 +41,20 @@ export default function LeaderboardPage() {
   const playersByTabRef = useRef<Partial<Record<LeaderboardTab, LeaderboardPlayer[]>>>({});
   const [displayedRealPlayers, setDisplayedRealPlayers] = useState<LeaderboardPlayer[]>([]);
   const [isTabRevalidating, setIsTabRevalidating] = useState(false);
-  const [activeTab, setActiveTab] = useState<LeaderboardTab>("skillpoints");
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>("rating");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { isPractice } = usePlayMode();
 
   const fetchRankedPlayersForTab = useCallback(async (tab: LeaderboardTab, currentUser: { id: string; username: string }) => {
-    if (tab === "skillpoints") {
-      const supabase = createClient();
-      if (!supabase) return [];
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, username, lifetime_sp, rank_tier, avatar_url")
-        .order("lifetime_sp", { ascending: false })
-        .limit(100);
-
-      const rows = data ?? [];
-      const cosmeticsMap = await getEquippedCosmeticsBatch(rows.map((p) => p.id));
-
-      const players: LeaderboardPlayer[] = rows.map((player) => {
-        const cosmetics = cosmeticsMap[player.id];
-        return {
-          id: player.id,
-          username: player.username ?? "Player",
-          avatarGradient: "from-teal/40 to-purple/40",
-          avatarUrl: (player.avatar_url as string | null) ?? null,
-          equippedBorder: cosmetics?.border ?? null,
-          equippedBadges: cosmetics?.badges ?? [],
-          skillRating: 1000,
-          totalMatches: 0,
-          winRate: 0,
-          totalEarnings: 0,
-          lifetimeSp: Number(player.lifetime_sp ?? 0),
-          rankTier: player.rank_tier ?? "bronze",
-          trend: "up",
-          isCurrentUser: player.id === currentUser.id,
-        };
-      });
-      return sortAndRankPlayers(players, tab);
-    }
-
-    const sortBy = tab === "rating" ? "skill_rating" : "total_earnings";
+    const sortBy = tab === "rating" ? "rating" : tab;
     const apiPlayers = await getLeaderboard(sortBy);
     const basePlayers: LeaderboardPlayer[] =
       apiPlayers?.map((p) => ({
         ...p,
         isCurrentUser: p.id === currentUser.id,
       })) ?? [];
-    const cosmeticsMap = await getEquippedCosmeticsBatch(basePlayers.map((p) => p.id));
-    const enriched = basePlayers.map((p) => {
-      const cosmetics = cosmeticsMap[p.id];
-      return {
-        ...p,
-        equippedBorder: cosmetics?.border ?? p.equippedBorder ?? null,
-        equippedBadges: cosmetics?.badges ?? p.equippedBadges ?? [],
-      };
-    });
-    return sortAndRankPlayers(buildLeaderboard(enriched), tab);
+    return sortAndRankPlayers(buildLeaderboard(basePlayers), tab);
   }, []);
 
   useEffect(() => {
@@ -118,10 +70,10 @@ export default function LeaderboardPage() {
           setUsername(user.username);
           setIsDevMode(user.isDevMode ?? false);
         }
-        const ranked = await fetchRankedPlayersForTab("skillpoints", currentUser);
+        const ranked = await fetchRankedPlayersForTab("rating", currentUser);
         setRawPlayers(ranked);
         setDisplayedRealPlayers(ranked);
-        const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { skillpoints: ranked };
+        const initialByTab: Partial<Record<LeaderboardTab, LeaderboardPlayer[]>> = { rating: ranked };
         playersByTabRef.current = initialByTab;
         setPlayersByTab(initialByTab);
         const practice = getPracticeMatches();
@@ -198,7 +150,7 @@ export default function LeaderboardPage() {
     return source.filter((p) => p.username.toLowerCase().includes(q));
   }, [displayedRealPlayers, sortedPractice, search, isPractice]);
 
-  const showPodium = isPractice || activeTab !== "skillpoints";
+  const showPodium = true;
   const podium = showPodium ? filteredPlayers.slice(0, 3) : [];
   const tablePlayers = showPodium ? filteredPlayers.slice(3) : filteredPlayers;
   const visibleCount = page * PAGE_SIZE;
@@ -247,8 +199,8 @@ export default function LeaderboardPage() {
         <p className="mt-1 text-body-gray">
           {isPractice
             ? "Ranked by practice matches played"
-            : activeTab === "skillpoints"
-              ? "Top 100 players ranked by lifetime SkillPoints"
+            : activeTab === "rating"
+              ? "Top players ranked by Glicko skill rating"
             : IS_SWEEPSTAKES_LAUNCH
               ? "Weekly alpha standings. Top players split the $100 prize pool."
               : "See how you stack up against the competition"}
@@ -301,15 +253,7 @@ export default function LeaderboardPage() {
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
               <p className="mt-2 text-lg font-bold text-white">
-                {isPractice ? (
-                  `${podium[1].totalMatches} matches`
-                ) : activeTab === "skillpoints" ? (
-                  <span className="inline-flex items-center gap-1">
-                    {(podium[1].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
-                  </span>
-                ) : (
-                  getMainStat(podium[1], activeTab)
-                )}
+                {isPractice ? `${podium[1].totalMatches} matches` : getMainStat(podium[1], activeTab)}
               </p>
             </div>
           )}
@@ -330,15 +274,7 @@ export default function LeaderboardPage() {
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
               <p className="mt-2 text-xl font-bold text-[#FFD700]">
-                {isPractice ? (
-                  `${podium[0].totalMatches} matches`
-                ) : activeTab === "skillpoints" ? (
-                  <span className="inline-flex items-center gap-1">
-                    {(podium[0].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={18} />
-                  </span>
-                ) : (
-                  getMainStat(podium[0], activeTab)
-                )}
+                {isPractice ? `${podium[0].totalMatches} matches` : getMainStat(podium[0], activeTab)}
               </p>
             </div>
           )}
@@ -358,15 +294,7 @@ export default function LeaderboardPage() {
                 <span className={`mt-1 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
               )}
               <p className="mt-2 text-lg font-bold text-white">
-                {isPractice ? (
-                  `${podium[2].totalMatches} matches`
-                ) : activeTab === "skillpoints" ? (
-                  <span className="inline-flex items-center gap-1">
-                    {(podium[2].lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
-                  </span>
-                ) : (
-                  getMainStat(podium[2], activeTab)
-                )}
+                {isPractice ? `${podium[2].totalMatches} matches` : getMainStat(podium[2], activeTab)}
               </p>
             </div>
           )}
@@ -402,16 +330,10 @@ export default function LeaderboardPage() {
                   <tr className="border-b border-white/5 bg-card">
                     <th className="px-4 py-3 font-medium text-body-gray">Rank</th>
                     <th className="px-4 py-3 font-medium text-body-gray">Player</th>
-                    {activeTab === "skillpoints" ? (
-                      <th className="px-4 py-3 font-medium text-body-gray">Lifetime SP</th>
-                    ) : (
-                      <>
-                        <th className="px-4 py-3 font-medium text-body-gray">Rating</th>
-                        <th className="px-4 py-3 font-medium text-body-gray">W / L</th>
-                        <th className="px-4 py-3 font-medium text-body-gray">Top Game</th>
-                        <th className="px-4 py-3 font-medium text-body-gray">Earnings</th>
-                      </>
-                    )}
+                    <th className="px-4 py-3 font-medium text-body-gray">Rating</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Matches</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Win Rate</th>
+                    <th className="px-4 py-3 font-medium text-body-gray">Earnings</th>
                   </tr>
                 )}
               </thead>
@@ -421,9 +343,7 @@ export default function LeaderboardPage() {
                   const rowBaseClasses = `border-b border-white/5 transition-colors ${
                     rank % 2 === 0 ? "bg-card" : "bg-[#1A1A22]"
                   } ${
-                    activeTab === "skillpoints" && player.id === currentUserId
-                      ? "bg-[#FFFF00]/8"
-                      : player.isCurrentUser
+                    player.isCurrentUser
                         ? isPractice
                           ? "bg-purple-500/10"
                           : "bg-teal/10"
@@ -453,9 +373,6 @@ export default function LeaderboardPage() {
                     );
                   }
 
-                  const wins = player.wins ?? Math.round((player.winRate / 100) * player.totalMatches);
-                  const losses = player.losses ?? Math.max(0, player.totalMatches - wins);
-                  const topGame = player.topGame ?? "All Games";
                   const earnings = player.totalEarnings;
                   const earningsClass =
                     earnings > 0 ? "text-emerald-400" : earnings < 0 ? "text-red-400" : "text-body-gray";
@@ -463,42 +380,21 @@ export default function LeaderboardPage() {
                   return (
                     <tr
                       key={player.id}
-                      className={`${rowBaseClasses} ${
-                        activeTab === "skillpoints" && player.id === currentUserId
-                          ? "border-l-2 border-l-[#FFFF00]"
-                          : "hover:border-l-2 hover:border-l-teal"
-                      }`}
+                      className={`${rowBaseClasses} hover:border-l-2 hover:border-l-teal`}
                     >
                       <td className="px-4 py-3 font-medium text-body-gray">#{rank}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <LeaderboardPlayerIdentity
-                            player={player}
-                            showRankBadge={activeTab === "skillpoints"}
-                          />
+                          <LeaderboardPlayerIdentity player={player} />
                           {player.isCurrentUser && (
                             <span className="rounded px-2 py-0.5 text-xs bg-teal/20 text-teal">You</span>
                           )}
                         </div>
                       </td>
-                      {activeTab === "skillpoints" ? (
-                        <td className="px-4 py-3 font-semibold text-white">
-                          <span className="inline-flex items-center gap-1">
-                            {(player.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={16} />
-                          </span>
-                        </td>
-                      ) : (
-                        <>
-                          <td className="px-4 py-3 font-semibold text-white">{player.skillRating}</td>
-                          <td className="px-4 py-3 text-body-gray">
-                            {wins}W - {losses}L
-                          </td>
-                          <td className="px-4 py-3 text-body-gray">
-                            {getTopGameEmoji(topGame)} {topGame}
-                          </td>
-                          <td className={`px-4 py-3 font-semibold ${earningsClass}`}>{formatCurrency(earnings)}</td>
-                        </>
-                      )}
+                      <td className="px-4 py-3 font-semibold text-white">{Math.round(player.skillRating)}</td>
+                      <td className="px-4 py-3 text-body-gray">{player.totalMatches}</td>
+                      <td className="px-4 py-3 text-body-gray">{player.winRate.toFixed(1)}%</td>
+                      <td className={`px-4 py-3 font-semibold ${earningsClass}`}>{formatCurrency(earnings)}</td>
                     </tr>
                   );
                 })}
@@ -514,9 +410,7 @@ export default function LeaderboardPage() {
                 <div
                   key={player.id}
                   className={`card-border flex items-center justify-between gap-3 rounded-card p-4 ${
-                    activeTab === "skillpoints" && player.id === currentUserId
-                      ? "border-[#FFFF00]/60 bg-[#FFFF00]/10"
-                      : player.isCurrentUser
+                    player.isCurrentUser
                         ? (isPractice ? "border-purple-500/30 bg-purple-500/10" : "border-teal/30 bg-teal/10")
                         : ""
                   }`}
@@ -524,11 +418,7 @@ export default function LeaderboardPage() {
                   <p className="w-8 shrink-0 text-body-gray">#{rank}</p>
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex items-center gap-2">
-                      <LeaderboardPlayerIdentity
-                        player={player}
-                        showRankBadge={activeTab === "skillpoints"}
-                        avatarSize="md"
-                      />
+                      <LeaderboardPlayerIdentity player={player} avatarSize="md" />
                       {player.isCurrentUser && (
                         <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${isPractice ? "bg-purple-500/20 text-purple-400" : "bg-teal/20 text-teal"}`}>You</span>
                       )}
@@ -543,13 +433,7 @@ export default function LeaderboardPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-semibold text-white">
-                      {activeTab === "skillpoints"
-                        ? (
-                            <span className="inline-flex items-center gap-1">
-                              {(player.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={14} />
-                            </span>
-                          )
-                        : isPractice
+                      {isPractice
                           ? player.totalMatches
                           : getMainStat(player, activeTab)}
                     </p>
@@ -597,15 +481,7 @@ export default function LeaderboardPage() {
               <span className="font-medium text-white">{currentUserPlayer.username}</span>
             </div>
             <span className="font-semibold text-white">
-              {isPractice ? (
-                `${currentUserPlayer.totalMatches} matches`
-              ) : activeTab === "skillpoints" ? (
-                <span className="inline-flex items-center gap-1">
-                  {(currentUserPlayer.lifetimeSp ?? 0).toLocaleString()} <SPIcon size={14} />
-                </span>
-              ) : (
-                getMainStat(currentUserPlayer, activeTab)
-              )}
+              {isPractice ? `${currentUserPlayer.totalMatches} matches` : getMainStat(currentUserPlayer, activeTab)}
             </span>
           </div>
         </div>

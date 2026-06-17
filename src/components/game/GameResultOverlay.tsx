@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
-import SPIcon from "@/components/SPIcon";
+import SkilliesIcon from "@/components/SkilliesIcon";
 
 const AUTO_REDIRECT_SEC = 8;
 
@@ -130,12 +130,12 @@ export default function GameResultOverlay({
       : isPractice ? "Even match" : "Stake returned";
 
   const cardLabel = isVictory
-    ? "— SP EARNED —"
+    ? "— SKILLIES WON —"
     : isDefeat
       ? "— ENTRY LOST —"
       : "— STAKE RETURNED —";
 
-  const spAmount = isVictory
+  const stakeDisplayAmount = isVictory
     ? `+${payoutAmount.toLocaleString()}`
     : isDefeat
       ? `−${lostAmount.toLocaleString()}`
@@ -229,7 +229,7 @@ export default function GameResultOverlay({
           {subtitle}
         </p>
 
-        {/* SP Card */}
+        {/* Skillies card */}
         {!isPractice ? (
           <div style={{
             width: "100%",
@@ -261,9 +261,9 @@ export default function GameResultOverlay({
               color: "#ffffff",
               lineHeight: 1,
             }}>
-              <span>{spAmount}</span>
-              <span style={{ fontSize: "17px", color: accentColor, fontWeight: 700 }}>SP</span>
-              <SPIcon size={20} />
+              <span>{stakeDisplayAmount}</span>
+              <span style={{ fontSize: "17px", color: accentColor, fontWeight: 700 }}>SK</span>
+              <SkilliesIcon size={20} />
             </div>
             {typeof newBalance === "number" ? (
               <div style={{
@@ -275,8 +275,8 @@ export default function GameResultOverlay({
                 fontSize: "13px",
                 color: "#6b7280",
               }}>
-                Balance: {newBalance.toLocaleString()} SP
-                <SPIcon size={13} />
+                Balance: {newBalance.toLocaleString()} SK
+                <SkilliesIcon size={13} />
               </div>
             ) : null}
           </div>

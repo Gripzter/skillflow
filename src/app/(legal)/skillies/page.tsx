@@ -7,14 +7,14 @@ export default function SkilliesPage() {
       <p style={{ fontSize: '12px', color: '#666', marginBottom: '48px' }}>Last updated: May 26, 2026</p>
 
       <p>
-        Skillies (also called &quot;SkillPoints&quot; or &quot;SP&quot;) are SkillFlow&apos;s in-platform virtual currency. This page explains exactly what Skillies are, how they work, and what they are not.
+        Skillies (SK) are SkillFlow&apos;s in-platform play currency. This page explains exactly what Skillies are, how they work, and what they are not.
       </p>
 
       <h2>What Skillies are</h2>
       <ul>
-        <li>An in-platform virtual currency used for match entry fees, daily challenges, case openings, and cosmetic purchases</li>
-        <li>Earned by winning matches, daily login rewards, completing challenges, and the referral program</li>
-        <li>Tracked in two balances: <strong>Lifetime SP</strong> (used to determine your rank tier — never decreases) and <strong>Balance SP</strong> (your spendable currency)</li>
+        <li>An in-platform currency used for match entry fees and rewards</li>
+        <li>Credited through deposits, match payouts, daily challenges, referrals, and refunds</li>
+        <li>Tracked in your wallet balance</li>
       </ul>
 
       <h2>What Skillies are not</h2>
@@ -28,24 +28,20 @@ export default function SkilliesPage() {
 
       <h2>How you earn Skillies</h2>
       <ul>
-        <li><strong>Match wins:</strong> +100 SP per win (base reward, may vary with multipliers)</li>
-        <li><strong>Match losses:</strong> +25 SP consolation reward</li>
-        <li><strong>Daily first match:</strong> +50 SP bonus the first time you complete a match each day</li>
-        <li><strong>Three-win streak:</strong> +50 SP bonus</li>
-        <li><strong>Referrals:</strong> +200 SP when a friend you refer plays their first match</li>
-        <li><strong>Daily login rewards:</strong> Variable amounts for consecutive daily logins</li>
+        <li><strong>Match wins:</strong> winners receive the match payout shown before entry</li>
+        <li><strong>Daily challenges:</strong> small SK rewards for completing selected objectives</li>
+        <li><strong>Referrals:</strong> SK bonus credit when eligible referred players complete the qualifying action</li>
+        <li><strong>Refunds:</strong> canceled, drawn, or voided matches may return the committed stake</li>
       </ul>
 
       <h2>How you spend Skillies</h2>
       <ul>
-        <li>Match entry fees (chosen at match-start, e.g. 50, 100, 200, 500, 1000 SP)</li>
-        <li>Case openings — Bronze (200 SP), Gold (500 SP), Diamond (1000 SP)</li>
-        <li>Cosmetic purchases (borders, badges, profile customization)</li>
+        <li>Match entry fees chosen before a match starts</li>
       </ul>
 
       <h2>Match betting mechanics</h2>
       <p>
-        When two players agree to a match at a chosen Skillie stake, both players commit equal amounts. The winner receives both stakes (minus a small platform fee). For example: in a 100 SP match, both players stake 100 SP. The winner receives 195 SP (with a 5% platform fee). The loser receives 25 SP as a consolation reward.
+        When two players agree to a match at a chosen Skillie stake, both players commit equal amounts. The winner receives both stakes minus the platform fee shown in the match flow.
       </p>
 
       <h2>Skillie balance and account closure</h2>
@@ -55,7 +51,7 @@ export default function SkilliesPage() {
 
       <h2>Future real-money features</h2>
       <p>
-        SkillFlow may, in the future, launch a real-money version of the platform (referred to as &quot;v2&quot; or &quot;real-money launch&quot;). This is a separate product offering that has not launched. Skillies earned during the current free-to-play platform may be eligible for promotional credit at real-money launch under terms to be defined at that time. <strong>No commitment is made about future product launches, conversion rates, or eligibility.</strong>
+        SkillFlow may update Skillies rules, staking limits, fees, or eligibility requirements as the platform evolves. We will publish material changes in the app or legal pages.
       </p>
 
       <h2>Questions</h2>

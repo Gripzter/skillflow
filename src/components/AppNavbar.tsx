@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ConnectionBadge from "@/components/ConnectionBadge";
 import MobileMenuDrawer from "@/components/MobileMenuDrawer";
-import SkillPointsModal from "@/components/modals/SkillPointsModal";
 import SkilliesModal from "@/components/modals/SkilliesModal";
 import Wordmark from "@/components/Wordmark";
 import { useProfile } from "@/hooks/useProfile";
@@ -33,38 +32,26 @@ interface AppNavbarProps {
     | "external"
     | "settings"
     | "referrals"
-    | "events"
-    | "skillpoints"
-    | "cases"
-    | "inventory";
+    | "events";
   initialOpenSpModal?: boolean;
 }
 
 const NAV_ITEMS = [
   { label: "Play", href: "/play" },
   { label: "Events", href: "/events" },
-  { label: "Cases", href: "/cases" },
-  { label: "Inventory", href: "/inventory" },
   { label: "Leaderboard", href: "/leaderboard" },
   { label: "Referrals", href: "/referrals" },
 ] as const;
-
-function formatTier(tier: string) {
-  return tier.charAt(0).toUpperCase() + tier.slice(1).toLowerCase();
-}
 
 export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps) {
   const pathname = usePathname();
   const { profile, loading } = useProfile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [spModalOpen, setSpModalOpen] = useState(false);
   const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
   const isAuthenticated = !loading && !!profile.id;
 
   useEffect(() => {
-    if (pathname === "/play" && initialOpenSpModal) {
-      setSpModalOpen(true);
-    }
+    void initialOpenSpModal;
   }, [pathname, initialOpenSpModal]);
 
   const avatarInitial = profile.username.charAt(0).toUpperCase() || "P";
@@ -112,19 +99,6 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
               <>
                 <button
                   type="button"
-                  onClick={() => setSpModalOpen(true)}
-                  className="inline-flex whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
-                  aria-label={`SkillPoints: ${profile.lifetimeSp.toLocaleString()}`}
-                >
-                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/10 text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]">
-                    SP
-                  </span>
-                  <span className="hidden text-white/60 sm:inline">{formatTier(profile.rankTier)} ·</span>
-                  <span>{profile.lifetimeSp.toLocaleString()}</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => setSkilliesModalOpen(true)}
                   className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs font-bold text-[#FFFF00] transition-colors hover:bg-white/10 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm"
                   aria-label={`Skillies: ${profile.balanceSp.toLocaleString()}`}
@@ -160,7 +134,6 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
                     src={profile.avatarUrl}
                     fallbackInitial={avatarInitial}
                     size="md"
-                    border={profile.equippedBorder}
                   />
                 </Link>
               </>
@@ -191,14 +164,6 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
 
       {isAuthenticated ? (
         <>
-          <SkillPointsModal
-            isOpen={spModalOpen}
-            onClose={() => setSpModalOpen(false)}
-            userId={profile.id}
-            lifetimeSp={profile.lifetimeSp}
-            balanceSp={profile.balanceSp}
-            rankTier={profile.rankTier}
-          />
           <SkilliesModal
             isOpen={skilliesModalOpen}
             onClose={() => setSkilliesModalOpen(false)}

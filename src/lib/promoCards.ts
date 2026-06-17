@@ -13,11 +13,11 @@ export type PromoCard = {
  * Image specs: 16:9 aspect ratio, recommended export at 1920x1080 PNG or JPG, optimized for web.
  *
  * Card types and their intent:
- * - winner: spotlight a big SP win
+ * - winner: spotlight a big SK win
  * - founders: drive Founders Program signups
  * - tournament: hype an upcoming tournament
  * - rank: showcase someone reaching a high rank
- * - drop: announce a new game, case, or cosmetic
+ * - drop: announce a new game or event
  * - streak: show a player on a hot streak
  */
 export const PROMO_CARDS: PromoCard[] = [
@@ -42,7 +42,7 @@ export const PROMO_CARDS: PromoCard[] = [
   {
     id: "rank-1",
     image: "/images/promo/rank-diamond.png",
-    alt: "Player reached Diamond tier",
+    alt: "Player climbed the leaderboard",
     type: "rank",
   },
   {

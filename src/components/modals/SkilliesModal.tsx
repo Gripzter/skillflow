@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { useSpTransactions } from "@/hooks/useSpTransactions";
+import { createClient } from "@/lib/supabase";
 
 type SkilliesModalProps = {
   isOpen: boolean;
@@ -16,13 +16,22 @@ function formatTransactionLabel(raw: string | null, type: string) {
   return type.replaceAll("_", " ");
 }
 
+type WalletTransaction = {
+  id: string;
+  type: string;
+  amount: number;
+  description: string | null;
+  created_at: string;
+};
+
 export default function SkilliesModal({
   isOpen,
   onClose,
   userId,
   balanceSp,
 }: SkilliesModalProps) {
-  const { transactions, loading } = useSpTransactions({ userId, limit: 10 });
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -36,6 +45,41 @@ export default function SkilliesModal({
       document.body.style.overflow = "";
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen || !userId) return;
+    let cancelled = false;
+    async function loadTransactions() {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        if (!supabase) return;
+        const { data } = await supabase
+          .from("transactions")
+          .select("id, type, amount, description, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        if (!cancelled) {
+          setTransactions(
+            (data ?? []).map((row) => ({
+              id: row.id as string,
+              type: row.type as string,
+              amount: Number(row.amount ?? 0),
+              description: (row.description as string | null) ?? null,
+              created_at: row.created_at as string,
+            }))
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void loadTransactions();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, userId]);
 
   if (!isOpen) return null;
 
@@ -93,9 +137,9 @@ export default function SkilliesModal({
         <div className="mt-4 rounded-xl border border-[#1F1F26] bg-[#0E0E12] p-4">
           <p className="text-sm font-semibold text-white">How to earn more</p>
           <ul className="mt-2 space-y-1 text-xs text-[#9CA3AF]">
-            <li>- Win a match (+100 SP earns you more Skillies)</li>
+            <li>- Win matches and collect payouts</li>
             <li>- Daily challenges</li>
-            <li>- Refer a friend (+200 SP)</li>
+            <li>- Refer a friend (+50 SK)</li>
           </ul>
         </div>
 

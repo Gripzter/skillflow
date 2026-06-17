@@ -5,7 +5,7 @@ import PlayContent from "@/app/(app)/play/PlayContent";
 export const metadata: Metadata = {
   title: "SkillFlow — Skill-Based Competitive Gaming",
   description:
-    "Play skill-based games, earn SkillPoints, and compete on the leaderboard. Free to play during beta.",
+    "Play skill-based games, stake Skillies, and compete on the Glicko leaderboard.",
 };
 
 export default function HomePage() {

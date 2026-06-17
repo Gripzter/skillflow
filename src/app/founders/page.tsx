@@ -11,11 +11,11 @@ const TIERS = [
     teaser: "Founding badge, early platform access, and priority product updates.",
   },
   {
-    name: "Gold Founder",
-    teaser: "Everything above, plus higher reward multipliers and bonus drops.",
+    name: "Launch Founder",
+    teaser: "Everything above, plus priority event access and bonus launch credit.",
   },
   {
-    name: "Diamond Founder",
+    name: "Omega Founder",
     teaser: "Top-tier status with concierge support and exclusive launch experiences.",
   },
 ];

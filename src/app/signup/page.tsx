@@ -327,7 +327,7 @@ function SignupContent() {
     <AuthLayout heading="Create your account" subtitle="Join the arena. Bet on yourself.">
       {referralCode && (
         <div className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-          You&apos;ll get a $5 bonus after your first deposit ($5+)!
+          You&apos;ll get a 50 SK bonus after your first deposit ($5+)!
         </div>
       )}
       <form onSubmit={handleSubmit} noValidate className="space-y-5">

@@ -3,16 +3,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
-import type { EquippedBorder } from "@/lib/inventory-cosmetics";
 
 type Props = {
   stake: number;
   gameName: string;
   opponentName: string;
   myAvatarUrl?: string | null;
-  myBorder?: EquippedBorder | null;
   opponentAvatarUrl?: string | null;
-  opponentBorder?: EquippedBorder | null;
   onReady: () => void;
 };
 
@@ -26,12 +23,10 @@ export default function MatchmakingScreen({
   stake,
   gameName,
   opponentName,
-  myAvatarUrl,
-  myBorder,
   opponentAvatarUrl,
-  opponentBorder,
   onReady,
 }: Props) {
+  void myAvatarUrl;
   const [phaseIndex, setPhaseIndex] = useState(0);
   const [showOpponent, setShowOpponent] = useState(false);
 
@@ -98,7 +93,6 @@ export default function MatchmakingScreen({
               src={opponentAvatarUrl}
               fallbackInitial={opponentName}
               size="md"
-              border={opponentBorder}
               className="!h-10 !w-10"
             />
             <div>

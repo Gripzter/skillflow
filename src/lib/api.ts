@@ -30,8 +30,6 @@ import {
   getPracticeStats,
 } from "@/lib/practice-matches";
 import { type LeaderboardPlayer } from "@/lib/leaderboard-data";
-import { awardMatchSP, awardStreakBonusIfEligible } from "@/lib/skillpoints";
-import { incrementMatchCount } from "@/lib/cases";
 import { notifyChallengeProgressFromClient } from "@/lib/challengeProgress";
 import { finishMatch } from "@/lib/matchActions";
 import { signOutAndRedirect } from "@/lib/client-session";
@@ -220,7 +218,11 @@ export async function setWalletBalance(value: number): Promise<void> {
 }
 
 /** Credit wallet (e.g. match win or refund). Returns new balance. */
-export async function creditWallet(amount: number, description: string, txType: "match_win" | "match_refund"): Promise<number> {
+export async function creditWallet(
+  amount: number,
+  description: string,
+  txType: "match_win" | "match_refund" | "match_entry"
+): Promise<number> {
   if (isDevMode()) {
     const balance = getLocalBalance();
     const newBalance = balance + amount;
@@ -698,7 +700,7 @@ export async function completeMatchAndSettle(
     return true;
   }
 
-  async function awardSkillPointsForMatchResult(skipSpAwards = false) {
+  async function notifyChallengesForMatchResult() {
     const isBotMatch = match.isBot === true;
     const targets: Array<{ userId: string; won: boolean }> = [];
 
@@ -706,7 +708,7 @@ export async function completeMatchAndSettle(
       const humanPlayerId = match.player1Id ?? match.player2Id;
       if (!isUuid(humanPlayerId)) {
         // eslint-disable-next-line no-console
-        console.error("[SP] Bot match missing human player ID", { matchId: match.id, result });
+        console.error("[Challenges] Bot match missing human player ID", { matchId: match.id, result });
         return;
       }
 
@@ -726,65 +728,10 @@ export async function completeMatchAndSettle(
 
     for (const target of targets) {
       try {
-        if (!skipSpAwards) {
-          // eslint-disable-next-line no-console
-          console.log("[AWARD_SP_CALL]", {
-            timestamp: new Date().toISOString(),
-            matchId: match.id,
-            userId: target.userId,
-            won: target.won,
-            resolvedFromMatch: {
-              matchResult: result,
-              matchWinnerId: winnerId,
-              isPlayer1: match.player1Id === target.userId,
-              isPlayer2: match.player2Id === target.userId,
-              isBot: match.isBot,
-            },
-          });
-          const awardResult = await awardMatchSP(target.userId, target.won, {
-            matchId: match.id,
-            gameType: match.gameType,
-          });
-          if (!awardResult.success) {
-            // eslint-disable-next-line no-console
-            console.error("[SP] Match reward failed", {
-              matchId: match.id,
-              userId: target.userId,
-              error: awardResult.error,
-            });
-            continue;
-          }
-
-          if (target.won) {
-            const streakResult = await awardStreakBonusIfEligible(target.userId, {
-              matchId: match.id,
-              gameType: match.gameType,
-            });
-            if (!streakResult.success) {
-              // eslint-disable-next-line no-console
-              console.error("[SP] Streak bonus failed", {
-                matchId: match.id,
-                userId: target.userId,
-                error: streakResult.error,
-              });
-            }
-          }
-        }
-
-        const crateProgressResult = await incrementMatchCount(target.userId);
-        if (!crateProgressResult.success) {
-          // eslint-disable-next-line no-console
-          console.error("[Cases] Match count increment failed", {
-            matchId: match.id,
-            userId: target.userId,
-            error: crateProgressResult.error,
-          });
-        }
-
         await notifyChallengeProgressFromClient(target.userId, match.gameType, target.won);
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.error("[SP] Unexpected SP award error", {
+        console.error("[Challenges] Unexpected challenge progress error", {
           matchId: match.id,
           userId: target.userId,
           error,
@@ -798,7 +745,7 @@ export async function completeMatchAndSettle(
     if (!persisted) {
       return { status: "local", callerWon: isWinner, payout: 0, callerBalance: null };
     }
-    await awardSkillPointsForMatchResult();
+    await notifyChallengesForMatchResult();
     return { status: "local", callerWon: isWinner, payout: 0, callerBalance: null };
   }
 
@@ -854,7 +801,7 @@ export async function completeMatchAndSettle(
         return { status: "local", callerWon: isWinner, payout, callerBalance };
       }
       await updateGameStatsForCurrentUser();
-      await awardSkillPointsForMatchResult();
+      await notifyChallengesForMatchResult();
       return { status: "local", callerWon: isWinner, payout, callerBalance };
     }
 
@@ -867,7 +814,7 @@ export async function completeMatchAndSettle(
       gameResult: { outcome, gameType: match.gameType },
     });
     await updateGameStatsForCurrentUser();
-    await awardSkillPointsForMatchResult(true);
+    await notifyChallengesForMatchResult();
     return {
       status: settlement.status,
       callerWon: settlement.caller_won,
@@ -887,7 +834,7 @@ export async function completeMatchAndSettle(
       return { status: "local", callerWon: false, payout: 0, callerBalance };
     }
     await updateGameStatsForCurrentUser();
-    await awardSkillPointsForMatchResult();
+    await notifyChallengesForMatchResult();
     return { status: "local", callerWon: false, payout: 0, callerBalance };
   }
 
@@ -897,7 +844,7 @@ export async function completeMatchAndSettle(
     gameResult: { outcome: "draw", gameType: match.gameType },
   });
   await updateGameStatsForCurrentUser();
-  await awardSkillPointsForMatchResult(true);
+  await notifyChallengesForMatchResult();
   return {
     status: settlement.status,
     callerWon: false,
@@ -909,16 +856,55 @@ export async function completeMatchAndSettle(
 // ============ LEADERBOARD ============
 
 export async function getLeaderboard(
-  sortBy: string = "total_earnings",
+  sortBy: string = "rating",
   _gameType?: string
 ): Promise<LeaderboardPlayer[] | null> {
   if (isDevMode()) return null;
   const supabase = createClient();
   if (!supabase) return null;
+
+  if (sortBy === "rating" || sortBy === "skill_rating") {
+    const { data, error } = await supabase
+      .from("player_ratings")
+      .select("user_id, rating, matches_played")
+      .eq("game_type", "overall")
+      .order("rating", { ascending: false })
+      .limit(50);
+    if (!error && data && data.length > 0) {
+      const userIds = data.map((row) => row.user_id as string);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, total_matches, total_wins, total_earnings")
+        .in("id", userIds);
+      const profileById = new Map((profiles ?? []).map((profile) => [profile.id as string, profile]));
+
+      return data.map((row) => {
+        const profile = profileById.get(row.user_id as string);
+        const totalMatches = Number(row.matches_played ?? profile?.total_matches ?? 0);
+        const wins = Number(profile?.total_wins ?? 0);
+        return {
+          id: row.user_id as string,
+          username: (profile?.username as string | null) ?? "Player",
+          avatarGradient: "from-teal/40 to-purple/40",
+          avatarUrl: (profile?.avatar_url as string | null) ?? null,
+          skillRating: Math.round(Number(row.rating ?? 1000)),
+          totalMatches,
+          winRate: totalMatches ? Math.round((wins / totalMatches) * 1000) / 10 : 0,
+          totalEarnings: Number(profile?.total_earnings ?? 0),
+          trend: "up",
+          wins,
+          losses: Math.max(0, totalMatches - wins),
+        };
+      });
+    }
+  }
+
+  const orderColumn =
+    sortBy === "matches" ? "total_matches" : sortBy === "winRate" ? "total_wins" : "skillflow_score";
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, username, skill_rating, total_matches, total_wins, total_earnings")
-    .order(sortBy === "skill_rating" ? "skill_rating" : "total_earnings", { ascending: false })
+    .select("id, username, avatar_url, skillflow_score, total_matches, total_wins, total_earnings")
+    .order(orderColumn, { ascending: false })
     .limit(50);
   if (error) return null;
   const players: LeaderboardPlayer[] = (data || []).map((p) => {
@@ -929,7 +915,8 @@ export async function getLeaderboard(
       id: p.id,
       username: p.username,
       avatarGradient: "from-teal/40 to-purple/40",
-      skillRating: p.skill_rating ?? 1000,
+      avatarUrl: (p.avatar_url as string | null) ?? null,
+      skillRating: Math.round(Number(p.skillflow_score ?? 1000)),
       totalMatches,
       winRate: totalMatches ? Math.round((wins / totalMatches) * 1000) / 10 : 0,
       totalEarnings: Number(p.total_earnings ?? 0),

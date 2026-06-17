@@ -60,7 +60,7 @@ function ReferralInvitePage({ code }: { code: string }) {
             You&apos;ve been invited by {referrerName}!
           </h1>
           <p className="mt-3 text-body-gray">
-            Sign up now and you both get a $5 bonus when you make your first deposit ($5+).
+            Sign up now and you both get a 50 SK bonus when you make your first deposit ($5+).
           </p>
           <button
             type="button"

@@ -23,6 +23,7 @@ export async function GET(
     { data: notes },
     { data: flags },
     { data: adjustments },
+    { data: wallet },
   ] = await Promise.all([
     admin.from("profiles").select("*").eq("id", userId).single(),
     admin.auth.admin.getUserById(userId),
@@ -62,6 +63,7 @@ export async function GET(
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false }),
+    admin.from("wallets").select("balance").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (!profile) return jsonOk({ error: "Player not found" }, 404);
@@ -110,7 +112,8 @@ export async function GET(
     };
   });
 
-  let runningBalance = Number(profile.balance_sp ?? 0);
+  const walletBalance = Number(wallet?.balance ?? 0);
+  let runningBalance = walletBalance;
   const financialHistory = (transactions ?? []).map((t) => {
     const amt = Number(t.amount);
     const row = {
@@ -144,8 +147,8 @@ export async function GET(
       suspicious: Boolean(profile.suspicious),
       country: geo?.[0]?.country ?? "—",
       countryFlag: countryFlag(geo?.[0]?.country as string ?? "—"),
-      balanceSK: Number(profile.balance_sp ?? 0),
-      balanceUSD: skToUsd(Number(profile.balance_sp ?? 0)),
+      balanceSK: walletBalance,
+      balanceUSD: skToUsd(walletBalance),
       totalMatches: Number(profile.total_matches ?? 0),
       wins,
       winRate: totalPlayed > 0 ? Math.round((wins / totalPlayed) * 1000) / 10 : 0,

@@ -9,7 +9,6 @@ import {
 } from "react";
 import AfkCountdownRing from "@/components/game/AfkCountdownRing";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
-import type { EquippedBorder } from "@/lib/inventory-cosmetics";
 
 export interface GameLayoutLogEntry {
   id: string;
@@ -27,7 +26,6 @@ export interface GameLayoutProps {
   player1: {
     username: string;
     avatar?: string | null;
-    border?: EquippedBorder | null;
     rating: number;
     score: number;
     scoreLabel?: string;
@@ -37,7 +35,6 @@ export interface GameLayoutProps {
   player2: {
     username: string;
     avatar?: string | null;
-    border?: EquippedBorder | null;
     rating: number;
     score: number;
     scoreLabel?: string;
@@ -138,7 +135,6 @@ function PlayerCard({
             src={player.avatar}
             fallbackInitial={initial}
             size="sm"
-            border={player.border}
             fallbackBg={avatarBg}
             className="!h-[26px] !w-[26px] md:!h-[34px] md:!w-[34px]"
           />

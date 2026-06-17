@@ -88,8 +88,8 @@ export default function PrivacyPage() {
           navigation patterns, and session duration.
         </li>
         <li>
-          Gameplay data: match history, game types played, results (win/loss/draw), skill ratings (Glicko-2), rank
-          tier, achievement progress, SP (SkillPoints) transactions, inventory activity, and daily challenge
+          Gameplay data: match history, game types played, results (win/loss/draw), skill ratings (Glicko-2),
+          wallet transactions, and daily challenge
           completion.
         </li>
       </ul>
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
         <li>Provide, operate, and maintain the Platform and its features.</li>
         <li>Authenticate you, manage your account, wallet, and match participation.</li>
         <li>Process deposits, withdrawals, and match payouts through our payment partners.</li>
-        <li>Compute and display skill ratings, leaderboards, rankings, tier progression, and SP balances.</li>
+        <li>Compute and display skill ratings, leaderboards, rankings, and wallet balances.</li>
         <li>Match you with opponents of comparable skill level through our automated matchmaking system.</li>
         <li>Resolve match disputes and investigate reports of suspicious activity or rule violations.</li>
         <li>Detect, prevent, and respond to fraud, cheating, multi-accounting, collusion, and security incidents.</li>
@@ -409,18 +409,13 @@ export default function PrivacyPage() {
           what wager amount.
         </li>
         <li>
-          <strong>Rank tier and progression:</strong> Your rank tier (e.g., Bronze through Diamond) is determined
-          automatically based on your lifetime SkillPoints (SP) accumulation. Rank tier affects which cosmetic cases
-          you can access and whether you qualify for certain rewards (such as the Founders Reward at Platinum tier).
-        </li>
-        <li>
           <strong>Anti-cheat and fraud detection:</strong> We use automated systems to monitor for patterns indicative
           of cheating, multi-accounting, collusion, or other prohibited activities. If an automated system flags your
           account, a human reviewer will assess the situation before any punitive action (such as suspension or ban) is
           taken. No account will be permanently terminated based solely on an automated decision without human review.
         </li>
         <li>
-          <strong>SP economy calculations:</strong> SkillPoints earned per match (wins, losses, streaks, daily bonuses)
+          <strong>Wallet and payout calculations:</strong> Skillies debits, payouts, refunds, and challenge rewards
           are calculated automatically according to published rules.
         </li>
       </ul>
@@ -485,11 +480,10 @@ export default function PrivacyPage() {
       <p>SkillFlow is currently operating in a beta phase. During the beta period:</p>
       <ul>
         <li>
-          The Platform uses virtual currency (SkillPoints / SP) only. No real money is wagered, deposited, or
-          withdrawn.
+          The Platform uses Skillies (SK) for match entry fees, payouts, and rewards.
         </li>
         <li>
-          Features, game offerings, SP economy parameters, and Platform functionality are subject to change,
+          Features, game offerings, wallet parameters, and Platform functionality are subject to change,
           modification, or removal without prior notice.
         </li>
         <li>

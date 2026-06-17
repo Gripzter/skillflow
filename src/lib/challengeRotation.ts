@@ -9,6 +9,7 @@ export type ChallengeTemplate = {
   challenge_type: string;
   target_value: number;
   reward_sk: number;
+  bonus_type?: "flat_sk" | "second_chance";
   is_active: boolean;
   difficulty: string;
   created_at: string;
@@ -72,6 +73,7 @@ async function fetchSlotsForDate(
         challenge_type,
         target_value,
         reward_sk,
+        bonus_type,
         is_active,
         difficulty,
         created_at

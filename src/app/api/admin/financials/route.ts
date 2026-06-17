@@ -6,9 +6,9 @@ export async function GET(req: NextRequest) {
   if ("error" in ctx) return ctx.error;
   const { admin } = ctx;
 
-  const [{ data: profiles }, { data: earnings }, { data: deposits }, { data: withdrawals }, { data: completedMatches }, { data: settings }] =
+  const [{ data: wallets }, { data: earnings }, { data: deposits }, { data: withdrawals }, { data: completedMatches }, { data: settings }] =
     await Promise.all([
-      admin.from("profiles").select("balance_sp"),
+      admin.from("wallets").select("balance"),
       admin.from("creator_earnings").select("earned_sk, earned_usd, paid_out, creator_id, created_at"),
       admin.from("transactions").select("amount, created_at").eq("type", "deposit"),
       admin.from("transactions").select("amount, created_at").eq("type", "withdrawal"),
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       admin.from("platform_settings").select("value").eq("key", "fixed_costs_usd").maybeSingle(),
     ]);
 
-  const poolBalanceSK = (profiles ?? []).reduce((s, p) => s + Number(p.balance_sp ?? 0), 0);
+  const poolBalanceSK = (wallets ?? []).reduce((s, w) => s + Number(w.balance ?? 0), 0);
   const totalDepositedUSD = (deposits ?? []).reduce((s, d) => s + Number(d.amount), 0);
   const totalWithdrawnUSD = (withdrawals ?? []).reduce(
     (s, w) => s + Math.abs(Number(w.amount)),

@@ -1,5 +1,4 @@
 import { formatCurrency } from "@/lib/formatCurrency";
-import type { EquippedBadge, EquippedBorder } from "@/lib/inventory-cosmetics";
 
 /**
  * Generates fake leaderboard data for development.
@@ -51,8 +50,6 @@ export interface LeaderboardPlayer {
   totalMatches: number;
   winRate: number;
   totalEarnings: number;
-  lifetimeSp?: number;
-  rankTier?: string;
   trend: "up" | "down";
   wins?: number;
   losses?: number;
@@ -60,8 +57,6 @@ export interface LeaderboardPlayer {
   isPlaceholder?: boolean;
   isCurrentUser?: boolean;
   avatarUrl?: string | null;
-  equippedBorder?: EquippedBorder | null;
-  equippedBadges?: EquippedBadge[];
 }
 
 export function generateFakeLeaderboard(
@@ -128,7 +123,7 @@ export function formatWinRate(rate: number): string {
   return `${n.toFixed(1)}%`;
 }
 
-export type LeaderboardTab = "skillpoints" | "earnings" | "winRate" | "matches" | "rating";
+export type LeaderboardTab = "rating" | "earnings" | "winRate" | "matches";
 
 export function sortAndRankPlayers(
   players: LeaderboardPlayer[],
@@ -136,16 +131,14 @@ export function sortAndRankPlayers(
 ): LeaderboardPlayer[] {
   const sorted = [...players].sort((a, b) => {
     switch (tab) {
-      case "skillpoints":
-        return (b.lifetimeSp ?? 0) - (a.lifetimeSp ?? 0);
+      case "rating":
+        return b.skillRating - a.skillRating;
       case "earnings":
         return b.totalEarnings - a.totalEarnings;
       case "winRate":
         return b.winRate - a.winRate;
       case "matches":
         return b.totalMatches - a.totalMatches;
-      case "rating":
-        return b.skillRating - a.skillRating;
       default:
         return 0;
     }
@@ -155,16 +148,14 @@ export function sortAndRankPlayers(
 
 export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): string | number {
   switch (tab) {
-    case "skillpoints":
-      return `${(player.lifetimeSp ?? 0).toLocaleString()} SP`;
+    case "rating":
+      return Math.round(player.skillRating);
     case "earnings":
       return formatCurrency(player.totalEarnings);
     case "winRate":
       return formatWinRate(player.winRate);
     case "matches":
       return player.totalMatches;
-    case "rating":
-      return player.skillRating;
     default:
       return "";
   }
@@ -172,8 +163,6 @@ export function getMainStat(player: LeaderboardPlayer, tab: LeaderboardTab): str
 
 export function getSecondaryStat(player: LeaderboardPlayer, tab: LeaderboardTab): string {
   switch (tab) {
-    case "skillpoints":
-      return `${player.rankTier?.toUpperCase() ?? "BRONZE"} tier`;
     case "earnings":
     case "winRate":
     case "rating":

@@ -11,7 +11,7 @@ import { ensureReferralCode } from "@/lib/referrals";
 import LoadingRing from "@/components/LoadingRing";
 import { redirectToAuthAction } from "@/lib/auth-action";
 
-const SHARE_TEXT = "Join me on SkillFlow! Compete in skill games for real money. Use my link and we both get $5: ";
+const SHARE_TEXT = "Join me on SkillFlow! Compete in skill games. Use my link and we both get 50 SK: ";
 const MAX_REFERRAL_BONUSES = 50;
 
 interface ReferralRow {
@@ -145,7 +145,7 @@ export default function ReferralsPage() {
       redirectToAuthAction();
       return;
     }
-    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent("Join me on SkillFlow — we both get $5!")}`, "_blank");
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent("Join me on SkillFlow — we both get 50 SK!")}`, "_blank");
   }
 
   if (loading) {
@@ -165,8 +165,8 @@ export default function ReferralsPage() {
         currentPage="referrals"
       />
       <main className="relative mx-auto max-w-[600px] px-4 py-8 sm:px-6">
-        <h1 className="text-2xl font-bold text-white">Invite Friends, Earn $5 Each</h1>
-        <p className="mt-1 text-body-gray">Share your link. When they sign up and make their first deposit ($5+), you both get $5.</p>
+        <h1 className="text-2xl font-bold text-white">Invite Friends, Earn 50 SK Each</h1>
+        <p className="mt-1 text-body-gray">Share your link. When they sign up and make their first deposit ($5+), you both get 50 SK.</p>
 
         <section className="mt-6 rounded-xl border border-white/10 bg-card p-6">
           <p className="text-sm text-body-gray">Share your link:</p>
@@ -235,7 +235,7 @@ export default function ReferralsPage() {
           <ol className="mt-2 list-decimal list-inside space-y-1">
             <li>Share your unique link with friends</li>
             <li>They sign up using your link</li>
-            <li>When they make their first deposit ($5+), you both get $5 bonus</li>
+            <li>When they make their first deposit ($5+), you both get a 50 SK bonus</li>
             <li>Invite as many friends as you want!</li>
           </ol>
         </div>
@@ -287,7 +287,7 @@ export default function ReferralsPage() {
                     </span>
                   </div>
                   {row.status === "completed" && (
-                    <span className={`text-sm font-medium ${isPractice ? "text-purple-300" : "text-teal"}`}>+$5</span>
+                    <span className={`text-sm font-medium ${isPractice ? "text-purple-300" : "text-teal"}`}>+50 SK</span>
                   )}
                 </li>
               ))}

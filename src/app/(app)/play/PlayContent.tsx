@@ -222,7 +222,7 @@ export default function PlayContent() {
         <h1 className="mt-8 text-[32px] font-black tracking-[-0.03em] text-white">
           Play smarter. Match faster. Earn more.
         </h1>
-        <p className="mt-2 text-sm text-[#9CA3AF]">Beta · Free to play · Earn SkillPoints</p>
+        <p className="mt-2 text-sm text-[#9CA3AF]">Beta · Practice free or stake Skillies</p>
 
         <CreateQRMatch
           open={qrModal.open}
@@ -285,7 +285,7 @@ export default function PlayContent() {
           {isAuthenticated && matches.length > 0 ? (
             <p className="mt-4 text-sm text-[#9CA3AF]">
               Last match: {matches[0].resultLabel} vs {matches[0].opponent} ·
-              <span className="text-[#FFFF00]"> +{matches[0].spDelta} SP</span> · {matches[0].timeAgo}
+              <span className="text-[#FFFF00]"> +{matches[0].spDelta} SK</span> · {matches[0].timeAgo}
             </p>
           ) : null}
         </section>

@@ -17,10 +17,10 @@ import {
   getCurrentUser,
   createMatch,
   generateFakeOpponent,
+  getWalletBalance,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { getUserSPData } from "@/lib/skillpoints";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
 import { useProfile } from "@/hooks/useProfile";
@@ -133,8 +133,7 @@ export default function PlayGamePage() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        const spData = await getUserSPData(user.id);
-        setBalance(Number(spData?.balanceSp ?? 0));
+        setBalance(await getWalletBalance());
         // Fetch player's Glicko-2 rating for this game
         if (user.id && gameSlug) {
           try {
@@ -154,7 +153,7 @@ export default function PlayGamePage() {
     load();
     const handleUpdate = () =>
       void (userId
-        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        ? getWalletBalance().then((nextBalance) => setBalance(Number(nextBalance ?? 0)))
         : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
@@ -453,7 +452,6 @@ export default function PlayGamePage() {
         gameName={gameName}
         opponentName={matchmakingState.opponentName}
         myAvatarUrl={profile.avatarUrl}
-        myBorder={profile.equippedBorder}
         onReady={handleMatchmakingReady}
       />
     );
@@ -638,7 +636,6 @@ export default function PlayGamePage() {
                     src={profile.avatarUrl}
                     fallbackInitial={username}
                     size="md"
-                    border={profile.equippedBorder}
                     className="!h-12 !w-12"
                   />
                   <p className="mt-2 font-medium text-white">{username}</p>
@@ -702,7 +699,6 @@ export default function PlayGamePage() {
                     src={profile.avatarUrl}
                     fallbackInitial={player1.username}
                     size="md"
-                    border={profile.equippedBorder}
                     className="!h-12 !w-12"
                   />
                   <p className="mt-2 font-medium text-white">{player1.username}</p>

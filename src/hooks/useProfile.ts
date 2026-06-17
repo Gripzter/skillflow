@@ -1,41 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser, getMyProfile } from "@/lib/api";
-import { getUserSPData, type RankTier } from "@/lib/skillpoints";
+import { getCurrentUser, getMyProfile, getWalletBalance } from "@/lib/api";
 import { markReturningUser } from "@/lib/auth-action";
-import { getEquippedCosmetics } from "@/lib/cases";
-import {
-  COSMETICS_UPDATED_EVENT,
-  dispatchCosmeticsUpdated,
-  type EquippedBadge,
-  type EquippedBorder,
-} from "@/lib/inventory-cosmetics";
 
 export type ProfileState = {
   id: string;
   username: string;
   avatarUrl: string | null;
-  lifetimeSp: number;
+  /** Real Skillies wallet balance. Kept as balanceSp for existing callers. */
   balanceSp: number;
-  rankTier: RankTier;
   isDevMode: boolean;
-  equippedBorder: EquippedBorder | null;
-  equippedBadges: EquippedBadge[];
 };
 
-export { dispatchCosmeticsUpdated };
+export function dispatchCosmeticsUpdated() {
+  // Backwards-compatible no-op for callers that still refresh profile styling.
+}
 
 const FALLBACK_PROFILE: ProfileState = {
   id: "",
   username: "Player",
   avatarUrl: null,
-  lifetimeSp: 0,
   balanceSp: 0,
-  rankTier: "bronze",
   isDevMode: false,
-  equippedBorder: null,
-  equippedBadges: [],
 };
 
 export function useProfile() {
@@ -54,10 +41,9 @@ export function useProfile() {
         }
         markReturningUser();
 
-        const [rawProfile, spData, cosmetics] = await Promise.all([
+        const [rawProfile, walletBalance] = await Promise.all([
           getMyProfile(),
-          getUserSPData(user.id),
-          getEquippedCosmetics(user.id),
+          getWalletBalance(),
         ]);
 
         if (cancelled) return;
@@ -69,12 +55,8 @@ export function useProfile() {
             rawProfile && "avatar_url" in rawProfile
               ? (rawProfile.avatar_url as string | null) ?? null
               : null,
-          lifetimeSp: Number(spData?.lifetimeSp ?? 0),
-          balanceSp: Number(spData?.balanceSp ?? 0),
-          rankTier: (spData?.rankTier ?? "bronze") as RankTier,
+          balanceSp: Number(walletBalance ?? 0),
           isDevMode: Boolean(user.isDevMode),
-          equippedBorder: cosmetics.border,
-          equippedBadges: cosmetics.badges,
         });
       } finally {
         if (!cancelled) setLoading(false);
@@ -83,12 +65,8 @@ export function useProfile() {
 
     void load();
 
-    const onCosmeticsUpdated = () => void load();
-    window.addEventListener(COSMETICS_UPDATED_EVENT, onCosmeticsUpdated);
-
     return () => {
       cancelled = true;
-      window.removeEventListener(COSMETICS_UPDATED_EVENT, onCosmeticsUpdated);
     };
   }, []);
 

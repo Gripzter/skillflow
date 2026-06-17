@@ -1,10 +1,10 @@
 /**
- * Referral system: invite friends, both get $5 on first deposit ($5+).
+ * Referral system: invite friends, both get Skillies on the first qualifying deposit.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const BONUS_AMOUNT = 5;
+const BONUS_AMOUNT = 50;
 const MIN_DEPOSIT_FOR_BONUS = 5;
 const MAX_REFERRAL_BONUSES_PER_USER = 50;
 
@@ -54,7 +54,7 @@ export async function ensureReferralCode(
 }
 
 /**
- * Complete a referral: pay $5 to both referrer and referred user after first deposit ($5+).
+ * Complete a referral: pay 50 SK to both referrer and referred user after first deposit ($5+).
  * Call after crediting the deposit. Idempotent (checks status) and enforces anti-abuse rules.
  */
 export async function completeReferral(

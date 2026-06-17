@@ -16,6 +16,7 @@ type ChallengeTemplate = {
   challenge_type: string;
   target_value: number;
   reward_sk: number;
+  bonus_type?: "flat_sk" | "second_chance";
   is_active: boolean;
   difficulty: string;
 };
@@ -64,6 +65,7 @@ const EMPTY_FORM = {
   challenge_type: "play_matches",
   target_value: 5,
   reward_sk: 100,
+  bonus_type: "flat_sk" as "flat_sk" | "second_chance",
   difficulty: "normal",
   is_active: true,
 };
@@ -155,6 +157,7 @@ export default function AdminChallengesPage() {
       challenge_type: template.challenge_type,
       target_value: template.target_value,
       reward_sk: template.reward_sk,
+      bonus_type: template.bonus_type ?? "flat_sk",
       difficulty: template.difficulty,
       is_active: template.is_active,
     });
@@ -170,7 +173,7 @@ export default function AdminChallengesPage() {
     e.preventDefault();
     if (!form.title.trim()) return;
     if (form.target_value <= 0) return;
-    if (form.reward_sk < 50 || form.reward_sk > 500) return;
+    if (form.reward_sk < 5 || form.reward_sk > 500) return;
 
     setSaving(true);
     try {
@@ -256,6 +259,7 @@ export default function AdminChallengesPage() {
                 <p className="mt-1 text-sm font-medium text-white">{slot.template?.title}</p>
                 <p className="mt-1 text-xs text-[#9CA3AF]">
                   {slot.template?.game} · +{slot.template?.reward_sk} SK
+                  {slot.template?.bonus_type === "second_chance" ? " · second chance" : ""}
                 </p>
                 <div className="mt-3 flex gap-4 text-xs text-[#C8C8D4]">
                   <span>{slot.startedCount} started</span>
@@ -349,16 +353,32 @@ export default function AdminChallengesPage() {
                 />
               </label>
               <label className="block text-xs text-[#9CA3AF]">
-                reward SK (50–500)
+                reward SK (5–500)
                 <input
                   type="number"
-                  min={50}
+                  min={5}
                   max={500}
                   required
                   value={form.reward_sk}
                   onChange={(e) => setForm((f) => ({ ...f, reward_sk: Number(e.target.value) }))}
                   className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
                 />
+              </label>
+              <label className="block text-xs text-[#9CA3AF]">
+                bonus type
+                <select
+                  value={form.bonus_type}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      bonus_type: e.target.value as "flat_sk" | "second_chance",
+                    }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white"
+                >
+                  <option value="flat_sk">flat SK</option>
+                  <option value="second_chance">second chance</option>
+                </select>
               </label>
               <label className="block text-xs text-[#9CA3AF]">
                 difficulty
@@ -414,6 +434,7 @@ export default function AdminChallengesPage() {
                 <th className="px-4 py-3">type</th>
                 <th className="px-4 py-3">target</th>
                 <th className="px-4 py-3">reward SK</th>
+                <th className="px-4 py-3">bonus</th>
                 <th className="px-4 py-3">difficulty</th>
                 <th className="px-4 py-3">active</th>
                 <th className="px-4 py-3">actions</th>
@@ -429,6 +450,7 @@ export default function AdminChallengesPage() {
                   <td className="px-4 py-3 text-[#C8C8D4]">{t.challenge_type}</td>
                   <td className="px-4 py-3 text-[#C8C8D4]">{t.target_value}</td>
                   <td className="px-4 py-3 text-[#FFFF00]">{t.reward_sk}</td>
+                  <td className="px-4 py-3 text-[#C8C8D4]">{t.bonus_type ?? "flat_sk"}</td>
                   <td className="px-4 py-3">
                     <AdminStatusBadge status={t.difficulty} />
                   </td>

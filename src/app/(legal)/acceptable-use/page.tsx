@@ -68,11 +68,11 @@ export default function AcceptableUsePage() {
         <li>Match forfeiture and Skillie reversal</li>
         <li>Temporary suspension from competitive matches</li>
         <li>Account suspension (3 days, 7 days, 30 days)</li>
-        <li>Permanent account ban with forfeiture of all Skillies and cosmetics</li>
+        <li>Permanent account ban with forfeiture of Skillies</li>
         <li>IP/device ban preventing new account creation</li>
       </ul>
       <p>
-        We do not refund Skillies, cosmetics, or any platform value as a result of enforcement actions. We reserve the
+        We do not refund Skillies or any platform value as a result of enforcement actions. We reserve the
         right to enforce this policy at our discretion. Repeat or severe violations result in permanent bans without
         warning.
       </p>

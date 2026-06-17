@@ -15,10 +15,10 @@ import {
   getCurrentUser,
   createMatch,
   generateFakeOpponent,
+  getWalletBalance,
   type PlayerInfo,
   type StoredMatch,
 } from "@/lib/api";
-import { getUserSPData } from "@/lib/skillpoints";
 import { startMatch } from "@/lib/matchActions";
 import { pickOpponentName } from "@/lib/opponentNames";
 import { useProfile } from "@/hooks/useProfile";
@@ -105,8 +105,7 @@ function PlaySpellingBeePageContent() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        const spData = await getUserSPData(user.id);
-        setBalance(Number(spData?.balanceSp ?? 0));
+        setBalance(await getWalletBalance());
         if (user.id) {
           try {
             const { getPlayerGameRating } = await import("@/lib/ranking/updateRating");
@@ -125,7 +124,7 @@ function PlaySpellingBeePageContent() {
     load();
     const handleUpdate = () =>
       void (userId
-        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        ? getWalletBalance().then((nextBalance) => setBalance(Number(nextBalance ?? 0)))
         : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
@@ -396,7 +395,6 @@ function PlaySpellingBeePageContent() {
         gameName={GAME_NAME}
         opponentName={matchmakingState.opponentName}
         myAvatarUrl={profile.avatarUrl}
-        myBorder={profile.equippedBorder}
         onReady={handleMatchmakingReady}
       />
     );

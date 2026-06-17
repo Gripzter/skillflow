@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { calculateNewRatings } from "@/lib/ranking/glicko2";
-import { getTier } from "@/lib/ranking/tiers";
 
 function getSupabaseAdmin(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -47,7 +46,6 @@ async function getOrCreateRating(
       volatility: 0.06,
       matches_played: 0,
       is_placed: false,
-      tier: "bronze",
     })
     .select()
     .single();
@@ -124,8 +122,6 @@ export async function POST(req: NextRequest) {
         player2RatingChange: 0,
         player1NewRating: r1.rating,
         player2NewRating: r2.rating,
-        player1Tier: getTier(r1.rating),
-        player2Tier: getTier(r2.rating),
         alreadyProcessed: true,
       });
     }
@@ -158,9 +154,6 @@ export async function POST(req: NextRequest) {
     const p1NewRating = Math.max(100, result.player1.rating);
     const p2NewRating = Math.max(100, result.player2.rating);
 
-    const p1Tier = getTier(p1NewRating);
-    const p2Tier = getTier(p2NewRating);
-
     // Update both players' ratings
     await Promise.all([
       supabase
@@ -171,7 +164,6 @@ export async function POST(req: NextRequest) {
           volatility: result.player1.volatility,
           matches_played: p1NewMatches,
           is_placed: p1NewMatches >= 10,
-          tier: p1Tier,
           last_match_at: now,
           last_rated_match_id: matchId,
         })
@@ -186,7 +178,6 @@ export async function POST(req: NextRequest) {
           volatility: result.player2.volatility,
           matches_played: p2NewMatches,
           is_placed: p2NewMatches >= 10,
-          tier: p2Tier,
           last_match_at: now,
           last_rated_match_id: matchId,
         })
@@ -216,8 +207,6 @@ export async function POST(req: NextRequest) {
       player2RatingChange: result.player2.ratingChange,
       player1NewRating: p1NewRating,
       player2NewRating: p2NewRating,
-      player1Tier: p1Tier,
-      player2Tier: p2Tier,
       alreadyProcessed: false,
     });
   } catch (err) {

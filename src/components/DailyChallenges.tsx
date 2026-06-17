@@ -142,7 +142,7 @@ export default function DailyChallenges({
                       <span className="text-[11px] text-[#6B7280]">✓ Claimed</span>
                     ) : (
                       <span className="text-[12px] font-semibold text-[#FFFF00]">
-                        +{challenge.rewardSk} SK
+                        {challenge.bonusType === "second_chance" ? "second chance" : `+${challenge.rewardSk} SK`}
                       </span>
                     )}
                   </div>
@@ -163,6 +163,7 @@ export default function DailyChallenges({
                 {slug ? (
                   <p className="mt-1 text-[10px] uppercase tracking-wide text-[#6B7280]">
                     {slug.replace("-", " ")}
+                    {challenge.bonusType === "second_chance" ? " · a little extra for next time" : ""}
                   </p>
                 ) : null}
               </div>

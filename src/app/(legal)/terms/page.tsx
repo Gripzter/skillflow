@@ -30,16 +30,14 @@ export default function TermsPage() {
       <p>
         SkillFlow is a competitive skill-gaming platform where users play games of skill against other users.
         SkillFlow does not currently involve real-money wagering. The platform uses an in-platform virtual currency
-        called Skillies (also referred to as &quot;SkillPoints&quot; or &quot;SP&quot;) for entry fees, rewards, and
-        cosmetic purchases.
+        called Skillies (SK) for entry fees, payouts, and rewards.
       </p>
 
       <h2>4. Skillies (Virtual Currency)</h2>
       <p>
         Skillies are a virtual in-platform currency. <strong>Skillies have no real-world monetary value</strong>, are
         not exchangeable for cash, are not transferable between accounts, and may not be redeemed outside the SkillFlow
-        platform. Skillies are awarded for in-platform achievements (winning matches, daily logins, etc.) and may be
-        spent on cosmetic items, case openings, and match entry fees.
+        platform. Skillies may be used for match entry fees, payouts, refunds, and eligible platform rewards.
       </p>
       <p>
         We reserve the right to modify Skillie balances, reward rates, and economy mechanics at any time. Skillies are
@@ -58,11 +56,10 @@ export default function TermsPage() {
         before winnings are distributed to the winner.
       </p>
 
-      <h2>6. Cosmetics and Cases</h2>
+      <h2>6. Platform Rewards</h2>
       <p>
-        Players may earn or purchase (with Skillies) cosmetic items and randomized case openings. Cosmetic items have no
-        monetary value, are not transferable, and exist only within the SkillFlow platform. Drop rates for case items
-        are published in-platform.
+        Platform rewards, including Skillies bonuses from challenges or referrals, have no monetary value outside
+        SkillFlow and are not transferable.
       </p>
 
       <h2>7. Acceptable Use</h2>

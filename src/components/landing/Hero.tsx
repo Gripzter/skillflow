@@ -22,7 +22,7 @@ export default function Hero() {
         </h1>
 
         <p className="mt-6 max-w-[480px] text-[16px] leading-[1.6] text-[#888]">
-          Eight skill games. One ranked ladder. Real opponents, no luck, no pay-to-win. Climb from Bronze to Diamond and prove it.
+          Eight skill games. One Glicko-powered leaderboard. Real opponents, no luck, no pay-to-win.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">

@@ -6,6 +6,8 @@ import Link from "next/link";
 import AppNavbar, { dispatchWalletUpdated } from "@/components/AppNavbar";
 import {
   getCurrentUser,
+  getWalletBalance,
+  creditWallet,
 } from "@/lib/api";
 import {
   createExternalMatch,
@@ -13,7 +15,6 @@ import {
 } from "@/lib/external-matches";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { creditSP, getUserSPData, spendSP } from "@/lib/skillpoints";
 
 const STAKE_PRESETS = [100, 200, 500, 1000, 2500, 5000];
 const SEARCH_TIMEOUT_SECONDS = 10;
@@ -81,8 +82,7 @@ export default function CS2LobbyPage() {
         setUsername(user.username);
         setUserId(user.id);
         setIsDevMode(user.isDevMode ?? false);
-        const spData = await getUserSPData(user.id);
-        setBalance(Number(spData?.balanceSp ?? 0));
+        setBalance(await getWalletBalance());
       } catch {
         router.push("/login");
       } finally {
@@ -92,7 +92,7 @@ export default function CS2LobbyPage() {
     load();
     const handleUpdate = () =>
       void (userId
-        ? getUserSPData(userId).then((spData) => setBalance(Number(spData?.balanceSp ?? 0)))
+        ? getWalletBalance().then((nextBalance) => setBalance(Number(nextBalance ?? 0)))
         : Promise.resolve());
     window.addEventListener("skillflow_wallet_updated", handleUpdate);
     return () => window.removeEventListener("skillflow_wallet_updated", handleUpdate);
@@ -104,15 +104,8 @@ export default function CS2LobbyPage() {
     if (!activeMode?.active) return;
 
     try {
-      const spendResult = await spendSP(
-        userId,
-        stakeAmount,
-        "match_entry",
-        `CS2 match – ${activeMode.title}`
-      );
-      if (!spendResult.success) return;
-      const spData = await getUserSPData(userId);
-      setBalance(Number(spData?.balanceSp ?? 0));
+      await creditWallet(-stakeAmount, `CS2 match – ${activeMode.title}`, "match_entry");
+      setBalance(await getWalletBalance());
       dispatchWalletUpdated();
     } catch {
       return;
@@ -163,9 +156,8 @@ export default function CS2LobbyPage() {
     setMatchId(null);
     setMatchmakingElapsed(0);
     try {
-      await creditSP(userId, stakeAmount, "match_refund", "Match cancelled – stake refunded");
-      const spData = await getUserSPData(userId);
-      setBalance(Number(spData?.balanceSp ?? 0));
+      await creditWallet(stakeAmount, "Match cancelled – stake refunded", "match_refund");
+      setBalance(await getWalletBalance());
       dispatchWalletUpdated();
     } catch {
       dispatchWalletUpdated();

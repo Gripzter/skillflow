@@ -24,11 +24,6 @@ type MatchRow = {
   move_history?: Array<{ from?: string; to?: string; piece?: string } | string> | null;
 };
 
-type ProfileTierRow = {
-  id: string;
-  rank_tier: string | null;
-};
-
 type ChessMove = { from: string; to: string; piece?: string };
 type BoardState = Record<string, string | null>;
 
@@ -45,27 +40,6 @@ type ShowcaseMatch = {
 
 const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
 const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
-
-const TIER_SCORE: Record<string, number> = {
-  bronze: 1,
-  silver: 2,
-  gold: 3,
-  platinum: 4,
-  diamond: 5,
-};
-
-function toTierLabel(raw: string | null | undefined): string {
-  const normalized = (raw ?? "").toLowerCase();
-  if (normalized === "diamond") return "DIAMOND";
-  if (normalized === "platinum") return "PLATINUM I";
-  if (normalized === "gold") return "GOLD I";
-  if (normalized === "silver") return "SILVER I";
-  return "BRONZE I";
-}
-
-function tierScore(raw: string | null | undefined): number {
-  return TIER_SCORE[(raw ?? "").toLowerCase()] ?? 1;
-}
 
 function toGameLabel(gameType: string | null): string {
   if (!gameType) return "Chess";
@@ -208,40 +182,18 @@ export default function LiveMatchShowcase() {
       }
 
       const matches = rows as MatchRow[];
-      const ids = [
-        ...new Set(matches.flatMap((row) => [row.player1_id, row.player2_id]).filter((id): id is string => !!id)),
-      ];
-
-      let tierMap = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, rank_tier")
-          .in("id", ids);
-        if (profiles) {
-          tierMap = new Map((profiles as ProfileTierRow[]).map((row) => [row.id, row.rank_tier ?? "bronze"]));
-        }
-      }
-
       const withScore = matches
         .filter((row) => isSanitizedUsername(row.player1_username) && isSanitizedUsername(row.player2_username))
         .map((row) => {
-          const p1Tier = tierMap.get(row.player1_id ?? "") ?? "bronze";
-          const p2Tier = tierMap.get(row.player2_id ?? "") ?? "bronze";
-          const p1Score = tierScore(p1Tier);
-          const p2Score = tierScore(p2Tier);
-          const bothGoldOrHigher = p1Score >= 3 && p2Score >= 3 ? 1 : 0;
-          const combinedRankScore = p1Score + p2Score;
           const bet = Number((row.bet_amount ?? row.stake_amount) ?? 0);
-          return { row, p1Tier, p2Tier, bothGoldOrHigher, combinedRankScore, bet };
+          return { row, bet };
         });
 
       const active = withScore
         .filter((entry) => entry.row.status === "in_progress")
         .sort((a, b) => {
-          if (b.bothGoldOrHigher !== a.bothGoldOrHigher) return b.bothGoldOrHigher - a.bothGoldOrHigher;
           if (b.bet !== a.bet) return b.bet - a.bet;
-          return b.combinedRankScore - a.combinedRankScore;
+          return new Date(b.row.created_at).getTime() - new Date(a.row.created_at).getTime();
         });
 
       const startOfTodayUtc = new Date();
@@ -253,7 +205,7 @@ export default function LiveMatchShowcase() {
           const created = new Date(entry.row.created_at).getTime();
           return status === "completed" && created >= startOfTodayUtc.getTime();
         })
-        .sort((a, b) => b.combinedRankScore - a.combinedRankScore);
+        .sort((a, b) => new Date(b.row.created_at).getTime() - new Date(a.row.created_at).getTime());
 
       const pickedLive = active[0];
       if (pickedLive) {
@@ -266,12 +218,12 @@ export default function LiveMatchShowcase() {
           player1: {
             id: pickedLive.row.player1_id,
             username: pickedLive.row.player1_username ?? "player_one",
-            rank: toTierLabel(pickedLive.p1Tier),
+            rank: "RATED",
           },
           player2: {
             id: pickedLive.row.player2_id,
             username: pickedLive.row.player2_username ?? "player_two",
-            rank: toTierLabel(pickedLive.p2Tier),
+            rank: "RATED",
           },
           bet: pickedLive.bet > 0 ? pickedLive.bet : null,
           moves: liveMoves,
@@ -291,12 +243,12 @@ export default function LiveMatchShowcase() {
             player1: {
               id: pickedCompleted.row.player1_id,
               username: pickedCompleted.row.player1_username ?? "player_one",
-              rank: toTierLabel(pickedCompleted.p1Tier),
+              rank: "RATED",
             },
             player2: {
               id: pickedCompleted.row.player2_id,
               username: pickedCompleted.row.player2_username ?? "player_two",
-              rank: toTierLabel(pickedCompleted.p2Tier),
+              rank: "RATED",
             },
             bet: pickedCompleted.bet > 0 ? pickedCompleted.bet : null,
             moves: replayMoves,

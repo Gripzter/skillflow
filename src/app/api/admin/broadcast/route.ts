@@ -14,7 +14,11 @@ async function resolveAudience(
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
 
-  const { data: profiles } = await admin.from("profiles").select("id, username, balance_sp, created_at");
+  const { data: profiles } = await admin.from("profiles").select("id, username, created_at");
+  const profileIds = (profiles ?? []).map((p) => p.id as string);
+  const { data: wallets } = profileIds.length
+    ? await admin.from("wallets").select("user_id, balance").in("user_id", profileIds)
+    : { data: [] };
   const { data: recentSessions } = await admin
     .from("player_sessions")
     .select("user_id")
@@ -34,6 +38,7 @@ async function resolveAudience(
 
   const emailMap = new Map((authUsers?.users ?? []).map((u) => [u.id, u.email ?? ""]));
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+  const balanceMap = new Map((wallets ?? []).map((w) => [w.user_id as string, Number(w.balance ?? 0)]));
 
   for (const u of authUsers?.users ?? []) {
     const id = u.id;
@@ -49,7 +54,7 @@ async function resolveAudience(
         id === target;
       if (!match) continue;
     } else if (audienceType === "active_7d" && !activeSet.has(id)) continue;
-    else if (audienceType === "balance_gt_0" && Number(p?.balance_sp ?? 0) <= 0) continue;
+    else if (audienceType === "balance_gt_0" && (balanceMap.get(id) ?? 0) <= 0) continue;
     else if (audienceType === "inactive_30d" && playedRecently.has(id)) continue;
 
     emails.push(email);

@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     challenge_type?: string;
     target_value?: number;
     reward_sk?: number;
+    bonus_type?: string;
     difficulty?: string;
     is_active?: boolean;
   };
@@ -82,8 +83,9 @@ export async function POST(req: NextRequest) {
   if (!body.game) return jsonError("Game is required");
   if (!body.challenge_type) return jsonError("Challenge type is required");
   if (!body.target_value || body.target_value <= 0) return jsonError("Target must be > 0");
-  if (!body.reward_sk || body.reward_sk < 50 || body.reward_sk > 500) {
-    return jsonError("Reward must be between 50 and 500 SK");
+  const bonusType = body.bonus_type === "second_chance" ? "second_chance" : "flat_sk";
+  if (!body.reward_sk || body.reward_sk < 5 || body.reward_sk > 500) {
+    return jsonError("Reward must be between 5 and 500 SK");
   }
 
   const { data, error } = await admin
@@ -95,6 +97,7 @@ export async function POST(req: NextRequest) {
       challenge_type: body.challenge_type,
       target_value: body.target_value,
       reward_sk: body.reward_sk,
+      bonus_type: bonusType,
       difficulty: body.difficulty ?? "normal",
       is_active: body.is_active ?? true,
       created_by: userId,
@@ -119,6 +122,7 @@ export async function PATCH(req: NextRequest) {
     challenge_type?: string;
     target_value?: number;
     reward_sk?: number;
+    bonus_type?: string;
     difficulty?: string;
     is_active?: boolean;
   };
@@ -132,6 +136,7 @@ export async function PATCH(req: NextRequest) {
   if (body.challenge_type !== undefined) patch.challenge_type = body.challenge_type;
   if (body.target_value !== undefined) patch.target_value = body.target_value;
   if (body.reward_sk !== undefined) patch.reward_sk = body.reward_sk;
+  if (body.bonus_type !== undefined) patch.bonus_type = body.bonus_type === "second_chance" ? "second_chance" : "flat_sk";
   if (body.difficulty !== undefined) patch.difficulty = body.difficulty;
   if (body.is_active !== undefined) patch.is_active = body.is_active;
 

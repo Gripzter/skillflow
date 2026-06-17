@@ -6,33 +6,13 @@ import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
 import ModeToggleBarContent from "@/components/ModeToggleBar";
-import RankBadge from "@/components/RankBadge";
-import RankProgressBar from "@/components/RankProgressBar";
-import SPIcon from "@/components/SPIcon";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { getCurrentUser, getMatches, getMyProfile, getTransactions, getPracticeStats, logout as apiLogout } from "@/lib/api";
-import { getEquippedCosmetics } from "@/lib/cases";
+import { getCurrentUser, getMatches, getMyProfile, getTransactions, getPracticeStats, getWalletBalance, logout as apiLogout } from "@/lib/api";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
-import EquippedBadgesRow from "@/components/EquippedBadgesRow";
-import type { EquippedBadge, EquippedBorder } from "@/lib/inventory-cosmetics";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import LoadingRing from "@/components/LoadingRing";
-import { getUserSPData, type UserSpData } from "@/lib/skillpoints";
-import { IS_SWEEPSTAKES_LAUNCH } from "@/constants/economy";
-
-const RATING_RANKS = [
-  { name: "Bronze", min: 0, max: 1199 },
-  { name: "Silver", min: 1200, max: 1599 },
-  { name: "Gold", min: 1600, max: 1999 },
-  { name: "Diamond", min: 2000, max: 9999 },
-] as const;
-
-function getRank(rating: number): string {
-  const r = RATING_RANKS.find((x) => rating >= x.min && rating <= x.max);
-  return r?.name ?? "Bronze";
-}
 
 const GAME_TABS = [
   { id: "all", label: "All Games" },
@@ -45,11 +25,11 @@ const ACHIEVEMENTS = [
   { id: "on_fire", title: "On Fire", desc: "Win 3 matches in a row", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
   { id: "high_roller", title: "High Roller", desc: "Play a $50+ stake match", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
   { id: "sharpshooter", title: "Sharpshooter", desc: "Win 10 matches total", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
-  { id: "champion", title: "Champion", desc: "Reach Gold rating", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
+  { id: "champion", title: "Champion", desc: "Reach 1600 rating", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
   { id: "speed_demon", title: "Speed Demon", desc: "Win a match in under 2 minutes", check: () => false },
   { id: "pool_shark", title: "Pool Shark", desc: "Win 10 8-ball pool matches", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
   { id: "grandmaster", title: "Grandmaster", desc: "Win 10 chess matches", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
-  { id: "diamond", title: "Diamond Player", desc: "Reach Diamond rating", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
+  { id: "rating_climber", title: "Rating Climber", desc: "Reach 2000 rating", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
 ] as const;
 
 interface ProfileStats {
@@ -147,14 +127,8 @@ export default function ProfilePage() {
   const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
   const [gameTab, setGameTab] = useState<string>("all");
   const [showAllMatches, setShowAllMatches] = useState(false);
-  const [spData, setSpData] = useState<UserSpData>({
-    lifetimeSp: 1000,
-    balanceSp: 1000,
-    rankTier: "bronze",
-  });
+  const [skilliesBalance, setSkilliesBalance] = useState(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [equippedBorder, setEquippedBorder] = useState<EquippedBorder | null>(null);
-  const [equippedBadges, setEquippedBadges] = useState<EquippedBadge[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -169,24 +143,19 @@ export default function ProfilePage() {
         if ("created_at" in user && user.created_at) {
           setMemberSince(new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
-        const [matchList, txs, userSpData, rawProfile, cosmetics] = await Promise.all([
+        const [matchList, txs, rawProfile, walletBalance] = await Promise.all([
           getMatches(),
           getTransactions(),
-          getUserSPData(user.id),
           getMyProfile(),
-          getEquippedCosmetics(user.id),
+          getWalletBalance(),
         ]);
         setMatches(matchList);
         setTransactions(txs);
         setPracticeStats(getPracticeStats(user.username));
-        if (userSpData) {
-          setSpData(userSpData);
-        }
+        setSkilliesBalance(Number(walletBalance ?? 0));
         if (rawProfile && "avatar_url" in rawProfile) {
           setAvatarUrl((rawProfile.avatar_url as string | null) ?? null);
         }
-        setEquippedBorder(cosmetics.border);
-        setEquippedBadges(cosmetics.badges);
       } catch {
         router.push("/login");
       } finally {
@@ -200,7 +169,6 @@ export default function ProfilePage() {
     () => computeProfileStats(matches, transactions, username),
     [matches, transactions, username]
   );
-  const rank = getRank(stats.rating);
 
   const filteredByGame =
     gameTab === "all"
@@ -312,7 +280,6 @@ export default function ProfilePage() {
                 src={avatarUrl}
                 fallbackInitial={username}
                 size="lg"
-                border={equippedBorder}
               />
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -325,15 +292,10 @@ export default function ProfilePage() {
                     Level 1
                   </span>
                 </div>
-                <EquippedBadgesRow badges={equippedBadges} size="md" className="mt-2" />
                 <p className="mt-1 text-sm text-body-gray">Joined {memberSince}</p>
                 <p className="mt-2 flex items-center gap-1.5 text-lg font-semibold text-white">
                   {stats.rating} Rating
-                  <span className="rounded bg-white/10 px-2 py-0.5 text-sm font-medium text-body-gray">{rank}</span>
                 </p>
-                <div className="mt-2">
-                  <RankBadge tier={spData.rankTier} size="large" />
-                </div>
               </div>
             </div>
             <Link
@@ -345,39 +307,21 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section className="mt-6 animate-fade-in">
-          <RankProgressBar lifetimeSp={spData.lifetimeSp} currentTier={spData.rankTier} />
-        </section>
-
         {/* Section 2: Stats overview */}
         <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           {[
             { label: "Total Matches", value: stats.matches.length },
             { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
             {
-              label: IS_SWEEPSTAKES_LAUNCH ? "Total SP Earned" : "Total Earnings",
-              value: IS_SWEEPSTAKES_LAUNCH
-                ? (
-                    <span className="inline-flex items-center gap-1">
-                      {spData.lifetimeSp.toLocaleString()} <SPIcon size={18} />
-                    </span>
-                  )
-                : `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
+              label: "Total Earnings",
+              value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
             },
             { label: "Win Streak", value: stats.bestStreak },
-            {
-              label: "Lifetime SP",
-              value: (
-                <span className="inline-flex items-center gap-1">
-                  {spData.lifetimeSp.toLocaleString()} <SPIcon size={18} />
-                </span>
-              ),
-            },
             {
               label: "Skillies Balance",
               value: (
                 <span className="inline-flex items-center gap-1">
-                  {spData.balanceSp.toLocaleString()} Skillies <SkilliesIcon size={18} />
+                  {skilliesBalance.toLocaleString()} Skillies <SkilliesIcon size={18} />
                 </span>
               ),
             },

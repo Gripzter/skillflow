@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const { data: profiles, error } = await admin
     .from("profiles")
     .select(
-      "id, username, balance_sp, total_matches, banned, suspicious, created_at"
+      "id, username, total_matches, banned, suspicious, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(2000);
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const userIds = (profiles ?? []).map((p) => p.id as string);
 
-  const [{ data: authData }, { data: geoRows }, { data: deposits }, { data: withdrawals }, { data: flags }, { data: sessions }] =
+  const [{ data: authData }, { data: geoRows }, { data: deposits }, { data: withdrawals }, { data: flags }, { data: sessions }, { data: wallets }] =
     await Promise.all([
       admin.auth.admin.listUsers({ perPage: 1000 }),
       userIds.length
@@ -47,6 +47,9 @@ export async function GET(req: NextRequest) {
             .select("user_id, created_at")
             .in("user_id", userIds)
             .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      userIds.length
+        ? admin.from("wallets").select("user_id, balance").in("user_id", userIds)
         : Promise.resolve({ data: [] }),
     ]);
 
@@ -72,6 +75,7 @@ export async function GET(req: NextRequest) {
       (withdrawalMap.get(w.user_id as string) ?? 0) + Math.abs(Number(w.amount))
     );
   }
+  const balanceMap = new Map((wallets ?? []).map((w) => [w.user_id as string, Number(w.balance ?? 0)]));
 
   const flaggedSet = new Set((flags ?? []).map((f) => f.player_id as string));
   const lastActiveMap = new Map<string, string>();
@@ -125,8 +129,8 @@ export async function GET(req: NextRequest) {
       totalMatches: Number(p.total_matches ?? 0),
       totalDepositedUSD: depositMap.get(id) ?? 0,
       totalWithdrawnUSD: withdrawalMap.get(id) ?? 0,
-      balanceSK: Number(p.balance_sp ?? 0),
-      balanceUSD: skToUsd(Number(p.balance_sp ?? 0)),
+      balanceSK: balanceMap.get(id) ?? 0,
+      balanceUSD: skToUsd(balanceMap.get(id) ?? 0),
       country,
       countryFlag: countryFlag(country),
       lastActive: lastActiveMap.get(id) ?? p.created_at,

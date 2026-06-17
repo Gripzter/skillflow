@@ -15,16 +15,15 @@ export default function FoundersSection({ remaining, closed }: FoundersSectionPr
           <p className="text-[11px] uppercase tracking-[1.5px] text-[#FFFF00]">FOUNDERS PROGRAM</p>
           <h2 className="mt-2 text-[32px] font-medium tracking-[-1px] text-white">Get in before everyone else.</h2>
           <p className="mt-4 text-[14px] leading-[1.6] text-[#888]">
-            Reach Platinum during beta and you&apos;re in. Permanent Founders badge nobody else can earn after launch.
-            Launch credit for your account, three free Diamond cases, and early access to v2.
+            Compete during beta and you&apos;re in. Founders get launch credit, early access to v2,
+            and invite-only events after launch.
           </p>
 
           <ul className="mt-6 text-[13px] text-[#aaa]">
             {[
-              "Permanent Founders badge — never droppable",
               "$10 launch credit when v2 opens",
-              "3 free Diamond case openings",
               "Founders-only Discord channel + tournaments",
+              "Early access to new games and formats",
             ].map((item, index, arr) => (
               <li
                 key={item}

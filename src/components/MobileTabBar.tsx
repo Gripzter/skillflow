@@ -3,7 +3,7 @@
 import type { ComponentType } from "react";
 import { usePathname } from "next/navigation";
 import { usePlayMode } from "@/contexts/PlayModeContext";
-import { CalendarDays, Gift, House, Trophy, Wallet } from "lucide-react";
+import { CalendarDays, House, Trophy, Wallet } from "lucide-react";
 
 const TABS: readonly {
   href: string;
@@ -12,9 +12,8 @@ const TABS: readonly {
 }[] = [
   { href: "/play", label: "Home", Icon: House },
   { href: "/events", label: "Events", Icon: CalendarDays },
-  { href: "/skillpoints", label: "SP", Icon: Wallet },
+  { href: "/wallet", label: "Wallet", Icon: Wallet },
   { href: "/leaderboard", label: "Rank", Icon: Trophy },
-  { href: "/cases", label: "Cases", Icon: Gift },
 ];
 
 export default function MobileTabBar() {

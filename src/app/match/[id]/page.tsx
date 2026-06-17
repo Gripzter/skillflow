@@ -45,7 +45,6 @@ import { AnonymousWinClaimBanner } from "@/components/AnonymousWinClaim";
 import AnonymousLossSettle from "@/components/AnonymousLossSettle";
 import { getAnonymousGuestId, getOrCreateAnonymousToken } from "@/lib/qr-match";
 import { pickOpponentName } from "@/lib/opponentNames";
-import { getEquippedCosmeticsBatch, type UserCosmeticsSnapshot } from "@/lib/cases";
 
 const OPPONENT_RECONNECT_SEC = 60;
 
@@ -139,7 +138,6 @@ function MatchPageContent() {
   const [userId, setUserId] = useState<string>("");
   const [isQrGuest, setIsQrGuest] = useState(false);
   const [matchAvatars, setMatchAvatars] = useState<Record<string, string | null>>({});
-  const [matchCosmetics, setMatchCosmetics] = useState<Record<string, UserCosmeticsSnapshot>>({});
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [isDevMode, setIsDevMode] = useState(false);
@@ -180,7 +178,7 @@ function MatchPageContent() {
   const [afkForfeitPending, setAfkForfeitPending] = useState(false);
   const [preMatchCompletedCount, setPreMatchCompletedCount] = useState<number | null>(null);
   const [showFirstMatchCelebration, setShowFirstMatchCelebration] = useState(false);
-  const [celebrationEarnedSp, setCelebrationEarnedSp] = useState(100);
+  const [celebrationEarnedSkillies, setCelebrationEarnedSkillies] = useState(100);
   const forfeitHandledRef = useRef(false);
   const inProgressSetRef = useRef(false);
   const firstCelebrationTriggeredRef = useRef(false);
@@ -335,16 +333,15 @@ function MatchPageContent() {
         const playerIds = [m.player1Id, m.player2Id].filter((id): id is string => Boolean(id));
         const supabaseForProfiles = createClient();
         if (supabaseForProfiles && playerIds.length > 0) {
-          const [{ data: profileRows }, cosmetics] = await Promise.all([
-            supabaseForProfiles.from("profiles").select("id, avatar_url").in("id", playerIds),
-            getEquippedCosmeticsBatch(playerIds),
-          ]);
+          const { data: profileRows } = await supabaseForProfiles
+            .from("profiles")
+            .select("id, avatar_url")
+            .in("id", playerIds);
           const avatars: Record<string, string | null> = {};
           for (const row of profileRows ?? []) {
             avatars[row.id] = (row.avatar_url as string | null) ?? null;
           }
           setMatchAvatars(avatars);
-          setMatchCosmetics(cosmetics);
         }
         setMoveLog(Array.isArray(m.moveLog) ? m.moveLog : []);
         const matchStartMs = m.matchStartTime ? new Date(m.matchStartTime).getTime() : NaN;
@@ -924,25 +921,25 @@ function MatchPageContent() {
       if (countError || cancelled || completedCount !== 1) return;
 
       const fallbackEarned = outcome === "victory" ? 100 : 25;
-      let earnedSp = fallbackEarned;
+      let earnedSkillies = fallbackEarned;
 
-      const { data: spRows } = await supabase
-        .from("sp_transactions")
+      const { data: walletRows } = await supabase
+        .from("transactions")
         .select("amount")
         .eq("user_id", userId)
-        .in("type", ["match_win", "match_loss", "daily_bonus", "streak_bonus"])
+        .in("type", ["match_win", "match_refund", "challenge_reward"])
         .ilike("description", `%match:${match.id}%`);
 
-      if (spRows && spRows.length > 0) {
-        const total = spRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      if (walletRows && walletRows.length > 0) {
+        const total = walletRows.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
         if (Number.isFinite(total) && total > 0) {
-          earnedSp = total;
+          earnedSkillies = total;
         }
       }
 
       if (cancelled) return;
       firstCelebrationTriggeredRef.current = true;
-      setCelebrationEarnedSp(earnedSp);
+      setCelebrationEarnedSkillies(earnedSkillies);
       setShowFirstMatchCelebration(true);
     }
 
@@ -1121,7 +1118,6 @@ function MatchPageContent() {
     player1: {
       username: displayedPlayer1.username,
       avatar: match.player1Id ? matchAvatars[match.player1Id] ?? null : null,
-      border: match.player1Id ? matchCosmetics[match.player1Id]?.border ?? null : null,
       rating: displayedPlayer1.rating,
       score: matchUi?.scores.player1 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
@@ -1131,7 +1127,6 @@ function MatchPageContent() {
     player2: {
       username: displayedPlayer2.username,
       avatar: match.player2Id ? matchAvatars[match.player2Id] ?? null : null,
-      border: match.player2Id ? matchCosmetics[match.player2Id]?.border ?? null : null,
       rating: displayedPlayer2.rating,
       score: matchUi?.scores.player2 ?? 0,
       scoreLabel: matchUi?.scoreLabel,
@@ -1708,7 +1703,7 @@ function MatchPageContent() {
 
       {showFirstMatchCelebration ? (
         <FirstMatchCelebration
-          earnedSp={celebrationEarnedSp}
+          earnedSkillies={celebrationEarnedSkillies}
           gameSlug={match.gameType}
           onClose={() => setShowFirstMatchCelebration(false)}
         />

@@ -51,7 +51,7 @@ export function buildLeaderboard(realPlayers: LeaderboardPlayer[], gradients: st
   ];
 
   combined.sort((a, b) => {
-    if (b.totalEarnings !== a.totalEarnings) return b.totalEarnings - a.totalEarnings;
+    if (b.skillRating !== a.skillRating) return b.skillRating - a.skillRating;
     const aWins = a.wins ?? Math.round((a.winRate / 100) * a.totalMatches);
     const bWins = b.wins ?? Math.round((b.winRate / 100) * b.totalMatches);
     return bWins - aWins;

@@ -21,6 +21,7 @@ export type PlayerDailyChallenge = {
   challengeType: ChallengeType;
   targetValue: number;
   rewardSk: number;
+  bonusType: "flat_sk" | "second_chance";
   difficulty: string;
   progress: number;
   completed: boolean;
@@ -55,6 +56,7 @@ function slotToView(
     challengeType: slot.template.challenge_type as ChallengeType,
     targetValue: slot.template.target_value,
     rewardSk: slot.template.reward_sk,
+    bonusType: (slot.template.bonus_type as "flat_sk" | "second_chance" | undefined) ?? "flat_sk",
     difficulty: slot.template.difficulty,
     progress: progress?.progress ?? 0,
     completed: progress?.completed ?? false,
@@ -90,6 +92,7 @@ export async function getPlayerDailyChallenges(userId: string): Promise<PlayerDa
         challenge_type,
         target_value,
         reward_sk,
+        bonus_type,
         is_active,
         difficulty,
         created_at

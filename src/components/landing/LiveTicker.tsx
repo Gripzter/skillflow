@@ -109,7 +109,7 @@ export default function LiveTicker() {
 
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data: txRows, error: txError } = await supabase
-        .from("sp_transactions")
+        .from("transactions")
         .select("user_id, amount, description, created_at")
         .eq("type", "match_win")
         .gte("created_at", since)
@@ -194,7 +194,7 @@ export default function LiveTicker() {
             <span className="text-[#888]">
               {event.username} won {event.game}
             </span>
-            <span className="text-[#FFFF00]">+{event.amount} SP</span>
+            <span className="text-[#FFFF00]">+{event.amount} SK</span>
           </div>
         ))}
       </div>

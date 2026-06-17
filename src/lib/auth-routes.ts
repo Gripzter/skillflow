@@ -8,7 +8,6 @@ const PROTECTED_ROUTE_PREFIXES = [
   "/play",
   "/profile",
   "/settings",
-  "/skillpoints",
   "/wallet",
 ] as const;
 
@@ -35,8 +34,6 @@ export function isProtectedPath(pathname: string, searchParams?: URLSearchParams
     pathname === "/" ||
     pathname === "/play" ||
     matchesPrefix(pathname, "/events") ||
-    matchesPrefix(pathname, "/cases") ||
-    matchesPrefix(pathname, "/inventory") ||
     matchesPrefix(pathname, "/leaderboard") ||
     matchesPrefix(pathname, "/referrals") ||
     matchesPrefix(pathname, "/login") ||

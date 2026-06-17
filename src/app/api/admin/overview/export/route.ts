@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     { count: matchCount },
     { data: earnings },
     { count: disputeCount },
-    { data: profiles },
+    { data: wallets },
   ] = await Promise.all([
     admin
       .from("matches")
@@ -25,14 +25,14 @@ export async function GET(req: NextRequest) {
       .from("disputes")
       .select("*", { count: "exact", head: true })
       .gte("created_at", todayStart.toISOString()),
-    admin.from("profiles").select("balance_sp"),
+    admin.from("wallets").select("balance"),
   ]);
 
   const revenueSK = (earnings ?? []).reduce(
     (s, e) => s + revenueFromCreatorEarnedSK(Number(e.earned_sk)),
     0
   );
-  const poolSK = (profiles ?? []).reduce((s, p) => s + Number(p.balance_sp ?? 0), 0);
+  const poolSK = (wallets ?? []).reduce((s, w) => s + Number(w.balance ?? 0), 0);
 
   const rows = [
     ["metric", "value"],

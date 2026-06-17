@@ -2,12 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import type { RankTier } from "@/lib/skillpoints";
 
 interface FirstMatchCelebrationProps {
-  earnedSp: number;
-  lifetimeSp?: number;
-  rankTier?: RankTier;
+  earnedSkillies: number;
   gameSlug: string;
   onClose: () => void;
 }
@@ -16,11 +13,11 @@ const AUTO_CLOSE_MS = 8000;
 const CONFETTI_DOTS = 28;
 
 export default function FirstMatchCelebration({
-  earnedSp,
+  earnedSkillies,
   gameSlug,
   onClose,
 }: FirstMatchCelebrationProps) {
-  const [displaySp, setDisplaySp] = useState(0);
+  const [displaySkillies, setDisplaySkillies] = useState(0);
 
   useEffect(() => {
     const start = performance.now();
@@ -29,14 +26,14 @@ export default function FirstMatchCelebration({
 
     const tick = (now: number) => {
       const progress = Math.min(1, (now - start) / duration);
-      setDisplaySp(Math.round(earnedSp * progress));
+      setDisplaySkillies(Math.round(earnedSkillies * progress));
       if (progress < 1) {
         raf = requestAnimationFrame(tick);
       }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [earnedSp]);
+  }, [earnedSkillies]);
 
   useEffect(() => {
     const timeout = window.setTimeout(onClose, AUTO_CLOSE_MS);
@@ -88,7 +85,7 @@ export default function FirstMatchCelebration({
             You just earned your first Skillies. Keep playing to win more.
           </p>
           <p className="mt-5 text-4xl font-black text-yellow-300 md:text-6xl">
-            +{displaySp.toLocaleString()} Skillies <SkilliesIcon size={28} />
+            +{displaySkillies.toLocaleString()} Skillies <SkilliesIcon size={28} />
           </p>
 
           <div className="mt-7 grid grid-cols-2 gap-3">
@@ -106,11 +103,11 @@ export default function FirstMatchCelebration({
               type="button"
               onClick={() => {
                 onClose();
-                window.location.href = "/cases";
+                window.location.href = "/play";
               }}
               className="rounded-xl border border-yellow-300/40 bg-yellow-500/10 px-4 py-3 text-sm font-bold text-yellow-100 transition hover:bg-yellow-500/20"
             >
-              Open a Case
+              Back to Play
             </button>
           </div>
         </div>

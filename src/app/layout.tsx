@@ -22,7 +22,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "SkillFlow — Bet On Yourself",
   description:
-    "Compete in skill-based games. Earn SkillPoints. Climb ranks. Open cases. Join the Founders Program during beta and earn exclusive rewards.",
+    "Compete in skill-based games, stake Skillies, and climb the Glicko leaderboard.",
   keywords:
     "skill gaming, competitive gaming, esports, chess, connect 4, reaction games, earn rewards",
   icons: {
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "SkillFlow — Bet On Yourself",
     description:
-      "Compete in skill-based games. Earn SkillPoints. Climb ranks. Open cases. Join the Founders Program during beta and earn exclusive rewards.",
+      "Compete in skill-based games, stake Skillies, and climb the Glicko leaderboard.",
     url: "https://skillflow.gg",
   },
   twitter: {
