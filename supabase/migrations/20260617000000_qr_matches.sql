@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.qr_matches (
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'accepted', 'in_progress', 'completed', 'expired', 'cancelled')),
   qr_token text NOT NULL UNIQUE,
+  short_code text NOT NULL UNIQUE,
   expires_at timestamptz NOT NULL,
   opponent_user_id uuid REFERENCES auth.users(id),
   opponent_is_anonymous boolean NOT NULL DEFAULT true,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS public.qr_matches (
 
 CREATE INDEX IF NOT EXISTS idx_qr_matches_host ON public.qr_matches (host_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_qr_matches_token ON public.qr_matches (qr_token);
+CREATE INDEX IF NOT EXISTS idx_qr_matches_short_code ON public.qr_matches (short_code);
 CREATE INDEX IF NOT EXISTS idx_qr_matches_status ON public.qr_matches (status, expires_at);
 CREATE INDEX IF NOT EXISTS idx_qr_matches_match ON public.qr_matches (match_id) WHERE match_id IS NOT NULL;
 
@@ -134,6 +136,32 @@ BEGIN
 END;
 $$;
 
+-- 6-char human-typeable code (no 0/O, 1/I/L)
+CREATE OR REPLACE FUNCTION public._qr_generate_short_code()
+RETURNS text
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_chars text := '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  v_code text;
+  v_attempts integer := 0;
+  v_i integer;
+BEGIN
+  LOOP
+    v_code := '';
+    FOR v_i IN 1..6 LOOP
+      v_code := v_code || substr(v_chars, 1 + floor(random() * length(v_chars))::integer, 1);
+    END LOOP;
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM public.qr_matches WHERE short_code = v_code);
+    v_attempts := v_attempts + 1;
+    IF v_attempts > 30 THEN
+      RAISE EXCEPTION 'SHORT_CODE_GENERATION_FAILED';
+    END IF;
+  END LOOP;
+  RETURN v_code;
+END;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- create_qr_match(game, stake_sk)
 -- Host holds 1× stake while QR is live (anonymous opponent side is host-funded,
@@ -152,6 +180,7 @@ DECLARE
   v_host uuid := auth.uid();
   v_game text;
   v_token text;
+  v_short_code text;
   v_id uuid;
   v_available integer;
 BEGIN
@@ -171,6 +200,7 @@ BEGIN
   END IF;
 
   v_token := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+  v_short_code := public._qr_generate_short_code();
 
   UPDATE public.profiles
   SET balance_sp_held = balance_sp_held + p_stake_sk
@@ -181,6 +211,7 @@ BEGIN
     game,
     stake_sk,
     qr_token,
+    short_code,
     expires_at,
     hold_sk
   )
@@ -189,6 +220,7 @@ BEGIN
     v_game,
     p_stake_sk,
     v_token,
+    v_short_code,
     now() + interval '5 minutes',
     p_stake_sk
   )
@@ -197,6 +229,7 @@ BEGIN
   RETURN jsonb_build_object(
     'id', v_id,
     'qr_token', v_token,
+    'short_code', v_short_code,
     'game', v_game,
     'stake_sk', p_stake_sk,
     'expires_at', (SELECT expires_at FROM public.qr_matches WHERE id = v_id)
@@ -315,7 +348,49 @@ BEGIN
     'expires_at', v_qr.expires_at,
     'host_username', COALESCE(v_host.username, 'Player'),
     'host_avatar_url', v_host.avatar_url,
+    'short_code', v_qr.short_code,
     'match_id', v_qr.match_id
+  );
+END;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Public read by short code (manual desktop entry)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_qr_match_by_short_code(p_short_code text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_qr public.qr_matches;
+BEGIN
+  IF p_short_code IS NULL OR length(trim(p_short_code)) < 4 THEN
+    RETURN jsonb_build_object('found', false);
+  END IF;
+
+  SELECT * INTO v_qr
+  FROM public.qr_matches
+  WHERE short_code = upper(trim(p_short_code));
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('found', false);
+  END IF;
+
+  IF v_qr.status = 'pending' AND v_qr.expires_at <= now() THEN
+    PERFORM public.expire_qr_match(v_qr.id);
+    RETURN jsonb_build_object('found', false, 'expired', true);
+  END IF;
+
+  IF v_qr.status != 'pending' THEN
+    RETURN jsonb_build_object('found', false, 'unavailable', true, 'status', v_qr.status);
+  END IF;
+
+  RETURN jsonb_build_object(
+    'found', true,
+    'qr_token', v_qr.qr_token,
+    'short_code', v_qr.short_code
   );
 END;
 $$;
@@ -886,6 +961,9 @@ GRANT EXECUTE ON FUNCTION public.expire_qr_match(uuid) TO authenticated, service
 REVOKE ALL ON FUNCTION public.get_qr_match_by_token(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_qr_match_by_token(text) TO anon, authenticated;
 
+REVOKE ALL ON FUNCTION public.get_qr_match_by_short_code(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_qr_match_by_short_code(text) TO anon, authenticated;
+
 REVOKE ALL ON FUNCTION public.accept_qr_match(text, text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.accept_qr_match(text, text, uuid) TO anon, authenticated;
 
@@ -894,3 +972,6 @@ GRANT EXECUTE ON FUNCTION public.claim_anonymous_payout(text) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.get_anonymous_pending_payout(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_anonymous_pending_payout(text) TO anon, authenticated;
+
+-- Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';

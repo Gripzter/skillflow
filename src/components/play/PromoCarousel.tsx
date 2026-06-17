@@ -13,19 +13,48 @@ function Slide({
   slide,
   active,
   isAuthenticated,
+  onOpenQrMatch,
 }: {
   slide: PromoSlide;
   active: boolean;
   isAuthenticated: boolean;
+  onOpenQrMatch?: () => void;
 }) {
   const accentColor = slide.accentColor ?? "#FFFF00";
-  const gateAction = !isAuthenticated && /join|open|play|bet/i.test(slide.cta);
+  const isQrAction = slide.action === "open-qr-match";
+  const gateAction =
+    !isAuthenticated && (isQrAction || (slide.cta && /join|open|play|bet|generate/i.test(slide.cta)));
 
-  const handleGatedAction = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!gateAction) return;
+  const handleGatedAction = (event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
+    if (!gateAction) {
+      if (isQrAction && onOpenQrMatch) {
+        event.preventDefault();
+        onOpenQrMatch();
+      }
+      return;
+    }
     event.preventDefault();
     redirectToAuthAction();
   };
+
+  const ctaClass =
+    "inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all";
+
+  const ctaArrow = (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
 
   return (
     <div
@@ -33,80 +62,69 @@ function Slide({
       style={{ transitionDuration: `${TRANSITION_MS}ms` }}
       aria-hidden={!active}
     >
-      <Image
-        src={slide.image}
-        alt=""
-        fill
-        priority={active}
-        sizes="(max-width: 1400px) 100vw, 1400px"
-        className="object-cover"
-      />
+      {slide.image ? (
+        <Image
+          src={slide.image}
+          alt=""
+          fill
+          priority={active}
+          sizes="(max-width: 1400px) 100vw, 1400px"
+          className="object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0" style={{ background: slide.gradient ?? "#0E0E12" }} />
+      )}
 
       <div
         className="absolute inset-0"
         style={{
-          background:
-            "linear-gradient(90deg, rgba(14,14,18,0.94) 0%, rgba(14,14,18,0.78) 35%, rgba(14,14,18,0) 70%)",
+          background: slide.image
+            ? "linear-gradient(90deg, rgba(14,14,18,0.94) 0%, rgba(14,14,18,0.78) 35%, rgba(14,14,18,0) 70%)"
+            : "linear-gradient(90deg, rgba(14,14,18,0.5) 0%, transparent 60%)",
         }}
       />
 
-      <div className="relative z-10 h-full flex items-center px-5 sm:px-8 md:px-12 lg:px-16">
+      <div className="relative z-10 flex h-full items-center px-5 sm:px-8 md:px-12 lg:px-16">
         <div className="max-w-[280px] sm:max-w-sm md:max-w-md">
           {slide.accent ? (
-            <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em]" style={{ color: accentColor }}>
+            <div
+              className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em]"
+              style={{ color: accentColor }}
+            >
               {slide.accent}
             </div>
           ) : null}
 
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white leading-[1.05] tracking-tight mb-2">
+          <h2 className="mb-2 text-2xl font-black leading-[1.05] tracking-tight text-white sm:text-3xl md:text-4xl lg:text-5xl">
             {slide.headline}
           </h2>
 
-          {slide.subline ? <p className="text-xs sm:text-sm md:text-base text-white/70 mb-4 sm:mb-5 leading-snug">{slide.subline}</p> : null}
+          {slide.subline ? (
+            <p className="mb-4 text-xs leading-snug text-white/70 sm:mb-5 sm:text-sm md:text-base">
+              {slide.subline}
+            </p>
+          ) : null}
 
-          {slide.external ? (
+          {isQrAction ? (
+            <button type="button" onClick={handleGatedAction} className={ctaClass}>
+              {slide.cta}
+              {ctaArrow}
+            </button>
+          ) : slide.external ? (
             <a
               href={slide.href}
               onClick={handleGatedAction}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
+              className={ctaClass}
             >
               {slide.cta}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+              {ctaArrow}
             </a>
           ) : (
-            <Link
-              href={slide.href}
-              onClick={handleGatedAction}
-              className="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg bg-[#FFFF00] text-black font-bold text-xs sm:text-sm hover:brightness-110 transition-all"
-            >
+            <Link href={slide.href ?? "#"} onClick={handleGatedAction} className={ctaClass}>
               {slide.cta}
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
+              {ctaArrow}
             </Link>
           )}
         </div>
@@ -115,7 +133,13 @@ function Slide({
   );
 }
 
-export default function PromoCarousel({ isAuthenticated }: { isAuthenticated: boolean }) {
+export default function PromoCarousel({
+  isAuthenticated,
+  onOpenQrMatch,
+}: {
+  isAuthenticated: boolean;
+  onOpenQrMatch?: () => void;
+}) {
   const slides = PROMO_SLIDES;
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -182,7 +206,13 @@ export default function PromoCarousel({ isAuthenticated }: { isAuthenticated: bo
       aria-label="Promotional highlights"
     >
       {slides.map((slide, i) => (
-        <Slide key={slide.id} slide={slide} active={i === index} isAuthenticated={isAuthenticated} />
+        <Slide
+          key={slide.id}
+          slide={slide}
+          active={i === index}
+          isAuthenticated={isAuthenticated}
+          onOpenQrMatch={onOpenQrMatch}
+        />
       ))}
 
       {slides.length > 1 ? (

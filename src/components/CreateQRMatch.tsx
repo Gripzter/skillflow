@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { X } from "lucide-react";
+import { X, QrCode } from "lucide-react";
 import LoadingRing from "@/components/LoadingRing";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import { createClient } from "@/lib/supabase";
@@ -24,11 +24,20 @@ const QRCodeSVG = dynamic(() => import("qrcode.react").then((m) => m.QRCodeSVG),
   loading: () => <div className="h-[220px] w-[220px] animate-pulse rounded-xl bg-white/5" />,
 });
 
+export type QRMatchModalMode = "select" | "instant";
+
 type Props = {
   open: boolean;
   onClose: () => void;
   balanceSp: number;
   onMatchStarted?: (matchId: string) => void;
+  onError?: (message: string) => void;
+  /** Full game+stake picker (carousel). Omit for instant per-game flow. */
+  mode?: QRMatchModalMode;
+  /** Pre-selected game slug for instant mode */
+  presetGame?: string | null;
+  /** Pre-selected stake; defaults to DEFAULT_QR_STAKE in instant mode */
+  presetStake?: number | null;
 };
 
 function formatCountdown(ms: number): string {
@@ -38,7 +47,16 @@ function formatCountdown(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted }: Props) {
+export default function CreateQRMatch({
+  open,
+  onClose,
+  balanceSp,
+  onMatchStarted,
+  mode = "select",
+  presetGame = null,
+  presetStake = null,
+  onError,
+}: Props) {
   const [game, setGame] = useState(QR_GAMES[0].slug);
   const [stake, setStake] = useState<number>(25);
   const [customStake, setCustomStake] = useState("");
@@ -46,6 +64,9 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
   const [error, setError] = useState<string | null>(null);
   const [qrData, setQrData] = useState<CreateQRMatchResult | null>(null);
   const [now, setNow] = useState(Date.now());
+  const [changingStake, setChangingStake] = useState(false);
+
+  const isInstant = mode === "instant";
 
   const effectiveStake = useMemo(() => {
     if (customStake.trim()) {
@@ -55,6 +76,7 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
     return stake;
   }, [customStake, stake]);
 
+  const activeGame = isInstant && presetGame ? presetGame : game;
   const availableBalance = balanceSp;
   const stakeValid = effectiveStake >= QR_MIN_STAKE && effectiveStake <= QR_MAX_STAKE;
   const canAfford = availableBalance >= effectiveStake;
@@ -63,13 +85,43 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
   const remainingMs = qrData ? expiresAtMs - now : 0;
   const expired = qrData ? remainingMs <= 0 : false;
 
+  const runGenerate = useCallback(
+    async (targetGame: string, targetStake: number) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await createQRMatch(targetGame, targetStake);
+        setQrData(result);
+        setNow(Date.now());
+        setChangingStake(false);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to create QR match";
+        setError(msg);
+        if (isInstant) {
+          onError?.(msg);
+          onClose();
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isInstant, onClose, onError]
+  );
+
   useEffect(() => {
     if (!open) {
       setQrData(null);
       setError(null);
       setCustomStake("");
+      setChangingStake(false);
+      setLoading(false);
+      return;
     }
-  }, [open]);
+
+    if (isInstant && presetGame && presetStake != null && !qrData && !loading) {
+      void runGenerate(presetGame, presetStake);
+    }
+  }, [open, isInstant, presetGame, presetStake, qrData, loading, runGenerate]);
 
   useEffect(() => {
     if (!qrData || expired) return;
@@ -82,7 +134,6 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
     void expireQRMatch(qrData.id).catch(() => {});
   }, [qrData, expired]);
 
-  // Poll for opponent accept → redirect host into match
   useEffect(() => {
     if (!qrData || expired) return;
     const supabase = createClient();
@@ -105,18 +156,8 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
 
   const handleGenerate = useCallback(async () => {
     if (!stakeValid || !canAfford) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await createQRMatch(game, effectiveStake);
-      setQrData(result);
-      setNow(Date.now());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create QR match");
-    } finally {
-      setLoading(false);
-    }
-  }, [game, effectiveStake, stakeValid, canAfford]);
+    await runGenerate(activeGame, effectiveStake);
+  }, [activeGame, effectiveStake, stakeValid, canAfford, runGenerate]);
 
   const handleCancel = useCallback(async () => {
     if (qrData && !expired) {
@@ -130,9 +171,30 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
     onClose();
   }, [qrData, expired, onClose]);
 
+  const handleChangeStake = useCallback(
+    async (newStake: number) => {
+      if (!qrData || newStake < QR_MIN_STAKE || newStake > QR_MAX_STAKE) return;
+      if (availableBalance < newStake) {
+        setError(`Insufficient balance for ${newStake} SK`);
+        return;
+      }
+      setChangingStake(true);
+      try {
+        await cancelQRMatch(qrData.id);
+      } catch {
+        /* continue */
+      }
+      setQrData(null);
+      await runGenerate(activeGame, newStake);
+      if (isInstant) setStake(newStake);
+    },
+    [qrData, activeGame, availableBalance, isInstant, runGenerate]
+  );
+
   if (!open) return null;
 
   const joinUrl = qrData ? getJoinUrl(qrData.qr_token) : "";
+  const showSelection = !isInstant && !qrData;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/70 p-4 sm:items-center">
@@ -155,10 +217,12 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
             Play In Person
           </h2>
           <p className="mt-1 text-sm text-[#9CA3AF]">
-            Generate a QR code. Your opponent scans to join — no account needed.
+            {isInstant
+              ? `Share this code for ${formatGameName(activeGame)}`
+              : "Generate a QR code. Your opponent scans to join — no account needed."}
           </p>
 
-          {!qrData ? (
+          {showSelection ? (
             <>
               <p className="mt-5 text-xs font-semibold uppercase tracking-widest text-[#9CA3AF]">
                 Choose game
@@ -232,19 +296,47 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
                 Generate QR Code
               </button>
             </>
-          ) : (
+          ) : loading && !qrData ? (
+            <div className="mt-10 flex flex-col items-center gap-3 py-8">
+              <LoadingRing size={32} />
+              <p className="text-sm text-[#9CA3AF]">Generating code…</p>
+              {error ? <p className="text-sm text-red-400">{error}</p> : null}
+            </div>
+          ) : qrData ? (
             <div className="mt-4 flex flex-col items-center">
               <div className="text-center">
                 <p className="text-lg font-bold text-white">{formatGameName(qrData.game)}</p>
                 <p className="mt-1 flex items-center justify-center gap-1.5 text-2xl font-black text-[#FFFF00]">
                   {qrData.stake_sk} <SkilliesIcon className="h-6 w-6" />
                 </p>
+                {qrData.short_code ? (
+                  <p className="mt-2 font-mono text-lg font-bold tracking-[0.2em] text-white">
+                    {qrData.short_code}
+                  </p>
+                ) : null}
                 <p
                   className={`mt-2 font-mono text-sm ${expired ? "text-red-400" : "text-[#9CA3AF]"}`}
                 >
                   {expired ? "Expired" : formatCountdown(remainingMs)}
                 </p>
               </div>
+
+              {!changingStake && !expired ? (
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                  <span className="text-xs text-[#6B7280]">Change stake:</span>
+                  {QR_STAKE_PRESETS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={loading || s === qrData.stake_sk}
+                      onClick={() => void handleChangeStake(s)}
+                      className="text-xs font-semibold text-[#FFFF00] hover:underline disabled:opacity-40"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               {!expired ? (
                 <div className="mt-4 rounded-2xl bg-[#0a0a0a] p-4">
@@ -263,15 +355,22 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
                 </p>
               )}
 
-              <p className="mt-3 max-w-[280px] break-all text-center text-[10px] text-[#6B7280]">
-                {joinUrl}
-              </p>
+              {qrData.short_code ? (
+                <p className="mt-2 text-center text-xs text-[#9CA3AF]">
+                  Or share code <span className="font-mono text-white">{qrData.short_code}</span> for desktop entry
+                </p>
+              ) : null}
 
               <div className="mt-5 flex w-full gap-2">
                 {expired ? (
                   <button
                     type="button"
-                    onClick={() => setQrData(null)}
+                    onClick={() => {
+                      setQrData(null);
+                      if (isInstant && presetGame && presetStake != null) {
+                        void runGenerate(presetGame, presetStake);
+                      }
+                    }}
                     className="flex-1 rounded-xl bg-[#FFFF00] py-3 text-sm font-bold text-black"
                   >
                     New QR Code
@@ -289,9 +388,46 @@ export default function CreateQRMatch({ open, onClose, balanceSp, onMatchStarted
 
               <p className="mt-3 text-xs text-[#9CA3AF]">Waiting for opponent to scan…</p>
             </div>
+          ) : (
+            error && <p className="mt-6 text-center text-sm text-red-400">{error}</p>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Compact QR icon button for game cards */
+export function GameCardQRButton({
+  onClick,
+  loading,
+  error,
+}: {
+  onClick: () => void;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  return (
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }}
+        disabled={loading}
+        className="flex min-h-[44px] w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-white/90 transition hover:bg-white/[0.12] disabled:opacity-60"
+        style={{ background: "rgba(255, 255, 255, 0.08)" }}
+      >
+        {loading ? (
+          <LoadingRing size={16} />
+        ) : (
+          <QrCode className="h-4 w-4 shrink-0 text-white/70" strokeWidth={2} />
+        )}
+        <span>Quick Match</span>
+      </button>
+      {error ? <p className="mt-1 px-1 text-[10px] leading-tight text-red-400">{error}</p> : null}
     </div>
   );
 }

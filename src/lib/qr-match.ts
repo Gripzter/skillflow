@@ -13,6 +13,7 @@ export const QR_GAMES = [
 ] as const;
 
 export const QR_STAKE_PRESETS = [10, 25, 50, 100] as const;
+export const DEFAULT_QR_STAKE = 10;
 export const QR_MIN_STAKE = 5;
 export const QR_MAX_STAKE = 1000;
 
@@ -31,6 +32,7 @@ export type QRMatchPublic = {
 export type CreateQRMatchResult = {
   id: string;
   qr_token: string;
+  short_code: string;
   game: string;
   stake_sk: number;
   expires_at: string;
@@ -147,6 +149,22 @@ export async function getAnonymousPendingPayout(token: string) {
   });
   if (error) return { found: false };
   return data as { found: boolean; amount_sk?: number; expires_at?: string; qr_match_id?: string };
+}
+
+export function isQRSupportedGame(slug: string): boolean {
+  return QR_GAMES.some((g) => g.slug === slug);
+}
+
+export async function lookupQRMatchByShortCode(
+  shortCode: string
+): Promise<{ found: boolean; qr_token?: string; expired?: boolean; unavailable?: boolean }> {
+  const supabase = createClient();
+  if (!supabase) return { found: false };
+  const { data, error } = await supabase.rpc("get_qr_match_by_short_code", {
+    p_short_code: shortCode.trim().toUpperCase(),
+  });
+  if (error) throw new Error(error.message);
+  return data as { found: boolean; qr_token?: string; expired?: boolean; unavailable?: boolean };
 }
 
 export function formatGameName(slug: string): string {
