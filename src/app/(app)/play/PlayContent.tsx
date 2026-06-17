@@ -18,7 +18,7 @@ import { useRecentMatches } from "@/hooks/useRecentMatches";
 import { toLegacyChallengeRow, type DailyChallengeRow } from "@/lib/daily-challenges";
 import { redirectToAuthAction } from "@/lib/auth-action";
 import CreateQRMatch, { GameCardQRButton } from "@/components/CreateQRMatch";
-import { DEFAULT_QR_STAKE, isQRSupportedGame, lookupQRMatchByShortCode } from "@/lib/qr-match";
+import { isQRSupportedGame } from "@/lib/qr-match";
 
 const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
   { label: "ALL", value: "all" },
@@ -30,7 +30,7 @@ const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
 type QRModalState =
   | { open: false }
   | { open: true; mode: "select" }
-  | { open: true; mode: "instant"; game: string; stake: number };
+  | { open: true; mode: "instant"; game: string };
 
 function PlayGameCard({
   game,
@@ -40,11 +40,6 @@ function PlayGameCard({
   onQuickMatch,
   qrLoading,
   qrError,
-  codeExpanded,
-  onToggleCode,
-  onJoinCode,
-  codeError,
-  codeJoining,
 }: {
   game: {
     slug: string;
@@ -60,14 +55,8 @@ function PlayGameCard({
   onQuickMatch: (slug: string) => void;
   qrLoading?: boolean;
   qrError?: string | null;
-  codeExpanded: boolean;
-  onToggleCode: () => void;
-  onJoinCode: (code: string) => void;
-  codeError?: string | null;
-  codeJoining?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
-  const [codeInput, setCodeInput] = useState("");
   const isComingSoon = game.status === "coming_soon";
   const supportsQr = isQRSupportedGame(game.slug);
   const scopedChallenges = useMemo(
@@ -126,7 +115,7 @@ function PlayGameCard({
             {game.description}
           </p>
         ) : supportsQr ? (
-          <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <GameCardQRButton
               onClick={() => {
                 if (!isAuthenticated) {
@@ -138,36 +127,6 @@ function PlayGameCard({
               loading={qrLoading}
               error={qrError}
             />
-            <button
-              type="button"
-              onClick={onToggleCode}
-              className="block w-full text-left text-[10px] font-medium text-white/50 hover:text-[#FFFF00] transition-colors py-1"
-            >
-              {codeExpanded ? "Hide code entry" : "Have a code? Enter it"}
-            </button>
-            {codeExpanded ? (
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={codeInput}
-                  onChange={(e) => setCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))}
-                  placeholder="6-digit code"
-                  maxLength={6}
-                  className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/40 px-2 py-2 font-mono text-xs text-white placeholder:text-white/30 focus:border-[#FFFF00]/50 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  disabled={codeInput.length < 4 || codeJoining}
-                  onClick={() => onJoinCode(codeInput)}
-                  className="shrink-0 rounded-md bg-[#FFFF00] px-3 py-2 text-xs font-bold text-black disabled:opacity-40"
-                >
-                  Join
-                </button>
-              </div>
-            ) : null}
-            {codeExpanded && codeError ? (
-              <p className="text-[10px] text-red-400">{codeError}</p>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -205,9 +164,6 @@ export default function PlayContent() {
   const [qrModal, setQrModal] = useState<QRModalState>({ open: false });
   const [qrLoadingSlug, setQrLoadingSlug] = useState<string | null>(null);
   const [qrErrorBySlug, setQrErrorBySlug] = useState<Record<string, string>>({});
-  const [codeExpandedSlug, setCodeExpandedSlug] = useState<string | null>(null);
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [codeJoining, setCodeJoining] = useState(false);
 
   const { profile, loading } = useProfile();
   const isAuthenticated = !!profile.id;
@@ -238,30 +194,7 @@ export default function PlayContent() {
       return next;
     });
     setQrLoadingSlug(slug);
-    setQrModal({ open: true, mode: "instant", game: slug, stake: DEFAULT_QR_STAKE });
-  };
-
-  const handleJoinCode = async (code: string) => {
-    setCodeJoining(true);
-    setCodeError(null);
-    try {
-      const result = await lookupQRMatchByShortCode(code);
-      if (!result.found) {
-        setCodeError(result.expired ? "This code has expired." : "Code not found.");
-        return;
-      }
-      if (result.unavailable) {
-        setCodeError("This match was already claimed.");
-        return;
-      }
-      if (result.qr_token) {
-        router.push(`/join/${result.qr_token}`);
-      }
-    } catch (e) {
-      setCodeError(e instanceof Error ? e.message : "Could not look up code");
-    } finally {
-      setCodeJoining(false);
-    }
+    setQrModal({ open: true, mode: "instant", game: slug });
   };
 
   return (
@@ -297,10 +230,8 @@ export default function PlayContent() {
             setQrModal({ open: false });
             setQrLoadingSlug(null);
           }}
-          balanceSp={profile.balanceSp ?? 0}
           mode={qrModal.open && qrModal.mode === "instant" ? "instant" : "select"}
           presetGame={qrModal.open && qrModal.mode === "instant" ? qrModal.game : null}
-          presetStake={qrModal.open && qrModal.mode === "instant" ? qrModal.stake : null}
           onMatchStarted={(matchId) => {
             setQrModal({ open: false });
             setQrLoadingSlug(null);
@@ -346,13 +277,6 @@ export default function PlayContent() {
               onQuickMatch={handleQuickMatch}
               qrLoading={qrLoadingSlug === game.slug && qrModal.open}
               qrError={qrErrorBySlug[game.slug] ?? null}
-              codeExpanded={codeExpandedSlug === game.slug}
-              onToggleCode={() =>
-                setCodeExpandedSlug((prev) => (prev === game.slug ? null : game.slug))
-              }
-              onJoinCode={handleJoinCode}
-              codeError={codeExpandedSlug === game.slug ? codeError : null}
-              codeJoining={codeJoining}
             />
           ))}
         </div>
