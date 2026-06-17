@@ -16,7 +16,21 @@ function matchesPrefix(pathname: string, prefix: string) {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-export function isProtectedPath(pathname: string) {
+/** QR in-person flow: join, stake, and guest match play must work without auth */
+function isQrPublicPath(pathname: string) {
+  return matchesPrefix(pathname, "/join") || matchesPrefix(pathname, "/qr");
+}
+
+export function isProtectedPath(pathname: string, searchParams?: URLSearchParams) {
+  if (isQrPublicPath(pathname)) {
+    return false;
+  }
+
+  // Anonymous QR opponents play matches with ?guest=1
+  if (matchesPrefix(pathname, "/match") && searchParams?.get("guest") === "1") {
+    return false;
+  }
+
   if (
     pathname === "/" ||
     pathname === "/play" ||

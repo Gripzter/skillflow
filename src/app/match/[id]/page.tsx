@@ -9,6 +9,7 @@ import LoadingRing from "@/components/LoadingRing";
 import {
   getCurrentUser,
   getMatch,
+  getQrGuestMatch,
   completeMatchAndSettle,
   updateMatch as apiUpdateMatch,
   submitReport,
@@ -41,7 +42,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
 import { AnonymousWinClaimBanner } from "@/components/AnonymousWinClaim";
-import { getAnonymousGuestId } from "@/lib/qr-match";
+import { getAnonymousGuestId, getOrCreateAnonymousToken } from "@/lib/qr-match";
 import { pickOpponentName } from "@/lib/opponentNames";
 import { getEquippedCosmeticsBatch, type UserCosmeticsSnapshot } from "@/lib/cases";
 
@@ -282,8 +283,13 @@ function MatchPageContent() {
       setLoadError(null);
       try {
         const guestId = isGuestMode ? getAnonymousGuestId() : null;
+        const anonToken = isGuestMode ? getOrCreateAnonymousToken() : null;
 
-        if (guestId) {
+        if (isGuestMode && anonToken) {
+          setIsQrGuest(true);
+          setUsername("Guest");
+          setUserId(guestId ?? anonToken.slice(0, 36));
+        } else if (guestId) {
           setIsQrGuest(true);
           setUsername("Guest");
           setUserId(guestId);
@@ -307,7 +313,10 @@ function MatchPageContent() {
           }
         }
 
-        const m = await getMatch(matchId);
+        const m =
+          isGuestMode && anonToken
+            ? await getQrGuestMatch(matchId, anonToken)
+            : await getMatch(matchId);
         if (!m) {
           setLoadError("Match not found. It may have been cancelled or the link is invalid.");
           setLoading(false);

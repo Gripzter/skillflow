@@ -13,8 +13,6 @@ export const QR_GAMES = [
 ] as const;
 
 export const QR_STAKE_PRESETS = [10, 25, 50, 100] as const;
-export const QR_MIN_STAKE = 5;
-export const QR_MAX_STAKE = 1000;
 
 export type QRMatchPublic = {
   found: boolean;
@@ -53,9 +51,7 @@ export type QRNegotiationState = {
   id?: string;
   game?: string;
   status?: string;
-  stake_status?: string;
   stake_sk?: number | null;
-  proposed_stake_sk?: number | null;
   match_id?: string | null;
   opponent_is_anonymous?: boolean;
   host_username?: string;
@@ -152,36 +148,26 @@ export async function acceptQRMatch(
   return data as AcceptQRMatchResult;
 }
 
-export async function proposeStake(qrMatchId: string, amountSk: number) {
+export async function setStake(qrMatchId: string, amountSk: number) {
   const supabase = createClient();
   if (!supabase) throw new Error("Supabase not configured");
-  const { data, error } = await supabase.rpc("propose_stake", {
+  const { data, error } = await supabase.rpc("set_stake", {
     p_qr_match_id: qrMatchId,
     p_amount_sk: amountSk,
   });
   if (error) throw new Error(error.message);
-  return data as { qr_match_id: string; proposed_stake_sk: number; stake_status: string };
+  return data as { match_id: string; stake_sk: number; status: string };
 }
 
-export async function respondToStake(
-  qrMatchId: string,
-  accept: boolean,
-  anonymousSessionToken?: string | null
-) {
+export async function fetchQrGuestMatch(matchId: string, anonymousSessionToken: string) {
   const supabase = createClient();
-  if (!supabase) throw new Error("Supabase not configured");
-  const { data, error } = await supabase.rpc("respond_to_stake", {
-    p_qr_match_id: qrMatchId,
-    p_accept: accept,
-    p_anonymous_session_token: anonymousSessionToken ?? null,
+  if (!supabase) return { found: false as const };
+  const { data, error } = await supabase.rpc("get_qr_guest_match", {
+    p_match_id: matchId,
+    p_anonymous_session_token: anonymousSessionToken,
   });
   if (error) throw new Error(error.message);
-  return data as {
-    stake_status: string;
-    accepted: boolean;
-    match_id?: string;
-    stake_sk?: number;
-  };
+  return data as { found: boolean; match?: Record<string, unknown> };
 }
 
 export async function fetchNegotiationState(

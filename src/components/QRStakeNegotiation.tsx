@@ -7,15 +7,12 @@ import SkilliesIcon from "@/components/SkilliesIcon";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
 import { createClient } from "@/lib/supabase";
 import {
-  QR_MAX_STAKE,
-  QR_MIN_STAKE,
   QR_STAKE_PRESETS,
   fetchNegotiationState,
   formatGameName,
   getAnonymousTokenFromCookie,
   getOrCreateAnonymousToken,
-  proposeStake,
-  respondToStake,
+  setStake,
   type QRNegotiationState,
 } from "@/lib/qr-match";
 
@@ -31,10 +28,9 @@ function applyRowToState(
 ): QRNegotiationState {
   return {
     ...prev,
+    found: true,
     status: row.status as string,
-    stake_status: row.stake_status as string,
     stake_sk: row.stake_sk as number | null,
-    proposed_stake_sk: row.proposed_stake_sk as number | null,
     match_id: row.match_id as string | null,
   };
 }
@@ -44,63 +40,55 @@ export default function QRStakeNegotiation({ qrMatchId, isGuest, balanceSp = 0 }
   const [state, setState] = useState<QRNegotiationState>({ found: false });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stake, setStake] = useState<number>(25);
-  const [customStake, setCustomStake] = useState("");
-  const [proposing, setProposing] = useState(false);
-  const [responding, setResponding] = useState(false);
-  const [acceptedFlash, setAcceptedFlash] = useState(false);
-  const [editingProposal, setEditingProposal] = useState(false);
+  const [settingStake, setSettingStake] = useState<number | null>(null);
 
   const anonToken = useMemo(
     () => (isGuest ? getOrCreateAnonymousToken() : getAnonymousTokenFromCookie()),
     [isGuest]
   );
 
-  const effectiveStake = useMemo(() => {
-    if (customStake.trim()) {
-      const n = parseInt(customStake, 10);
-      if (!Number.isNaN(n)) return n;
-    }
-    return stake;
-  }, [customStake, stake]);
-
-  const stakeValid = effectiveStake >= QR_MIN_STAKE && effectiveStake <= QR_MAX_STAKE;
-  const canAfford = balanceSp >= effectiveStake;
-
   const loadState = useCallback(async () => {
     try {
       const data = await fetchNegotiationState(qrMatchId, isGuest ? anonToken : null);
-      setState(data);
-      setError(data.found ? null : "match not found");
+      if (data.found) {
+        setState(data);
+        setError(null);
+      } else if (!state.found) {
+        setError("couldn't find this match — it may have expired.");
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "could not load match");
+      const msg = e instanceof Error ? e.message : "could not load match";
+      if (!state.found) {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
-  }, [qrMatchId, isGuest, anonToken]);
+  }, [qrMatchId, isGuest, anonToken, state.found]);
 
   useEffect(() => {
     void loadState();
   }, [loadState]);
 
+  const goToMatch = useCallback(
+    (matchId: string) => {
+      router.push(`/match/${matchId}${isGuest ? "?guest=1" : ""}`);
+    },
+    [isGuest, router]
+  );
+
   useEffect(() => {
     if (state.status === "in_progress" && state.match_id) {
-      if (acceptedFlash) {
-        const t = window.setTimeout(() => {
-          router.push(`/match/${state.match_id}${isGuest ? "?guest=1" : ""}`);
-        }, 600);
-        return () => window.clearTimeout(t);
-      }
-      router.push(`/match/${state.match_id}${isGuest ? "?guest=1" : ""}`);
+      goToMatch(state.match_id);
     }
-  }, [state.status, state.match_id, acceptedFlash, isGuest, router]);
+  }, [state.status, state.match_id, goToMatch]);
 
   useEffect(() => {
     const supabase = createClient();
     if (!supabase) return;
 
     const channel = supabase
-      .channel(`qr-negotiation:${qrMatchId}`)
+      .channel(`qr-stake:${qrMatchId}`)
       .on(
         "postgres_changes",
         {
@@ -110,66 +98,50 @@ export default function QRStakeNegotiation({ qrMatchId, isGuest, balanceSp = 0 }
           filter: `id=eq.${qrMatchId}`,
         },
         (payload) => {
-          setState((prev) => applyRowToState(prev, payload.new as Record<string, unknown>));
-          if ((payload.new as { stake_status?: string }).stake_status === "pending") {
-            setEditingProposal(false);
+          const row = payload.new as Record<string, unknown>;
+          setState((prev) => applyRowToState(prev, row));
+          const matchId = row.match_id as string | null;
+          const status = row.status as string;
+          if (status === "in_progress" && matchId) {
+            goToMatch(matchId);
           }
         }
       )
       .subscribe();
 
-    const poll = isGuest
-      ? window.setInterval(() => {
-          void loadState();
-        }, 1500)
-      : null;
+    const poll = window.setInterval(() => {
+      void loadState();
+    }, isGuest ? 1500 : 2000);
 
     return () => {
-      if (poll) window.clearInterval(poll);
+      window.clearInterval(poll);
       void supabase.removeChannel(channel);
     };
-  }, [qrMatchId, isGuest, loadState]);
+  }, [qrMatchId, isGuest, loadState, goToMatch]);
 
-  const handlePropose = useCallback(async () => {
-    if (!stakeValid || !canAfford) return;
-    setProposing(true);
-    setError(null);
-    try {
-      await proposeStake(qrMatchId, effectiveStake);
-      setEditingProposal(false);
-      await loadState();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "could not propose stake");
-    } finally {
-      setProposing(false);
-    }
-  }, [qrMatchId, effectiveStake, stakeValid, canAfford, loadState]);
-
-  const handleRespond = useCallback(
-    async (accept: boolean) => {
-      setResponding(true);
+  const handlePickStake = useCallback(
+    async (amount: number) => {
+      if (balanceSp < amount) {
+        setError(`insufficient balance — need ${amount} SK.`);
+        return;
+      }
+      setSettingStake(amount);
       setError(null);
       try {
-        const result = await respondToStake(qrMatchId, accept, isGuest ? anonToken : null);
-        if (result.accepted && result.match_id) {
-          setAcceptedFlash(true);
-          setState((prev) => ({
-            ...prev,
-            status: "in_progress",
-            match_id: result.match_id,
-            stake_sk: result.stake_sk,
-            stake_status: "accepted",
-          }));
-        } else {
-          await loadState();
-        }
+        const result = await setStake(qrMatchId, amount);
+        setState((prev) => ({
+          ...prev,
+          status: "in_progress",
+          stake_sk: result.stake_sk,
+          match_id: result.match_id,
+        }));
+        goToMatch(result.match_id);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "could not respond");
-      } finally {
-        setResponding(false);
+        setError(e instanceof Error ? e.message : "could not start match");
+        setSettingStake(null);
       }
     },
-    [qrMatchId, isGuest, anonToken, loadState]
+    [qrMatchId, balanceSp, goToMatch]
   );
 
   if (loading) {
@@ -183,159 +155,109 @@ export default function QRStakeNegotiation({ qrMatchId, isGuest, balanceSp = 0 }
   if (!state.found) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-xl font-bold">match not found</p>
-        {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
-      </div>
-    );
-  }
-
-  if (acceptedFlash) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-2xl font-black text-[#FFFF00]">locked in.</p>
-        <p className="mt-2 text-sm text-[#9CA3AF]">starting match…</p>
+        <p className="text-xl font-bold">couldn&apos;t find this match</p>
+        <p className="mt-2 text-sm text-[#9CA3AF]">
+          {error ?? "it may have expired or been cancelled."}
+        </p>
       </div>
     );
   }
 
   const isHost = state.role === "host";
   const isOpponent = state.role === "opponent";
-  const stakePending = state.stake_status === "pending";
-  const stakeProposed = state.stake_status === "proposed";
-  const proposedAmount = state.proposed_stake_sk ?? 0;
+  const waitingForStake = state.status === "accepted" && !state.match_id;
 
-  return (
-    <div className="flex min-h-screen flex-col bg-[#0E0E12] text-white">
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-8">
-        <p className="text-center text-xs font-semibold uppercase tracking-widest text-[#9CA3AF]">
+  if (isOpponent && waitingForStake) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-6 text-center text-white">
+        <LoadingRing size={36} />
+        <p className="mt-6 text-xs font-semibold uppercase tracking-widest text-[#9CA3AF]">
           {formatGameName(state.game ?? "")}
         </p>
+        <h1 className="mt-3 text-xl font-black leading-snug">
+          waiting for {state.host_username ?? "host"} to set the stake
+        </h1>
+        <div className="mt-6">
+          <AvatarWithBorder
+            src={state.host_avatar_url}
+            fallbackInitial={(state.host_username ?? "H").charAt(0).toUpperCase()}
+            size="lg"
+          />
+        </div>
+        <p className="mt-6 max-w-xs text-sm text-[#6B7280]">
+          hang tight — match starts the moment they pick an amount.
+        </p>
+      </div>
+    );
+  }
 
-        {isHost ? (
-          <>
-            <h1 className="mt-3 text-center text-xl font-black">you&apos;re matched! propose your stake.</h1>
-            <div className="mt-6 flex flex-col items-center">
+  if (isHost && waitingForStake) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#0E0E12] text-white">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-5 py-10">
+          <div className="flex w-full max-w-sm flex-col items-center text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9CA3AF]">
+              {formatGameName(state.game ?? "").toUpperCase()}
+            </p>
+
+            <h1 className="mt-4 text-2xl font-black leading-tight">
+              you&apos;re matched! pick your stake.
+            </h1>
+
+            <div className="mt-8">
               <AvatarWithBorder
                 src={state.opponent_avatar_url}
                 fallbackInitial={(state.opponent_username ?? "A").charAt(0).toUpperCase()}
                 size="lg"
               />
-              <p className="mt-2 text-sm font-semibold">{state.opponent_username ?? "Anonymous Player"}</p>
+              <p className="mt-3 text-base font-semibold">
+                {state.opponent_username ?? "Anonymous Player"}
+              </p>
             </div>
 
-            {(stakePending || (stakeProposed && editingProposal)) ? (
-              <div className="mt-8">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[#9CA3AF]">Stake (SK)</p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {QR_STAKE_PRESETS.map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => {
-                        setStake(preset);
-                        setCustomStake("");
-                      }}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
-                        stake === preset && !customStake
-                          ? "border-[#FFFF00] bg-[#FFFF00] text-black"
-                          : "border-[#1F1F26] bg-[#16161C] text-[#9CA3AF] hover:text-white"
-                      }`}
-                    >
-                      {preset}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="number"
-                  min={QR_MIN_STAKE}
-                  max={QR_MAX_STAKE}
-                  placeholder={`Custom (${QR_MIN_STAKE}–${QR_MAX_STAKE})`}
-                  value={customStake}
-                  onChange={(e) => setCustomStake(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[#1F1F26] bg-[#16161C] px-4 py-2.5 text-sm text-white placeholder:text-[#6B7280] focus:border-[#FFFF00] focus:outline-none"
-                />
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-[#9CA3AF]">
-                  Your balance: {balanceSp.toLocaleString()} <SkilliesIcon className="h-3.5 w-3.5" />
-                </p>
-                {!canAfford && stakeValid ? (
-                  <p className="mt-2 text-sm text-amber-400">insufficient SkillPoints for this stake.</p>
-                ) : null}
-                {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
-                <button
-                  type="button"
-                  disabled={proposing || !stakeValid || !canAfford}
-                  onClick={() => void handlePropose()}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFFF00] py-3.5 text-sm font-bold text-black disabled:opacity-40"
-                >
-                  {proposing ? <LoadingRing size={20} /> : null}
-                  Propose Stake
-                </button>
-              </div>
-            ) : stakeProposed && !editingProposal ? (
-              <div className="mt-8 rounded-2xl border border-[#1F1F26] bg-[#16161C] p-6 text-center">
-                <p className="text-sm text-[#9CA3AF]">
-                  waiting for {state.opponent_username ?? "opponent"} to respond…
-                </p>
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-3xl font-black text-[#FFFF00]">
-                  {proposedAmount} <SkilliesIcon className="h-7 w-7" />
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setEditingProposal(true)}
-                  className="mt-4 text-xs font-semibold text-[#FFFF00] hover:underline"
-                >
-                  Change amount
-                </button>
-              </div>
-            ) : null}
-          </>
-        ) : isOpponent ? (
-          <>
-            {stakeProposed ? (
-              <>
-                <h1 className="mt-3 text-center text-xl font-black leading-snug">
-                  {state.host_username ?? "Host"} wants to play for{" "}
-                  <span className="text-[#FFFF00]">{proposedAmount} SK</span>
-                </h1>
-                <div className="mt-6 flex flex-col items-center">
-                  <AvatarWithBorder
-                    src={state.host_avatar_url}
-                    fallbackInitial={(state.host_username ?? "H").charAt(0).toUpperCase()}
-                    size="lg"
-                  />
-                </div>
-                {error ? <p className="mt-4 text-center text-sm text-red-400">{error}</p> : null}
-                <div className="mt-8 flex flex-col gap-3">
+            <p className="mt-5 text-sm italic text-[#9CA3AF]">winner takes it all.</p>
+
+            <div className="mt-8 grid w-full grid-cols-2 gap-3">
+              {QR_STAKE_PRESETS.map((preset) => {
+                const disabled = settingStake !== null || balanceSp < preset;
+                const isLoading = settingStake === preset;
+                return (
                   <button
+                    key={preset}
                     type="button"
-                    disabled={responding}
-                    onClick={() => void handleRespond(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFFF00] py-4 text-base font-black text-black disabled:opacity-50"
+                    disabled={disabled}
+                    onClick={() => void handlePickStake(preset)}
+                    className="flex min-h-[88px] flex-col items-center justify-center rounded-2xl border border-[#1F1F26] bg-[#16161C] px-4 py-5 transition duration-150 hover:border-[#FFFF00] hover:bg-[#FFFF00]/10 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {responding ? <LoadingRing size={22} /> : null}
-                    Accept
+                    {isLoading ? (
+                      <LoadingRing size={22} />
+                    ) : (
+                      <>
+                        <span className="text-3xl font-black text-[#FFFF00]">{preset}</span>
+                        <span className="mt-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest text-[#9CA3AF]">
+                          SK <SkilliesIcon className="h-3 w-3" />
+                        </span>
+                      </>
+                    )}
                   </button>
-                  <button
-                    type="button"
-                    disabled={responding}
-                    onClick={() => void handleRespond(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#1F1F26] py-4 text-base font-semibold text-[#9CA3AF] hover:text-white disabled:opacity-50"
-                  >
-                    Decline
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="mt-12 text-center">
-                <p className="text-lg font-bold text-[#9CA3AF]">waiting for a new offer…</p>
-                <p className="mt-2 text-sm text-[#6B7280]">
-                  {state.host_username ?? "Host"} is setting the stake.
-                </p>
-              </div>
-            )}
-          </>
-        ) : null}
-      </main>
+                );
+              })}
+            </div>
+
+            <p className="mt-6 flex items-center gap-1.5 text-xs text-[#6B7280]">
+              balance: {balanceSp.toLocaleString()} <SkilliesIcon className="h-3.5 w-3.5" />
+            </p>
+
+            {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#0E0E12]">
+      <LoadingRing size={32} />
     </div>
   );
 }

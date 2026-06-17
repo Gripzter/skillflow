@@ -11,7 +11,7 @@ function applyNoCacheHeaders(response: NextResponse) {
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
-  const protectedPath = isProtectedPath(pathname);
+  const protectedPath = isProtectedPath(pathname, request.nextUrl.searchParams);
   let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

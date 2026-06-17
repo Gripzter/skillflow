@@ -449,6 +449,16 @@ export async function getMatch(id: string): Promise<StoredMatch | null> {
   return mapDbMatchToStoredMatch(data);
 }
 
+export async function getQrGuestMatch(
+  matchId: string,
+  anonymousSessionToken: string
+): Promise<StoredMatch | null> {
+  const { fetchQrGuestMatch } = await import("@/lib/qr-match");
+  const result = await fetchQrGuestMatch(matchId, anonymousSessionToken);
+  if (!result.found || !result.match) return null;
+  return mapDbMatchToStoredMatch(result.match);
+}
+
 export async function getMatches(): Promise<StoredMatch[]> {
   if (isDevMode()) return getLocalMatches();
   const supabase = createClient();
