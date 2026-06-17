@@ -207,7 +207,7 @@ export default function CreateQRMatch({
       }
       if (result.qr_token) {
         onClose();
-        router.push(`/join/${result.qr_token}`);
+        router.push(`/join/${codeInput.trim().toUpperCase()}`);
       }
     } catch (e) {
       setCodeError(e instanceof Error ? e.message : "Could not look up code");
@@ -218,7 +218,7 @@ export default function CreateQRMatch({
 
   if (!open) return null;
 
-  const joinUrl = qrData ? getJoinUrl(qrData.qr_token) : "";
+  const joinUrl = qrData?.short_code ? getJoinUrl(qrData.short_code) : "";
   const showSelection = !isInstant && !qrData;
 
   return (
@@ -321,18 +321,19 @@ export default function CreateQRMatch({
           ) : qrData ? (
             <div className="mt-5 flex flex-col items-center">
               {!expired ? (
-                <div className="w-full rounded-2xl bg-[#0a0a0a] p-5">
+                <div className="w-full rounded-2xl bg-[#0a0a0a] p-6">
                   <p className="text-center text-sm font-bold uppercase tracking-widest text-[#9CA3AF]">
                     {formatGameName(qrData.game)}
                   </p>
-                  <div className="mx-auto mt-3 flex w-[65%] max-w-[280px] justify-center">
+                  <div className="mx-auto mt-4 flex w-full max-w-[320px] justify-center px-2">
                     <QRCodeSVG
                       value={joinUrl}
-                      size={256}
-                      level="M"
+                      size={300}
+                      level="L"
                       bgColor="#0a0a0a"
                       fgColor="#FFFF00"
                       className="h-auto w-full"
+                      marginSize={3}
                       includeMargin
                     />
                   </div>

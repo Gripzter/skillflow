@@ -1,14 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import LoadingRing from "@/components/LoadingRing";
-import AvatarWithBorder from "@/components/AvatarWithBorder";
 import { createClient } from "@/lib/supabase";
 import {
   acceptQRMatch,
-  formatGameName,
   getOrCreateAnonymousToken,
   storeAnonymousGuestId,
   type QRMatchPublic,
@@ -19,52 +17,41 @@ type Props = {
   initialMatch: QRMatchPublic;
 };
 
-function gameIcon(slug: string): string {
-  const icons: Record<string, string> = {
-    chess: "♟️",
-    "connect-4": "🔴",
-    checkers: "⬛",
-    "reaction-duel": "⚡",
-    "memory-match": "🧠",
-    "spelling-bee": "🐝",
-  };
-  return icons[slug] ?? "🎮";
+type JoinPhase = "loading" | "joining" | "redirecting" | "error" | "unavailable";
+
+function parseErrorMessage(message: string): string {
+  if (message.includes("QR_EXPIRED") || message.includes("expired")) {
+    return "this code went stale.";
+  }
+  if (message.includes("QR_NOT_AVAILABLE") || message.includes("already")) {
+    return "this match was already claimed.";
+  }
+  if (message.includes("CANNOT_PLAY_SELF")) {
+    return "you can't join your own match.";
+  }
+  return message;
 }
 
 export default function JoinQRMatchClient({ token, initialMatch }: Props) {
   const router = useRouter();
-  const [match, setMatch] = useState(initialMatch);
-  const [accepting, setAccepting] = useState(false);
+  const [match] = useState(initialMatch);
+  const [phase, setPhase] = useState<JoinPhase>("loading");
   const [error, setError] = useState<string | null>(null);
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const joinStarted = useRef(false);
 
-  useEffect(() => {
-    async function checkSession() {
-      const supabase = createClient();
-      if (!supabase) {
-        setCheckingSession(false);
-        return;
-      }
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setSessionUserId(session?.user?.id ?? null);
-      setCheckingSession(false);
-    }
-    void checkSession();
-  }, []);
-
-  useEffect(() => {
-    if (match.status === "accepted" && match.id) {
-      router.replace(`/qr/${match.id}/negotiate${sessionUserId ? "" : "?guest=1"}`);
-    }
-  }, [match.status, match.id, sessionUserId, router]);
-
-  const handleAccept = useCallback(async () => {
-    setAccepting(true);
+  const runJoin = useCallback(async () => {
+    setPhase("joining");
     setError(null);
     try {
+      const supabase = createClient();
+      let sessionUserId: string | null = null;
+      if (supabase) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        sessionUserId = session?.user?.id ?? null;
+      }
+
       let opponentUserId: string | null = sessionUserId;
       let anonymousToken: string | null = null;
 
@@ -82,19 +69,71 @@ export default function JoinQRMatchClient({ token, initialMatch }: Props) {
         storeAnonymousGuestId(result.anonymous_guest_id);
       }
 
+      setPhase("redirecting");
       const guestParam = result.opponent_is_anonymous ? "?guest=1" : "";
-      router.push(`/qr/${result.qr_match_id}/negotiate${guestParam}`);
+      router.replace(`/qr/${result.qr_match_id}/negotiate${guestParam}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not join match");
-      setAccepting(false);
+      const msg = e instanceof Error ? e.message : "Could not join match";
+      setError(parseErrorMessage(msg));
+      setPhase("error");
     }
-  }, [token, sessionUserId, router]);
+  }, [token, router]);
+
+  useEffect(() => {
+    if (!match.found) {
+      setPhase("unavailable");
+      return;
+    }
+
+    if (match.status === "in_progress" && match.match_id) {
+      router.replace(`/match/${match.match_id}`);
+      return;
+    }
+
+    if (match.status === "accepted" && match.id) {
+      setPhase("redirecting");
+      void (async () => {
+        const supabase = createClient();
+        let guestSuffix = "?guest=1";
+        if (supabase) {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          if (session?.user?.id) guestSuffix = "";
+        }
+        router.replace(`/qr/${match.id}/negotiate${guestSuffix}`);
+      })();
+      return;
+    }
+
+    const isExpired =
+      match.status === "expired" ||
+      (match.status === "pending" &&
+        match.expires_at &&
+        new Date(match.expires_at).getTime() <= Date.now());
+
+    if (isExpired) {
+      setPhase("unavailable");
+      setError("this code went stale.");
+      return;
+    }
+
+    if (match.status !== "pending") {
+      setPhase("unavailable");
+      setError("this match is no longer available.");
+      return;
+    }
+
+    if (joinStarted.current) return;
+    joinStarted.current = true;
+    void runJoin();
+  }, [match, router, runJoin]);
 
   if (!match.found) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-xl font-bold">Match not found</p>
-        <p className="mt-2 text-sm text-[#9CA3AF]">This link may be invalid or expired.</p>
+        <p className="text-xl font-bold">match not found</p>
+        <p className="mt-2 text-sm text-[#9CA3AF]">this link may be invalid or expired.</p>
         <Link href="/" className="mt-6 text-sm text-[#FFFF00] hover:underline">
           Go to SkillFlow
         </Link>
@@ -102,50 +141,13 @@ export default function JoinQRMatchClient({ token, initialMatch }: Props) {
     );
   }
 
-  if (match.status === "in_progress" && match.match_id) {
+  if (phase === "unavailable" || phase === "error") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-xl font-bold">Match already started</p>
-        <Link
-          href={`/match/${match.match_id}`}
-          className="mt-6 rounded-xl bg-[#FFFF00] px-6 py-3 text-sm font-bold text-black"
-        >
-          Open match
-        </Link>
-      </div>
-    );
-  }
-
-  if (match.status === "accepted" && match.id) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0E0E12]">
-        <LoadingRing size={32} />
-      </div>
-    );
-  }
-
-  const isExpired =
-    match.status === "expired" ||
-    (match.status === "pending" &&
-      match.expires_at &&
-      new Date(match.expires_at).getTime() <= Date.now());
-
-  if (isExpired) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-xl font-bold">this code went stale.</p>
-        <p className="mt-2 text-sm text-[#9CA3AF]">ask the host to generate a new one.</p>
-        <Link href="/" className="mt-6 text-sm text-[#FFFF00] hover:underline">
-          Go to SkillFlow
-        </Link>
-      </div>
-    );
-  }
-
-  if (match.status !== "pending") {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
-        <p className="text-xl font-bold">This match is no longer available</p>
+        <p className="text-xl font-bold">{error ?? "this match is no longer available"}</p>
+        {phase === "error" && error !== "this code went stale." ? (
+          <p className="mt-2 text-sm text-[#9CA3AF]">try scanning a fresh code from the host.</p>
+        ) : null}
         <Link href="/" className="mt-6 text-sm text-[#FFFF00] hover:underline">
           Go to SkillFlow
         </Link>
@@ -154,49 +156,11 @@ export default function JoinQRMatchClient({ token, initialMatch }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#0E0E12] text-white">
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-8">
-        <div className="flex flex-col items-center text-center">
-          <AvatarWithBorder
-            src={match.host_avatar_url}
-            fallbackInitial={(match.host_username ?? "H").charAt(0).toUpperCase()}
-            size="lg"
-          />
-          <p className="mt-3 text-lg font-bold">{match.host_username ?? "Player"}</p>
-          <p className="text-sm text-[#9CA3AF]">invites you to play</p>
-        </div>
-
-        <div className="mt-8 rounded-2xl border border-[#1F1F26] bg-[#16161C] p-6 text-center">
-          <span className="text-4xl">{gameIcon(match.game ?? "")}</span>
-          <p className="mt-3 text-xl font-black">{formatGameName(match.game ?? "")}</p>
-        </div>
-
-        {sessionUserId ? (
-          <p className="mt-4 text-center text-xs text-[#9CA3AF]">
-            signed in — you&apos;ll agree on a stake after joining.
-          </p>
-        ) : (
-          <p className="mt-4 text-center text-xs text-[#9CA3AF]">
-            no account needed. win and sign up later to claim your SkillPoints.
-          </p>
-        )}
-
-        {error ? <p className="mt-4 text-center text-sm text-red-400">{error}</p> : null}
-
-        <button
-          type="button"
-          disabled={accepting || checkingSession}
-          onClick={() => void handleAccept()}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#FFFF00] py-4 text-base font-black text-black disabled:opacity-50"
-        >
-          {accepting || checkingSession ? <LoadingRing size={22} /> : null}
-          Join Match
-        </button>
-      </main>
-
-      <footer className="border-t border-[#1F1F26] py-4 text-center text-xs text-[#6B7280]">
-        Powered by <span className="font-semibold text-[#9CA3AF]">SkillFlow</span>
-      </footer>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#0E0E12] px-4 text-center text-white">
+      <LoadingRing size={36} />
+      <p className="mt-4 text-sm font-semibold text-[#9CA3AF]">
+        {phase === "redirecting" ? "heading to stake negotiation…" : "joining match…"}
+      </p>
     </div>
   );
 }

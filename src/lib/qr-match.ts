@@ -72,12 +72,12 @@ export function getNegotiateUrl(qrMatchId: string, guest = false): string {
   return `${base}/qr/${qrMatchId}/negotiate${guest ? "?guest=1" : ""}`;
 }
 
-export function getJoinUrl(qrToken: string): string {
+export function getJoinUrl(shortCode: string): string {
   const base =
     typeof window !== "undefined"
       ? window.location.origin
       : process.env.NEXT_PUBLIC_SITE_URL ?? "https://skillflow.gg";
-  return `${base}/join/${qrToken}`;
+  return `${base}/join/${shortCode}`;
 }
 
 export function getOrCreateAnonymousToken(): string {
