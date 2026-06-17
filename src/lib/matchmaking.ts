@@ -105,6 +105,8 @@ export interface StoredMatch {
   player2Id?: string;
   /** Real match flag for bot opponents */
   isBot?: boolean;
+  /** QR in-person match (realtime PvP, possibly with anonymous guest) */
+  isQrMatch?: boolean;
   /** Practice only: bot difficulty */
   botDifficulty?: "rookie" | "gamer" | "professional";
   /** Persisted replay log (Supabase JSONB: move_log). */

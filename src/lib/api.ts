@@ -88,6 +88,8 @@ function mapDbMatchToStoredMatch(row: {
   player2_remaining_time_ms?: number | null;
   active_turn?: string | null;
   turn_started_at?: string | null;
+  qr_match_id?: string | null;
+  player_b_is_bot?: boolean | null;
 }): StoredMatch {
   const status =
     row.status === "completed" || row.status === "draw"
@@ -121,10 +123,12 @@ function mapDbMatchToStoredMatch(row: {
     status,
     winner,
     createdAt: row.created_at,
-    isRealMultiplayer: !!row.player2_id && !row.is_bot,
+    isRealMultiplayer:
+      !!row.qr_match_id || (!!row.player2_id && !row.is_bot && !row.player_b_is_bot),
+    isQrMatch: !!row.qr_match_id,
     player1Id: row.player1_id ?? undefined,
     player2Id: row.player2_id ?? undefined,
-    isBot: !!row.is_bot,
+    isBot: !!row.is_bot || !!row.player_b_is_bot,
     botDifficulty:
       row.bot_difficulty === "rookie" || row.bot_difficulty === "gamer" || row.bot_difficulty === "professional"
         ? row.bot_difficulty

@@ -40,6 +40,8 @@ import { usePlayMode } from "@/contexts/PlayModeContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useToast } from "@/components/Toast";
 import SettlementErrorScreen from "@/components/match/SettlementErrorScreen";
+import { AnonymousWinClaimBanner } from "@/components/AnonymousWinClaim";
+import { getAnonymousGuestId } from "@/lib/qr-match";
 import { pickOpponentName } from "@/lib/opponentNames";
 import { getEquippedCosmeticsBatch, type UserCosmeticsSnapshot } from "@/lib/cases";
 
@@ -127,11 +129,13 @@ function MatchPageContent() {
   const params = useParams();
   const matchId = (params?.id as string) || "";
   const opponentNameFromUrl = searchParams.get("opponent");
+  const isGuestMode = searchParams.get("guest") === "1";
   const { isPractice } = usePlayMode();
   const { showToast } = useToast();
 
   const [username, setUsername] = useState<string>("Player");
   const [userId, setUserId] = useState<string>("");
+  const [isQrGuest, setIsQrGuest] = useState(false);
   const [matchAvatars, setMatchAvatars] = useState<Record<string, string | null>>({});
   const [matchCosmetics, setMatchCosmetics] = useState<Record<string, UserCosmeticsSnapshot>>({});
   const [loading, setLoading] = useState(true);
@@ -277,23 +281,32 @@ function MatchPageContent() {
     async function load() {
       setLoadError(null);
       try {
-        const user = await getCurrentUser();
-        if (!user) {
-          router.push("/login");
-          return;
+        const guestId = isGuestMode ? getAnonymousGuestId() : null;
+
+        if (guestId) {
+          setIsQrGuest(true);
+          setUsername("Guest");
+          setUserId(guestId);
+        } else {
+          const user = await getCurrentUser();
+          if (!user) {
+            router.push("/login");
+            return;
+          }
+          setUsername(user.username);
+          setUserId(user.id);
+          setIsDevMode(user.isDevMode ?? false);
+          const supabase = createClient();
+          if (supabase) {
+            const { count: completedCount } = await supabase
+              .from("matches")
+              .select("id", { count: "exact", head: true })
+              .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
+              .eq("status", "completed");
+            setPreMatchCompletedCount(completedCount ?? 0);
+          }
         }
-        setUsername(user.username);
-        setUserId(user.id);
-        setIsDevMode(user.isDevMode ?? false);
-        const supabase = createClient();
-        if (supabase) {
-          const { count: completedCount } = await supabase
-            .from("matches")
-            .select("id", { count: "exact", head: true })
-            .or(`player1_id.eq.${user.id},player2_id.eq.${user.id}`)
-            .eq("status", "completed");
-          setPreMatchCompletedCount(completedCount ?? 0);
-        }
+
         const m = await getMatch(matchId);
         if (!m) {
           setLoadError("Match not found. It may have been cancelled or the link is invalid.");
@@ -331,9 +344,11 @@ function MatchPageContent() {
         if (m.status === "completed") {
           // In practice / bot matches the current user is always player1.
           // In real-multiplayer matches resolve by comparing stored player IDs.
-          const iAmPlayer1 = !m.isRealMultiplayer
-            ? true
-            : m.player1Id === user.id;
+          const iAmPlayer1 = isQrGuest
+            ? false
+            : !m.isRealMultiplayer
+              ? true
+              : m.player1Id === userId;
 
           if (!m.winner) {
             setOutcome("draw");
@@ -352,14 +367,17 @@ function MatchPageContent() {
       }
     }
     load();
-  }, [matchId, router]);
+  }, [matchId, router, isGuestMode]);
 
   const isRealMultiplayerMatch = match?.isRealMultiplayer ?? false;
-  // Computed before early-returns so hooks below can reference it.
   const myRoleComputed: "player1" | "player2" =
-    isRealMultiplayerMatch && match?.player1Id && match?.player2Id
-      ? match.player1Id === userId ? "player1" : "player2"
-      : "player1";
+    isQrGuest && match?.isQrMatch
+      ? "player2"
+      : isRealMultiplayerMatch && match?.player1Id && match.player1Id === userId
+        ? "player1"
+        : isRealMultiplayerMatch && match?.player2Id && match.player2Id === userId
+          ? "player2"
+          : "player1";
   const realtimeConnectedRef = useRef(realtimeConnected);
   realtimeConnectedRef.current = realtimeConnected;
 
@@ -667,9 +685,16 @@ function MatchPageContent() {
     async (winner: "player1" | "player2"): Promise<boolean> => {
       if (!match) return false;
       const winnerId = winner === "player1" ? match.player1Id : match.player2Id;
-      // Practice/dev matches may not have stable user IDs on the match record,
-      // so fall back to role-based win detection.
-      const iWon = winnerId ? winnerId === userId : winner === "player1";
+      const iWon = isQrGuest
+        ? winner === "player2"
+        : winnerId
+          ? winnerId === userId
+          : winner === "player1";
+
+      if (isQrGuest) {
+        setOutcome(iWon ? "victory" : "defeat");
+        return true;
+      }
 
       try {
         setIsSettling(true);
@@ -702,7 +727,7 @@ function MatchPageContent() {
         return false;
       }
     },
-    [match, userId]
+    [match, userId, isQrGuest]
   );
 
   const handleWin = useCallback(() => handleGameEnd("player1"), [handleGameEnd]);
@@ -1645,9 +1670,24 @@ function MatchPageContent() {
           opponentUsername={opponentUsername}
           wonByForfeit={wonByForfeit}
           onPlayAgain={handlePlayAgain}
-          onLeave={() => { window.location.href = "/play"; }}
+          onLeave={() => { window.location.href = isQrGuest ? "/" : "/play"; }}
         />
       )}
+
+      {isQrGuest && outcome === "victory" ? (
+        <div className="fixed inset-x-0 bottom-0 z-[60] max-h-[70vh] overflow-y-auto bg-[#0E0E12]/95 px-4 pb-8 pt-4 backdrop-blur">
+          <AnonymousWinClaimBanner amountSk={match.stakeAmount * 2} />
+        </div>
+      ) : null}
+
+      {isQrGuest && outcome === "defeat" ? (
+        <div className="fixed inset-x-0 bottom-6 z-[60] px-4 text-center">
+          <p className="text-sm text-[#9CA3AF]">Play more — sign up free on SkillFlow</p>
+          <a href="/signup" className="mt-2 inline-block text-sm font-semibold text-[#FFFF00] hover:underline">
+            Create account
+          </a>
+        </div>
+      ) : null}
 
       {showFirstMatchCelebration ? (
         <FirstMatchCelebration

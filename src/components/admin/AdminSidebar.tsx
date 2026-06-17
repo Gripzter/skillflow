@@ -6,6 +6,7 @@ import { adminLogout } from "@/lib/admin-auth";
 const NAV_ITEMS = [
   { href: "/admin", label: "overview", exact: true },
   { href: "/admin/matches", label: "matches" },
+  { href: "/admin/qr-matches", label: "qr matches" },
   { href: "/admin/challenges", label: "challenges" },
   { href: "/admin/players", label: "players" },
   { href: "/admin/creators", label: "creators" },

@@ -8,6 +8,11 @@ import PasswordInput from "@/components/PasswordInput";
 import { useToast } from "@/components/Toast";
 import LoadingRing from "@/components/LoadingRing";
 import { getUserFriendlyError } from "@/lib/errorHandler";
+import {
+  QR_ANON_TOKEN_KEY,
+  claimAnonymousPayout,
+  getAnonymousTokenFromCookie,
+} from "@/lib/qr-match";
 import { createClient } from "@/lib/supabase";
 import { markReturningUser } from "@/lib/auth-action";
 
@@ -102,6 +107,18 @@ function LoginContent() {
           }).eq("user_id", user.id);
         }
         showToast("Welcome back!", "success");
+        const anonToken =
+          typeof window !== "undefined"
+            ? localStorage.getItem(QR_ANON_TOKEN_KEY) ?? getAnonymousTokenFromCookie()
+            : null;
+        if (anonToken) {
+          try {
+            const claimed = await claimAnonymousPayout(anonToken);
+            showToast(`Claimed ${claimed.amount_sk} SK from your QR match win!`, "success");
+          } catch {
+            /* no pending payout */
+          }
+        }
         router.push("/play");
         router.refresh();
       }

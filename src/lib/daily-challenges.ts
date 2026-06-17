@@ -1,6 +1,5 @@
 import type { PlayerDailyChallenge } from "@/lib/challengeProgress";
 import { CHALLENGE_GAME_TO_SLUG } from "@/lib/challengeGames";
-import { toLegacyChallengeRow, type DailyChallengeRow } from "@/lib/daily-challenges";
 
 export {
   getPlayerDailyChallenges,
@@ -12,8 +11,30 @@ export {
 
 export { getOrCreateTodaysChallenges, forceRotateTodaysChallenges } from "@/lib/challengeRotation";
 
-export type { DailyChallengeRow } from "@/lib/daily-challenges";
-export { toLegacyChallengeRow };
+/** @deprecated Use PlayerDailyChallenge from @/lib/challengeProgress */
+export type DailyChallengeRow = {
+  id: string;
+  description: string;
+  target: number;
+  progress: number;
+  reward_sp: number;
+  completed: boolean;
+  claimed: boolean;
+  game_slug: string | null;
+};
+
+export function toLegacyChallengeRow(c: PlayerDailyChallenge): DailyChallengeRow {
+  return {
+    id: c.slotId,
+    description: c.title,
+    target: c.targetValue,
+    progress: c.progress,
+    reward_sp: c.rewardSk,
+    completed: c.completed,
+    claimed: c.rewardClaimed,
+    game_slug: CHALLENGE_GAME_TO_SLUG[c.game],
+  };
+}
 
 /** @deprecated Use getPlayerDailyChallenges via /api/challenges */
 export async function getDailyChallenges(userId: string): Promise<DailyChallengeRow[]> {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEventHandler } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -16,6 +17,7 @@ import { useProfile } from "@/hooks/useProfile";
 import { useRecentMatches } from "@/hooks/useRecentMatches";
 import { toLegacyChallengeRow, type DailyChallengeRow } from "@/lib/daily-challenges";
 import { redirectToAuthAction } from "@/lib/auth-action";
+import CreateQRMatch from "@/components/CreateQRMatch";
 
 const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
   { label: "ALL", value: "all" },
@@ -136,9 +138,11 @@ function PlayGameCard({
 }
 
 export default function PlayContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [activeFilter, setActiveFilter] = useState<"all" | GameCategory>("all");
   const [onlineBucket, setOnlineBucket] = useState(Math.floor(Date.now() / (5 * 60 * 1000)));
+  const [qrOpen, setQrOpen] = useState(false);
   const { profile, loading } = useProfile();
   const isAuthenticated = !!profile.id;
   const { games } = useGames();
@@ -191,6 +195,34 @@ export default function PlayContent() {
           Play smarter. Match faster. Earn more.
         </h1>
         <p className="mt-2 text-sm text-[#9CA3AF]">Beta · Free to play · Earn SkillPoints</p>
+
+        {isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => setQrOpen(true)}
+            className="mt-5 flex w-full max-w-md items-center gap-4 rounded-2xl border border-[#FFFF00]/40 bg-gradient-to-r from-[#FFFF00]/10 to-transparent px-5 py-4 text-left transition hover:border-[#FFFF00]"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFFF00] text-2xl">
+              📱
+            </span>
+            <span>
+              <span className="block text-base font-black text-white">Play In Person</span>
+              <span className="block text-sm text-[#9CA3AF]">
+                Generate a QR code for a face-to-face match
+              </span>
+            </span>
+          </button>
+        ) : null}
+
+        <CreateQRMatch
+          open={qrOpen}
+          onClose={() => setQrOpen(false)}
+          balanceSp={profile.balanceSp ?? 0}
+          onMatchStarted={(matchId) => {
+            setQrOpen(false);
+            router.push(`/match/${matchId}`);
+          }}
+        />
 
         <div className="mt-4 flex flex-wrap gap-2">
           {FILTERS.map((filter) => {
