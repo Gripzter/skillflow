@@ -1,8 +1,9 @@
 "use client";
 
-export type AvatarSize = "sm" | "md" | "lg" | "xl";
+export type AvatarSize = "nav" | "sm" | "md" | "lg" | "xl";
 
 const SIZE_CLASSES: Record<AvatarSize, { outer: string; text: string }> = {
+  nav: { outer: "h-9 w-9", text: "text-sm" },
   sm: { outer: "h-8 w-8", text: "text-xs" },
   md: { outer: "h-9 w-9 sm:h-10 sm:w-10", text: "text-sm" },
   lg: { outer: "h-16 w-16 md:h-20 md:w-20", text: "text-2xl md:text-3xl" },

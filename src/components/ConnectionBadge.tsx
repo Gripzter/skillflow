@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { Wifi } from "lucide-react";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   subscribeConnectionMetrics,
@@ -124,36 +125,29 @@ export default function ConnectionBadge() {
         ? "Your connection may cause issues during competitive matches. We strongly recommend improving your connection before wagering."
         : "";
 
-  const effectiveRating: ConnectionRating = grace ? "good" : metrics.overallRating;
   const effectivePing = Math.round(metrics.pingAvg || metrics.ping);
 
-  let level = 4;
-  if (!grace) {
-    if (effectiveRating === "good") level = 4;
-    else if (effectiveRating === "medium") level = 3;
-    else if (effectiveRating === "warning") level = 2;
-    else level = 1;
+  // The Wifi icon only carries color when it reflects a *real* measured
+  // connection state. Until the first ping resolves (and during the initial
+  // grace window) it stays neutral gray instead of a decorative color.
+  const hasRealMeasurement =
+    metrics.lastUpdated > 0 && (metrics.pingAvg > 0 || metrics.ping > 0);
+
+  let iconColor = "#9CA3AF"; // gray-400 — default / not yet measured
+  let levelLabel = "Checking connection";
+  if (hasRealMeasurement && !grace) {
+    if (metrics.overallRating === "good" || metrics.overallRating === "medium") {
+      iconColor = "#FFFF00";
+      levelLabel = metrics.overallRating === "good" ? "Strong connection" : "Fair connection";
+    } else {
+      iconColor = "#EF4444";
+      levelLabel = metrics.overallRating === "warning" ? "Weak connection" : "Poor connection";
+    }
   }
 
-  const dotOn = level >= 1;
-  const arc1On = level >= 2;
-  const arc2On = level >= 3;
-  const arc3On = level >= 4;
-
-  let wifiColor = "#22C55E";
-  let levelLabel = "Strong connection";
-  if (level === 3) {
-    wifiColor = "#FACC15";
-    levelLabel = "Fair connection";
-  } else if (level === 2) {
-    wifiColor = "#EF4444";
-    levelLabel = "Weak connection";
-  } else if (level === 1) {
-    wifiColor = "#EF4444";
-    levelLabel = "Poor connection";
-  }
-
-  const tooltipText = `${levelLabel} · ${effectivePing}ms`;
+  const tooltipText = hasRealMeasurement
+    ? `${levelLabel} · ${effectivePing}ms`
+    : levelLabel;
 
   return (
     <>
@@ -166,46 +160,12 @@ export default function ConnectionBadge() {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center justify-center rounded-full p-1.5 text-[11px] font-bold transition-colors hover:bg-white/5"
+          className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
           aria-label="Connection quality"
           aria-expanded={open}
           title={tooltipText}
         >
-          <svg
-            className="h-8 w-8"
-            viewBox="0 0 24 24"
-            fill="none"
-            aria-hidden
-          >
-            {/* outer arc */}
-            <path
-              d="M4.5 9.5C8.2 6.3 15.8 6.3 19.5 9.5"
-              stroke={arc3On ? wifiColor : "#2A2A38"}
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-            {/* middle arc */}
-            <path
-              d="M7 12c3-2.5 7-2.5 10 0"
-              stroke={arc2On ? wifiColor : "#2A2A38"}
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-            {/* inner arc */}
-            <path
-              d="M9.5 14.5c1.5-1.3 3.5-1.3 5 0"
-              stroke={arc1On ? wifiColor : "#2A2A38"}
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-            {/* dot */}
-            <circle
-              cx="12"
-              cy="18"
-              r="2.1"
-              fill={dotOn ? wifiColor : "#2A2A38"}
-            />
-          </svg>
+          <Wifi size={20} strokeWidth={1.5} color={iconColor} aria-hidden />
         </button>
 
         {/* Dropdown */}
