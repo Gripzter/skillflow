@@ -9,10 +9,15 @@ import ModeToggleBarContent from "@/components/ModeToggleBar";
 import SkilliesIcon from "@/components/SkilliesIcon";
 import { getCurrentUser, getMatches, getMyProfile, getTransactions, getPracticeStats, getWalletBalance, logout as apiLogout } from "@/lib/api";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
+import FilterPill from "@/components/FilterPill";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import LoadingRing from "@/components/LoadingRing";
+
+// Single source of truth for the brand yellow inside inline SVG (where Tailwind
+// color tokens can't be applied via className).
+const BRAND_YELLOW = "#FFFF00";
 
 const GAME_TABS = [
   { id: "all", label: "All Games" },
@@ -21,15 +26,15 @@ const GAME_TABS = [
 ] as const;
 
 const ACHIEVEMENTS = [
-  { id: "first_blood", title: "First Blood", desc: "Win your first match", check: (ctx: ProfileStats) => ctx.totalWins >= 1 },
-  { id: "on_fire", title: "On Fire", desc: "Win 3 matches in a row", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
-  { id: "high_roller", title: "High Roller", desc: "Play a $50+ stake match", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
-  { id: "sharpshooter", title: "Sharpshooter", desc: "Win 10 matches total", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
-  { id: "champion", title: "Champion", desc: "Reach 1600 rating", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
-  { id: "speed_demon", title: "Speed Demon", desc: "Win a match in under 2 minutes", check: () => false },
-  { id: "pool_shark", title: "Pool Shark", desc: "Win 10 8-ball pool matches", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
-  { id: "grandmaster", title: "Grandmaster", desc: "Win 10 chess matches", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
-  { id: "rating_climber", title: "Rating Climber", desc: "Reach 2000 rating", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
+  { id: "first_blood", title: "First Blood", desc: "Win your first match", icon: "🩸", check: (ctx: ProfileStats) => ctx.totalWins >= 1 },
+  { id: "on_fire", title: "On Fire", desc: "Win 3 matches in a row", icon: "🔥", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
+  { id: "high_roller", title: "High Roller", desc: "Play a $50+ stake match", icon: "💰", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
+  { id: "sharpshooter", title: "Sharpshooter", desc: "Win 10 matches total", icon: "🎯", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
+  { id: "champion", title: "Champion", desc: "Reach 1600 rating", icon: "🏆", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
+  { id: "speed_demon", title: "Speed Demon", desc: "Win a match in under 2 minutes", icon: "⚡", check: () => false },
+  { id: "pool_shark", title: "Pool Shark", desc: "Win 10 8-ball pool matches", icon: "🎱", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
+  { id: "grandmaster", title: "Grandmaster", desc: "Win 10 chess matches", icon: "♟️", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
+  { id: "rating_climber", title: "Rating Climber", desc: "Reach 2000 rating", icon: "📈", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
 ] as const;
 
 interface ProfileStats {
@@ -247,10 +252,28 @@ export default function ProfilePage() {
   const chartMin = Math.min(900, ...ratingHistoryPoints.map((p) => p.y)) - 50;
   const chartMax = Math.max(1100, ...ratingHistoryPoints.map((p) => p.y)) + 50;
   const chartW = 600;
-  const chartH = 200;
-  const pad = { left: 40, right: 20, top: 20, bottom: 30 };
+  const chartH = 220;
+  const pad = { left: 52, right: 20, top: 20, bottom: 36 };
   const innerW = chartW - pad.left - pad.right;
   const innerH = chartH - pad.top - pad.bottom;
+
+  // Axis ticks for the rating chart.
+  const sortedAscMatches = [...stats.completed].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  const yTickValues = [0, 1, 2, 3, 4].map((i) => Math.round(chartMax - (i / 4) * (chartMax - chartMin)));
+  const xTickCount = Math.min(5, ratingHistoryPoints.length);
+  const xTicks = Array.from({ length: xTickCount }, (_, t) => {
+    const idx = xTickCount <= 1 ? 0 : Math.round((t * (ratingHistoryPoints.length - 1)) / (xTickCount - 1));
+    const p = ratingHistoryPoints[idx];
+    const x = pad.left + (p.x / Math.max(1, ratingHistoryPoints.length - 1)) * innerW;
+    let label = "Start";
+    if (idx > 0) {
+      const m = sortedAscMatches[idx - 1];
+      label = m ? new Date(m.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+    }
+    return { x, label, key: idx };
+  });
 
   return (
     <div className="min-h-screen bg-charcoal pb-20 md:pb-0">
@@ -286,7 +309,7 @@ export default function ProfilePage() {
                   <h1 className="text-2xl font-bold text-white sm:text-3xl">{username}</h1>
                   <span
                     className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                      isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
                     }`}
                   >
                     Level 1
@@ -330,33 +353,33 @@ export default function ProfilePage() {
         </section>
 
         {/* Section 2: Stats overview */}
-        <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
-          {[
-            { label: "Total Matches", value: stats.matches.length },
-            { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
-            {
-              label: "Total Earnings",
-              value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
-            },
-            { label: "Win Streak", value: stats.bestStreak },
-            {
-              label: "Skillies Balance",
-              value: (
-                <span className="inline-flex items-center gap-1">
-                  {skilliesBalance.toLocaleString()} Skillies <SkilliesIcon size={18} />
-                </span>
-              ),
-            },
-          ].map((card, i) => (
-            <div
-              key={card.label}
-              className="card-border animate-fade-in rounded-card bg-card p-5"
-              style={{ animationDelay: `${i * 0.05}s` }}
-            >
-              <p className="mt-2 text-xs text-body-gray">{card.label}</p>
-              <p className="mt-1 text-2xl font-bold text-white">{card.value}</p>
-            </div>
-          ))}
+        <section className="mt-8">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              { label: "Total Matches", value: stats.matches.length },
+              { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%` },
+              {
+                label: "Total Earnings",
+                value: `$${stats.totalEarnings >= 0 ? "" : "-"}${Math.abs(stats.totalEarnings).toFixed(2)}`,
+              },
+              { label: "Win Streak", value: stats.bestStreak },
+            ].map((card, i) => (
+              <div
+                key={card.label}
+                className="card-border animate-fade-in rounded-card bg-card p-5"
+                style={{ animationDelay: `${i * 0.05}s` }}
+              >
+                <p className="mt-2 text-xs text-body-gray">{card.label}</p>
+                <p className="mt-1 text-2xl font-bold text-white">{card.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="card-border animate-fade-in mt-4 flex items-center justify-between rounded-card bg-card p-5">
+            <p className="text-xs text-body-gray">Skillies Balance</p>
+            <p className="inline-flex items-center gap-1.5 text-2xl font-bold text-white">
+              {skilliesBalance.toLocaleString()} Skillies <SkilliesIcon size={20} />
+            </p>
+          </div>
         </section>
 
         {/* Practice Stats */}
@@ -364,15 +387,15 @@ export default function ProfilePage() {
           <h2 className="text-lg font-bold text-purple-300">Practice Stats</h2>
           <p className="mt-1 text-xs text-body-gray">Free play — no money involved</p>
           <div className="mt-4 grid grid-cols-3 gap-4">
-            <div className="rounded-lg bg-white/5 p-4">
+            <div>
               <p className="text-xs text-body-gray">Practice Matches</p>
               <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceMatchesPlayed}</p>
             </div>
-            <div className="rounded-lg bg-white/5 p-4">
+            <div>
               <p className="text-xs text-body-gray">Practice Wins</p>
               <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceWins}</p>
             </div>
-            <div className="rounded-lg bg-white/5 p-4">
+            <div>
               <p className="text-xs text-body-gray">Practice Win Rate</p>
               <p className="mt-1 text-xl font-bold text-purple-400">
                 {practiceStats.practiceWinRate.toFixed(1)}%
@@ -384,22 +407,15 @@ export default function ProfilePage() {
         {/* Section 3: Game stats */}
         <section className="mt-10 animate-fade-in">
           <h2 className="text-xl font-bold text-white">Competitive Game Stats</h2>
-          <div className="mt-3 flex gap-1 rounded-lg bg-white/5 p-1">
+          <div className="mt-3 flex flex-wrap gap-2">
             {GAME_TABS.map((tab) => (
-              <button
+              <FilterPill
                 key={tab.id}
-                type="button"
+                active={gameTab === tab.id}
                 onClick={() => setGameTab(tab.id)}
-                className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                  gameTab === tab.id
-                    ? isPractice
-                      ? "bg-purple-500/20 text-purple-300"
-                      : "bg-teal/20 text-teal"
-                    : "text-body-gray hover:text-white"
-                }`}
               >
                 {tab.label}
-              </button>
+              </FilterPill>
             ))}
           </div>
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -429,7 +445,7 @@ export default function ProfilePage() {
                 className={`mt-4 inline-block rounded-lg px-4 py-2 font-medium text-charcoal ${
                   isPractice
                     ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
-                    : "bg-teal hover:shadow-teal-glow"
+                    : "bg-brand-yellow hover:shadow-teal-glow"
                 }`}
               >
                 Find a match
@@ -467,7 +483,7 @@ export default function ProfilePage() {
                             {matchWon(m) ? (
                               <span
                                 className={`rounded px-2 py-0.5 text-xs font-medium ${
-                                  isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                                  isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
                                 }`}
                               >
                                 Won
@@ -500,7 +516,7 @@ export default function ProfilePage() {
                         {matchWon(m) ? (
                           <span
                             className={`rounded px-2 py-0.5 text-xs font-medium ${
-                              isPractice ? "bg-purple-500/20 text-purple-300" : "bg-teal/20 text-teal"
+                              isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
                             }`}
                           >
                             Won
@@ -543,18 +559,28 @@ export default function ProfilePage() {
               return (
                 <div
                   key={a.id}
-                  className={`card-border rounded-card p-4 transition-all ${
+                  className={`rounded-card border p-4 transition-all ${
                     unlocked
-                      ? isPractice
-                        ? "border-purple-500/40 bg-card shadow-[0_0_20px_rgba(139,92,246,0.16)]"
-                        : "border-steel-blue bg-card shadow-[0_0_20px_rgba(42,58,92,0.4)]"
-                      : "border-white/10 bg-card/80 opacity-50"
+                      ? "border-brand-yellow bg-card"
+                      : "border-white/10 bg-card/80 opacity-60"
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl">{a.icon}</span>
+                    <span className={`text-2xl ${unlocked ? "" : "grayscale"}`} aria-hidden>
+                      {a.icon}
+                    </span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-white">{a.title}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate font-medium text-white">{a.title}</p>
+                        {unlocked && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-yellow px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">
+                            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Unlocked
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-xs text-body-gray">{a.desc}</p>
                       {!unlocked && (
                         <p className="mt-2 flex items-center gap-1 text-xs text-body-gray">
@@ -579,22 +605,30 @@ export default function ProfilePage() {
             <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full max-w-full" preserveAspectRatio="xMidYMid meet">
               <defs>
                 <linearGradient id="ratingGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#FFFF00" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#FFFF00" stopOpacity="0" />
+                  <stop offset="0%" stopColor={BRAND_YELLOW} stopOpacity="0.4" />
+                  <stop offset="100%" stopColor={BRAND_YELLOW} stopOpacity="0" />
                 </linearGradient>
               </defs>
-              {/* Grid */}
-              {[0, 1, 2, 3, 4].map((i) => (
-                <line
-                  key={`h-${i}`}
-                  x1={pad.left}
-                  y1={pad.top + (i / 4) * innerH}
-                  x2={chartW - pad.right}
-                  y2={pad.top + (i / 4) * innerH}
-                  stroke="rgba(255,255,255,0.06)"
-                  strokeWidth="1"
-                />
-              ))}
+              {/* Horizontal grid lines + y-axis (rating) labels */}
+              {yTickValues.map((val, i) => {
+                const y = pad.top + (i / 4) * innerH;
+                return (
+                  <g key={`y-${i}`}>
+                    <line
+                      x1={pad.left}
+                      y1={y}
+                      x2={chartW - pad.right}
+                      y2={y}
+                      stroke="rgba(255,255,255,0.06)"
+                      strokeWidth="1"
+                    />
+                    <text x={pad.left - 8} y={y + 4} textAnchor="end" fontSize="11" fill="#7A7A8E">
+                      {val}
+                    </text>
+                  </g>
+                );
+              })}
+              {/* Vertical grid lines */}
               {[0, 1, 2, 3, 4, 5].map((i) => (
                 <line
                   key={`v-${i}`}
@@ -605,6 +639,19 @@ export default function ProfilePage() {
                   stroke="rgba(255,255,255,0.06)"
                   strokeWidth="1"
                 />
+              ))}
+              {/* X-axis (date) labels from real match data */}
+              {xTicks.map((tick) => (
+                <text
+                  key={`x-${tick.key}`}
+                  x={tick.x}
+                  y={chartH - pad.bottom + 18}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fill="#7A7A8E"
+                >
+                  {tick.label}
+                </text>
               ))}
               {/* Area + line */}
               {ratingHistoryPoints.length >= 2 && (
@@ -631,7 +678,7 @@ export default function ProfilePage() {
                       })
                       .join(" ")}
                     fill="none"
-                    stroke="#FFFF00"
+                    stroke={BRAND_YELLOW}
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -644,16 +691,13 @@ export default function ProfilePage() {
                   y1={pad.top + innerH / 2}
                   x2={chartW - pad.right}
                   y2={pad.top + innerH / 2}
-                  stroke="#FFFF00"
+                  stroke={BRAND_YELLOW}
                   strokeWidth="2"
                   strokeDasharray="4 4"
                 />
               )}
             </svg>
-            <div className="mt-2 flex justify-between text-xs text-body-gray">
-              <span>Past matches</span>
-              <span>{chartMin} – {chartMax} rating</span>
-            </div>
+            <p className="mt-2 text-center text-xs text-body-gray">Rating after each match</p>
           </div>
         </section>
       </main>

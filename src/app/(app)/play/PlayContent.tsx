@@ -18,6 +18,7 @@ import { useRecentMatches } from "@/hooks/useRecentMatches";
 import { toLegacyChallengeRow, type DailyChallengeRow } from "@/lib/daily-challenges";
 import { redirectToAuthAction } from "@/lib/auth-action";
 import CreateQRMatch, { GameCardQRButton } from "@/components/CreateQRMatch";
+import FilterPill from "@/components/FilterPill";
 import { isQRSupportedGame } from "@/lib/qr-match";
 
 const FILTERS: Array<{ label: string; value: "all" | GameCategory }> = [
@@ -247,23 +248,15 @@ export default function PlayContent() {
         />
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {FILTERS.map((filter) => {
-            const active = activeFilter === filter.value;
-            return (
-              <button
-                key={filter.value}
-                type="button"
-                onClick={() => setActiveFilter(filter.value)}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold tracking-[0.06em] transition-colors ${
-                  active
-                    ? "border-[#FFFF00] bg-[#FFFF00] text-black"
-                    : "border-[#1F1F26] bg-[#16161C] text-[#9CA3AF] hover:text-white"
-                }`}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
+          {FILTERS.map((filter) => (
+            <FilterPill
+              key={filter.value}
+              active={activeFilter === filter.value}
+              onClick={() => setActiveFilter(filter.value)}
+            >
+              {filter.label}
+            </FilterPill>
+          ))}
         </div>
 
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">

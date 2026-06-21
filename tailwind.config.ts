@@ -18,7 +18,11 @@ const config: Config = {
         "primary-text": "#F0F0F4",
 
         // Accents
-        teal: "#FFFF00", // real-money accent (legacy name kept for class compatibility)
+        // Single source of truth for the SkillFlow brand yellow. Use this token
+        // for every active/selected/highlight state so the value can't drift.
+        "brand-yellow": "#FFFF00",
+        "brand-yellow-hover": "#E6E600",
+        teal: "#FFFF00", // real-money accent (legacy alias of brand-yellow)
         purple: "#A855F7", // practice accent (legacy name kept for class compatibility)
         "teal-hover": "#E6E600",
         "purple-hover": "#C084FC",
