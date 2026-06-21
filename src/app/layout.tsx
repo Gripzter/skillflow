@@ -4,7 +4,7 @@ import { ToastProvider } from "@/components/Toast";
 import { GeoProvider } from "@/contexts/GeoContext";
 import { PlayModeProvider } from "@/contexts/PlayModeContext";
 import ConnectionMonitor from "@/components/ConnectionMonitor";
-import MobileTabBar from "@/components/MobileTabBar";
+import BottomNav from "@/components/BottomNav";
 import PracticeModeClassToggle from "@/components/PracticeModeClassToggle";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import CookieConsentBanner from "@/components/CookieConsentBanner";
@@ -98,7 +98,7 @@ if (typeof window !== 'undefined') {
               <ErrorBoundary>
                 <PracticeModeClassToggle />
                 <AuthSessionGuard>{children}</AuthSessionGuard>
-                <MobileTabBar />
+                <BottomNav />
                 <CookieConsentBanner />
                 <CookieSettingsController />
               </ErrorBoundary>

@@ -307,6 +307,28 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* Account quick links (mobile) — relocated here from the removed nav drawer */}
+        <section className="mt-6 overflow-hidden rounded-card border border-white/10 bg-card md:hidden">
+          <Link
+            href="/settings"
+            className="flex items-center justify-between px-5 py-4 text-sm font-medium text-white transition-colors hover:bg-white/5"
+          >
+            <span>Settings</span>
+            <svg className="h-4 w-4 text-body-gray" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+          <a
+            href="mailto:admin@skillflow.gg"
+            className="flex items-center justify-between border-t border-white/10 px-5 py-4 text-sm font-medium text-white transition-colors hover:bg-white/5"
+          >
+            <span>Contact support</span>
+            <svg className="h-4 w-4 text-body-gray" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </a>
+        </section>
+
         {/* Section 2: Stats overview */}
         <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
           {[

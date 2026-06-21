@@ -9,7 +9,7 @@ export default function CookieConsentBanner() {
   const [isReady, setIsReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
 
-  const hasMobileTabBar =
+  const hasBottomNav =
     pathname !== "/" &&
     !pathname.startsWith("/login") &&
     !pathname.startsWith("/signup") &&
@@ -41,8 +41,8 @@ export default function CookieConsentBanner() {
   return (
     <div
       className={`fixed left-0 right-0 z-50 border-t border-white/10 bg-[#0E0E12] px-4 py-3 ${
-        hasMobileTabBar
-          ? "bottom-[calc(60px+env(safe-area-inset-bottom)+8px)] md:bottom-4"
+        hasBottomNav
+          ? "bottom-[calc(64px+env(safe-area-inset-bottom)+8px)] md:bottom-4"
           : "bottom-[env(safe-area-inset-bottom)] md:bottom-4"
       }`}
     >

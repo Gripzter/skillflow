@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
 import ConnectionBadge from "@/components/ConnectionBadge";
-import MobileMenuDrawer from "@/components/MobileMenuDrawer";
 import SkilliesModal from "@/components/modals/SkilliesModal";
 import Wordmark from "@/components/Wordmark";
 import { useProfile } from "@/hooks/useProfile";
@@ -47,7 +46,6 @@ const NAV_ITEMS = [
 export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps) {
   const pathname = usePathname();
   const { profile, loading } = useProfile();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [skilliesModalOpen, setSkilliesModalOpen] = useState(false);
   const isAuthenticated = !loading && !!profile.id;
 
@@ -62,21 +60,7 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
       <header className="sticky top-0 z-50 border-b border-white/[0.06] bg-[#0E0E12]/95 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1280px] items-center justify-between px-3 sm:h-16 sm:px-4 lg:px-6">
           <div className="flex min-w-0 items-center gap-8">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-lg text-[#9CA3AF] transition-colors hover:bg-white/[0.06] hover:text-white md:hidden"
-                onClick={() => setMobileMenuOpen(true)}
-                aria-label="Open menu"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
-              </button>
-              <Wordmark href="/play" size="sm" />
-            </div>
+            <Wordmark href="/play" size="sm" />
 
             <nav className="hidden items-center gap-8 md:flex">
               {NAV_ITEMS.map((item) => {
@@ -153,11 +137,6 @@ export default function AppNavbar({ initialOpenSpModal = false }: AppNavbarProps
           </div>
         </div>
       </header>
-      <MobileMenuDrawer
-        open={mobileMenuOpen}
-        onClose={() => setMobileMenuOpen(false)}
-        isAuthenticated={isAuthenticated}
-      />
 
       {isAuthenticated ? (
         <>
