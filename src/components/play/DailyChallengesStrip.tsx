@@ -40,7 +40,7 @@ function CompletionTick({ completed }: { completed: boolean }) {
           completed ? (isScaledIn ? "scale-100" : "scale-0") : "scale-0"
         }`}
       >
-        ✓
+        
       </span>
     </span>
   );

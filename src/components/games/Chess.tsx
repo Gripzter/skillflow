@@ -577,7 +577,7 @@ export default function Chess({
     const systemLogEntries: MatchUiState["systemLogEntries"] = [
       {
         id: "game-start",
-        text: `♟ Game started — ${player1.username} (White) vs ${player2.username} (Black)${isPlayer2Bot ? " 🤖" : ""}`,
+        text: ` Game started — ${player1.username} (White) vs ${player2.username} (Black)${isPlayer2Bot ? " " : ""}`,
         timestamp: startTs,
       },
       ...moveHistory.map((m, i) => ({

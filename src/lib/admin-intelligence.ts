@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { calcMatchEconomics, resolveAdminMatchStatus, SKILLFLOW_RAKE_SHARE } from "./admin-api";
 
 export function countryFlag(code: string): string {
-  if (!code || code === "—" || code.length !== 2) return "🌐";
+  if (!code || code === "—" || code.length !== 2) return "";
   const upper = code.toUpperCase();
   return String.fromCodePoint(
     ...[...upper].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)

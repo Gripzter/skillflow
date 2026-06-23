@@ -148,7 +148,7 @@ function RaceBar({
             className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold"
             style={{ color }}
           >
-            ✓
+            
           </div>
         )}
       </div>
@@ -509,7 +509,7 @@ export default function TypingRace({
       systemLogEntries: [
         {
           id: "start",
-          text: `⌨️ Typing Race — ${player1.username} vs ${player2.username}`,
+          text: `⌨ Typing Race — ${player1.username} vs ${player2.username}`,
           timestamp: gameStartRef.current,
         },
         ...(myFinishMs !== null
@@ -662,7 +662,7 @@ export default function TypingRace({
         {/* Finished overlays */}
         {phase === "finished" && (
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-teal/30 bg-teal/10 px-3 py-2 text-sm">
-            <span className="text-teal font-semibold">✓ You finished!</span>
+            <span className="text-teal font-semibold"> You finished!</span>
             <span className="text-body-gray">
               {myWpm} WPM • {myAccuracy}% accuracy
               {myAccuracy < 90 && myErrors > 0 && (

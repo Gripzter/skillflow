@@ -122,7 +122,7 @@ export default function AdminCreatorDetailPage({
             </div>
           </dl>
           {(data as { gameHealth?: { investigate?: boolean } })?.gameHealth?.investigate ? (
-            <p className="mt-3 text-xs text-orange-400">⚠ investigate game mechanics — void rate &gt; 15%</p>
+            <p className="mt-3 text-xs text-orange-400"> investigate game mechanics — void rate &gt; 15%</p>
           ) : null}
         </div>
 

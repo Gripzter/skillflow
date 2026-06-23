@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Wifi } from "lucide-react";
+import HeaderIconButton from "@/components/HeaderIconButton";
 import { usePlayMode } from "@/contexts/PlayModeContext";
 import {
   subscribeConnectionMetrics,
@@ -157,16 +158,15 @@ export default function ConnectionBadge() {
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
       >
-        <button
+        <HeaderIconButton
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-white/[0.06]"
           aria-label="Connection quality"
           aria-expanded={open}
           title={tooltipText}
         >
           <Wifi size={20} strokeWidth={1.5} color={iconColor} aria-hidden />
-        </button>
+        </HeaderIconButton>
 
         {/* Dropdown */}
         <div

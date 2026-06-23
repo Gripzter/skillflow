@@ -114,7 +114,7 @@ export default function DailyChallenges({
                 }`}
               >
                 {challenge.completed ? (
-                  <span className="text-[11px] font-black text-black">✓</span>
+                  <span className="text-[11px] font-black text-black"></span>
                 ) : null}
               </span>
 
@@ -139,7 +139,7 @@ export default function DailyChallenges({
                         {claimingId === challenge.slotId ? "…" : "Claim"}
                       </button>
                     ) : challenge.completed && challenge.rewardClaimed ? (
-                      <span className="text-[11px] text-[#6B7280]">✓ Claimed</span>
+                      <span className="text-[11px] text-[#6B7280]"> Claimed</span>
                     ) : (
                       <span className="text-[12px] font-semibold text-[#FFFF00]">
                         {challenge.bonusType === "second_chance" ? "second chance" : `+${challenge.rewardSk} SK`}

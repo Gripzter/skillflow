@@ -22,7 +22,7 @@ const ROUND_START_DELAY_MIN = 2000;
 const ROUND_START_DELAY_MAX = 5000;
 
 function reactionLabel(ms: number): { text: string; color: string } {
-  if (ms < 200) return { text: "INSANE! 🔥", color: "#FACC15" };
+  if (ms < 200) return { text: "INSANE! ", color: "#FACC15" };
   if (ms < 300) return { text: "Great!", color: "#FFFF00" };
   if (ms < 400) return { text: "Good", color: "#22C55E" };
   if (ms < 500) return { text: "OK", color: "#FACC15" };
@@ -532,7 +532,7 @@ export default function ReactionDuel({
     const systemLogEntries: MatchUiState["systemLogEntries"] = [
       {
         id: "start",
-        text: `⚡ Reaction Duel — ${player1.username} vs ${player2.username}`,
+        text: ` Reaction Duel — ${player1.username} vs ${player2.username}`,
         timestamp: gameStartRef.current,
       },
       ...roundHistory.map((r, i) => {

@@ -47,7 +47,7 @@ export default function MatchTimeline({
               ) : null}
               {e.reactionTimeMs != null ? (
                 <p className={`mt-1 text-xs ${fast ? "text-red-400" : "text-[#7A7A8E]"}`}>
-                  reaction: {e.reactionTimeMs}ms {fast ? "⚠ inhuman" : ""}
+                  reaction: {e.reactionTimeMs}ms {fast ? " inhuman" : ""}
                 </p>
               ) : null}
             </div>

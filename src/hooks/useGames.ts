@@ -31,7 +31,7 @@ const GAMES: PlayGameCard[] = [
     waitSeconds: 0,
     status: "coming_soon",
     description: "Crack the code faster than your opponent. Pure logic, zero luck.",
-    icon: "🔐",
+    icon: "",
   },
   {
     name: "Chromo",
@@ -41,7 +41,7 @@ const GAMES: PlayGameCard[] = [
     waitSeconds: 0,
     status: "coming_soon",
     description: "Memorize the color. Recreate it perfectly. Your eyes vs theirs.",
-    icon: "🎨",
+    icon: "",
   },
 ];
 

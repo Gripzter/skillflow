@@ -1208,7 +1208,7 @@ function MatchPageContent() {
               </span>
             )}
             <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
-              ✓ Connection OK
+               Connection OK
             </span>
           </div>
           <span className="text-body-gray tabular-nums">{formatTime(timerSec)}</span>
@@ -1641,7 +1641,7 @@ function MatchPageContent() {
         >
           <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
             <p className="font-semibold text-white">
-              ⚠ Make a move or you&apos;ll be kicked in {afkSecondsLeft}s
+               Make a move or you&apos;ll be kicked in {afkSecondsLeft}s
             </p>
             <div className="flex items-center gap-3">
               <div className="h-2 w-28 overflow-hidden rounded-full bg-red-950">
@@ -1726,7 +1726,7 @@ function MatchPageContent() {
           <div className="card-border w-full max-w-md rounded-card bg-card p-6">
             {reportSubmitted ? (
               <div className="flex flex-col items-center gap-4 py-4 text-center">
-                <span className="text-3xl">✓</span>
+                <span className="text-3xl"></span>
                 <p className="font-medium text-white">Report submitted</p>
                 <p className="text-sm text-body-gray">Our team will review this and take action if needed.</p>
                 <button

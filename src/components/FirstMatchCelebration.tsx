@@ -79,7 +79,7 @@ export default function FirstMatchCelebration({
 
         <div className="relative text-center">
           <h2 className="mt-1 text-3xl font-black tracking-tight text-white md:text-5xl">
-            FIRST MATCH COMPLETE! 🎉
+            FIRST MATCH COMPLETE! 
           </h2>
           <p className="mt-3 text-sm text-gray-300 md:text-base">
             You just earned your first Skillies. Keep playing to win more.

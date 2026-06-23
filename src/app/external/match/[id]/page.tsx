@@ -458,7 +458,7 @@ export default function ExternalMatchRoomPage() {
             </Link>
             {match.status === "in_progress" && connectionCheckPassed && (
               <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">
-                ✓ Connection OK
+                 Connection OK
               </span>
             )}
           </div>
@@ -645,7 +645,7 @@ export default function ExternalMatchRoomPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-teal/10 via-transparent to-teal/10 victory-glow" aria-hidden />
           <div className="animate-fade-in relative text-center">
             <p className="text-5xl font-bold text-white drop-shadow-[0_0_30px_rgba(0,229,199,0.5)] sm:text-6xl">
-              🏆 VICTORY!
+               VICTORY!
             </p>
             <p className="mt-4 text-2xl font-bold text-teal">
               You won ${match.winnerPayout.toFixed(2)}!

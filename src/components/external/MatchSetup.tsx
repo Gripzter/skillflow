@@ -117,7 +117,7 @@ export default function MatchSetup({
                 : "bg-teal text-charcoal hover:shadow-teal-glow"
             }`}
           >
-            {playerReady ? "Ready ✓" : "Ready"}
+            {playerReady ? "Ready " : "Ready"}
           </button>
           {otherReady && !playerReady && (
             <span className="text-sm text-body-gray">Opponent is ready. Click Ready when you are.</span>

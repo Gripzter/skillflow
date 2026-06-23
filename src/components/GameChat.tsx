@@ -193,7 +193,7 @@ export default function GameChat({
             className="flex h-9 w-9 items-center justify-center rounded-lg text-body-gray hover:bg-white/10 hover:text-white"
             aria-label="Close chat history"
           >
-            ✕
+            
           </button>
         )}
       </div>

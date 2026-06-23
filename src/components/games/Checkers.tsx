@@ -43,7 +43,7 @@ function winnerRoleFromPlayer(p: Player): "player1" | "player2" {
 }
 
 function getBotName(isPlayer2Bot: boolean, player2Username: string): string {
-  return isPlayer2Bot ? `${player2Username} 🤖` : player2Username;
+  return isPlayer2Bot ? `${player2Username} ` : player2Username;
 }
 
 type LogEntry = { id: string; side: Player; message: string };
@@ -808,7 +808,7 @@ export default function Checkers({
                             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
                             style={{ color: "#FFD700", fontSize: 12, fontWeight: 900 }}
                           >
-                            👑
+                            
                           </div>
                         </>
                       )}

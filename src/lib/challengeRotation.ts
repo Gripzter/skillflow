@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase-admin";
+import { createNotificationsForAllUsers } from "@/lib/notifications";
 import type { ChallengeGame } from "@/lib/challengeGames";
 
 export type ChallengeTemplate = {
@@ -114,6 +115,11 @@ async function insertSlotsForDate(
 
   const { error } = await admin.from("daily_challenge_slots").insert(rows);
   if (error) throw error;
+
+  await createNotificationsForAllUsers({
+    type: `daily_challenges:${dateStr}`,
+    message: "New daily challenges are live.",
+  });
 
   return fetchSlotsForDate(admin, dateStr);
 }

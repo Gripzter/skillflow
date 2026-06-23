@@ -14,7 +14,7 @@ export default function DisputePanel({ match, isDevMode, onResolve }: DisputePan
 
   return (
     <div className="card-border rounded-card bg-card p-6">
-      <h3 className="text-xl font-bold text-amber-400">⚠️ Result Disputed</h3>
+      <h3 className="text-xl font-bold text-amber-400"> Result Disputed</h3>
       <p className="mt-2 text-body-gray">
         Both players reported different outcomes. Our team will review the evidence and resolve this
         dispute within 24 hours. Stakes are held until resolution.

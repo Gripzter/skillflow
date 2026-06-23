@@ -16,7 +16,7 @@ const games: Game[] = [
   {
     name: "8 Ball Pool",
     description: "Sink the 8. Call your pocket. Pure skill on the felt.",
-    icon: "🎱",
+    icon: "",
     status: "coming_soon",
     slug: "8-ball-pool",
     category: "reflex",
@@ -25,7 +25,7 @@ const games: Game[] = [
   {
     name: "Chess",
     description: "Classic 1v1 strategy. Outthink your opponent.",
-    icon: "♟️",
+    icon: "",
     status: "active",
     slug: "chess",
     category: "strategy",
@@ -34,7 +34,7 @@ const games: Game[] = [
   {
     name: "Connect 4",
     description: "Speed-thinking grid duel. Four in a row wins.",
-    icon: "🔴",
+    icon: "",
     status: "active",
     slug: "connect-4",
     category: "strategy",
@@ -52,7 +52,7 @@ const games: Game[] = [
   {
     name: "Reaction Duel",
     description: "Sub-200ms reflexes win the pot.",
-    icon: "⚡",
+    icon: "",
     status: "active",
     slug: "reaction-duel",
     category: "reflex",
@@ -61,7 +61,7 @@ const games: Game[] = [
   {
     name: "Mini Golf",
     description: "Precision putting under pressure.",
-    icon: "⛳",
+    icon: "",
     status: "coming_soon",
     slug: "mini-golf",
     category: "reflex",
@@ -70,7 +70,7 @@ const games: Game[] = [
   {
     name: "Darts",
     description: "Hit the bullseye before they do.",
-    icon: "🎯",
+    icon: "",
     status: "coming_soon",
     slug: "darts",
     category: "reflex",
@@ -88,7 +88,7 @@ const games: Game[] = [
   {
     name: "Deadlock",
     description: "Crack the code faster than your opponent. Pure logic, zero luck.",
-    icon: "🔐",
+    icon: "",
     status: "coming_soon",
     slug: "deadlock",
     category: "strategy",
@@ -97,7 +97,7 @@ const games: Game[] = [
   {
     name: "Chromo",
     description: "Memorize the color. Recreate it perfectly. Your eyes vs theirs.",
-    icon: "🎨",
+    icon: "",
     status: "coming_soon",
     slug: "chromo",
     category: "reflex",

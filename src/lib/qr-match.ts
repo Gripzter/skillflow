@@ -4,12 +4,12 @@ export const QR_ANON_TOKEN_KEY = "skillflow_qr_anon_token";
 export const QR_ANON_GUEST_KEY = "skillflow_qr_anon_guest_id";
 
 export const QR_GAMES = [
-  { slug: "chess", name: "Chess", icon: "♟️" },
-  { slug: "connect-4", name: "Connect 4", icon: "🔴" },
-  { slug: "checkers", name: "Checkers", icon: "⬛" },
-  { slug: "reaction-duel", name: "Reaction Duel", icon: "⚡" },
-  { slug: "memory-match", name: "Memory Match", icon: "🧠" },
-  { slug: "spelling-bee", name: "Spelling Bee", icon: "🐝" },
+  { slug: "chess", name: "Chess", icon: "" },
+  { slug: "connect-4", name: "Connect 4", icon: "" },
+  { slug: "checkers", name: "Checkers", icon: "" },
+  { slug: "reaction-duel", name: "Reaction Duel", icon: "" },
+  { slug: "memory-match", name: "Memory Match", icon: "" },
+  { slug: "spelling-bee", name: "Spelling Bee", icon: "" },
 ] as const;
 
 export const QR_STAKE_PRESETS = [10, 25, 50, 100] as const;

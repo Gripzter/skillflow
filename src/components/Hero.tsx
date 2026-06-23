@@ -49,7 +49,7 @@ export default function Hero() {
         </form>
 
         <p className="mt-6 text-sm text-body-gray">
-          🎮 Launching soon — be the first to play
+           Launching soon — be the first to play
         </p>
       </div>
     </section>

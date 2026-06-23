@@ -316,16 +316,16 @@ export default function CS2LobbyPage() {
             <h3 className="font-semibold text-white">Platform Requirements</h3>
             <ul className="mt-3 space-y-2 text-sm text-body-gray">
               <li className="flex items-center gap-2">
-                <span className="text-teal">✅</span> You need CS2 installed on Steam
+                <span className="text-teal"></span> You need CS2 installed on Steam
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-teal">✅</span> Both players must have Prime status
+                <span className="text-teal"></span> Both players must have Prime status
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-teal">✅</span> Match will be played on a private server
+                <span className="text-teal"></span> Match will be played on a private server
               </li>
               <li className="flex items-center gap-2">
-                <span className="text-teal">✅</span> Screenshots or demo file required as proof
+                <span className="text-teal"></span> Screenshots or demo file required as proof
               </li>
             </ul>
           </div>

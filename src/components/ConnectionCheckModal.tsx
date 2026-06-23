@@ -5,8 +5,8 @@ import type { ConnectionMetrics, ConnectionRating } from "@/lib/connection-teste
 import type { ConnectionWarningAck } from "@/lib/connection-logger";
 
 const RATING_LABELS: Record<ConnectionRating, string> = {
-  good: "✓ Connection OK",
-  medium: "✓ Connection OK",
+  good: " Connection OK",
+  medium: " Connection OK",
   warning: "Connection Warning",
   unrecommended: "Connection Not Recommended",
 };

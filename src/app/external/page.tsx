@@ -114,7 +114,7 @@ export default function ExternalGamesHubPage() {
       />
       <main className="relative mx-auto max-w-[1200px] px-4 py-8 sm:px-6 lg:px-8">
         <div className="border-b border-yellow-500/20 pb-6">
-          <h1 className="text-3xl font-bold text-white sm:text-4xl">Arena 🎮</h1>
+          <h1 className="text-3xl font-bold text-white sm:text-4xl">Arena </h1>
           <p className="mt-2 text-lg text-body-gray">
             Wager on your skill in real games. Play on your platform, win on ours.
           </p>

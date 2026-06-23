@@ -40,7 +40,7 @@ export default function CookieSettingsModal({ isOpen, onClose }: CookieSettingsM
           aria-label="Close cookie settings"
           className="absolute right-3 top-3 rounded-md p-1 text-gray-300 transition hover:bg-white/10 hover:text-white"
         >
-          ✕
+          
         </button>
 
         <h2 className="text-xl font-semibold">Cookie Settings</h2>

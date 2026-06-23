@@ -3,6 +3,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createNotificationAdmin } from "@/lib/notifications";
 
 const BONUS_AMOUNT = 50;
 const MIN_DEPOSIT_FOR_BONUS = 5;
@@ -126,6 +127,12 @@ export async function completeReferral(
       balance_after: referrerBalance,
       description: "Referral bonus — your friend joined SkillFlow!",
       status: "completed",
+    });
+
+    await createNotificationAdmin({
+      userId: referral.referrer_id,
+      type: "referral_payout",
+      message: `You earned ${BONUS_AMOUNT} SK from a referral.`,
     });
   }
 

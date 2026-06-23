@@ -73,6 +73,59 @@ serve(async (req) => {
     }
 
     console.log("[MATCH_FINISH_OK]", { caller: user.id, matchId, result: data });
+
+    const result = data as {
+      status?: string;
+      winner_id?: string | null;
+      caller_won?: boolean;
+      payout?: number;
+    };
+
+    if (result.status === "settled") {
+      const { data: match } = await admin
+        .from("matches")
+        .select(
+          "qr_match_id, player1_id, player2_id, player_a, player_b, player1_username, player2_username, stake_sp, stake_amount, winner_payout, platform_fee"
+        )
+        .eq("id", matchId)
+        .maybeSingle();
+
+      if (match?.qr_match_id) {
+        const player1Id = (match.player1_id ?? match.player_a) as string | null;
+        const player2Id = (match.player2_id ?? match.player_b) as string | null;
+        const stake = Number(match.stake_sp ?? match.stake_amount ?? 0);
+        const winnerPayout = Number(
+          match.winner_payout ?? Math.max(0, stake * 2 - Number(match.platform_fee ?? 0))
+        );
+
+        const notifyPlayer = async (
+          playerId: string | null,
+          opponentName: string | null,
+          won: boolean
+        ) => {
+          if (!playerId) return;
+          const amount = won ? winnerPayout : stake;
+          const verb = won ? "won" : "lost";
+          await admin.from("notifications").insert({
+            user_id: playerId,
+            type: `qr_match_result:${matchId}`,
+            message: `You ${verb} ${amount} SK against ${opponentName ?? "your opponent"}.`,
+          });
+        };
+
+        await notifyPlayer(
+          player1Id,
+          match.player2_username as string | null,
+          result.winner_id === player1Id
+        );
+        await notifyPlayer(
+          player2Id,
+          match.player1_username as string | null,
+          result.winner_id === player2Id
+        );
+      }
+    }
+
     return json(data, 200);
   } catch (err) {
     console.error("[MATCH_FINISH_THREW]", err);

@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import AppNavbar from "@/components/AppNavbar";
 import Footer from "@/components/Footer";
-import ModeToggleBarContent from "@/components/ModeToggleBar";
 import SkilliesIcon from "@/components/SkilliesIcon";
-import { getCurrentUser, getMatches, getMyProfile, getTransactions, getPracticeStats, getWalletBalance, logout as apiLogout } from "@/lib/api";
+import { getCurrentUser, getMatches, getMyProfile, getTransactions, getWalletBalance, logout as apiLogout } from "@/lib/api";
 import AvatarWithBorder from "@/components/AvatarWithBorder";
 import FilterPill from "@/components/FilterPill";
-import { usePlayMode } from "@/contexts/PlayModeContext";
 import type { StoredMatch } from "@/lib/api";
 import type { StoredTransaction } from "@/lib/wallet";
 import LoadingRing from "@/components/LoadingRing";
@@ -25,18 +23,6 @@ const GAME_TABS = [
   { id: "chess", label: "Chess" },
 ] as const;
 
-const ACHIEVEMENTS = [
-  { id: "first_blood", title: "First Blood", desc: "Win your first match", icon: "🩸", check: (ctx: ProfileStats) => ctx.totalWins >= 1 },
-  { id: "on_fire", title: "On Fire", desc: "Win 3 matches in a row", icon: "🔥", check: (ctx: ProfileStats) => ctx.bestStreak >= 3 },
-  { id: "high_roller", title: "High Roller", desc: "Play a $50+ stake match", icon: "💰", check: (ctx: ProfileStats) => ctx.maxStake >= 50 },
-  { id: "sharpshooter", title: "Sharpshooter", desc: "Win 10 matches total", icon: "🎯", check: (ctx: ProfileStats) => ctx.totalWins >= 10 },
-  { id: "champion", title: "Champion", desc: "Reach 1600 rating", icon: "🏆", check: (ctx: ProfileStats) => ctx.rating >= 1600 },
-  { id: "speed_demon", title: "Speed Demon", desc: "Win a match in under 2 minutes", icon: "⚡", check: () => false },
-  { id: "pool_shark", title: "Pool Shark", desc: "Win 10 8-ball pool matches", icon: "🎱", check: (ctx: ProfileStats) => ctx.poolWins >= 10 },
-  { id: "grandmaster", title: "Grandmaster", desc: "Win 10 chess matches", icon: "♟️", check: (ctx: ProfileStats) => ctx.chessWins >= 10 },
-  { id: "rating_climber", title: "Rating Climber", desc: "Reach 2000 rating", icon: "📈", check: (ctx: ProfileStats) => ctx.rating >= 2000 },
-] as const;
-
 interface ProfileStats {
   matches: StoredMatch[];
   completed: StoredMatch[];
@@ -47,9 +33,6 @@ interface ProfileStats {
   currentStreak: number;
   bestStreak: number;
   rating: number;
-  maxStake: number;
-  poolWins: number;
-  chessWins: number;
   transactions: StoredTransaction[];
 }
 
@@ -80,9 +63,6 @@ function computeProfileStats(
     }
   }
   const rating = Math.max(100, Math.min(2500, 1000 + (totalWins - totalLosses) * 25));
-  const maxStake = completed.length ? Math.max(...completed.map((m) => m.stakeAmount)) : 0;
-  const poolWins = completed.filter((m) => m.gameType === "8-ball-pool" && won(m)).length;
-  const chessWins = completed.filter((m) => m.gameType === "chess" && won(m)).length;
   return {
     matches,
     completed,
@@ -93,9 +73,6 @@ function computeProfileStats(
     currentStreak: sorted.length && won(sorted[0]) ? currentStreak : 0,
     bestStreak,
     rating,
-    maxStake,
-    poolWins,
-    chessWins,
     transactions,
   };
 }
@@ -121,7 +98,6 @@ function fakeDuration(): string {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isPractice } = usePlayMode();
   const [username, setUsername] = useState<string>("Player");
   const [memberSince, setMemberSince] = useState<string>("February 2026");
   const [loading, setLoading] = useState(true);
@@ -129,7 +105,6 @@ export default function ProfilePage() {
   const [isDevMode, setIsDevMode] = useState(false);
   const [matches, setMatches] = useState<StoredMatch[]>([]);
   const [transactions, setTransactions] = useState<StoredTransaction[]>([]);
-  const [practiceStats, setPracticeStats] = useState({ practiceMatchesPlayed: 0, practiceWins: 0, practiceWinRate: 0 });
   const [gameTab, setGameTab] = useState<string>("all");
   const [showAllMatches, setShowAllMatches] = useState(false);
   const [skilliesBalance, setSkilliesBalance] = useState(0);
@@ -156,7 +131,6 @@ export default function ProfilePage() {
         ]);
         setMatches(matchList);
         setTransactions(txs);
-        setPracticeStats(getPracticeStats(user.username));
         setSkilliesBalance(Number(walletBalance ?? 0));
         if (rawProfile && "avatar_url" in rawProfile) {
           setAvatarUrl((rawProfile.avatar_url as string | null) ?? null);
@@ -285,16 +259,13 @@ export default function ProfilePage() {
         loggingOut={loggingOut}
         currentPage="profile"
       />
-      <ModeToggleBarContent />
-
       <main className="mx-auto max-w-[1200px] px-4 pt-6 pb-24 sm:px-6 lg:px-8 md:pt-8 md:pb-12">
         {/* Section 1: Profile header */}
         <section
           className="animate-fade-in overflow-hidden rounded-card border border-white/10 bg-gradient-to-br from-[#0E0E12] via-[#1A1A22] to-[#0E0E12]"
           style={{
-            backgroundImage: isPractice
-              ? "linear-gradient(135deg, rgba(168,85,247,0.07) 0%, transparent 50%, rgba(192,132,252,0.06) 100%)"
-              : "linear-gradient(135deg, rgba(255, 255, 0, 0.06) 0%, transparent 50%, rgba(255,122,46,0.05) 100%)",
+            backgroundImage:
+              "linear-gradient(135deg, rgba(255, 255, 0, 0.06) 0%, transparent 50%, rgba(255,122,46,0.05) 100%)",
           }}
         >
           <div className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
@@ -307,11 +278,7 @@ export default function ProfilePage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-white sm:text-3xl">{username}</h1>
-                  <span
-                    className={`rounded px-2 py-0.5 text-xs font-medium ${
-                      isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
-                    }`}
-                  >
+                  <span className="rounded px-2 py-0.5 text-xs font-medium bg-brand-yellow/20 text-brand-yellow">
                     Level 1
                   </span>
                 </div>
@@ -382,29 +349,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Practice Stats */}
-        <section className="mt-8 animate-fade-in rounded-card border border-purple-500/20 bg-purple-500/5 p-6">
-          <h2 className="text-lg font-bold text-purple-300">Practice Stats</h2>
-          <p className="mt-1 text-xs text-body-gray">Free play — no money involved</p>
-          <div className="mt-4 grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-xs text-body-gray">Practice Matches</p>
-              <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceMatchesPlayed}</p>
-            </div>
-            <div>
-              <p className="text-xs text-body-gray">Practice Wins</p>
-              <p className="mt-1 text-xl font-bold text-white">{practiceStats.practiceWins}</p>
-            </div>
-            <div>
-              <p className="text-xs text-body-gray">Practice Win Rate</p>
-              <p className="mt-1 text-xl font-bold text-purple-400">
-                {practiceStats.practiceWinRate.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 3: Game stats */}
+        {/* Section 2: Game stats */}
         <section className="mt-10 animate-fade-in">
           <h2 className="text-xl font-bold text-white">Competitive Game Stats</h2>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -442,11 +387,7 @@ export default function ProfilePage() {
               <p className="text-body-gray">No matches yet. Start playing to build your history!</p>
               <Link
                 href="/play"
-                className={`mt-4 inline-block rounded-lg px-4 py-2 font-medium text-charcoal ${
-                  isPractice
-                    ? "bg-purple-500 hover:shadow-[0_0_18px_rgba(139,92,246,0.45)]"
-                    : "bg-brand-yellow hover:shadow-teal-glow"
-                }`}
+                className="mt-4 inline-block rounded-lg bg-brand-yellow px-4 py-2 font-medium text-charcoal hover:shadow-teal-glow"
               >
                 Find a match
               </Link>
@@ -481,11 +422,7 @@ export default function ProfilePage() {
                           </td>
                           <td className="py-3 pr-4">
                             {matchWon(m) ? (
-                              <span
-                                className={`rounded px-2 py-0.5 text-xs font-medium ${
-                                  isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
-                                }`}
-                              >
+                              <span className="rounded px-2 py-0.5 text-xs font-medium bg-brand-yellow/20 text-brand-yellow">
                                 Won
                               </span>
                             ) : (
@@ -514,11 +451,7 @@ export default function ProfilePage() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-white">{m.gameDisplayName}</span>
                         {matchWon(m) ? (
-                          <span
-                            className={`rounded px-2 py-0.5 text-xs font-medium ${
-                              isPractice ? "bg-purple-500/20 text-purple-300" : "bg-brand-yellow/20 text-brand-yellow"
-                            }`}
-                          >
+                          <span className="rounded px-2 py-0.5 text-xs font-medium bg-brand-yellow/20 text-brand-yellow">
                             Won
                           </span>
                         ) : (
@@ -550,55 +483,7 @@ export default function ProfilePage() {
           )}
         </section>
 
-        {/* Section 5: Achievements */}
-        <section className="mt-10 animate-fade-in">
-          <h2 className="text-xl font-bold text-white">Achievements</h2>
-          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-            {ACHIEVEMENTS.map((a) => {
-              const unlocked = a.check(stats);
-              return (
-                <div
-                  key={a.id}
-                  className={`rounded-card border p-4 transition-all ${
-                    unlocked
-                      ? "border-brand-yellow bg-card"
-                      : "border-white/10 bg-card/80 opacity-60"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className={`text-2xl ${unlocked ? "" : "grayscale"}`} aria-hidden>
-                      {a.icon}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate font-medium text-white">{a.title}</p>
-                        {unlocked && (
-                          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-yellow px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-black">
-                            <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Unlocked
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-body-gray">{a.desc}</p>
-                      {!unlocked && (
-                        <p className="mt-2 flex items-center gap-1 text-xs text-body-gray">
-                          <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                          </svg>
-                          Locked
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Section 6: Rating history */}
+        {/* Section 5: Rating history */}
         <section className="mt-10 animate-fade-in">
           <h2 className="text-xl font-bold text-white">Rating History</h2>
           <div className="card-border mt-4 overflow-hidden rounded-card bg-card p-4">

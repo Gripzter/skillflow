@@ -746,6 +746,33 @@ export default function LastTouch({
     };
   }, [joined, liveSession]);
 
+  // 15-minute in-app notification for joined players (server-persisted).
+  useEffect(() => {
+    if (!joined || !liveSession || liveSession.status !== "upcoming") return;
+
+    const scheduleReminder = async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      await fetch("/api/notifications/event-reminder", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sessionId: liveSession.id }),
+      });
+    };
+
+    void scheduleReminder();
+    const interval = setInterval(() => void scheduleReminder(), 60_000);
+    return () => clearInterval(interval);
+  }, [joined, liveSession]);
+
   // ─── Rendering ────────────────────────────────────────────────────────────
 
   // No session
@@ -794,7 +821,7 @@ export default function LastTouch({
         <p className="text-xl text-teal">Won ${netPool.toFixed(2)}!</p>
         <p className="text-body-gray">Hold time: {formatHoldTime(holdTime)}</p>
         {isRealWinner && (
-          <p className="text-lg text-teal">🎉 Congratulations! Funds added to your wallet.</p>
+          <p className="text-lg text-teal"> Congratulations! Funds added to your wallet.</p>
         )}
         {simState.realPlayerEliminated && (
           <p className="text-body-gray">
@@ -978,7 +1005,7 @@ export default function LastTouch({
                   key={f.id}
                   className={`text-xs ${f.type === "late_join" ? "text-emerald-400" : "text-red-400/90"}`}
                 >
-                  {f.type === "late_join" && "💰"} {f.type === "eliminate" && "❌"} {f.message}
+                  {f.type === "late_join" && ""} {f.type === "eliminate" && ""} {f.message}
                 </div>
               ))}
           </div>
@@ -1029,7 +1056,7 @@ export default function LastTouch({
             ) : (
               lobbyFeed.map((item) => (
                 <p key={item.id} className="text-xs text-white/90">
-                  🎮 {item.message}
+                   {item.message}
                 </p>
               ))
             )}

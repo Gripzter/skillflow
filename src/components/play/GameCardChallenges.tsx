@@ -36,7 +36,7 @@ export default function GameCardChallenges({ challenges, visible }: Props) {
                   ${done ? "bg-[#FFFF00] text-black" : "border border-white/30 bg-transparent"}
                 `}
               >
-                {done && <span className="text-[8px] leading-none font-black">✓</span>}
+                {done && <span className="text-[8px] leading-none font-black"></span>}
               </span>
               <span className={`flex-1 whitespace-normal break-words leading-snug ${done ? "text-white/50 line-through" : "text-white/90"}`}>
                 {challenge.description}

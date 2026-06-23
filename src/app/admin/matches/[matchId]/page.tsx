@@ -129,7 +129,7 @@ export default function AdminMatchDetailPage({
           <AdminStatusBadge status={m?.status ?? "unknown"} />
           {m?.suspicious ? (
             <span className="rounded-full border border-orange-500/30 bg-orange-500/15 px-2.5 py-0.5 text-xs text-orange-400">
-              ⚠ suspicious{m.suspiciousReasons.length ? `: ${m.suspiciousReasons.join(", ")}` : ""}
+               suspicious{m.suspiciousReasons.length ? `: ${m.suspiciousReasons.join(", ")}` : ""}
             </span>
           ) : null}
         </div>

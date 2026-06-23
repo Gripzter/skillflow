@@ -399,7 +399,7 @@ export default function AdminPlayerDetailPage({
                   </td>
                   <td className="px-4 py-3">
                     {s.sharedIp ? (
-                      <span className="text-orange-400">⚠ yes</span>
+                      <span className="text-orange-400"> yes</span>
                     ) : (
                       <span className="text-[#7A7A8E]">no</span>
                     )}

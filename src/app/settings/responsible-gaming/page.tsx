@@ -252,7 +252,7 @@ export default function SettingsResponsibleGamingPage() {
           </svg>
           Back to Settings
         </Link>
-        <h1 className="mt-6 text-2xl font-bold text-white">🛡️ Responsible Gaming</h1>
+        <h1 className="mt-6 text-2xl font-bold text-white"> Responsible Gaming</h1>
         <p className="mt-1 text-body-gray">Set personal limits to stay in control of your gaming.</p>
 
         <p className="mt-4 text-sm text-amber-200/90">
@@ -386,7 +386,7 @@ export default function SettingsResponsibleGamingPage() {
           <p className="mt-1 text-sm text-body-gray">A temporary break from real money play. Practice mode stays available.</p>
           {inCoolOff && coolOffUntil && (
             <p className="mt-3 text-amber-300">
-              ⏸️ Cool-off active until {coolOffUntil.toLocaleString()}. Cannot be reversed early.
+              ⏸ Cool-off active until {coolOffUntil.toLocaleString()}. Cannot be reversed early.
             </p>
           )}
           {!inCoolOff && (
@@ -422,7 +422,7 @@ export default function SettingsResponsibleGamingPage() {
             ))}
           </div>
           <p className="mt-4 text-sm text-body-gray">
-            📞 National Problem Gambling Helpline: <a href={`tel:${HELPLINE.replace(/-/g, "")}`} className="text-teal hover:underline">{HELPLINE}</a>
+             National Problem Gambling Helpline: <a href={`tel:${HELPLINE.replace(/-/g, "")}`} className="text-teal hover:underline">{HELPLINE}</a>
             {" "}• <a href={HELPLINE_CHAT} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">Chat</a>
           </p>
         </section>
@@ -474,7 +474,7 @@ export default function SettingsResponsibleGamingPage() {
               Are you sure you want to take a {coolOffModal === 24 ? "24-hour" : coolOffModal === 48 ? "48-hour" : coolOffModal === 7 * 24 ? "7-day" : "30-day"} break?
               During this time you will NOT be able to: play matches for real money; make deposits. You CAN still use Practice Mode. This CANNOT be reversed early.
             </p>
-            <p className="mt-3 text-sm text-amber-300">📞 Need help? {HELPLINE}</p>
+            <p className="mt-3 text-sm text-amber-300"> Need help? {HELPLINE}</p>
             <div className="mt-6 flex gap-3">
               <button
                 type="button"
@@ -499,7 +499,7 @@ export default function SettingsResponsibleGamingPage() {
       {selfExcludeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-red-500/30 bg-card p-6">
-            <h3 className="text-lg font-bold text-red-300">⚠️ Self-Exclusion</h3>
+            <h3 className="text-lg font-bold text-red-300"> Self-Exclusion</h3>
             <p className="mt-2 text-sm text-white">
               Self-exclusion is a serious step. During this period:
             </p>
@@ -516,8 +516,8 @@ export default function SettingsResponsibleGamingPage() {
             <p className="mt-4 text-sm font-medium text-white">
               If you are struggling with gaming addiction, please contact:
             </p>
-            <p className="mt-2 text-lg font-bold text-teal">📞 {HELPLINE}</p>
-            <p className="text-sm text-body-gray">💬 Chat: ncpgambling.org/chat • 📱 Text: {HELPLINE}</p>
+            <p className="mt-2 text-lg font-bold text-teal"> {HELPLINE}</p>
+            <p className="text-sm text-body-gray"> Chat: ncpgambling.org/chat •  Text: {HELPLINE}</p>
             <div className="mt-6 flex gap-3">
               <button
                 type="button"

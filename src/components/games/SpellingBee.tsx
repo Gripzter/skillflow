@@ -685,7 +685,7 @@ export default function SpellingBee({
           {player1.username}: {p1Score.toFixed(1)} | {player2.username}: {p2Score.toFixed(1)}
         </p>
         <p className="mt-4 text-xl font-bold text-amber-400">
-          {winner === "player1" ? player1.username : player2.username} Wins! 🏆🐝
+          {winner === "player1" ? player1.username : player2.username} Wins! 
         </p>
         {finalStats && (
           <div className="mt-6 w-full max-w-md space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-left text-sm text-white">
@@ -754,14 +754,14 @@ export default function SpellingBee({
                           onClick={handleHearWord}
                           className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 font-semibold text-charcoal hover:bg-amber-400"
                         >
-                          <span className={audioPlaying ? "animate-pulse" : ""}>🔊</span>
+                          <span className={audioPlaying ? "animate-pulse" : ""}></span>
                           Hear word
                         </button>
                       )}
                     </div>
                   ) : audioPlaying ? (
                     <div className="flex flex-col items-center gap-2">
-                      <p className="text-amber-400 font-medium">🔊 Playing...</p>
+                      <p className="text-amber-400 font-medium"> Playing...</p>
                       <div className="flex h-10 items-end justify-center gap-1">
                         {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
                           <span
@@ -801,7 +801,7 @@ export default function SpellingBee({
                     disabled={repeatCount >= 3 || audioPlaying}
                     className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                   >
-                    🔊 Repeat word {repeatCount < 3 ? `(${3 - repeatCount} left)` : ""}
+                     Repeat word {repeatCount < 3 ? `(${3 - repeatCount} left)` : ""}
                   </button>
                   <button
                     type="button"
@@ -809,7 +809,7 @@ export default function SpellingBee({
                     disabled={audioPlaying}
                     className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                   >
-                    📖 Definition
+                     Definition
                   </button>
                   <button
                     type="button"
@@ -817,7 +817,7 @@ export default function SpellingBee({
                     disabled={audioPlaying}
                     className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                   >
-                    📝 Use in sentence
+                     Use in sentence
                   </button>
                 </div>
               )}
@@ -836,10 +836,10 @@ export default function SpellingBee({
                     <div>
                       <p className="font-medium text-white">{player1.username}</p>
                       {isAnswerCorrect(effectiveWord.word, p1Answer ?? "") ? (
-                        <p className="text-emerald-500">✅ {p1Answer || "(empty)"}</p>
+                        <p className="text-emerald-500"> {p1Answer || "(empty)"}</p>
                       ) : (
                         <div className="mt-1">
-                          <p className="text-red-400">❌ {p1Answer || "(empty)"}</p>
+                          <p className="text-red-400"> {p1Answer || "(empty)"}</p>
                           <div className="mt-1 flex flex-wrap gap-0.5 font-mono text-xs">
                             {compareSpelling(effectiveWord.word, p1Answer ?? "").map((item, i) => (
                               <span
@@ -862,10 +862,10 @@ export default function SpellingBee({
                     <div>
                       <p className="font-medium text-white">{player2.username}</p>
                       {isAnswerCorrect(effectiveWord.word, p2Answer ?? "") ? (
-                        <p className="text-emerald-500">✅ {p2Answer || "(empty)"}</p>
+                        <p className="text-emerald-500"> {p2Answer || "(empty)"}</p>
                       ) : (
                         <div className="mt-1">
-                          <p className="text-red-400">❌ {p2Answer || "(empty)"}</p>
+                          <p className="text-red-400"> {p2Answer || "(empty)"}</p>
                           <div className="mt-1 flex flex-wrap gap-0.5 font-mono text-xs">
                             {compareSpelling(effectiveWord.word, p2Answer ?? "").map((item, i) => (
                               <span
@@ -929,7 +929,7 @@ export default function SpellingBee({
                     disabled={submitted || !isRoundActive}
                     className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-charcoal hover:bg-amber-400 disabled:opacity-50"
                   >
-                    {submitted ? "Answer submitted ✓" : "Submit Answer"}
+                    {submitted ? "Answer submitted " : "Submit Answer"}
                   </button>
                 </>
               )}
@@ -955,7 +955,7 @@ export default function SpellingBee({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden py-1">
           <div className="flex items-center justify-between gap-2 px-1">
             <span className="font-semibold text-white">
-              Spelling Bee 🐝 · Round {displayRound}{isTiebreaker ? " (Tiebreaker)" : `/${TOTAL_ROUNDS}`}
+              Spelling Bee  · Round {displayRound}{isTiebreaker ? " (Tiebreaker)" : `/${TOTAL_ROUNDS}`}
             </span>
             {effectiveWord && (
               <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${DIFFICULTY_COLORS[effectiveWord.difficulty]}`}>
@@ -1015,14 +1015,14 @@ export default function SpellingBee({
                               onClick={handleHearWord}
                               className="flex items-center gap-2 rounded-lg bg-amber-500 px-5 py-2.5 font-semibold text-charcoal hover:bg-amber-400"
                             >
-                              <span className={audioPlaying ? "animate-pulse" : ""}>🔊</span>
+                              <span className={audioPlaying ? "animate-pulse" : ""}></span>
                               Hear word
                             </button>
                           )}
                         </div>
                       ) : audioPlaying ? (
                         <div className="flex flex-col items-center gap-2">
-                          <p className="text-amber-400 font-medium">🔊 Playing...</p>
+                          <p className="text-amber-400 font-medium"> Playing...</p>
                           <div className="flex h-10 items-end justify-center gap-1">
                             {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
                               <span
@@ -1062,7 +1062,7 @@ export default function SpellingBee({
                         disabled={repeatCount >= 3 || audioPlaying}
                         className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                       >
-                        🔊 Repeat word {repeatCount < 3 ? `(${3 - repeatCount} left)` : ""}
+                         Repeat word {repeatCount < 3 ? `(${3 - repeatCount} left)` : ""}
                       </button>
                       <button
                         type="button"
@@ -1070,7 +1070,7 @@ export default function SpellingBee({
                         disabled={audioPlaying}
                         className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                       >
-                        📖 Definition
+                         Definition
                       </button>
                       <button
                         type="button"
@@ -1078,7 +1078,7 @@ export default function SpellingBee({
                         disabled={audioPlaying}
                         className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
                       >
-                        📝 Use in sentence
+                         Use in sentence
                       </button>
                     </div>
                   )}
@@ -1121,7 +1121,7 @@ export default function SpellingBee({
                         disabled={submitted || !isRoundActive}
                         className="mt-3 w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-charcoal hover:bg-amber-400 disabled:opacity-50"
                       >
-                        {submitted ? "Answer submitted ✓" : "Submit Answer"}
+                        {submitted ? "Answer submitted " : "Submit Answer"}
                       </button>
                     </>
                   )}

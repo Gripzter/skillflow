@@ -414,7 +414,7 @@ export default function MemoryMatch({
     const systemLogEntries: MatchUiState["systemLogEntries"] = [
       {
         id: "game-start",
-        text: `🧠 Memory Match — ${player1.username} vs ${player2.username}${isPlayer2Bot ? " 🤖" : ""}`,
+        text: ` Memory Match — ${player1.username} vs ${player2.username}${isPlayer2Bot ? " " : ""}`,
         timestamp: gameStartRef.current,
       },
       ...[...moves]
@@ -549,7 +549,7 @@ export default function MemoryMatch({
                         </span>
                         {isMatched && (
                           <span className="absolute right-1 top-1 text-[14px] text-teal">
-                            ✓
+                            
                           </span>
                         )}
                       </div>

@@ -614,18 +614,18 @@ export default function Trivia({
     else if (phase === "countdown") turnText = "Get ready!";
     else if (phase === "question") turnText = `Question ${qIndex + 1} of ${TOTAL_QUESTIONS}`;
     else if (phase === "answer_reveal") turnText = "Results";
-    else if (phase === "sudden_death" || phase === "sudden_death_intro") turnText = "⚡ Sudden Death!";
+    else if (phase === "sudden_death" || phase === "sudden_death_intro") turnText = " Sudden Death!";
     else if (phase === "match_over") turnText = "Match over";
 
     const logEntries: MatchUiState["systemLogEntries"] = [
       {
         id: "start",
-        text: `🧠 Trivia — ${player1.username} vs ${player2.username}`,
+        text: ` Trivia — ${player1.username} vs ${player2.username}`,
         timestamp: gameStartRef.current,
       },
       ...myAnswers.map((a, i) => ({
         id: `q-${i}`,
-        text: `Q${i + 1}: ${a.correct ? `✓ +${a.points}pts` : "✗ 0pts"}`,
+        text: `Q${i + 1}: ${a.correct ? ` +${a.points}pts` : " 0pts"}`,
         timestamp: gameStartRef.current + (i + 1) * 1000,
       })),
     ];
@@ -650,7 +650,7 @@ export default function Trivia({
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
         {isMultiplayer && myRole === "player2" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-            <div className="text-4xl">🧠</div>
+            <div className="text-4xl"></div>
             <p className="text-lg font-semibold text-white">Waiting for opponent to choose a category...</p>
             <div className="mt-2 flex gap-1">
               {[0, 1, 2].map((i) => (
@@ -751,7 +751,7 @@ export default function Trivia({
   if (phase === "sudden_death_intro") {
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center p-6">
-        <div className="text-5xl">⚡</div>
+        <div className="text-5xl"></div>
         <p className="text-2xl font-black text-white">It&apos;s a Tie!</p>
         <p className="text-lg font-semibold" style={{ color: "#FACC15" }}>
           {p1Score} – {p2Score}
@@ -776,7 +776,7 @@ export default function Trivia({
     const iWon = sdWinner === (myRole === "player1" ? "player1" : myRole === "player2" ? "player2" : null);
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-center p-6">
-        <div className="text-5xl">{sdWinner ? (iWon ? "🏆" : "💀") : "🤝"}</div>
+        <div className="text-5xl">{sdWinner ? (iWon ? "" : "") : ""}</div>
         <p className="text-2xl font-black" style={{ color: sdWinner ? (iWon ? "#00BCD4" : "#EF4444") : "#FACC15" }}>
           {sdWinner
             ? iWon
@@ -798,7 +798,7 @@ export default function Trivia({
       <div className="flex h-full min-h-0 w-full flex-col gap-3 overflow-hidden p-4">
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-yellow-500/20 px-3 py-1 text-xs font-bold text-yellow-400">
-            ⚡ SUDDEN DEATH
+             SUDDEN DEATH
           </span>
           <TimerRing timeMs={Math.max(0, timerMs)} totalMs={QUESTION_TIME_MS} />
         </div>
@@ -905,11 +905,11 @@ export default function Trivia({
         {isReveal && (
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className={`rounded-full px-2 py-0.5 font-medium ${myIsCorrect ? "bg-emerald-500/20 text-emerald-300" : myTimedOut ? "bg-white/10 text-body-gray" : "bg-red-500/20 text-red-300"}`}>
-              You: {myTimedOut ? "⏱ timed out" : myIsCorrect ? `✓ +${myPointsEarned}pts` : "✗ wrong"}
+              You: {myTimedOut ? "⏱ timed out" : myIsCorrect ? ` +${myPointsEarned}pts` : " wrong"}
             </span>
             {(isPlayer2Bot || isMultiplayer) && (
               <span className={`rounded-full px-2 py-0.5 font-medium ${opIsCorrect ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}`}>
-                {player2.username}: {opIsCorrect ? `✓ +${opponentAnswer?.points ?? 0}pts` : "✗ wrong"}
+                {player2.username}: {opIsCorrect ? ` +${opponentAnswer?.points ?? 0}pts` : " wrong"}
               </span>
             )}
           </div>
@@ -941,7 +941,7 @@ export default function Trivia({
               </span>
               <span className="leading-snug">{ans}</span>
               {revealed && correct && (
-                <span className="ml-auto text-emerald-400">✓</span>
+                <span className="ml-auto text-emerald-400"></span>
               )}
             </button>
           );

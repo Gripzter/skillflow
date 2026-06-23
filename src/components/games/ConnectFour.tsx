@@ -347,7 +347,7 @@ export default function ConnectFour({
     const startTs = gameStartTimeRef.current;
     let turnText = "Waiting for opponent...";
     if (winResult) {
-      turnText = `🏆 ${winResult.player === 1 ? player1.username : player2.username} wins!`;
+      turnText = ` ${winResult.player === 1 ? player1.username : player2.username} wins!`;
     } else if (isDraw) {
       turnText = "Draw!";
     } else if (isMyTurn) {
@@ -358,7 +358,7 @@ export default function ConnectFour({
     const systemLogEntries: MatchUiState["systemLogEntries"] = [
       {
         id: "game-start",
-        text: `🔴🟡 Game started • ${player1.username} vs ${player2.username}${isPlayer2Bot ? " 🤖" : ""}`,
+        text: ` Game started • ${player1.username} vs ${player2.username}${isPlayer2Bot ? " " : ""}`,
         timestamp: startTs,
       },
       ...moveHistory.map((e, i) => ({

@@ -256,7 +256,7 @@ export default function AdminMatchesPage() {
                       className="accent-[#FFFF00]"
                     />
                   </th>
-                  <th className="px-3 py-3">⚠</th>
+                  <th className="px-3 py-3"></th>
                   <th className="px-3 py-3">match id</th>
                   <th className="px-3 py-3">game</th>
                   <th className="px-3 py-3">player 1</th>
@@ -290,7 +290,7 @@ export default function AdminMatchesPage() {
                     <td className="px-3 py-3 text-center">
                       {m.suspicious ? (
                         <span className="text-orange-400" title={m.suspiciousReasons.join(", ")}>
-                          ⚠
+                          
                         </span>
                       ) : null}
                     </td>

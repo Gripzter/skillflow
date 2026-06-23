@@ -309,7 +309,7 @@ export default function Blockade({
       systemLogEntries: [
         {
           id: "start",
-          text: `🧱 ${player1.username} vs ${player2.username}${isPlayer2Bot ? " 🤖" : ""}`,
+          text: ` ${player1.username} vs ${player2.username}${isPlayer2Bot ? " " : ""}`,
           timestamp: gameStartRef.current,
         },
         ...gameLog,

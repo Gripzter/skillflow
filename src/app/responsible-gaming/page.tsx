@@ -70,7 +70,7 @@ export default function ResponsibleGamingPage() {
           </p>
           <p className="mt-4 text-2xl font-bold tracking-wide text-teal">
             <a href={`tel:${HELPLINE_TEL}`} className="hover:underline">
-              📞 {HELPLINE}
+               {HELPLINE}
             </a>
           </p>
           <p className="mt-2 text-lg font-medium text-white">
@@ -78,12 +78,12 @@ export default function ResponsibleGamingPage() {
           </p>
           <ul className="mt-4 space-y-2 text-body-gray">
             <li>
-              💬 Chat:{" "}
+               Chat:{" "}
               <a href={HELPLINE_CHAT} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
                 ncpgambling.org/chat
               </a>
             </li>
-            <li>📱 Text: {HELPLINE}</li>
+            <li> Text: {HELPLINE}</li>
             <li>
               National Council on Problem Gambling:{" "}
               <a href={NCPG} target="_blank" rel="noopener noreferrer" className="text-teal hover:underline">
